@@ -219,7 +219,7 @@
 	});
 
 	function navigateBack() {
-		goto(resolve(routes.settings));
+		goto(resolve(routes.settingsStorage));
 	}
 
 	async function handleSave() {
@@ -370,7 +370,7 @@
 					variant="ghost"
 					size="icon-lg"
 					class="shrink-0"
-					aria-label="Back to Settings"
+					aria-label="Back to Backups and storage"
 					onclick={navigateBack}
 				>
 					<ArrowLeft class="size-5" />

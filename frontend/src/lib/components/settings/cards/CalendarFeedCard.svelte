@@ -165,7 +165,6 @@
 				{#if webcal && onApple}
 					<Button
 						variant="outline"
-						class="h-10 rounded-full"
 						onclick={() => openInCalendarApp(webcal)}
 						data-testid="calendar-webcal"
 					>
@@ -184,7 +183,6 @@
 			<div class="flex flex-wrap gap-2">
 				<Button
 					variant="outline"
-					class="h-10 rounded-full"
 					onclick={() => (confirmRotate = true)}
 					disabled={busy}
 					data-testid="calendar-rotate"
@@ -193,7 +191,7 @@
 				</Button>
 				<Button
 					variant="outline"
-					class="h-10 rounded-full text-destructive"
+					class="text-destructive"
 					onclick={() => (confirmOff = true)}
 					disabled={busy}
 					data-testid="calendar-off"
@@ -204,7 +202,6 @@
 		{:else}
 			<Button
 				variant="outline"
-				class="h-10 rounded-full"
 				onclick={() => void createLink().catch(() => undefined)}
 				disabled={busy}
 				data-testid="calendar-create"

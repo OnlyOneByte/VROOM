@@ -162,14 +162,16 @@
 					<div class="min-w-0">
 						<p class="text-sm font-medium text-foreground">No photo storage set up yet</p>
 						<p class="mt-1 text-xs text-muted-foreground">
-							Connect a storage provider (Google Drive, S3, …) in Settings before uploading photos
-							or documents.
+							Connect a storage provider (Google Drive, S3, …) in Settings → Backups and storage
+							before uploading photos or documents.
 						</p>
 					</div>
 				</div>
 				<Dialog.Footer>
 					<Button variant="outline" onclick={handleClose}>Cancel</Button>
-					<Button href={resolve(routes.settings)} onclick={handleClose}>Go to Settings</Button>
+					<Button href={resolve(routes.settingsStorage)} onclick={handleClose}>
+						Set up storage
+					</Button>
 				</Dialog.Footer>
 			</div>
 		{:else}

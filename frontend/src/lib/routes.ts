@@ -10,6 +10,7 @@ export const routes = {
 	settings: '/settings',
 	settingsProviderNew: '/settings/providers/new',
 	settingsServer: '/settings/server',
+	settingsStorage: '/settings/storage',
 	profile: '/profile',
 	trips: '/trips',
 	privacyPolicy: '/privacypolicy',

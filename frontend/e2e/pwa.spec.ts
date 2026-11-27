@@ -171,6 +171,7 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/trips': { debt: [], ready: pageHeading('Trips') },
 	'/settings': { debt: [], ready: pageHeading('Settings') },
 	'/settings/server': { debt: [], ready: page => page.getByText('kim@example.com') },
+	'/settings/storage': { debt: [], ready: pageHeading('Backups and storage') },
 	'/profile': { debt: [], ready: pageHeading('Profile') },
 	'/no-such-page': { debt: [], ready: pageHeading('Wrong turn') }
 };

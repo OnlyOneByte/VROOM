@@ -133,14 +133,14 @@ describe('MediaCaptureDialog: storage provider check', () => {
 		expect(await screen.findByText('Drop files here or click to browse')).toBeInTheDocument();
 	});
 
-	test('without a storage provider it points the user to Settings instead', async () => {
+	test('without a storage provider it points the user to Backups and storage instead', async () => {
 		getProviders.mockResolvedValue([]);
 		const { onClose } = mount();
 
 		expect(await screen.findByText('No photo storage set up yet')).toBeInTheDocument();
 		expect(screen.queryByText('Drop files here or click to browse')).toBeNull();
-		const settings = screen.getByRole('link', { name: 'Go to Settings' });
-		expect(settings).toHaveAttribute('href', '/settings');
+		const settings = screen.getByRole('link', { name: 'Set up storage' });
+		expect(settings).toHaveAttribute('href', '/settings/storage');
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 		expect(onClose).toHaveBeenCalledOnce();
