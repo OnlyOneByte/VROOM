@@ -242,23 +242,21 @@ const TARGET_FIELD_LABELS: Record<string, [field: string, label: string]> = {
   vlm: ['baseUrl', 'VLM base URL'],
 };
 
-function assertOwnerMayReach(
+async function assertOwnerMayReach(
   ownerId: string,
   domain: string,
   config: Record<string, unknown> | null | undefined
-): void {
+): Promise<void> {
   const entry = TARGET_FIELD_LABELS[domain];
   const target = entry ? config?.[entry[0]] : undefined;
   if (entry && typeof target === 'string') {
-    assertSafeOutboundUrl(target, entry[1], privateEndpointPolicyFor(ownerId));
+    assertSafeOutboundUrl(target, entry[1], await privateEndpointPolicyFor(ownerId));
   }
 }
 
 routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
-
-  const db = appContext().db;
 
   if (body.domain === 'auth') {
     throw new ValidationError('Auth providers cannot be created through this endpoint');
@@ -286,11 +284,10 @@ routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount)
     body.config ? withoutServerState(descriptor, body.config) : null,
     body.nonce
   );
-  assertOwnerMayReach(user.id, body.domain, resolvedConfig);
+  await assertOwnerMayReach(user.id, body.domain, resolvedConfig);
 
-  // bun:sqlite transactions must be synchronous.
-  const created = db.transaction((tx) => {
-    const existingProviders = tx
+  const created = await appContext().asyncDb.transaction(async (tx) => {
+    const existingProviders = await tx
       .select({ id: userProviders.id, config: userProviders.config })
       .from(userProviders)
       .where(
@@ -299,8 +296,7 @@ routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount)
           eq(userProviders.domain, body.domain),
           eq(userProviders.providerType, body.providerType)
         )
-      )
-      .all();
+      );
 
     const newAccountEmail = (resolvedConfig as Record<string, unknown> | null)?.accountEmail as
       | string
@@ -318,7 +314,7 @@ routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount)
       }
     }
 
-    return tx
+    const [row] = await tx
       .insert(userProviders)
       .values({
         id: rowId,
@@ -330,8 +326,9 @@ routes.post('/', zValidator('json', createProviderSchema), authorize(ownAccount)
         config: resolvedConfig,
         status: 'active',
       })
-      .returning()
-      .get();
+      .returning();
+    if (!row) throw new Error('Provider insert returned no row');
+    return row;
   });
 
   if (body.domain === 'storage') {
@@ -391,7 +388,7 @@ routes.put(
         validateProviderConfig(descriptor, merged, unchanged);
         assertSecretsReentered(descriptor, stored, clientConfig, body.credentials);
       }
-      assertOwnerMayReach(existing.userId, existing.domain, merged);
+      await assertOwnerMayReach(existing.userId, existing.domain, merged);
       updates.config = merged;
     }
     if (body.credentials !== undefined) {
@@ -570,7 +567,7 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const { db, asyncDb } = appContext();
+    const { asyncDb } = appContext();
 
     await findOwnedProviderOrThrow(asyncDb, id, user.id);
     await repos().photoRefs.resetFailedForProvider(id);
@@ -583,8 +580,7 @@ routes.post(
     }
 
     let created = 0;
-    // bun:sqlite transactions must be synchronous.
-    db.transaction((tx) => {
+    await asyncDb.transaction(async (tx) => {
       for (const [category, setting] of Object.entries(providerCategories)) {
         if (!setting?.enabled || !isPhotoCategory(category)) continue;
         const entityTypes = CATEGORY_TO_ENTITY_TYPES[category];
@@ -597,23 +593,20 @@ routes.post(
               .where(and(eq(photoRefs.photoId, photos.id), eq(photoRefs.providerId, id)))
           );
 
-          const missingPhotos = tx
+          const missingPhotos = await tx
             .select({ id: photos.id })
             .from(photos)
             .where(
               and(eq(photos.entityType, entityType), eq(photos.userId, user.id), notExistsClause)
-            )
-            .all();
+            );
 
           for (const photo of missingPhotos) {
-            tx.insert(photoRefs)
-              .values({
-                photoId: photo.id,
-                providerId: id,
-                storageRef: '',
-                status: 'pending',
-              })
-              .run();
+            await tx.insert(photoRefs).values({
+              photoId: photo.id,
+              providerId: id,
+              storageRef: '',
+              status: 'pending',
+            });
             created++;
           }
         }

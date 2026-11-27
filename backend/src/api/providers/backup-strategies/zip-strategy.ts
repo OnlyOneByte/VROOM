@@ -11,14 +11,14 @@ import type { StorageProvider } from '../domains/storage/storage-provider';
 
 export async function uploadZipBackup(
   context: BackupStrategyContext,
-  createProvider: () => StorageProvider
+  createProvider: () => StorageProvider | Promise<StorageProvider>
 ): Promise<BackupCapabilityResult> {
   try {
     if (!context.zipBuffer) {
       return { success: false, message: 'ZIP generation failed or skipped' };
     }
 
-    const provider = createProvider();
+    const provider = await createProvider();
     const folderPath = resolveBackupFolderPath(context.providerRow, context.providerConfig);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `vroom-backup-${timestamp}.zip`;

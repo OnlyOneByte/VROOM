@@ -29,7 +29,7 @@ export function installFakePhotoStorage(ctx: TestApp): FakePhotoStorage {
   );
 
   const registry = getStorageProviderRegistry();
-  registry.createProviderInstance = () => provider;
+  registry.createProviderInstance = async () => provider;
   return {
     provider,
     restore: () => {

@@ -28,7 +28,8 @@ function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 }
 
-const SYNC_HANDLE_TYPE = /\b(AppDatabase|DrizzleTransaction)\b/;
+const SYNC_HANDLE_TYPE =
+  /\b(AppDatabase|DrizzleTransaction|syncDb)\b|appContext\(\)\.db\b|\bgetDb\(\)|drizzle-orm\/bun-sqlite/;
 
 function countAsyncTransactions(src: string): number {
   const code = stripComments(src);
@@ -68,6 +69,9 @@ countRatchet({
       countAsyncTransactions('tx: DrizzleTransaction;\nthis.syncDb.transaction(async () => 1);')
     ).toBe(1);
     expect(countAsyncTransactions('this.db.transaction(async (tx) => 1);')).toBe(0);
+    expect(countAsyncTransactions('appContext().db.transaction(async () => 1);')).toBe(1);
+    expect(countAsyncTransactions('getDb().transaction(async () => 1);')).toBe(1);
+    expect(countAsyncTransactions('appContext().asyncDb.transaction(async () => 1);')).toBe(0);
     expect(countAsyncTransactions(`// AppDatabase\nthis.db.transaction(async (tx) => 1);`)).toBe(0);
     expect(
       countAsyncTransactions(

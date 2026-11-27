@@ -122,17 +122,17 @@ export function modelProviderDescriptor<Cap extends ModelCapability, P>(
 }
 
 // Restored rows can bypass the create/PUT gate, so resolution must validate too.
-export function resolveModelSettings(
+export async function resolveModelSettings(
   row: UserProvider,
   domain: ModelDomainLabel
-): ModelProviderSettings {
+): Promise<ModelProviderSettings> {
   const config = (row.config ?? {}) as Record<string, unknown>;
   const model = config.model;
   if (typeof model !== 'string' || model.length === 0) {
     throw new ValidationError(`${domain} provider config is missing a model name`);
   }
   const baseUrl = typeof config.baseUrl === 'string' ? config.baseUrl : undefined;
-  const outbound = privateEndpointPolicyFor(row.userId);
+  const outbound = await privateEndpointPolicyFor(row.userId);
   if (baseUrl) assertSafeOutboundUrl(baseUrl, `${domain} base URL`, outbound);
 
   const credentials = JSON.parse(decrypt(row.credentials, secretContextOf(row))) as Record<
@@ -147,10 +147,10 @@ export function resolveModelSettings(
 export function createModelProviderResolver<Cap extends ModelCapability, P>(
   capability: Cap,
   descriptors: Record<string, ModelProviderDescriptor<Cap, P>>
-): (row: UserProvider) => P {
+): (row: UserProvider) => Promise<P> {
   const domain = MODEL_DOMAIN_LABEL[capability];
-  return (row) => {
-    const settings = resolveModelSettings(row, domain);
+  return async (row) => {
+    const settings = await resolveModelSettings(row, domain);
     const descriptor = modelProviderDescriptor(descriptors, row.providerType);
     if (!descriptor) {
       throw new ValidationError(`Unsupported ${domain} provider type: ${row.providerType}`);
