@@ -1,4 +1,5 @@
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import {
   jsonArrayIsEmpty,
@@ -577,7 +578,11 @@ function itemsWhere(
 }
 
 export class AnalyticsQueryRepository {
-  constructor(private db: AppDatabase) {}
+  private db: AsyncAppDatabase;
+
+  constructor(private syncDb: AppDatabase) {
+    this.db = openAsyncDatabase(syncDb.$client).db;
+  }
 
   async query(userId: string, query: AnalyticsQuery): Promise<AnalyticsQueryResult> {
     try {
@@ -598,7 +603,7 @@ export class AnalyticsQueryRepository {
       throw new ValidationError(`metric=${query.metric} cannot be grouped by ${query.groupBy}`);
     }
     const { ctx, currency, range, prior } = await this.loadContext(userId, query);
-    const rows = this.aggregate(ctx);
+    const rows = await this.aggregate(ctx);
     const primary = this.shapePeriod(ctx, 0, range, rows[0]);
     const comparePeriod = prior && rows[1] ? this.shapePeriod(ctx, 1, prior, rows[1]) : null;
 
@@ -609,11 +614,11 @@ export class AnalyticsQueryRepository {
       groupBy: query.groupBy,
       ...primary,
       compare: comparePeriod,
-      ...this.annotate(ctx, range),
+      ...(await this.annotate(ctx, range)),
     };
   }
 
-  private annotate(ctx: QueryContext, range: { start: number; end: number }) {
+  private async annotate(ctx: QueryContext, range: { start: number; end: number }) {
     const wanted = ctx.query.annotations ?? [];
     if (wanted.length === 0) return {};
     const scope = {
@@ -622,18 +627,19 @@ export class AnalyticsQueryRepository {
       names: new Map([...ctx.vehicleInfo].map(([id, v]) => [id, v.name])),
       ...range,
     };
-    const services = wanted.includes('services') ? serviceAnnotations(this.db, scope) : null;
+    const services = wanted.includes('services') ? await serviceAnnotations(this.db, scope) : null;
+    const trips = wanted.includes('trips')
+      ? await tripLane(this.db, scope, ctx.periods[0] ?? [], {
+          user: ctx.userUnits,
+          byVehicle: new Map([...ctx.vehicleInfo].map(([id, v]) => [id, v.units])),
+        })
+      : null;
     return {
       ...(services && {
         annotations: services.services,
         annotationsTruncated: services.truncated,
       }),
-      ...(wanted.includes('trips') && {
-        trips: tripLane(this.db, scope, ctx.periods[0] ?? [], {
-          user: ctx.userUnits,
-          byVehicle: new Map([...ctx.vehicleInfo].map(([id, v]) => [id, v.units])),
-        }),
-      }),
+      ...(trips && { trips }),
     };
   }
 
@@ -692,7 +698,7 @@ export class AnalyticsQueryRepository {
     const many = vehicleInfo.size > 1;
     const names = new Map<string, string>();
     for (const [vehicleId, info] of vehicleInfo) {
-      for (const driver of listDrivers(this.db, vehicleId)) {
+      for (const driver of listDrivers(this.syncDb, vehicleId)) {
         const car = many ? ` (${info.name})` : '';
         names.set(driver.id, `${driver.name}${car}`);
       }
@@ -719,7 +725,7 @@ export class AnalyticsQueryRepository {
       .where(and(...conditions));
   }
 
-  private aggregate(ctx: QueryContext): PeriodRows[] {
+  private async aggregate(ctx: QueryContext): Promise<PeriodRows[]> {
     const result: PeriodRows[] = ctx.periods.map((buckets) => ({
       byKey: new Map(),
       bucketTotals: buckets.map(emptyAggregate),
@@ -727,13 +733,13 @@ export class AnalyticsQueryRepository {
       rangeDistance: 0,
     }));
     if (ctx.vehicleIds.length === 0) return result;
-    collectAggregates(ctx, result, this.aggregateRows(ctx));
+    collectAggregates(ctx, result, await this.aggregateRows(ctx));
     if (ctx.query.groupBy !== 'tag') sumBucketTotals(result);
-    collectDistances(ctx, result, this.distanceAggregate(ctx));
+    collectDistances(ctx, result, await this.distanceAggregate(ctx));
     return result;
   }
 
-  private aggregateRows(ctx: QueryContext): AggregateRow[] {
+  private async aggregateRows(ctx: QueryContext): Promise<AggregateRow[]> {
     if (ctx.categories.length === 0) return [];
     return usesFuelRows(ctx.query) ? this.fuelAggregate(ctx) : this.expenseAggregate(ctx);
   }
@@ -779,7 +785,7 @@ export class AnalyticsQueryRepository {
 
     const where = itemsWhere(userId, vehicleIds, categories, query, groupBy);
     const limit = query.limit ?? 8;
-    const [totals] = rawAll<{
+    const [totals] = await rawAll<{
       total: number | null;
       n: number;
       fuel_total: number | null;
@@ -793,7 +799,7 @@ export class AnalyticsQueryRepository {
       FROM expenses e WHERE ${where}
     `
     );
-    const rows = rawAll<{
+    const rows = await rawAll<{
       id: string;
       date: number;
       category: string;
@@ -836,7 +842,7 @@ export class AnalyticsQueryRepository {
     return sql`e.user_id = ${ctx.userId} AND e.vehicle_id IN (${inList(ctx.vehicleIds)}) AND e.category IN (${inList(ctx.categories)})`;
   }
 
-  private expenseAggregate(ctx: QueryContext): AggregateRow[] {
+  private expenseAggregate(ctx: QueryContext): Promise<AggregateRow[]> {
     if (ctx.query.groupBy === 'tag') return this.tagAggregate(ctx);
     const key = keyExpression(ctx.query.groupBy);
     return rawAll<AggregateRow>(
@@ -852,7 +858,7 @@ export class AnalyticsQueryRepository {
     );
   }
 
-  private tagAggregate(ctx: QueryContext): AggregateRow[] {
+  private tagAggregate(ctx: QueryContext): Promise<AggregateRow[]> {
     const tag = leftJoinJsonArrayElements(sql`e.tags`, 't');
     return rawAll<AggregateRow>(
       this.db,
@@ -878,7 +884,7 @@ export class AnalyticsQueryRepository {
     );
   }
 
-  private fuelAggregate(ctx: QueryContext): AggregateRow[] {
+  private fuelAggregate(ctx: QueryContext): Promise<AggregateRow[]> {
     const electric = ctx.query.energy === 'electric';
     const key =
       ctx.query.groupBy === 'fuelType'
@@ -916,7 +922,7 @@ export class AnalyticsQueryRepository {
     );
   }
 
-  private distanceAggregate(ctx: QueryContext): DistanceRow[] {
+  private distanceAggregate(ctx: QueryContext): Promise<DistanceRow[]> {
     return rawAll<DistanceRow>(
       this.db,
       sql`

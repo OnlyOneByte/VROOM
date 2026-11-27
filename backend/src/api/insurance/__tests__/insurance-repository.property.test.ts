@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 import { insuranceTerms, insuranceTermVehicles } from '../../../db/schema';
@@ -411,15 +412,19 @@ describe('policy lists load terms and coverage in batches', () => {
 
   test('findByUserId runs the same number of queries for 1 or 6 policies, with the same data as findById', async () => {
     await createPolicies(1);
-    const prepare = spyOn(sqliteDb, 'prepare');
+    const { session } = openAsyncDatabase(sqliteDb).db as unknown as {
+      session: { client: (...args: unknown[]) => unknown };
+    };
+    const executed = spyOn(session, 'client');
     await repo.findByUserId(USER_ID);
-    const queriesForOne = prepare.mock.calls.length;
+    const queriesForOne = executed.mock.calls.length;
+    expect(queriesForOne).toBeGreaterThan(0);
 
     const ids = await createPolicies(5);
-    prepare.mockClear();
+    executed.mockClear();
     const policies = await repo.findByUserId(USER_ID);
-    expect(prepare.mock.calls.length).toBe(queriesForOne);
-    prepare.mockRestore();
+    expect(executed.mock.calls.length).toBe(queriesForOne);
+    executed.mockRestore();
 
     expect(policies).toHaveLength(6);
     for (const id of ids) {

@@ -12,7 +12,7 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
-import { openAsyncDatabase } from '../../db/async-sqlite';
+import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import { countNum, sqlFalse, sumNum } from '../../db/dialect';
 import {
@@ -454,7 +454,11 @@ export class AnalyticsRepository {
   private static readonly VEHICLE_NAME_CACHE_TTL = 5_000;
   private static readonly VEHICLE_NAME_CACHE_MAX_SIZE = 100;
 
-  constructor(private db: AppDatabase) {}
+  private db: AsyncAppDatabase;
+
+  constructor(syncDb: AppDatabase) {
+    this.db = openAsyncDatabase(syncDb.$client).db;
+  }
 
   private getCachedVehicleNames(cacheKey: string, now: number): Map<string, string> | undefined {
     const cached = this.vehicleNameCache.get(cacheKey);
@@ -996,7 +1000,7 @@ export class AnalyticsRepository {
     financingRows: Array<{ id: string; isActive: boolean }>,
     timeZone: string | undefined
   ): Promise<Map<string, number>> {
-    return new FinancingRepository(openAsyncDatabase(this.db.$client).db).computeBalances(
+    return new FinancingRepository(this.db).computeBalances(
       financingRows.filter((fin) => fin.isActive).map((fin) => fin.id),
       timeZone
     );

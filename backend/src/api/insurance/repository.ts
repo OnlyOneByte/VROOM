@@ -1,5 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
+import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
 import {
@@ -83,10 +84,10 @@ function ownedPolicy(policyId: string, userId: string) {
 }
 
 export class InsurancePolicyRepository {
-  private db: AppDatabase;
+  private db: AsyncAppDatabase;
 
-  constructor(db: AppDatabase) {
-    this.db = db;
+  constructor(private syncDb: AppDatabase) {
+    this.db = openAsyncDatabase(syncDb.$client).db;
   }
 
   // bun:sqlite: an async transaction callback autocommits each write, which could leave partial coverage.
@@ -103,7 +104,7 @@ export class InsurancePolicyRepository {
   }
 
   private async fetchTermsAndCoverageByPolicy(
-    handle: AppDatabase | DrizzleTransaction,
+    handle: AsyncAppDatabase,
     policyIds: string[]
   ): Promise<Map<string, PolicyCoverage>> {
     const terms: InsuranceTerm[] = [];
@@ -148,7 +149,7 @@ export class InsurancePolicyRepository {
   }
 
   private async fetchTermsAndCoverage(
-    handle: AppDatabase | DrizzleTransaction,
+    handle: AsyncAppDatabase,
     policyId: string
   ): Promise<PolicyCoverage> {
     const byPolicy = await this.fetchTermsAndCoverageByPolicy(handle, [policyId]);
@@ -172,10 +173,10 @@ export class InsurancePolicyRepository {
   async create(data: CreatePolicyData, userId: string): Promise<InsurancePolicyWithVehicles> {
     try {
       const allVehicleIds = [...new Set(data.terms.flatMap((t) => t.vehicleCoverage.vehicleIds))];
-      await requireVehiclesAccess(allVehicleIds, userId, 'owner', this.db);
+      await requireVehiclesAccess(allVehicleIds, userId, 'owner', this.syncDb);
 
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Policy creation requires sequential steps within a transaction
-      return this.db.transaction((tx) => {
+      return this.syncDb.transaction((tx) => {
         const policyId = createId();
         const now = new Date();
         const isActive = data.isActive !== false;
@@ -299,7 +300,7 @@ export class InsurancePolicyRepository {
     userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
-      return await this.db.transaction(async (tx) => {
+      const updated = await this.syncDb.transaction(async (tx) => {
         const existing = await tx
           .select()
           .from(insurancePolicies)
@@ -321,10 +322,10 @@ export class InsurancePolicyRepository {
           .where(ownedPolicy(id, userId))
           .returning();
 
-        const coverage = await this.fetchTermsAndCoverage(tx, id);
-
-        return { ...updatedResult[0], ...coverage };
+        return updatedResult[0];
       });
+      const coverage = await this.fetchTermsAndCoverage(this.db, id);
+      return { ...updated, ...coverage };
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
       logger.error('Failed to update insurance policy', {
@@ -337,7 +338,7 @@ export class InsurancePolicyRepository {
 
   async delete(id: string, userId: string): Promise<void> {
     try {
-      await this.db.transaction(async (tx) => {
+      await this.syncDb.transaction(async (tx) => {
         const existing = await tx
           .select()
           .from(insurancePolicies)
@@ -366,10 +367,10 @@ export class InsurancePolicyRepository {
     userId: string
   ): Promise<InsurancePolicyWithVehicles & { newTermId: string }> {
     try {
-      await requireVehiclesAccess(term.vehicleCoverage.vehicleIds, userId, 'owner', this.db);
+      await requireVehiclesAccess(term.vehicleCoverage.vehicleIds, userId, 'owner', this.syncDb);
 
       const termId = createId();
-      this.db.transaction((tx) => {
+      this.syncDb.transaction((tx) => {
         const existing = tx
           .select()
           .from(insurancePolicies)
@@ -440,11 +441,11 @@ export class InsurancePolicyRepository {
     try {
       const { vehicleCoverage, ...termFields } = updates;
       if (vehicleCoverage) {
-        await requireVehiclesAccess(vehicleCoverage.vehicleIds, userId, 'owner', this.db);
+        await requireVehiclesAccess(vehicleCoverage.vehicleIds, userId, 'owner', this.syncDb);
       }
 
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Term update requires field-by-field mapping and junction management
-      this.db.transaction((tx) => {
+      this.syncDb.transaction((tx) => {
         const existing = tx
           .select()
           .from(insurancePolicies)
@@ -533,7 +534,7 @@ export class InsurancePolicyRepository {
     userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
-      return await this.db.transaction(async (tx) => {
+      const updatedPolicy = await this.syncDb.transaction(async (tx) => {
         const existing = await tx
           .select()
           .from(insurancePolicies)
@@ -561,16 +562,15 @@ export class InsurancePolicyRepository {
           .set({ updatedAt: new Date() })
           .where(eq(insurancePolicies.id, policyId));
 
-        const updatedPolicy = await tx
+        const [policy] = await tx
           .select()
           .from(insurancePolicies)
           .where(eq(insurancePolicies.id, policyId))
           .limit(1);
-
-        const coverage = await this.fetchTermsAndCoverage(tx, policyId);
-
-        return { ...updatedPolicy[0], ...coverage };
+        return policy;
       });
+      const coverage = await this.fetchTermsAndCoverage(this.db, policyId);
+      return { ...updatedPolicy, ...coverage };
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
       logger.error('Failed to delete term from insurance policy', {
