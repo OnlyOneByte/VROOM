@@ -108,6 +108,7 @@
 
 	let summary = $state<ExpenseSummary | null>(null);
 	let summaryRequestedAt = $state<number | undefined>();
+	let listRequestedAt = $state<number | undefined>();
 	let fuelEfficiencyPoints = $state<FuelEfficiencyPoint[]>([]);
 	let isLoadingFuelEfficiency = $state(true);
 	let yearStats = $state<VehicleStats | null>(null);
@@ -190,16 +191,16 @@
 	let expenseCategoryFilter = $state<string>('');
 
 	const onThisCar = (row: Expense) => row.vehicleId === vehicleId;
-	let movedBackToCar = $derived(
-		movedBackRows(new Set(expenses.map(expense => expense.id)), onThisCar)
-	);
+	const backOnThisCar = (row: Expense) => !isDeleteHidden(row) && onThisCar(row);
+	let listedIds = $derived(new Set(expenses.map(expense => expense.id)));
+	let movedBackListed = $derived(movedBackRows(listedIds, backOnThisCar, listRequestedAt));
 
 	let chartSummary = $derived.by(() => {
 		const edited = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
 		const removed = [...expenses.filter(isDeleteHidden), ...edited.before];
 		return withRowsInBreakdowns(withoutRowsInBreakdowns(summary, removed), [
 			...edited.after.filter(onThisCar),
-			...movedBackToCar,
+			...movedBackRows(listedIds, backOnThisCar, summaryRequestedAt),
 			...pending.saving
 		]);
 	});
@@ -347,7 +348,9 @@
 		currentOffset === 0
 			? [
 					...pendingTabRows,
-					...movedBackToCar.filter(row => matchesFilters(row, tabFilters)),
+					...movedBackListed.filter(row =>
+						matchesFilters(row, { ...tabFilters, search: searchTerm })
+					),
 					...tabListed
 				]
 			: tabListed
@@ -622,12 +625,14 @@
 	async function fetchExpensesPage(offset: number) {
 		isLoadingPage = true;
 		expensesLoadError = null;
+		const requestedAt = Date.now();
 		try {
 			const result = await expenseApi.getExpensesByVehicle(
 				vehicleId,
 				buildExpenseListParams(offset)
 			);
 			expenses = result.data;
+			listRequestedAt = requestedAt;
 			totalCount = result.pagination.totalCount;
 			currentOffset = offset;
 			expensesLoaded = true;

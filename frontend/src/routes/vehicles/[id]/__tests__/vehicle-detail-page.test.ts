@@ -59,6 +59,7 @@ vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => capture('media
 vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => captureWithMarker('insurance'));
 
 const getExpensesByVehicle = vi.fn();
+const updateExpense = vi.fn((..._args: unknown[]) => new Promise(() => {}));
 const getExpenseSummary = vi.fn();
 const downloadExpensesCsv = vi.fn();
 
@@ -81,7 +82,7 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 				: getExpensesByVehicle(vehicleId, params),
 		getExpenseSummary: (...args: unknown[]) => getExpenseSummary(...args),
 		downloadExpensesCsv: (...args: unknown[]) => downloadExpensesCsv(...args),
-		updateExpense: () => new Promise(() => {})
+		updateExpense: (...args: unknown[]) => updateExpense(...args)
 	}
 }));
 
@@ -700,12 +701,18 @@ describe('vehicle detail page tabs', () => {
 			data: [],
 			pagination: { totalCount: 0, limit: 20, offset: 0, hasMore: false }
 		});
+		updateExpense.mockResolvedValueOnce({
+			...EXPENSE,
+			vehicleId: 'v2',
+			updatedAt: '2024-03-15T12:00:01.000Z'
+		});
 		try {
 			scheduleEdit(EXPENSE, { ...EXPENSE, vehicleId: 'v2' }, {
 				vehicleId: 'v2',
 				category: 'fuel',
 				amount: 45.5
 			} as never);
+			await settle();
 			await mount();
 			await openTab('Expenses');
 			await waitFor(() => expect(captured['table']).toBeDefined());

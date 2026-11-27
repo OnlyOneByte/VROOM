@@ -770,25 +770,56 @@ describe('an edit that moves an expense out of the view', () => {
 });
 
 describe('an Undo of an edit that moved an expense out of the view', () => {
-	beforeEach(() => vi.resetAllMocks());
-	afterEach(() => resetPendingEdits());
-
-	const onV1 = (row: Expense) => row.vehicleId === 'v1';
-
-	test('brings the row back to a list that never had it, until the list holds it', () => {
-		vi.mocked(expenseApi.updateExpense).mockReturnValue(new Promise(() => {}));
-		scheduleEdit(saved, { ...saved, vehicleId: 'v2' }, payload);
-		expect(movedBackRows(new Set(), onV1)).toEqual([]);
-
-		undoEdit('e1');
-		expect(movedBackRows(new Set(), onV1)).toEqual([saved]);
-		expect(movedBackRows(new Set(['e1']), onV1)).toEqual([]);
+	beforeEach(() => {
+		vi.resetAllMocks();
+		vi.useFakeTimers({ toFake: ['Date'] });
+	});
+	afterEach(() => {
+		resetPendingEdits();
+		vi.useRealTimers();
 	});
 
-	test('does not bring back an edit that never left the view', () => {
-		vi.mocked(expenseApi.updateExpense).mockReturnValue(new Promise(() => {}));
-		scheduleEdit(saved, { ...saved, amount: 99 }, payload);
+	const onV1 = (row: Expense) => row.vehicleId === 'v1';
+	const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+
+	async function moveThenUndo() {
+		const restore = deferred();
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce({ ...saved, vehicleId: 'v2', updatedAt: '2026-11-20T12:00:01.000Z' })
+			.mockReturnValueOnce(restore.promise);
+		vi.setSystemTime(1000);
+		scheduleEdit(saved, { ...saved, vehicleId: 'v2' }, payload);
+		await flush();
+		vi.setSystemTime(3000);
 		undoEdit('e1');
-		expect(movedBackRows(new Set(), onV1)).toEqual([]);
+		await flush();
+		return restore;
+	}
+
+	test('brings the row back only to a list loaded while the move was on the server', async () => {
+		const restore = await moveThenUndo();
+		expect(movedBackRows(new Set(), onV1, 2000)).toEqual([saved]);
+		expect(movedBackRows(new Set(), onV1, 500)).toEqual([]);
+		expect(movedBackRows(new Set(['e1']), onV1, 2000)).toEqual([]);
+
+		vi.setSystemTime(4000);
+		restore.resolve({ ...saved, updatedAt: '2026-11-20T12:00:02.000Z' });
+		await flush();
+		expect(movedBackRows(new Set(), onV1, 2000)).toEqual([saved]);
+		expect(movedBackRows(new Set(), onV1, 5000)).toEqual([]);
+	});
+
+	test('a list or summary with no load time never gets the row', async () => {
+		await moveThenUndo();
+		expect(movedBackRows(new Set(), onV1, undefined)).toEqual([]);
+	});
+
+	test('does not bring back an edit that never left the view', async () => {
+		vi.mocked(expenseApi.updateExpense).mockResolvedValue(saved);
+		vi.setSystemTime(1000);
+		scheduleEdit(saved, { ...saved, amount: 99 }, payload);
+		await flush();
+		undoEdit('e1');
+		expect(movedBackRows(new Set(), onV1, 2000)).toEqual([]);
 	});
 });

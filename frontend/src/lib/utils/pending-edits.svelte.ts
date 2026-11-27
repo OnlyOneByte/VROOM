@@ -26,6 +26,8 @@ interface PendingEdit {
 	undoneAt?: string;
 	undoSeq?: number;
 	undid?: Expense;
+	landedAt?: number;
+	undidLandedAt?: number;
 	expected?: string | null;
 	currentUpdatedAt?: string | null;
 	retried?: boolean;
@@ -92,7 +94,12 @@ function landed(id: string, seq: number, saved: Expense | undefined): void {
 	const entry = edits.get(id);
 	if (!entry) return;
 	if (entry.seq === seq) {
-		edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
+		edits.set(id, {
+			...entry,
+			status: 'saved',
+			landedAt: Date.now(),
+			...(!entry.undo && stamp && { savedAt: stamp })
+		});
 		if (entry.retried && entry.undo) {
 			appStore.addNotification({
 				type: 'success',
@@ -108,8 +115,12 @@ function landed(id: string, seq: number, saved: Expense | undefined): void {
 				action: { label: 'Undo', onClick: () => undoEdit(id) }
 			});
 		}
-	} else if (entry.undo && entry.undoSeq === seq && !entry.undoneAt && stamp) {
-		edits.set(id, { ...entry, undoneAt: stamp });
+	} else if (entry.undo && entry.undoSeq === seq) {
+		edits.set(id, {
+			...entry,
+			undidLandedAt: Date.now(),
+			...(!entry.undoneAt && stamp && { undoneAt: stamp })
+		});
 	}
 }
 
@@ -255,6 +266,7 @@ export function undoEdit(id: string): void {
 		undo: true,
 		undoSeq: entry.seq,
 		undid: entry.after,
+		...(entry.landedAt !== undefined && { undidLandedAt: entry.landedAt }),
 		...(entry.savedAt && { undoneAt: entry.savedAt })
 	});
 	send(id);
@@ -335,19 +347,27 @@ export function shownExpense<T extends Expense>(listed: T): T {
 	return entry ? { ...expense, ...entry.after } : expense;
 }
 
+function loadedWhileMoved(entry: PendingEdit, loadedAt: number | undefined): boolean {
+	if (loadedAt === undefined || entry.undidLandedAt === undefined) return false;
+	if (loadedAt < entry.undidLandedAt) return false;
+	return entry.status !== 'saved' || entry.landedAt === undefined || loadedAt < entry.landedAt;
+}
+
 export function movedBackRows(
 	listedIds: ReadonlySet<string>,
-	inView: (row: Expense) => boolean
+	inView: (row: Expense) => boolean,
+	loadedAt: number | undefined
 ): Expense[] {
 	return [...edits.values()]
 		.filter(
-			({ undo, undid, before, status }) =>
-				undo &&
-				undid &&
-				status !== 'failed' &&
-				!listedIds.has(before.id) &&
-				!inView(undid) &&
-				inView(before)
+			entry =>
+				entry.undo &&
+				entry.undid &&
+				entry.status !== 'failed' &&
+				loadedWhileMoved(entry, loadedAt) &&
+				!listedIds.has(entry.before.id) &&
+				!inView(entry.undid) &&
+				inView(entry.before)
 		)
 		.map(({ before }) => before);
 }

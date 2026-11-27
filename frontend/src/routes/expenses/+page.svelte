@@ -78,6 +78,7 @@
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<ExpenseSummary | null>(null);
 	let summaryRequestedAt = $state<number | undefined>();
+	let listRequestedAt = $state<number | undefined>();
 
 	let currentOffset = $state(0);
 	let pageSize = $state(20);
@@ -136,14 +137,20 @@
 	let deletingRows = $derived(expenses.filter(isDeleteHidden));
 	let viewFilters = $derived({ ...pendingFilters, search: undefined });
 	const inView = (row: Expense) => matchesFilters(row, viewFilters);
-	let movedBack = $derived(
+	const backInView = (row: Expense) => !isDeleteHidden(row) && inView(row);
+	let movedBackListed = $derived(
 		currentOffset === 0
-			? movedBackRows(listedExpenseIds, row => !isDeleteHidden(row) && inView(row))
+			? movedBackRows(
+					listedExpenseIds,
+					row => backInView(row) && matchesFilters(row, pendingFilters),
+					listRequestedAt
+				)
 			: []
 	);
+	let movedBackCounted = $derived(movedBackRows(listedExpenseIds, backInView, summaryRequestedAt));
 	let edited = $derived.by(() => {
 		const rows = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
-		return { before: rows.before, after: [...rows.after.filter(inView), ...movedBack] };
+		return { before: rows.before, after: [...rows.after.filter(inView), ...movedBackCounted] };
 	});
 	let shownSummary = $derived.by(() => {
 		const now = Date.now();
@@ -376,8 +383,10 @@
 
 			const listReported = isCurrentList();
 			if (listReported) {
-				if (pageResult.status === 'fulfilled') applyPage(pageResult.value, offset, filtered);
-				else failPage(pageResult.reason, offset);
+				if (pageResult.status === 'fulfilled') {
+					applyPage(pageResult.value, offset, filtered);
+					listRequestedAt = requestedAt;
+				} else failPage(pageResult.reason, offset);
 			}
 			if (isCurrentSummary()) {
 				if (summaryResult.status === 'fulfilled') {
@@ -571,7 +580,7 @@
 	let displayExpenses = $derived<ExpenseWithVehicle[]>(
 		[
 			...pendingListRows,
-			...movedBack,
+			...movedBackListed,
 			...expenses.filter(expense => stillInView(expense, inView))
 		].map(expense => ({
 			...expense,
