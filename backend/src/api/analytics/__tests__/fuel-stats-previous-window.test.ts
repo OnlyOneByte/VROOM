@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
   createTestDb,
@@ -19,7 +20,7 @@ const EV = { id: 'veh-ev', userId: USER.id, make: 'Kia', model: 'Niro EV', year:
 
 beforeEach(() => {
   testDb = createTestDb();
-  repo = new AnalyticsRepository(testDb.drizzle);
+  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
   seedUser(testDb.sqlite, USER);
   seedVehicle(testDb.sqlite, GAS);
   seedVehicle(testDb.sqlite, EV);

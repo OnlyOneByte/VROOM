@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
   createTestDb,
@@ -17,7 +18,7 @@ let repo: AnalyticsRepository;
 
 beforeEach(() => {
   testDb = createTestDb();
-  repo = new AnalyticsRepository(testDb.drizzle);
+  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 });
 
 afterEach(() => {
@@ -47,7 +48,7 @@ describe('Fuel volume ordering invariant', () => {
       fc.asyncProperty(fc.integer({ min: 1, max: 8 }), async (expenseCount) => {
         testDb.sqlite.close();
         testDb = createTestDb();
-        repo = new AnalyticsRepository(testDb.drizzle);
+        repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
         const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
         seedUser(testDb.sqlite, user);
@@ -110,7 +111,7 @@ describe('MPG computation from consecutive expenses', () => {
         async (startMileage, milesDriven, volume, expenseAmount) => {
           testDb.sqlite.close();
           testDb = createTestDb();
-          repo = new AnalyticsRepository(testDb.drizzle);
+          repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
           const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
           seedUser(testDb.sqlite, user);
@@ -175,7 +176,7 @@ describe('Monthly arrays bounded to 12 entries', () => {
       fc.asyncProperty(fc.integer({ min: 1, max: 20 }), async (expenseCount) => {
         testDb.sqlite.close();
         testDb = createTestDb();
-        repo = new AnalyticsRepository(testDb.drizzle);
+        repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
         const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
         seedUser(testDb.sqlite, user);
@@ -377,7 +378,7 @@ describe('Gas price always positive', () => {
       fc.asyncProperty(fc.integer({ min: 1, max: 10 }), async (expenseCount) => {
         testDb.sqlite.close();
         testDb = createTestDb();
-        repo = new AnalyticsRepository(testDb.drizzle);
+        repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
         const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
         seedUser(testDb.sqlite, user);

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { zonedCalendar } from '../../../utils/analytics-charts';
 import { cachedTimeZoneCount, calendarDayIn, zonedMidnight } from '../../../utils/time-zone';
 import { AnalyticsRepository, calendarYearRange } from '../repository';
@@ -27,7 +28,7 @@ const WINDOW = {
 
 beforeEach(() => {
   testDb = createTestDb();
-  repo = new AnalyticsRepository(testDb.drizzle);
+  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
   seedUser(testDb.sqlite, USER);
   seedVehicle(testDb.sqlite, VEHICLE);
   seedExpense(testDb.sqlite, {

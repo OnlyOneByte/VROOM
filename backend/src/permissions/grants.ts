@@ -2,7 +2,6 @@ import { and, eq, inArray, isNotNull, isNull, notInArray, type SQL } from 'drizz
 import type { Context } from 'hono';
 import { appContext } from '../app-context';
 import type { AsyncAppDatabase, AsyncHandle, AsyncTransaction } from '../db/async-sqlite';
-import type { AppDatabase } from '../db/connection';
 import {
   permissionOverrides,
   roleAssignments,
@@ -13,15 +12,12 @@ import {
   vehicleShares,
   vehicles,
 } from '../db/schema';
-import type { DrizzleTransaction } from '../db/types';
 import { ConflictError, ForbiddenError, ScopeNotLoadedError, ValidationError } from '../errors';
 import { PERMISSION_REGISTRY } from './registry';
 import {
   type Actor,
   type AsyncGrantSource,
   createLoadingResolver,
-  createResolver,
-  type GrantSource,
   type HeldRole,
   type LoadingResolver,
   type Resolver,
@@ -29,8 +25,6 @@ import {
   type ScopeGrants,
 } from './resolve';
 import { DEMO_ROLE_KEY, ROLE_REACH, ROLE_TEMPLATES, type RoleScope } from './roles';
-
-type Db = AppDatabase | DrizzleTransaction;
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -250,40 +244,6 @@ function actorQuery(db: AsyncHandle, userId: string) {
     .where(eq(users.id, userId));
 }
 
-function heldRoles(tx: Db, where: SQL | undefined): HeldRole[] {
-  const rows = tx
-    .select({ id: roles.id, key: roles.key, builtIn: roles.builtIn })
-    .from(roleAssignments)
-    .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
-    .where(where)
-    .all();
-  if (rows.length === 0) return [];
-  const permissions = tx
-    .select()
-    .from(rolePermissions)
-    .where(
-      inArray(
-        rolePermissions.roleId,
-        rows.map((row) => row.id)
-      )
-    )
-    .all();
-  return rows.map((row) => ({
-    id: row.id,
-    permissions: permissions.filter((p) => p.roleId === row.id).map((p) => p.permission),
-    builtInDemo: row.builtIn && row.key === DEMO_ROLE_KEY,
-  }));
-}
-
-function syncIsVehicleMember(db: Db, vehicleId: string, userId: string): boolean {
-  const share = db
-    .select({ id: vehicleShares.id })
-    .from(vehicleShares)
-    .where(memberWhere(vehicleId, userId))
-    .get();
-  return share !== undefined;
-}
-
 export async function isVehicleMember(
   db: AsyncHandle,
   vehicleId: string,
@@ -295,60 +255,6 @@ export async function isVehicleMember(
     .where(memberWhere(vehicleId, userId))
     .get();
   return share !== undefined;
-}
-
-function syncGrantSource(tx: Db): GrantSource {
-  return {
-    serverGrants: (userId) => ({
-      roles: heldRoles(tx, serverRolesWhere(userId)),
-      overrides: tx
-        .select(OVERRIDE_COLUMNS)
-        .from(permissionOverrides)
-        .where(overridesWhere(userId, 'server', null))
-        .all(),
-    }),
-    vehicleFacts: (userId, vehicleId) => {
-      const vehicle = tx
-        .select({ ownerId: vehicles.userId })
-        .from(vehicles)
-        .where(eq(vehicles.id, vehicleId))
-        .get();
-      if (!vehicle) return null;
-      const owner = vehicle.ownerId === userId;
-      const member = !owner && syncIsVehicleMember(tx, vehicleId, userId);
-      const grants: ScopeGrants = member
-        ? {
-            roles: heldRoles(tx, vehicleRolesWhere(userId, vehicleId)),
-            overrides: tx
-              .select(OVERRIDE_COLUMNS)
-              .from(permissionOverrides)
-              .where(overridesWhere(userId, 'vehicle', vehicleId))
-              .all(),
-          }
-        : { roles: [], overrides: [] };
-      const demoGarage =
-        !owner &&
-        !member &&
-        tx
-          .select({ id: roles.id })
-          .from(roleAssignments)
-          .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
-          .where(builtInDemoWhere(vehicle.ownerId))
-          .get() !== undefined;
-      return { owner, member, demoGarage, grants };
-    },
-  };
-}
-
-export function syncResolverFor(tx: Db, userId: string): Resolver {
-  const row = tx
-    .select(ACTOR_COLUMNS)
-    .from(users)
-    .leftJoin(roleAssignments, demoRoleJoin())
-    .where(eq(users.id, userId))
-    .get();
-  const actor = { userId, disabled: !row || row.disabledAt !== null, demo: Boolean(row?.demoRole) };
-  return createResolver(actor, syncGrantSource(tx));
 }
 
 async function heldRolesAsync(db: AsyncHandle, where: SQL | undefined): Promise<HeldRole[]> {

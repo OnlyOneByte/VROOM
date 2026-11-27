@@ -6,7 +6,7 @@ import { appContext } from '../../app-context';
 import { getDb } from '../../db/connection';
 import type { AppError } from '../../errors';
 import { createTestApp, requestAs } from '../../test-helpers/http-client';
-import { assignServerRole, syncResolverFor } from '../grants';
+import { assignServerRole, resolverFor } from '../grants';
 import { withImplied } from '../resolve';
 import { DEMO_ROLE_KEY, ROLE_TEMPLATES } from '../roles';
 import { routeGuard } from '../route-guard';
@@ -213,9 +213,9 @@ describe('the Demo role on its own garage', () => {
       ctx.sqlite.run(
         "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('demo-car', 'demo-probe', 'Kia', 'Rio', 2020)"
       );
-      const resolver = syncResolverFor(getDb(), 'demo-probe');
       const car = { kind: 'vehicle' as const, vehicleId: 'demo-car' };
       const own = { kind: 'account' as const, userId: 'demo-probe' };
+      const resolver = await resolverFor('demo-probe', [car, own]);
       expect(resolver.can('vehicle.read', car).allow).toBe(true);
       expect(resolver.can('vehicle.expense.read', car).allow).toBe(true);
       expect(resolver.can('vehicle.write', car).allow).toBe(false);
@@ -223,12 +223,12 @@ describe('the Demo role on its own garage', () => {
       expect(resolver.can('vehicle.delete', car).allow).toBe(false);
       expect(resolver.can('vehicle.expense.read', own).allow).toBe(true);
       expect(resolver.can('vehicle.expense.write', own).allow).toBe(false);
-      expect(syncResolverFor(getDb(), ctx.user.id).can('vehicle.read', car).allow).toBe(false);
+      expect((await resolverFor(ctx.user.id, [car])).can('vehicle.read', car).allow).toBe(false);
       ctx.sqlite.run(
         "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('own-car', ?, 'Kia', 'Rio', 2020)",
         [ctx.user.id]
       );
-      const owner = syncResolverFor(getDb(), ctx.user.id);
+      const owner = await resolverFor(ctx.user.id, [{ kind: 'vehicle', vehicleId: 'own-car' }]);
       expect(owner.can('vehicle.write', { kind: 'vehicle', vehicleId: 'own-car' }).allow).toBe(
         true
       );

@@ -1,7 +1,3 @@
-import type { AppDatabase } from './connection';
-
-export type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
-
 export const EXPENSE_CATEGORIES = [
   'fuel',
   'maintenance',

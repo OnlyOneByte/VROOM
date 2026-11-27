@@ -1,3 +1,4 @@
+import type { Database } from 'bun:sqlite';
 import { AnalyticsInsightsRepository } from './api/analytics/insights';
 import { AnalyticsQueryRepository } from './api/analytics/query-repository';
 import { AnalyticsRepository } from './api/analytics/repository';
@@ -18,18 +19,17 @@ import { VehicleShareRepository } from './api/shares/repository';
 import { TripRepository } from './api/trips/repository';
 import { VehicleRepository } from './api/vehicles/repository';
 import { openAsyncDatabase } from './db/async-sqlite';
-import { type AppDatabase, getDb } from './db/connection';
+import { getDb } from './db/connection';
 
-export function createAppContext(db: AppDatabase) {
-  const analyticsQuery = new AnalyticsQueryRepository(db);
-  const asyncDb = openAsyncDatabase(db.$client).db;
+export function createAppContext(sqlite: Database) {
+  const asyncDb = openAsyncDatabase(sqlite).db;
+  const analyticsQuery = new AnalyticsQueryRepository(asyncDb);
   return {
-    db,
     asyncDb,
     lucia: createLucia(asyncDb),
     repos: {
-      analytics: new AnalyticsRepository(db),
-      analyticsInsights: new AnalyticsInsightsRepository(db, analyticsQuery),
+      analytics: new AnalyticsRepository(asyncDb),
+      analyticsInsights: new AnalyticsInsightsRepository(asyncDb, analyticsQuery),
       analyticsQuery,
       authProviders: new AuthProviderRepository(asyncDb),
       communityStats: new CommunityStatsRepository(asyncDb),
@@ -56,7 +56,7 @@ export type AppContext = ReturnType<typeof createAppContext>;
 let current: AppContext | null = null;
 
 export function appContext(): AppContext {
-  current ??= createAppContext(getDb());
+  current ??= createAppContext(getDb().$client);
   return current;
 }
 
