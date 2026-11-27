@@ -326,17 +326,19 @@ export async function deletePhotoForEntity(
 ): Promise<void> {
   const photo = await requireEntityPhoto(entityType, entityId, photoId, userId);
 
-  const wasCover = photo.isCover;
-
-  await deletePhotoRowsAndObjects([photoId], photo.userId);
-  await repos().photos.delete(photoId);
-
-  if (wasCover) {
-    const remaining = await repos().photos.findByEntity(entityType, entityId);
-    if (remaining.length > 0) {
-      await repos().photos.setCoverPhoto(entityType, entityId, remaining[0].id);
+  const refs = await appContext().asyncDb.transaction(async () => {
+    const photoRefs = await repos().photoRefs.findAllByPhotos([photoId]);
+    await repos().photoRefs.deleteByPhotos([photoId]);
+    await repos().photos.delete(photoId);
+    if (photo.isCover) {
+      const remaining = await repos().photos.findByEntity(entityType, entityId);
+      if (remaining.length > 0) {
+        await repos().photos.setCoverPhoto(entityType, entityId, remaining[0].id);
+      }
     }
-  }
+    return photoRefs;
+  });
+  await deleteStoredPhotoObjects(refs, photo.userId);
 }
 
 async function deletePhotoRowsAndObjects(photoIds: string[], userId: string): Promise<void> {
