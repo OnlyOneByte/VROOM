@@ -9,6 +9,7 @@ import {
   handleDatabaseError,
   isAppError,
   isSyncError,
+  ScopeNotLoadedError,
   syncErrorResponse,
   ValidationError,
 } from '../errors';
@@ -31,7 +32,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
   } else {
     logger.error('Server error', {
       error: err,
-      details: isAppError(err) ? err.details : undefined,
+      scope: err instanceof ScopeNotLoadedError ? err.details : undefined,
     });
   }
 
