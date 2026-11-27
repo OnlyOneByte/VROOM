@@ -25,6 +25,7 @@ interface PendingEdit {
 	undo?: boolean;
 	undoneAt?: string;
 	undoSeq?: number;
+	undid?: Expense;
 	expected?: string | null;
 	currentUpdatedAt?: string | null;
 	retried?: boolean;
@@ -253,6 +254,7 @@ export function undoEdit(id: string): void {
 		seq: ++nextSeq,
 		undo: true,
 		undoSeq: entry.seq,
+		undid: entry.after,
 		...(entry.savedAt && { undoneAt: entry.savedAt })
 	});
 	send(id);
@@ -331,6 +333,23 @@ export function shownExpense<T extends Expense>(listed: T): T {
 	const expense = withLatest(listed);
 	const entry = overlay(expense);
 	return entry ? { ...expense, ...entry.after } : expense;
+}
+
+export function movedBackRows(
+	listedIds: ReadonlySet<string>,
+	inView: (row: Expense) => boolean
+): Expense[] {
+	return [...edits.values()]
+		.filter(
+			({ undo, undid, before, status }) =>
+				undo &&
+				undid &&
+				status !== 'failed' &&
+				!listedIds.has(before.id) &&
+				!inView(undid) &&
+				inView(before)
+		)
+		.map(({ before }) => before);
 }
 
 export function stillInView<T extends Expense>(listed: T, inView: (shown: T) => boolean): boolean {

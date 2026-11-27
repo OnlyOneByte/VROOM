@@ -47,7 +47,7 @@
 		withRowsInBreakdowns,
 		withoutRowsInBreakdowns
 	} from '#lib/utils/sync/pending-rows.ts';
-	import { editedRows, stillInView } from '#lib/utils/pending-edits.svelte.ts';
+	import { editedRows, movedBackRows, stillInView } from '#lib/utils/pending-edits.svelte.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
@@ -190,12 +190,16 @@
 	let expenseCategoryFilter = $state<string>('');
 
 	const onThisCar = (row: Expense) => row.vehicleId === vehicleId;
+	let movedBackToCar = $derived(
+		movedBackRows(new Set(expenses.map(expense => expense.id)), onThisCar)
+	);
 
 	let chartSummary = $derived.by(() => {
 		const edited = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
 		const removed = [...expenses.filter(isDeleteHidden), ...edited.before];
 		return withRowsInBreakdowns(withoutRowsInBreakdowns(summary, removed), [
 			...edited.after.filter(onThisCar),
+			...movedBackToCar,
 			...pending.saving
 		]);
 	});
@@ -339,7 +343,15 @@
 			stillInView(expense, row => onThisCar(row) && matchesFilters(row, tabFilters))
 		)
 	);
-	let tabExpenses = $derived(currentOffset === 0 ? [...pendingTabRows, ...tabListed] : tabListed);
+	let tabExpenses = $derived(
+		currentOffset === 0
+			? [
+					...pendingTabRows,
+					...movedBackToCar.filter(row => matchesFilters(row, tabFilters)),
+					...tabListed
+				]
+			: tabListed
+	);
 	let tabWaiting = $derived(!expensesLoaded && tabExpenses.length === 0);
 
 	let firstExpense = $derived(

@@ -20,6 +20,7 @@ import {
 	retryEdit,
 	scheduleEdit,
 	shownExpense,
+	movedBackRows,
 	stillInView,
 	undoEdit
 } from '../pending-edits.svelte.ts';
@@ -765,5 +766,29 @@ describe('an edit that moves an expense out of the view', () => {
 
 	test('a row with no pending edit is never taken out, whatever the view', () => {
 		expect(stillInView(saved, () => false)).toBe(true);
+	});
+});
+
+describe('an Undo of an edit that moved an expense out of the view', () => {
+	beforeEach(() => vi.resetAllMocks());
+	afterEach(() => resetPendingEdits());
+
+	const onV1 = (row: Expense) => row.vehicleId === 'v1';
+
+	test('brings the row back to a list that never had it, until the list holds it', () => {
+		vi.mocked(expenseApi.updateExpense).mockReturnValue(new Promise(() => {}));
+		scheduleEdit(saved, { ...saved, vehicleId: 'v2' }, payload);
+		expect(movedBackRows(new Set(), onV1)).toEqual([]);
+
+		undoEdit('e1');
+		expect(movedBackRows(new Set(), onV1)).toEqual([saved]);
+		expect(movedBackRows(new Set(['e1']), onV1)).toEqual([]);
+	});
+
+	test('does not bring back an edit that never left the view', () => {
+		vi.mocked(expenseApi.updateExpense).mockReturnValue(new Promise(() => {}));
+		scheduleEdit(saved, { ...saved, amount: 99 }, payload);
+		undoEdit('e1');
+		expect(movedBackRows(new Set(), onV1)).toEqual([]);
 	});
 });

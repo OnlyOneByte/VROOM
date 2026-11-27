@@ -695,6 +695,32 @@ describe('vehicle detail page tabs', () => {
 		}
 	});
 
+	test('Undo of a move shows the expense again on its car even when the list loaded after the move', async () => {
+		getExpensesByVehicle.mockResolvedValue({
+			data: [],
+			pagination: { totalCount: 0, limit: 20, offset: 0, hasMore: false }
+		});
+		try {
+			scheduleEdit(EXPENSE, { ...EXPENSE, vehicleId: 'v2' }, {
+				vehicleId: 'v2',
+				category: 'fuel',
+				amount: 45.5
+			} as never);
+			await mount();
+			await openTab('Expenses');
+			await waitFor(() => expect(captured['table']).toBeDefined());
+			const listedIds = () =>
+				(captured['table']?.['expenses'] as Expense[]).map(expense => expense.id);
+			expect(listedIds()).toEqual([]);
+
+			undoEdit('e1');
+			await settle();
+			expect(listedIds()).toEqual(['e1']);
+		} finally {
+			resetPendingEdits();
+		}
+	});
+
 	test('a retry after a failed first load shows the loading state again, not "no expenses"', async () => {
 		let answer: (value: unknown) => void = () => {};
 		getExpensesByVehicle
