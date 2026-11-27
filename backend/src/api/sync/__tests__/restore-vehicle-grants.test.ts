@@ -256,4 +256,42 @@ describe('a full restore keeps the per-person grants of current members, from li
       ctx.sqlite.query('SELECT id FROM permission_overrides WHERE user_id = ?').all('member-4')
     ).toEqual([]);
   });
+
+  test('a deny always comes back with its car, so a restore never widens access', async () => {
+    await addMember('limited-1');
+    await addMember('setter-1');
+    await addMember('limited-2');
+    override('limited-1', 'vehicle.photo.read', 'setter-1', 'deny');
+    override('limited-1', 'vehicle.expense.read', ctx.user.id, 'deny');
+    ctx.sqlite.run(
+      "UPDATE permission_overrides SET set_by = NULL WHERE user_id = 'limited-1' AND permission = 'vehicle.expense.read'"
+    );
+    override('limited-2', 'vehicle.trip.read', ctx.user.id, 'deny');
+    ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', ['limited-2']);
+    const zip = new AdmZip(await exportZip());
+    const shares = zip.getEntry('vehicle_shares.csv')?.getData().toString('utf-8') ?? '';
+    zip.updateFile(
+      'vehicle_shares.csv',
+      Buffer.from(
+        shares
+          .split('\n')
+          .filter((line) => !line.includes('setter-1'))
+          .join('\n'),
+        'utf-8'
+      )
+    );
+
+    const result = await restore(zip.toBuffer());
+
+    expect(result.grants).toEqual({ reapplied: 3, dropped: [] });
+    expect(grantsOf('limited-1').overrides).toEqual([
+      { permission: 'vehicle.expense.read', effect: 'deny' },
+      { permission: 'vehicle.photo.read', effect: 'deny' },
+    ]);
+    expect(grantsOf('limited-2').overrides).toEqual([
+      { permission: 'vehicle.trip.read', effect: 'deny' },
+    ]);
+    expect(await can('limited-1', 'vehicle.photo.read')).toBe(false);
+    expect(await can('limited-1', 'vehicle.expense.read')).toBe(false);
+  });
 });

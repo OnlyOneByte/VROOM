@@ -409,23 +409,18 @@ async function roleManagerCount(tx: AsyncHandle): Promise<number> {
   return count;
 }
 
-export async function keepingARoleManagerIn<T>(
-  tx: AsyncHandle,
-  change: () => Promise<T>
-): Promise<T> {
-  const before = await roleManagerCount(tx);
-  const result = await change();
-  if (before > 0 && (await roleManagerCount(tx)) === 0) {
-    throw new ConflictError('At least one person must keep the permission to manage roles');
-  }
-  return result;
-}
-
 export async function keepingARoleManager<T>(
   asyncDb: AsyncAppDatabase,
   change: (tx: AsyncTransaction) => Promise<T>
 ): Promise<T> {
-  return asyncDb.transaction((tx) => keepingARoleManagerIn(tx, () => change(tx)));
+  return asyncDb.transaction(async (tx) => {
+    const before = await roleManagerCount(tx);
+    const result = await change(tx);
+    if (before > 0 && (await roleManagerCount(tx)) === 0) {
+      throw new ConflictError('At least one person must keep the permission to manage roles');
+    }
+    return result;
+  });
 }
 
 export async function perPersonVehicleGrants(db: AsyncHandle, ownerId: string) {

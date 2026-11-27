@@ -31,6 +31,19 @@ export interface RegrantReport {
   dropped: DroppedGrant[];
 }
 
+async function carCheck(
+  tx: AsyncHandle,
+  ownerId: string,
+  vehicleId: string
+): Promise<DroppedGrantReason | null> {
+  const car = await tx
+    .select({ id: vehicles.id })
+    .from(vehicles)
+    .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, ownerId)))
+    .then(firstRow);
+  return car ? null : 'vehicle_not_restored';
+}
+
 async function personCheck(
   tx: AsyncHandle,
   ownerId: string,
@@ -38,12 +51,8 @@ async function personCheck(
   userId: string,
   grantor: string | null
 ): Promise<DroppedGrantReason | null> {
-  const car = await tx
-    .select({ id: vehicles.id })
-    .from(vehicles)
-    .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, ownerId)))
-    .then(firstRow);
-  if (!car) return 'vehicle_not_restored';
+  const noCar = await carCheck(tx, ownerId, vehicleId);
+  if (noCar) return noCar;
   if (!(await isVehicleMember(tx, vehicleId, userId))) return 'no_accepted_share';
   const person = await tx
     .select({ disabledAt: users.disabledAt, pendingApprovalAt: users.pendingApprovalAt })
@@ -76,15 +85,17 @@ function grantablePermission(permission: string): boolean {
 type Assignment = LiveVehicleGrants['assignments'][number];
 type Override = LiveVehicleGrants['overrides'][number];
 
+type Outcome = DroppedGrantReason | 'reapplied' | 'unchanged';
+
 async function reapplyAssignment(
   tx: AsyncHandle,
   ownerId: string,
   row: Assignment & { scopeId: string }
-): Promise<DroppedGrantReason | null> {
+): Promise<Outcome> {
   const reason = await personCheck(tx, ownerId, row.scopeId, row.userId, row.grantedBy);
   if (reason) return reason;
   if (!(await assignableRole(tx, ownerId, row.roleId))) return 'role_not_assignable';
-  await tx
+  const inserted = await tx
     .insert(roleAssignments)
     .values({
       userId: row.userId,
@@ -92,30 +103,37 @@ async function reapplyAssignment(
       scopeId: row.scopeId,
       grantedBy: row.grantedBy,
     })
-    .onConflictDoNothing();
-  return null;
+    .onConflictDoNothing()
+    .returning({ id: roleAssignments.id });
+  return inserted.length > 0 ? 'reapplied' : 'unchanged';
 }
 
 async function reapplyOverride(
   tx: AsyncHandle,
   ownerId: string,
   row: Override & { scopeId: string }
-): Promise<DroppedGrantReason | null> {
-  const reason = await personCheck(tx, ownerId, row.scopeId, row.userId, row.setBy);
+): Promise<Outcome> {
+  const allow = row.effect === 'allow';
+  const reason = allow
+    ? await personCheck(tx, ownerId, row.scopeId, row.userId, row.setBy)
+    : await carCheck(tx, ownerId, row.scopeId);
   if (reason) return reason;
-  if (!grantablePermission(row.permission)) return 'permission_not_grantable';
-  await tx
+  if (allow && (row.scope !== 'vehicle' || !grantablePermission(row.permission))) {
+    return 'permission_not_grantable';
+  }
+  const inserted = await tx
     .insert(permissionOverrides)
     .values({
       userId: row.userId,
-      scope: 'vehicle',
+      scope: row.scope,
       scopeId: row.scopeId,
       permission: row.permission,
-      effect: row.effect === 'deny' ? 'deny' : 'allow',
+      effect: allow ? 'allow' : 'deny',
       setBy: row.setBy,
     })
-    .onConflictDoNothing();
-  return null;
+    .onConflictDoNothing()
+    .returning({ id: permissionOverrides.id });
+  return inserted.length > 0 ? 'reapplied' : 'unchanged';
 }
 
 export async function reapplyVehicleGrants(
@@ -127,10 +145,12 @@ export async function reapplyVehicleGrants(
   const record = (
     kind: DroppedGrant['kind'],
     row: { scopeId: string; userId: string },
-    reason: DroppedGrantReason | null
+    outcome: Outcome
   ) => {
-    if (reason) report.dropped.push({ kind, vehicleId: row.scopeId, userId: row.userId, reason });
-    else report.reapplied++;
+    if (outcome === 'reapplied') report.reapplied++;
+    else if (outcome !== 'unchanged') {
+      report.dropped.push({ kind, vehicleId: row.scopeId, userId: row.userId, reason: outcome });
+    }
   };
   for (const row of live.assignments) {
     if (!row.scopeId) continue;
@@ -138,7 +158,7 @@ export async function reapplyVehicleGrants(
     record('role', scoped, await reapplyAssignment(tx, ownerId, scoped));
   }
   for (const row of live.overrides) {
-    if (row.scope !== 'vehicle' || !row.scopeId) continue;
+    if (!row.scopeId) continue;
     const scoped = { ...row, scopeId: row.scopeId };
     record('override', scoped, await reapplyOverride(tx, ownerId, scoped));
   }

@@ -34,11 +34,7 @@ import {
   SyncError,
   ValidationError,
 } from '../../errors';
-import {
-  changeShareRole,
-  keepingARoleManagerIn,
-  perPersonVehicleGrants,
-} from '../../permissions/grants';
+import { changeShareRole, perPersonVehicleGrants } from '../../permissions/grants';
 import {
   type BackupConfig,
   DEFAULT_PROVIDER_CAPABILITIES,
@@ -214,19 +210,15 @@ class RestoreService {
             'The currency changed while this backup was being read. Reload and try again.'
           );
         }
-        await keepingARoleManagerIn(tx, async () => {
-          // Read before the wipe: deleteUserData cascades vehicle_shares.
-          const consented = await this.consentedShareKeys(tx, userId);
-          const currentPrefs = await this.currentProviderPrefs(tx, userId);
-          const live = mode === 'replace' ? await perPersonVehicleGrants(tx, userId) : undefined;
-          if (mode === 'replace') {
-            await this.deleteUserData(tx, userId, {
-              keepPreferences: !data.userPreferences?.length,
-            });
-          }
-          await this.insertBackupData(tx, data, userId, consented, currentPrefs);
-          if (live) grants = await reapplyVehicleGrants(tx, userId, live);
-        });
+        // Read before the wipe: deleteUserData cascades vehicle_shares.
+        const consented = await this.consentedShareKeys(tx, userId);
+        const currentPrefs = await this.currentProviderPrefs(tx, userId);
+        const live = mode === 'replace' ? await perPersonVehicleGrants(tx, userId) : undefined;
+        if (mode === 'replace') {
+          await this.deleteUserData(tx, userId, { keepPreferences: !data.userPreferences?.length });
+        }
+        await this.insertBackupData(tx, data, userId, consented, currentPrefs);
+        if (live) grants = await reapplyVehicleGrants(tx, userId, live);
         signal?.throwIfAborted();
       });
     } catch (error) {
