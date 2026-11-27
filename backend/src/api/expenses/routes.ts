@@ -420,7 +420,11 @@ routes.post(
     assertMayTouchFinancialExpense(mayTouch, data.sourceType);
     await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
-    const payerFor = (vehicleId: string) => attributedDriver(c, vehicleId, undefined) ?? null;
+    const payers = new Map<string, string | null>();
+    for (const vehicleId of splitConfigVehicleIds(data.splitConfig)) {
+      payers.set(vehicleId, (await attributedDriver(c, vehicleId, undefined)) ?? null);
+    }
+    const payerFor = (vehicleId: string) => payers.get(vehicleId) ?? null;
     const scale = await repos().preferences.moneyScale(ownerId);
     const siblings = await repos().expenses.createSplitExpense(splitFromApi(data, scale), {
       ownerId,
@@ -853,7 +857,11 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   const access = await requireVehicleAccess(expenseData.vehicleId, user.id, 'read');
   const { ownerId } = access;
   const createdBy = ownerId === user.id ? null : user.id;
-  const paidByDriverId = attributedDriver(c, expenseData.vehicleId, expenseData.paidByDriverId);
+  const paidByDriverId = await attributedDriver(
+    c,
+    expenseData.vehicleId,
+    expenseData.paidByDriverId
+  );
   assertMayTouchFinancialExpense(writesFinancials(access), expenseData.sourceType);
 
   let createdExpense = expenseData.clientId
@@ -983,16 +991,21 @@ routes.get(
   }
 );
 
-function payerChange(
+async function payerChange(
   c: Context,
   existing: Expense,
   vehicleId: string | undefined,
   requested: string | null | undefined
-): { paidByDriverId?: string | null } {
+): Promise<{ paidByDriverId?: string | null }> {
   const target = vehicleId ?? existing.vehicleId;
   const movedCar = target !== existing.vehicleId;
-  if (movedCar) assertMayClearDriver(c, existing.vehicleId, existing.paidByDriverId);
-  const paidBy = attributedDriver(c, target, requested, movedCar ? null : existing.paidByDriverId);
+  if (movedCar) await assertMayClearDriver(c, existing.vehicleId, existing.paidByDriverId);
+  const paidBy = await attributedDriver(
+    c,
+    target,
+    requested,
+    movedCar ? null : existing.paidByDriverId
+  );
   if (paidBy !== undefined) return { paidByDriverId: paidBy };
   return movedCar ? { paidByDriverId: null } : {};
 }
@@ -1054,10 +1067,8 @@ routes.put(
     validateFuelExpenseData(finalCategory, finalMileage, finalVolume, finalFuelType);
 
     const { paidByDriverId: requestedPayer, ...withoutPayer } = updateData;
-    const normalizedUpdate = clearFuelFieldsIfNotFuel(
-      { ...withoutPayer, ...payerChange(c, existingExpense, updateData.vehicleId, requestedPayer) },
-      finalCategory
-    );
+    const payer = await payerChange(c, existingExpense, updateData.vehicleId, requestedPayer);
+    const normalizedUpdate = clearFuelFieldsIfNotFuel({ ...withoutPayer, ...payer }, finalCategory);
     const odometer = await editedOdometerCheck(existingExpense, {
       vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
       date: updateData.date ?? existingExpense.date,

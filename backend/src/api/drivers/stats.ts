@@ -1,5 +1,5 @@
 import { and, eq, gte, isNotNull, lte } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { expenses, odometerEntries, trips } from '../../db/schema';
 import { isElectricFuelType } from '../../db/types';
 import { attributeDistance, type Period } from './distance';
@@ -33,31 +33,29 @@ export interface DriverFigures {
 
 const round = (n: number, places = 2) => Math.round(n * 10 ** places) / 10 ** places;
 
-function loadEntries(db: AppDatabase, vehicleId: string, period: Period) {
+async function loadEntries(db: AsyncAppDatabase, vehicleId: string, period: Period) {
   const to = new Date(period.to);
-  const readings = db
+  const readings = await db
     .select({
       odometer: odometerEntries.odometer,
       at: odometerEntries.recordedAt,
       driverId: odometerEntries.driverId,
     })
     .from(odometerEntries)
-    .where(and(eq(odometerEntries.vehicleId, vehicleId), lte(odometerEntries.recordedAt, to)))
-    .all();
-  const fillUps = db
+    .where(and(eq(odometerEntries.vehicleId, vehicleId), lte(odometerEntries.recordedAt, to)));
+  const fillUps = await db
     .select({ odometer: expenses.mileage, at: expenses.date, driverId: expenses.paidByDriverId })
     .from(expenses)
     .where(
       and(eq(expenses.vehicleId, vehicleId), isNotNull(expenses.mileage), lte(expenses.date, to))
-    )
-    .all();
+    );
   const points = [...readings, ...fillUps].map((p) => ({
     odometer: p.odometer ?? 0,
     at: p.at.getTime(),
     driverId: p.driverId,
   }));
 
-  const spans = db
+  const tripRows = await db
     .select({
       start: trips.startOdometer,
       end: trips.endOdometer,
@@ -65,11 +63,10 @@ function loadEntries(db: AppDatabase, vehicleId: string, period: Period) {
       driverId: trips.driverId,
     })
     .from(trips)
-    .where(eq(trips.vehicleId, vehicleId))
-    .all()
-    .map((t) => ({ ...t, at: t.at.getTime() }));
+    .where(eq(trips.vehicleId, vehicleId));
+  const spans = tripRows.map((t) => ({ ...t, at: t.at.getTime() }));
 
-  const spending = db
+  const expenseRows = await db
     .select({
       category: expenses.category,
       cents: expenses.expenseAmount,
@@ -84,22 +81,21 @@ function loadEntries(db: AppDatabase, vehicleId: string, period: Period) {
         gte(expenses.date, new Date(period.from)),
         lte(expenses.date, to)
       )
-    )
-    .all()
-    .filter((e) => RUNNING_CATEGORIES.has(e.category));
+    );
+  const spending = expenseRows.filter((e) => RUNNING_CATEGORIES.has(e.category));
 
   return { points, spans, spending };
 }
 
-export function driverStats(db: AppDatabase, vehicleId: string, options: StatsOptions) {
-  const { points, spans, spending } = loadEntries(db, vehicleId, options.period);
+export async function driverStats(db: AsyncAppDatabase, vehicleId: string, options: StatsOptions) {
+  const { points, spans, spending } = await loadEntries(db, vehicleId, options.period);
   const distances = attributeDistance(points, spans, options.period, options.withEstimates);
   const totalOf = (key: string | null) => {
     const row = distances.get(key);
     return row ? row.trips + row.estimated : 0;
   };
 
-  const drivers = listDrivers(db, vehicleId);
+  const drivers = await listDrivers(db, vehicleId);
   const attributed = drivers.reduce((sum, d) => sum + totalOf(d.id), 0);
   const unattributed = [...distances.keys()]
     .filter((key) => !drivers.some((d) => d.id === key))

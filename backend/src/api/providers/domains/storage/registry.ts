@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { appContext } from '../../../../app-context';
 import { CONFIG } from '../../../../config';
-import type { AppDatabase } from '../../../../db/connection';
+import type { AsyncAppDatabase } from '../../../../db/async-sqlite';
 import type { UserProvider } from '../../../../db/schema';
 import { userPreferences, userProviders } from '../../../../db/schema';
 import { NotFoundError, ValidationError } from '../../../../errors';
@@ -308,7 +308,7 @@ export function storageProviderDescriptor(
 }
 
 export class StorageProviderRegistry {
-  constructor(private db: AppDatabase) {}
+  constructor(private db: AsyncAppDatabase) {}
 
   private async findOwnedProvider(
     providerId: string,
@@ -469,7 +469,7 @@ export class StorageProviderRegistry {
 let _registryInstance: StorageProviderRegistry | null = null;
 export function getStorageProviderRegistry(): StorageProviderRegistry {
   if (!_registryInstance) {
-    _registryInstance = new StorageProviderRegistry(appContext().db);
+    _registryInstance = new StorageProviderRegistry(appContext().asyncDb);
   }
   return _registryInstance;
 }

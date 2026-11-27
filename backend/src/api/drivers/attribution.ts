@@ -1,8 +1,8 @@
 import type { Context } from 'hono';
-import { appContext } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { ForbiddenError, ValidationError } from '../../errors';
 import { requestResolver } from '../../permissions/grants';
-import { carShareEnabled, findDriver, ownDriverId } from './repository';
+import { findDriver, ownDriverId } from './repository';
 
 type DriverField = 'driverId' | 'paidByDriverId';
 
@@ -32,21 +32,21 @@ export function carShareAccess(c: Context, vehicleId: string, enabled: boolean) 
   };
 }
 
-function assertActiveDriver(vehicleId: string, driverId: string): void {
-  const driver = findDriver(appContext().db, vehicleId, driverId);
+async function assertActiveDriver(vehicleId: string, driverId: string): Promise<void> {
+  const driver = await findDriver(appContext().asyncDb, vehicleId, driverId);
   if (!driver || driver.archivedAt !== null) {
     throw new ValidationError("That driver doesn't drive this vehicle");
   }
 }
 
-function assertMayAttribute(
+async function assertMayAttribute(
   c: Context,
   vehicleId: string,
   requested: string | null,
   current: string | null | undefined
-): void {
+): Promise<void> {
   if (mayRecordOthers(c, vehicleId)) return;
-  const own = ownDriverId(appContext().db, vehicleId, c.get('user').id);
+  const own = await ownDriverId(appContext().asyncDb, vehicleId, c.get('user').id);
   if (current && current !== own) {
     throw new ForbiddenError("Only people who record drivers can change someone else's entry");
   }
@@ -55,26 +55,31 @@ function assertMayAttribute(
   }
 }
 
-export function assertMayClearDriver(c: Context, vehicleId: string, current: string | null): void {
-  if (current) assertMayAttribute(c, vehicleId, null, current);
+export async function assertMayClearDriver(
+  c: Context,
+  vehicleId: string,
+  current: string | null
+): Promise<void> {
+  if (current) await assertMayAttribute(c, vehicleId, null, current);
 }
 
-export function attributedDriver(
+export async function attributedDriver(
   c: Context,
   vehicleId: string,
   requested: string | null | undefined,
   current?: string | null
-): string | null | undefined {
-  const db = appContext().db;
+): Promise<string | null | undefined> {
+  const db = appContext().asyncDb;
   const userId = c.get('user').id;
   const creating = current === undefined;
-  if (!carShareEnabled(db, vehicleId)) {
+  const vehicle = await repos().vehicles.findById(vehicleId);
+  if (!vehicle?.carShareEnabled) {
     if (requested) throw new ValidationError('Car sharing is off for this vehicle');
     return creating ? null : undefined;
   }
   if (requested === undefined) return creating ? ownDriverId(db, vehicleId, userId) : undefined;
-  if (requested !== null) assertActiveDriver(vehicleId, requested);
-  assertMayAttribute(c, vehicleId, requested, current);
+  if (requested !== null) await assertActiveDriver(vehicleId, requested);
+  await assertMayAttribute(c, vehicleId, requested, current);
   return requested;
 }
 

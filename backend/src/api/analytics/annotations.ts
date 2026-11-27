@@ -1,5 +1,5 @@
 import { type SQL, sql } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { rawAll } from '../../db/dialect';
 import type { UnitPreferences } from '../../types';
 import { convertDistance } from '../../utils/unit-conversions';
@@ -38,12 +38,12 @@ function inList(values: readonly string[]): SQL {
   );
 }
 
-export function serviceAnnotations(
-  db: AppDatabase,
+export async function serviceAnnotations(
+  db: AsyncAppDatabase,
   scope: Scope
-): { services: ServiceAnnotation[]; truncated: boolean } {
+): Promise<{ services: ServiceAnnotation[]; truncated: boolean }> {
   if (scope.vehicleIds.length === 0) return { services: [], truncated: false };
-  const rows = rawAll<{
+  const rows = await rawAll<{
     date: number;
     vehicle_id: string;
     description: string | null;
@@ -73,15 +73,15 @@ export function serviceAnnotations(
   return { services, truncated };
 }
 
-export function tripLane(
-  db: AppDatabase,
+export async function tripLane(
+  db: AsyncAppDatabase,
   scope: Scope,
   buckets: Array<{ start: number; end: number }>,
   units: { user: UnitPreferences; byVehicle: Map<string, UnitPreferences> }
-): TripLane {
+): Promise<TripLane> {
   const lane: TripLane = { count: buckets.map(() => 0), distance: buckets.map(() => 0) };
   if (scope.vehicleIds.length === 0 || buckets.length === 0) return lane;
-  const rows = rawAll<{ date: number; vehicle_id: string; distance: number }>(
+  const rows = await rawAll<{ date: number; vehicle_id: string; distance: number }>(
     db,
     sql`
     SELECT t.trip_date AS date, t.vehicle_id, t.end_odometer - t.start_odometer AS distance FROM trips t

@@ -112,8 +112,12 @@ Drizzle's async `sqlite-proxy` session:
 
 `src/db/__tests__/async-sqlite.test.ts` proves each of these properties, and removing either
 the wait or the queue fails a test. Rows map the same as with the sync driver, Drizzle's
-relational queries included. The exception is raw `db.all(sql…)`, which returns positional
-arrays and must move to the dialect helpers. The module keeps its own cache of 500 prepared
+relational queries and raw SQL included. Builder queries read positional rows, so joined
+tables that share a column name still map correctly. Raw `db.all(sql…)` and `db.get(sql…)`
+return rows keyed by column name, and raw `db.values(sql…)` returns positional arrays. A raw
+query that selects two columns with the same name keeps only the last, so alias them. Inside
+`db.batch`, raw `all` and `get` still return positional rows, so keep raw SQL out of batches. App
+code runs raw SQL through `rawAll` in `src/db/dialect`. The module keeps its own cache of 500 prepared
 statements, because `bun:sqlite`'s `query()` cache holds only 20 and the app has hundreds of
 distinct statements. Over 20,000 single-row selects cycling through 200 statement shapes, a
 query took 32 µs through the proxy against 44 µs through the sync driver.
@@ -136,13 +140,25 @@ own pooled transaction, so call sites won't change again.
 **Moving the app across (#1378).** `appContext().asyncDb` is the async session over the same
 connection as `appContext().db`, and repositories move to it area by area. The settings,
 auth-provider, photo-ref, insurance-claim, financing, push, vehicle, trip and share
-repositories are on it so far. `BaseRepository`'s shared methods run on it for every
-subclass. Expenses, odometer and reminders keep their own queries on a `syncDb` handle,
-because they open sync transactions. Those move in part C, with the transactions. One ordering
-rule holds the migration together: sync queries must be gone before the first async
-transaction ships, because a sync query issued while an async transaction is open runs
-inside it. The async module enforces this. It wraps the
-connection's `prepare`, `query`, `run`, `exec` and `transaction`, and any call that doesn't
+repositories are on it so far, and so are analytics, community stats, insurance policies,
+photos, drivers, the calendar feed, the settings and providers routes, provider resolution and
+the storage provider registry outside their transactions.
+`BaseRepository`'s shared methods run on it for every subclass. In `src/api/drivers/`,
+`carShareEnabled` and `ensureMemberDriver` take only a sync transaction handle, because the
+share-accept and car-share transactions call them; code outside a transaction reads a
+vehicle's car-share flag through `repos().vehicles`.
+
+Some repositories hold two handles on the same connection while the move is under way: the
+async session for ordinary queries, and `syncDb` for the sync transactions they still open.
+Expenses, odometer and reminders keep all their own queries on `syncDb`. Community stats,
+insurance policies and photos use `syncDb` only to open their transactions (and insurance for
+its vehicle access checks). When you edit one of these, use the transaction handle `tx`
+inside a transaction callback and the async session outside it, and never pass `syncDb` to
+code that runs on the async session. The sync transactions and `syncDb` go in part C.
+
+One ordering rule holds the migration together: sync queries must be gone before the first
+async transaction ships, because a sync query issued while an async transaction is open runs
+inside it. The async module enforces this. It wraps the connection's `prepare`, `query`, `run`, `exec` and `transaction`, and any call that doesn't
 come from the async session while an async transaction is open throws
 `SyncQueryInAsyncTransactionError`. The guard can't see a statement prepared before the
 transaction opened and run during it, so sync code must not hold prepared statements
