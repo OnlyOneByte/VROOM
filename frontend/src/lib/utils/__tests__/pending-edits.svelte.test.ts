@@ -301,6 +301,42 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		await vi.waitFor(() => expect(editFailureStates([saved])).toEqual([]));
 		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
 	});
+
+	test('a Retry that succeeds says so in place of the error toast', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockRejectedValueOnce(new ApiError('down', 500))
+			.mockResolvedValueOnce(changed);
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(editFailureStates([saved])).toHaveLength(1));
+
+		retryEdit('e1');
+		await vi.waitFor(() => expect(notices()).toHaveLength(3));
+		expect(notices()[2]).toMatchObject({
+			type: 'success',
+			message: 'Expense updated successfully',
+			toastId: 'expense-edit-e1'
+		});
+	});
+
+	test('a retried Undo that succeeds says the changes were undone, and a plain save adds no second toast', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce(changed)
+			.mockRejectedValueOnce(new ApiError('down', 500))
+			.mockResolvedValueOnce(saved);
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+		await flush();
+		expect(notices()).toHaveLength(1);
+
+		pressUndo();
+		await vi.waitFor(() => expect(notices()).toHaveLength(2));
+		retryEdit('e1');
+		await vi.waitFor(() => expect(notices()).toHaveLength(3));
+		expect(notices()[2]).toMatchObject({
+			type: 'success',
+			message: 'Your changes to the expense were undone'
+		});
+	});
 });
 
 describe('a save that never answers times out', () => {

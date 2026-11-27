@@ -19,6 +19,7 @@ interface PendingEdit {
 	undo?: boolean;
 	undoneAt?: string;
 	undoSeq?: number;
+	retried?: boolean;
 }
 
 export const EDIT_TIMEOUT_MS = 15_000;
@@ -48,6 +49,15 @@ async function put(id: string, seq: number, payload: EditPayload): Promise<void>
 		const stamp = saved?.updatedAt;
 		if (entry.seq === seq) {
 			edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
+			if (entry.retried) {
+				appStore.addNotification({
+					type: 'success',
+					message: entry.undo
+						? 'Your changes to the expense were undone'
+						: 'Expense updated successfully',
+					toastId: toastId(id)
+				});
+			}
 		} else if (entry.undo && entry.undoSeq === seq && !entry.undoneAt && stamp) {
 			edits.set(id, { ...entry, undoneAt: stamp });
 		}
@@ -144,7 +154,7 @@ export function retryEdit(id: string): void {
 	const entry = edits.get(id);
 	if (entry?.status !== 'failed') return;
 	appStore.dismissToast(toastId(id));
-	edits.set(id, { ...entry, status: 'saving', error: undefined, seq: ++nextSeq });
+	edits.set(id, { ...entry, status: 'saving', error: undefined, seq: ++nextSeq, retried: true });
 	send(id);
 }
 
