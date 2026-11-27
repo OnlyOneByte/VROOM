@@ -9,17 +9,16 @@ export async function deactivateFinancing(
   userId: string
 ): Promise<VehicleFinancing> {
   const now = new Date();
-  const { updated, cleared } = appContext().db.transaction((tx) => {
-    const row = tx
+  const { updated, cleared } = await appContext().asyncDb.transaction(async (tx) => {
+    const [row] = await tx
       .update(vehicleFinancing)
       .set({ isActive: false, endDate: now, updatedAt: now })
       .where(eq(vehicleFinancing.id, financingId))
-      .returning()
-      .get();
+      .returning();
     if (!row) {
       throw new NotFoundError('Resource');
     }
-    const detached = tx
+    const detached = await tx
       .update(expenses)
       .set({ sourceType: null, sourceId: null })
       .where(
@@ -29,8 +28,7 @@ export async function deactivateFinancing(
           eq(expenses.userId, userId)
         )
       )
-      .returning({ id: expenses.id })
-      .all();
+      .returning({ id: expenses.id });
     return { updated: row, cleared: detached.length };
   });
   if (cleared > 0) {

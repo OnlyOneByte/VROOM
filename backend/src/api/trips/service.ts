@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import { appContext, repos } from '../../app-context';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { type Trip, trips } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -65,13 +65,13 @@ export async function createTrip(
   userId: string,
   data: CreateTripInput,
   createdBy: string | null = null,
-  db: AppDatabase = appContext().db
+  db: AsyncAppDatabase = appContext().asyncDb
 ): Promise<Trip> {
   await requireVehicleAccess(data.vehicleId, userId, 'owner');
   const check = await readingCheck(data.vehicleId, data.endOdometer, data.tripDate, data.timeZone);
-  const trip = db.transaction((tx) => {
-    assertOdometerInOrder(tx, check);
-    const created = tx
+  const trip = await db.transaction(async (tx) => {
+    await assertOdometerInOrder(tx, check);
+    const [created] = await tx
       .insert(trips)
       .values({
         vehicleId: data.vehicleId,
@@ -86,9 +86,9 @@ export async function createTrip(
         driverId: data.driverId ?? null,
         createdBy,
       })
-      .returning()
-      .get();
-    repos().odometer.createFromTrip(
+      .returning();
+    if (!created) throw new Error('Trip insert returned no row');
+    await repos().odometer.createFromTrip(
       {
         tripId: created.id,
         vehicleId: data.vehicleId,
@@ -113,7 +113,7 @@ export async function updateTrip(
   existing: Trip,
   data: UpdateTripInput,
   timeZone: string | undefined,
-  db: AppDatabase = appContext().db
+  db: AsyncAppDatabase = appContext().asyncDb
 ): Promise<Trip> {
   // The schema refine sees both odometers only when the body sends both, so check the merged pair here.
   const start = data.startOdometer ?? existing.startOdometer;
@@ -129,16 +129,15 @@ export async function updateTrip(
   const tripDate = data.tripDate ?? existing.tripDate;
   const { id, vehicleId } = existing;
   const check = resync ? await readingCheck(vehicleId, end, tripDate, timeZone) : null;
-  const { updated, removedEntryIds } = db.transaction((tx) => {
-    const row = tx
+  const { updated, removedEntryIds } = await db.transaction(async (tx) => {
+    const [row] = await tx
       .update(trips)
       .set({ ...data, updatedAt: new Date() })
       .where(and(eq(trips.id, id), eq(trips.userId, userId)))
-      .returning()
-      .get();
+      .returning();
     if (!row) throw new NotFoundError('Trip');
     if (!resync) return { updated: row, removedEntryIds: [] };
-    const otherAtOld = repos().trips.findOtherAtOdometerKey(
+    const otherAtOld = await repos().trips.findOtherAtOdometerKey(
       {
         excludeTripId: id,
         vehicleId,
@@ -159,16 +158,20 @@ export async function updateTrip(
     };
     const movedId = otherAtOld
       ? null
-      : repos().odometer.moveLinkedTripEntry(oldKey, { odometer: end, recordedAt: tripDate }, tx);
+      : await repos().odometer.moveLinkedTripEntry(
+          oldKey,
+          { odometer: end, recordedAt: tripDate },
+          tx
+        );
     if (movedId) {
-      assertOdometerInOrder(tx, check && { ...check, excludeId: movedId });
+      await assertOdometerInOrder(tx, check && { ...check, excludeId: movedId });
       return { updated: row, removedEntryIds: [] };
     }
     let removed: string[] = [];
-    if (otherAtOld) repos().odometer.handOverLinkedTripEntry(oldKey, otherAtOld, tx);
-    else removed = repos().odometer.deleteLinkedTripEntry(oldKey, tx);
-    assertOdometerInOrder(tx, check);
-    repos().odometer.createFromTrip(
+    if (otherAtOld) await repos().odometer.handOverLinkedTripEntry(oldKey, otherAtOld, tx);
+    else removed = await repos().odometer.deleteLinkedTripEntry(oldKey, tx);
+    await assertOdometerInOrder(tx, check);
+    await repos().odometer.createFromTrip(
       {
         tripId: id,
         vehicleId,
@@ -192,7 +195,7 @@ export async function deleteTrip(
   userId: string,
   existing: Trip,
   options: { keepOdometer: boolean; timeZone: string | undefined },
-  db: AppDatabase = appContext().db
+  db: AsyncAppDatabase = appContext().asyncDb
 ): Promise<void> {
   const { id, vehicleId } = existing;
   const key = {
@@ -204,14 +207,13 @@ export async function deleteTrip(
     timeZone: options.timeZone,
   };
 
-  const { removedEntryIds, handedOver } = db.transaction((tx) => {
-    const row = tx
+  const { removedEntryIds, handedOver } = await db.transaction(async (tx) => {
+    const [row] = await tx
       .delete(trips)
       .where(and(eq(trips.id, id), eq(trips.userId, userId)))
-      .returning({ id: trips.id })
-      .get();
+      .returning({ id: trips.id });
     if (!row) throw new NotFoundError('Trip');
-    const other = repos().trips.findOtherAtOdometerKey(
+    const other = await repos().trips.findOtherAtOdometerKey(
       {
         excludeTripId: id,
         vehicleId,
@@ -223,11 +225,13 @@ export async function deleteTrip(
       tx
     );
     if (other) {
-      repos().odometer.handOverLinkedTripEntry(key, other, tx);
+      await repos().odometer.handOverLinkedTripEntry(key, other, tx);
       return { removedEntryIds: [], handedOver: true };
     }
     return {
-      removedEntryIds: options.keepOdometer ? [] : repos().odometer.deleteLinkedTripEntry(key, tx),
+      removedEntryIds: options.keepOdometer
+        ? []
+        : await repos().odometer.deleteLinkedTripEntry(key, tx),
       handedOver: false,
     };
   });

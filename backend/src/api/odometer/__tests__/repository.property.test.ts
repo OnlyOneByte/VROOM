@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import fc from 'fast-check';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 import { OdometerRepository } from '../repository';
@@ -26,7 +27,7 @@ describe('Odometer repository: manual entry CRUD', () => {
     );
 
     drizzleDb = drizzle(db, { schema });
-    repo = new OdometerRepository(drizzleDb);
+    repo = new OdometerRepository(openAsyncDatabase(drizzleDb.$client).db);
   });
 
   afterEach(() => {

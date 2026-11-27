@@ -139,18 +139,18 @@ own pooled transaction, so call sites won't change again.
 
 **Moving the app across (#1378).** `appContext().asyncDb` is the async session over the same
 connection as `appContext().db`, and repositories move to it area by area. The settings,
-auth-provider, photo-ref, insurance-claim, financing, push, vehicle, trip and share
-repositories are on it so far, and so are analytics, community stats, insurance policies,
+auth-provider, photo-ref, insurance-claim, financing, push, vehicle, trip, share, expense,
+odometer and reminder repositories are on it so far, and so are analytics, community stats, insurance policies,
 photos, drivers, the calendar feed, the settings and providers routes, provider resolution,
 the storage provider registry and Lucia's session adapter. Since part C1, so are the
 grants, roles, sign-up, share and driver transactions, the auth sign-up and unlink
-transactions, and the boot-time role sync and first-admin check.
+transactions, and the boot-time role sync and first-admin check. Since C2, so are the expense,
+split-expense, trip, odometer, reminder-trigger and financing transactions.
 `BaseRepository`'s shared methods run on it for every subclass.
 
 Some repositories hold two handles on the same connection while the move is under way: the
 async session for ordinary queries, and `syncDb` for the sync transactions they still open.
-Expenses, odometer and reminders keep all their own queries on `syncDb`. Community stats,
-insurance policies and photos use `syncDb` only to open their transactions. When you edit one
+Community stats, insurance policies and photos use `syncDb` only to open their transactions. When you edit one
 of these, use the transaction handle `tx`
 inside a transaction callback and the async session outside it, and never pass `syncDb` to
 code that runs on the async session. The sync transactions and `syncDb` go in part C.
@@ -163,7 +163,9 @@ share transitions in `src/api/shares/routes.ts` read the share, the owner and an
 grants inside their transaction; the role, assignment and override writes in
 `src/api/roles/routes.ts` read the role, the vehicle owner, the target member and the row they
 replace inside theirs; and `keepingARoleManager` counts role managers before and after the
-change in the same transaction. Each request's own permissions are still loaded once, before
+change in the same transaction. An expense, trip or odometer write checks that the reading
+fits between its neighbours (`assertOdometerInOrder`) inside its transaction, and a reminder
+claims its period inside the transaction that creates the expense or notification. Each request's own permissions are still loaded once, before
 its transaction opens (see "Permissions load, then check").
 
 Inside an async transaction, await only database work. The transaction holds the write lock,
@@ -177,16 +179,12 @@ checked. Use `outsideTransaction` for work that must start inside one and outliv
 The role-manager count skips accounts still waiting for approval, so a role given to one can't
 stand in for the last real role manager.
 
-Expenses, trips, odometer, reminders and financing still guard some writes with a sync read
-in the same synchronous stretch; those move inside their async transactions in part C2.
-
 The same holds for reads that look like one snapshot: a backup (`createBackup` in
 `src/api/sync/backup.ts`) and the Sheets mirror await each table in turn, so a write can land
 between two of their reads on either handle. A true snapshot needs a read transaction, which
 part C can add.
 
-What part C still has to move: the expense, trip, odometer, reminder and financing
-transactions (C2); the insurance, community and photo transactions, settings, and the
+What part C still has to move: the insurance, community and photo transactions, settings, and the
 synchronous checks that provider construction calls in `src/utils/outbound-url.ts`
 (`isNetworkAdmin`, `hasSecondAccount`, `adminEmailWarnings`) (C3); and the restore path, a
 read transaction for backups, the key-rotation script, and demo and sample seeding (C4).

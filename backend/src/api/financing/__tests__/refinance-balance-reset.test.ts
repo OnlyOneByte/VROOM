@@ -64,7 +64,7 @@ describe('refinance after payoff resets the balance', () => {
     seedFinancingPayment(3000, 'fin-refi');
     expect(await repo.computeBalance('fin-refi')).toBe(12000);
 
-    const localExpenseRepo = new ExpenseRepository(db);
+    const localExpenseRepo = new ExpenseRepository(openAsyncDatabase(db.$client).db);
     const cleared = await localExpenseRepo.clearSource('financing', 'fin-refi', USER_ID);
     expect(cleared).toBe(2);
 
