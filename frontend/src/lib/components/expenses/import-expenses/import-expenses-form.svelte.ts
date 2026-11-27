@@ -235,9 +235,10 @@ export class ImportExpensesForm {
 	}
 
 	setColumnField(header: string, field: NativeImportField | '') {
+		if (!header) return;
 		const next: ManualColumns = { ...this.manualColumns };
 		for (const key of Object.keys(next) as NativeImportField[]) {
-			if (next[key] === header) next[key] = '';
+			if (next[key] === header) delete next[key];
 		}
 		if (field) next[field] = header;
 		const categoryChanged = (next.category ?? '') !== (this.manualColumns.category ?? '');

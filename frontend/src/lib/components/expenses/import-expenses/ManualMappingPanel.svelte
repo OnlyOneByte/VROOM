@@ -53,7 +53,12 @@
 		MAPPABLE_FIELDS.filter(f => f.required && !form.manualColumns[f.field]).map(f => f.label)
 	);
 
+	const columns = $derived(
+		form.fileHeaders.map((header, i) => ({ header, i })).filter(({ header }) => header)
+	);
+
 	function fieldFor(header: string) {
+		if (!header) return undefined;
 		return MAPPABLE_FIELDS.find(f => form.manualColumns[f.field] === header);
 	}
 </script>
@@ -75,7 +80,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each form.fileHeaders as header, i (i)}
+			{#each columns as { header, i } (i)}
 				{@const mapped = fieldFor(header)}
 				<tr class="border-b">
 					<th scope="row" class="py-2 pr-3 text-left font-normal break-words">
@@ -108,11 +113,13 @@
 		</tbody>
 	</table>
 
-	{#if missing.length > 0}
-		<p class="text-sm text-muted-foreground" role="status" data-testid="mapping-missing">
-			Still needed: {missing.join(' and ')}
-		</p>
-	{/if}
+	<p
+		class="text-sm text-muted-foreground {missing.length > 0 ? '' : 'sr-only'}"
+		role="status"
+		data-testid="mapping-missing"
+	>
+		{missing.length > 0 ? `Still needed: ${missing.join(' and ')}` : ''}
+	</p>
 
 	<div class="flex items-center gap-2">
 		<label for="manual-date-format" class="w-32 shrink-0 text-sm text-muted-foreground">

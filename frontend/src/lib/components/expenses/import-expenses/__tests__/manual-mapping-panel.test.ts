@@ -115,7 +115,33 @@ describe('ManualMappingPanel: column mapping', () => {
 
 		await pick(screen.getByLabelText('When'), "Don't import");
 
-		expect(form.manualColumns.date).toBe('');
+		expect(form.manualColumns).not.toHaveProperty('date');
+		expect(screen.getByTestId('mapping-missing')).toHaveTextContent('Still needed: Date');
+	});
+
+	test('a column with no header is left out, and a cleared field never shows on it', async () => {
+		const form = manualForm();
+		form.fileHeaders = ['When', 'Spent', ''];
+		form.csvText = 'When,Spent,\n2025-03-14,38.20,';
+		form.manualColumns = { date: 'When', amount: 'Spent' };
+		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
+
+		const rows = within(screen.getByTestId('column-mapping')).getAllByRole('row').slice(1);
+		expect(rows).toHaveLength(2);
+
+		await pick(screen.getByLabelText('When'), "Don't import");
+		expect(screen.getByLabelText('When')).toHaveTextContent("Don't import");
+		expect(screen.getByLabelText('Spent')).toHaveTextContent('Amount *');
+	});
+
+	test('the Still needed line stays mounted, empty once Date and Amount are mapped', () => {
+		const form = manualForm();
+		form.manualColumns = { date: 'When', amount: 'Spent' };
+		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
+
+		const status = screen.getByRole('status');
+		expect(status).toHaveTextContent('');
+		expect(status).toHaveClass('sr-only');
 	});
 });
 

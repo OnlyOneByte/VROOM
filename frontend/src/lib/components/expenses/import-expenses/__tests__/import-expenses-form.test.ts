@@ -563,6 +563,24 @@ describe('ImportExpensesForm: a new file replaces the old preview at once', () =
 		expect(form.categoryRemap).toEqual({});
 	});
 
+	test('mapping an unrelated column keeps the category picks', async () => {
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		const csv = 'Transaction Date,Spent,Kind,Type\n2026-01-02,40,gas,ferry';
+		await form.loadFile(new File([csv], 'foreign.csv'));
+		form.setColumnField('Transaction Date', 'date');
+		form.setColumnField('Spent', 'amount');
+		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ unmappedCategories: ['gas'] }));
+		form.setColumnField('Kind', 'category');
+		await flush();
+		form.setCategoryRemap('gas', 'fuel');
+		await flush();
+
+		form.setColumnField('Type', 'description');
+		await flush();
+
+		expect(form.categoryRemap).toEqual({ gas: 'fuel' });
+	});
+
 	test('a failed re-preview drops the old result instead of leaving it importable', async () => {
 		mocks.detectImportSource.mockResolvedValue(FUELLY);
 		const form = new ImportExpensesForm(() => [CAMRY]);

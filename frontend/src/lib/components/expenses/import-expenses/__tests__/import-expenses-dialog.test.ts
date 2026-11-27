@@ -258,6 +258,18 @@ describe('ImportExpensesDialog', () => {
 		expect(screen.getByLabelText('Spent')).toHaveTextContent('Amount *');
 	});
 
+	test('the row count skips blank lines and the trailing newline', async () => {
+		renderDialog();
+
+		await chooseFile(`${FOREIGN_CSV}\r\n\r\n2026-01-03,12,toll\r\n`, 'bank.csv');
+
+		await waitFor(() =>
+			expect(
+				screen.getByText('bank.csv · 2 rows. Match each column to a VROOM field.')
+			).toBeInTheDocument()
+		);
+	});
+
 	test('a failed import keeps the dialog open and does not report success', async () => {
 		mocks.detectImportSource.mockResolvedValue(FUELLY);
 		const { onImported } = renderDialog();
