@@ -767,7 +767,7 @@ describe('ExpenseForm edit mode', () => {
 		const dialog = await screen.findByRole('alertdialog');
 		expect(dialog.textContent).toContain('Oil change');
 
-		await fireEvent.click(screen.getByRole('button', { name: /delete expense/i }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/expenses'));
 		expect(notificationMessages()).toContain('Expense deleted');
