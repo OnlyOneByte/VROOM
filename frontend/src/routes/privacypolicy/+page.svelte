@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import { routes } from '#lib/routes.ts';
+	import LegalPage from '#lib/components/common/LegalPage.svelte';
 </script>
 
 <svelte:head>
@@ -8,180 +7,163 @@
 	<meta name="description" content="VROOM privacy policy — how we handle your data." />
 </svelte:head>
 
-<div class="min-h-screen bg-background">
-	<div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16">
-		<a
-			href={resolve(routes.home)}
-			class="inline-flex min-h-10 items-center gap-2 text-sm text-muted-foreground mb-8 hover:text-foreground transition-colors sm:min-h-0"
-		>
-			<span>←</span> Back to home
-		</a>
+<LegalPage title="Privacy Policy" updated="November 2026">
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Overview</h2>
+		<p>
+			VROOM ("the Service") is an open-source, self-hostable vehicle expense tracking application.
+			This privacy policy describes how data is collected, used, and stored when you use the
+			Service.
+		</p>
+		<p>
+			Because VROOM is designed to be self-hosted, the operator of each instance controls where data
+			is stored and how it is managed. This policy covers the default behavior of the software.
+		</p>
+	</section>
 
-		<h1 class="text-4xl font-bold text-foreground mb-2">Privacy Policy</h1>
-		<p class="text-muted-foreground mb-10">Last updated: November 2026</p>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Data We Collect</h2>
+		<p>When you sign in with Google, we receive and store:</p>
+		<ul class="list-disc space-y-1 pl-6 marker:text-muted-foreground">
+			<li>Your Google account email address</li>
+			<li>Your display name</li>
+			<li>Your Google account ID (for authentication)</li>
+		</ul>
+		<p>When you use the Service, you may provide:</p>
+		<ul class="list-disc space-y-1 pl-6 marker:text-muted-foreground">
+			<li>Vehicle information (make, model, year, VIN, license plate)</li>
+			<li>Expense records (fuel, maintenance, insurance, financing)</li>
+			<li>Odometer readings</li>
+			<li>Photos of vehicles, receipts, or documents</li>
+		</ul>
+	</section>
 
-		<div class="space-y-8 text-foreground leading-relaxed">
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Overview</h2>
-				<p>
-					VROOM ("the Service") is an open-source, self-hostable vehicle expense tracking
-					application. This privacy policy describes how data is collected, used, and stored when
-					you use the Service.
-				</p>
-				<p>
-					Because VROOM is designed to be self-hosted, the operator of each instance controls where
-					data is stored and how it is managed. This policy covers the default behavior of the
-					software.
-				</p>
-			</section>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">How Data Is Stored</h2>
+		<p>
+			All data is stored in a SQLite database on the server where the instance is hosted. No data is
+			sent to third-party analytics services, advertising networks, or data brokers.
+		</p>
+		<p>
+			If you enable Google Drive sync, your data is also stored in your personal Google Drive
+			account as CSV files and/or Google Sheets. This data remains under your Google account's
+			control and access policies.
+		</p>
+		<p>
+			Photos are stored in your Google Drive. The Service does not store photo files on the server.
+		</p>
+	</section>
 
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Data We Collect</h2>
-				<p>When you sign in with Google, we receive and store:</p>
-				<ul class="list-disc pl-6 space-y-1 text-foreground">
-					<li>Your Google account email address</li>
-					<li>Your display name</li>
-					<li>Your Google account ID (for authentication)</li>
-				</ul>
-				<p>When you use the Service, you may provide:</p>
-				<ul class="list-disc pl-6 space-y-1 text-foreground">
-					<li>Vehicle information (make, model, year, VIN, license plate)</li>
-					<li>Expense records (fuel, maintenance, insurance, financing)</li>
-					<li>Odometer readings</li>
-					<li>Photos of vehicles, receipts, or documents</li>
-				</ul>
-			</section>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Google API Usage</h2>
+		<p>The Service uses the following Google API scopes:</p>
+		<ul class="list-disc space-y-1 pl-6 marker:text-muted-foreground">
+			<li>Drive file access — to create and manage backup files and photos in your Drive</li>
+			<li>Drive app data — to store configuration in your Drive</li>
+			<li>Drive install — to connect the app to your Drive</li>
+			<li>Sheets access — to mirror your data to a Google Sheets spreadsheet (optional)</li>
+		</ul>
+		<p>
+			The Service only accesses files it creates. It does not read, modify, or delete any other
+			files in your Google Drive.
+		</p>
+	</section>
 
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">How Data Is Stored</h2>
-				<p>
-					All data is stored in a SQLite database on the server where the instance is hosted. No
-					data is sent to third-party analytics services, advertising networks, or data brokers.
-				</p>
-				<p>
-					If you enable Google Drive sync, your data is also stored in your personal Google Drive
-					account as CSV files and/or Google Sheets. This data remains under your Google account's
-					control and access policies.
-				</p>
-				<p>
-					Photos are stored in your Google Drive. The Service does not store photo files on the
-					server.
-				</p>
-			</section>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Cookies & Sessions</h2>
+		<p>
+			The Service uses a session cookie to keep you signed in. This cookie contains only a session
+			identifier and is required for the Service to function. No tracking cookies, analytics
+			cookies, or third-party cookies are used.
+		</p>
+	</section>
 
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Google API Usage</h2>
-				<p>The Service uses the following Google API scopes:</p>
-				<ul class="list-disc pl-6 space-y-1 text-foreground">
-					<li>Drive file access — to create and manage backup files and photos in your Drive</li>
-					<li>Drive app data — to store configuration in your Drive</li>
-					<li>Drive install — to connect the app to your Drive</li>
-					<li>Sheets access — to mirror your data to a Google Sheets spreadsheet (optional)</li>
-				</ul>
-				<p>
-					The Service only accesses files it creates. It does not read, modify, or delete any other
-					files in your Google Drive.
-				</p>
-			</section>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Data Retention & Deletion</h2>
+		<p>
+			Your data is retained as long as your account exists. You can export all your data at any time
+			via the backup feature (CSV format). To delete your account and all associated data, contact
+			the instance operator.
+		</p>
+		<p>
+			Data synced to your Google Drive remains in your Drive even if your account on this instance
+			is deleted. You can manage or delete that data directly from Google Drive.
+		</p>
+	</section>
 
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Cookies & Sessions</h2>
-				<p>
-					The Service uses a session cookie to keep you signed in. This cookie contains only a
-					session identifier and is required for the Service to function. No tracking cookies,
-					analytics cookies, or third-party cookies are used.
-				</p>
-			</section>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Community Comparisons (Optional)</h2>
+		<p>
+			If this server has community comparisons turned on and you switch on "Include my vehicles in
+			community stats" in Settings, anonymous averages built from your vehicles are shown to other
+			people on the same server who have also opted in. Each average covers a group of about 30
+			people or more (a server can set this, but never below 20). The average, the group size and
+			whether a group is shown at all have random noise added. That strictly limits how much anyone
+			can learn about you from them, including whether you are in a group, and an average is never
+			your own numbers. Only make, model and model year, powertrain, vehicle kind (such as car or
+			motorcycle), vehicle age, your currency, your region if you set one, and from the last 12
+			months your fuel, maintenance and insurance costs, your fuel or charge amounts, and the
+			distance driven (worked out from your odometer readings) are used.
+		</p>
+		<p>
+			Nothing leaves the server. The setting is off by default, restoring a backup never turns it
+			on, and if you turn it off you are left out from the next daily refresh.
+		</p>
+	</section>
 
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Data Retention & Deletion</h2>
-				<p>
-					Your data is retained as long as your account exists. You can export all your data at any
-					time via the backup feature (CSV format). To delete your account and all associated data,
-					contact the instance operator.
-				</p>
-				<p>
-					Data synced to your Google Drive remains in your Drive even if your account on this
-					instance is deleted. You can manage or delete that data directly from Google Drive.
-				</p>
-			</section>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Third-Party Services</h2>
+		<p>The Service interacts with the following third-party services:</p>
+		<ul class="list-disc space-y-1 pl-6 marker:text-muted-foreground">
+			<li>Google OAuth — for authentication</li>
+			<li>Google Drive API — for backup and photo storage (optional)</li>
+			<li>Google Sheets API — for data mirroring (optional)</li>
+		</ul>
+		<p>
+			No other third-party services are used. There is no analytics, advertising, or tracking
+			integration of any kind.
+		</p>
+	</section>
 
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Community Comparisons (Optional)</h2>
-				<p>
-					If this server has community comparisons turned on and you switch on "Include my vehicles
-					in community stats" in Settings, anonymous averages built from your vehicles are shown to
-					other people on the same server who have also opted in. Each average covers a group of
-					about 30 people or more (a server can set this, but never below 20). The average, the
-					group size and whether a group is shown at all have random noise added. That strictly
-					limits how much anyone can learn about you from them, including whether you are in a
-					group, and an average is never your own numbers. Only make, model and model year,
-					powertrain, vehicle kind (such as car or motorcycle), vehicle age, your currency, your
-					region if you set one, and from the last 12 months your fuel, maintenance and insurance
-					costs, your fuel or charge amounts, and the distance driven (worked out from your odometer
-					readings) are used.
-				</p>
-				<p>
-					Nothing leaves the server. The setting is off by default, restoring a backup never turns
-					it on, and if you turn it off you are left out from the next daily refresh.
-				</p>
-			</section>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Open Source</h2>
+		<p>
+			VROOM is open-source software. You can review the complete source code to verify exactly what
+			data is collected and how it is handled. The source code is available on
+			<a
+				href="https://github.com/OnlyOneByte/vroom"
+				class="font-medium text-accent-ink underline underline-offset-4 hover:decoration-2"
+				target="_blank"
+				rel="noopener noreferrer"
+			>
+				GitHub
+			</a>.
+		</p>
+	</section>
 
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Third-Party Services</h2>
-				<p>The Service interacts with the following third-party services:</p>
-				<ul class="list-disc pl-6 space-y-1 text-foreground">
-					<li>Google OAuth — for authentication</li>
-					<li>Google Drive API — for backup and photo storage (optional)</li>
-					<li>Google Sheets API — for data mirroring (optional)</li>
-				</ul>
-				<p>
-					No other third-party services are used. There is no analytics, advertising, or tracking
-					integration of any kind.
-				</p>
-			</section>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Changes to This Policy</h2>
+		<p>
+			This policy may be updated from time to time. Changes will be reflected on this page with an
+			updated date. Continued use of the Service after changes constitutes acceptance of the updated
+			policy.
+		</p>
+	</section>
 
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Open Source</h2>
-				<p>
-					VROOM is open-source software. You can review the complete source code to verify exactly
-					what data is collected and how it is handled. The source code is available on
-					<a
-						href="https://github.com/OnlyOneByte/vroom"
-						class="text-primary underline underline-offset-4 hover:decoration-2"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						GitHub
-					</a>.
-				</p>
-			</section>
-
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Changes to This Policy</h2>
-				<p>
-					This policy may be updated from time to time. Changes will be reflected on this page with
-					an updated date. Continued use of the Service after changes constitutes acceptance of the
-					updated policy.
-				</p>
-			</section>
-
-			<section class="space-y-3">
-				<h2 class="text-xl font-semibold text-foreground">Contact</h2>
-				<p>
-					If you have questions about this privacy policy or how your data is handled, please open
-					an issue on the
-					<a
-						href="https://github.com/OnlyOneByte/vroom"
-						class="text-primary underline underline-offset-4 hover:decoration-2"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						GitHub repository
-					</a>
-					or contact the instance operator.
-				</p>
-			</section>
-		</div>
-	</div>
-</div>
+	<section class="space-y-3 border-t pt-5">
+		<h2 class="text-base font-semibold">Contact</h2>
+		<p>
+			If you have questions about this privacy policy or how your data is handled, please open an
+			issue on the
+			<a
+				href="https://github.com/OnlyOneByte/vroom"
+				class="font-medium text-accent-ink underline underline-offset-4 hover:decoration-2"
+				target="_blank"
+				rel="noopener noreferrer"
+			>
+				GitHub repository
+			</a>
+			or contact the instance operator.
+		</p>
+	</section>
+</LegalPage>

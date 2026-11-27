@@ -21,7 +21,7 @@ describe('deleting a storage provider that holds the only copy of photos', () =>
 	});
 
 	test('photosOnlyOnProvider reads the count from the 409 the server sends', () => {
-		const conflict = new ApiError('2 photos are stored only in this provider.', 409, {
+		const conflict = new ApiError('2 photos are stored only in this storage.', 409, {
 			photosOnlyHere: 2
 		});
 		expect(photosOnlyOnProvider(conflict)).toBe(2);

@@ -51,7 +51,7 @@ describe('deleting a storage provider that holds the only copy of photos', () =>
       res
     );
     expect(body.error.details.photosOnlyHere).toBe(1);
-    expect(body.error.message).toContain('1 photo is stored only in this provider');
+    expect(body.error.message).toContain('1 photo is stored only in this storage');
     expect(providerIds()).toEqual(['prov-a', 'prov-b']);
     expect(ctx.sqlite.query('SELECT id FROM photo_refs').all()).toEqual([{ id: 'ref-a' }]);
   });
