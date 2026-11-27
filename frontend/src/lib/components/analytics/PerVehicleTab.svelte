@@ -224,7 +224,7 @@
 	let tcoSummaryItems = $derived.by(() => {
 		if (!tco) return [];
 		const ownership = [
-			{ label: 'Total Cost', value: formatCurrency(tco.totalCost) },
+			{ label: 'Total cost of ownership', value: formatCurrency(tco.totalCost) },
 			{
 				label: costPerDistLabel,
 				value: tco.costPerDistance != null ? formatCurrency(tco.costPerDistance) : 'N/A'
@@ -288,7 +288,7 @@
 			/>
 		{:else if health && tco && expenses && selectedVehicle}
 			<section aria-label="{carName(selectedVehicle)} overview" class="space-y-8">
-				<div class="grid gap-6 md:grid-cols-2 md:gap-10">
+				<div class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
 					<div class="space-y-2">
 						<h2 class="text-base text-muted-foreground md:text-lg">
 							{carName(selectedVehicle)}, all time
@@ -342,7 +342,7 @@
 					</p>
 				{/if}
 
-				<div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-10">
+				<div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-10">
 					{#if filterLabel && onClearFilters && rangeEmpty}
 						<EmptyState level={2}>
 							{#snippet icon()}
