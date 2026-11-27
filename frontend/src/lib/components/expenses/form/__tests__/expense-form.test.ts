@@ -605,6 +605,15 @@ describe('ExpenseForm edit mode', () => {
 		expect(field('amount')).not.toHaveClass('text-7xl');
 	});
 
+	test('the vehicle and date sit above the title, outside its name', async () => {
+		await renderEdit();
+
+		const title = screen.getByRole('heading', { level: 1, name: 'Oil change' });
+		const kicker = await screen.findByText(/2020 Toyota Camry/, { selector: 'p' });
+		expect(kicker.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		expect(title.contains(kicker)).toBe(false);
+	});
+
 	test('the back link names where it goes, and the title falls back to the category', async () => {
 		await renderEdit({ ...EXISTING, description: '' }, '/vehicles/v1');
 

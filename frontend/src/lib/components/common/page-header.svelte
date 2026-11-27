@@ -7,9 +7,10 @@
 		back?: Snippet;
 		actions?: Snippet;
 		variant?: 'default' | 'display';
+		eyebrow?: string | Snippet | undefined;
 	}
 
-	let { title, description, back, actions, variant = 'default' }: Props = $props();
+	let { title, description, back, actions, variant = 'default', eyebrow }: Props = $props();
 </script>
 
 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-4">
@@ -18,6 +19,11 @@
 			{@render back()}
 		{/if}
 		<div class="min-w-0">
+			{#if eyebrow}
+				<p class="mb-1 text-[0.8125rem] leading-snug font-medium text-muted-foreground">
+					{#if typeof eyebrow === 'function'}{@render eyebrow()}{:else}{eyebrow}{/if}
+				</p>
+			{/if}
 			<h1
 				tabindex="-1"
 				class="{variant === 'display'

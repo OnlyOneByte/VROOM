@@ -43,7 +43,7 @@
 			<ChevronLeft class="size-4" aria-hidden="true" />
 			{backLabel}
 		</button>
-		<PageHeader variant="display" {title} description={subtitle} {actions} />
+		<PageHeader variant="display" {title} eyebrow={subtitle} {actions} />
 	</div>
 {:else}
 	<PageHeader {title} description={subtitle}>
