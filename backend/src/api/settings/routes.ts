@@ -240,9 +240,7 @@ function rateInNewDistanceUnit(
   if (to === from) return {};
   const perNewUnit = existing.businessMileageRate * convertDistance(1, to, from);
   const rounded =
-    perNewUnit < 0.0001
-      ? Number(perNewUnit.toPrecision(4))
-      : Math.round(perNewUnit * 10_000) / 10_000;
+    perNewUnit < 0.1 ? Number(perNewUnit.toPrecision(4)) : Math.round(perNewUnit * 10_000) / 10_000;
   return { businessMileageRate: Math.min(rounded, MAX_BUSINESS_MILEAGE_RATE) };
 }
 
