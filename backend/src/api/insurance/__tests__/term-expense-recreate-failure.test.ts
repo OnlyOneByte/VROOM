@@ -66,10 +66,12 @@ describe('insurance term update premium recreate failure', () => {
       });
       const body = await json<{ success: boolean; error?: { message: string } }>(res);
 
-      expect(premiumRows(termId).length, 'the old premium row was deleted').toBe(0);
+      const rows = premiumRows(termId);
+      expect(rows.length, 'the old premium row is kept when the recreate fails').toBe(1);
+      expect(rows[0]?.expense_amount).toBe(120_000);
       expect(res.status, JSON.stringify(body)).toBe(500);
       expect(body.success).toBe(false);
-      expect(body.error?.message).toContain('premium expense could not be recreated');
+      expect(body.error?.message).toContain('premium expense could not be updated');
     } finally {
       spy.mockRestore();
     }

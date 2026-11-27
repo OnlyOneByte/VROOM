@@ -28,10 +28,23 @@ function stripComments(src: string): string {
 const SYNC_HANDLE_TYPE =
   /\b(AppDatabase|DrizzleTransaction|syncDb)\b|appContext\(\)\.db\b|\{[^}]*\bdb\b[^}]*\}\s*=\s*appContext\(\)|\bgetDb\(\)|drizzle-orm\/bun-sqlite/;
 
+const CONTEXT_BINDING = /\b(\w+)\s*=\s*appContext\(\)/g;
+const SYNC_RENAMED_AS_ASYNC = /\{[^}]*\bdb\s*:\s*asyncDb\b[^}]*\}\s*=\s*appContext\(\)/;
+
+function holdsSyncHandle(code: string): boolean {
+  if (SYNC_HANDLE_TYPE.test(code)) return true;
+  return [...code.matchAll(CONTEXT_BINDING)].some(([, name]) =>
+    new RegExp(`\\b${name}\\.db\\b`).test(code)
+  );
+}
+
 function countAsyncTransactions(src: string): number {
   const code = stripComments(src);
-  if (!SYNC_HANDLE_TYPE.test(code)) return 0;
-  return (code.match(/(?<!(?:^|[^\w$])asyncDb)\.transaction\(\s*async\b/g) ?? []).length;
+  if (!holdsSyncHandle(code)) return 0;
+  const callbacks = SYNC_RENAMED_AS_ASYNC.test(code)
+    ? /\.transaction\(\s*async\b/g
+    : /(?<!(?:^|[^\w$])asyncDb)\.transaction\(\s*async\b/g;
+  return (code.match(callbacks) ?? []).length;
 }
 
 countRatchet({
@@ -68,6 +81,17 @@ countRatchet({
     expect(countAsyncTransactions('this.db.transaction(async (tx) => 1);')).toBe(0);
     expect(countAsyncTransactions('appContext().db.transaction(async () => 1);')).toBe(1);
     expect(countAsyncTransactions('getDb().transaction(async () => 1);')).toBe(1);
+    expect(
+      countAsyncTransactions('const ctx = appContext();\nctx.db.transaction(async () => 1);')
+    ).toBe(1);
+    expect(
+      countAsyncTransactions('const ctx = appContext();\nctx.asyncDb.transaction(async () => 1);')
+    ).toBe(0);
+    expect(
+      countAsyncTransactions(
+        'const { db: asyncDb } = appContext();\nasyncDb.transaction(async () => 1);'
+      )
+    ).toBe(1);
     expect(
       countAsyncTransactions(
         'const { db, asyncDb } = appContext();\ndb.transaction(async () => 1);'

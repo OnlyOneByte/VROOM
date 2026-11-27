@@ -148,8 +148,10 @@ transactions, and the boot-time role sync and first-admin check. Since C2, so ar
 split-expense, trip, odometer, reminder-trigger and financing transactions.
 `BaseRepository`'s shared methods run on it for every subclass.
 
-Since C3, every repository and every transaction outside the restore path runs on the async
-session. Inside a transaction callback, use the transaction handle `tx`; outside it, use the
+Since C3, every repository and every transaction runs on the async session, except the
+restore path, the key-rotation script and sample seeding, which move in C4. The analytics
+repositories already query through the async session; only their constructors still take the
+sync handle, until C5. Inside a transaction callback, use the transaction handle `tx`; outside it, use the
 async session. Insurance writes check vehicle ownership inside the transaction that writes,
 and a currency change rescales the owner's money and saves the new currency in one transaction.
 

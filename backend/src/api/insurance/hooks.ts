@@ -1,4 +1,4 @@
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { AppError, ConflictError, ValidationError } from '../../errors';
 import { termBillingMonths } from '../../utils/calculations';
@@ -111,33 +111,39 @@ export function assertTermPremiumWithinCap(
   }
 }
 
+function createPremiumExpenses(params: TermExpenseParams, totalCost: number) {
+  const { termId, vehicleIds, startDate, policyNumber, userId } = params;
+  const description = policyNumber ? `Insurance premium — ${policyNumber}` : 'Insurance premium';
+  return repos().expenses.createSplitExpense(
+    {
+      splitConfig: { method: 'even', vehicleIds },
+      category: 'financial',
+      tags: ['insurance'],
+      date: startDate,
+      description,
+      totalAmount: totalCost,
+      sourceType: 'insurance_term',
+      sourceId: termId,
+    },
+    { ownerId: userId, createdBy: null }
+  );
+}
+
+function atScale<T>(userId: string, scale: number | undefined, write: () => Promise<T>) {
+  return scale === undefined
+    ? appContext().asyncDb.transaction(write)
+    : repos().preferences.writeAtScale(userId, scale, write);
+}
+
 async function materializeTermExpenses(
   params: TermExpenseParams,
   totalCost: number,
   scale?: number
 ): Promise<void> {
-  const { termId, vehicleIds, startDate, policyNumber, userId } = params;
-  const description = policyNumber ? `Insurance premium — ${policyNumber}` : 'Insurance premium';
-
-  const create = () =>
-    repos().expenses.createSplitExpense(
-      {
-        splitConfig: { method: 'even', vehicleIds },
-        category: 'financial',
-        tags: ['insurance'],
-        date: startDate,
-        description,
-        totalAmount: totalCost,
-        sourceType: 'insurance_term',
-        sourceId: termId,
-      },
-      { ownerId: userId, createdBy: null }
-    );
-  await (scale === undefined ? create() : repos().preferences.writeAtScale(userId, scale, create));
-
+  await atScale(params.userId, scale, () => createPremiumExpenses(params, totalCost));
   logger.info('Auto-created insurance expenses for term', {
-    termId,
-    vehicleCount: vehicleIds.length,
+    termId: params.termId,
+    vehicleCount: params.vehicleIds.length,
     totalCost,
   });
 }
@@ -198,7 +204,6 @@ async function termExpensesInSync(params: TermExpenseParams): Promise<boolean> {
   return expectsExpenses === linked.length > 0;
 }
 
-// Delete and recreate are not atomic: a failed recreate must throw rather than silently drop the premium.
 export async function updateTermExpenses(
   params: TermExpenseParams,
   previous?: TermExpenseParams,
@@ -214,30 +219,28 @@ export async function updateTermExpenses(
 
   const { termId, vehicleIds, userId } = params;
   const totalCost = effectiveTermCost(params);
-  if (scale !== undefined && (await repos().preferences.moneyScale(userId)) !== scale) {
-    throw new ConflictError(
-      'The currency changed while this was being saved. Reload and try again'
-    );
-  }
-
-  const deleted = await deleteTermExpenses(termId, userId);
-  if (deleted > 0) {
-    logger.info('Deleted old insurance expenses for term update', { termId, deleted });
-  }
-
-  if (totalCost <= 0 || vehicleIds.length === 0) return;
+  const linked = await repos().expenses.findBySource('insurance_term', termId, userId);
+  await deletePhotosForEntities(
+    'expense',
+    linked.map((expense) => expense.id),
+    userId
+  );
 
   try {
-    await materializeTermExpenses(params, totalCost, scale);
+    const deleted = await atScale(userId, scale, async () => {
+      const removed = await repos().expenses.deleteBySource('insurance_term', termId, userId);
+      if (totalCost > 0 && vehicleIds.length > 0) await createPremiumExpenses(params, totalCost);
+      return removed;
+    });
+    logger.info('Replaced insurance expenses for term update', { termId, deleted });
   } catch (error) {
     if (error instanceof ConflictError) throw error;
-    logger.error('Failed to recreate insurance expenses for term update', {
+    logger.error('Failed to replace insurance expenses for term update', {
       termId,
-      deleted,
       error: error instanceof Error ? error.message : String(error),
     });
     throw new AppError(
-      'The insurance term was saved, but its premium expense could not be recreated. ' +
+      'The insurance term was saved, but its premium expense could not be updated. ' +
         'Re-save the term to retry.',
       500
     );

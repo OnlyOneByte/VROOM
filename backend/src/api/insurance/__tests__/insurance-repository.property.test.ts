@@ -80,8 +80,45 @@ describe('insurance write failures', () => {
     expect(error).toBeInstanceOf(DatabaseError);
     expect((error as DatabaseError).message).toBe('Failed to create insurance policy');
     expect((error as DatabaseError).details).toBeUndefined();
+    expect(counts()).toEqual({ policies: 0, terms: 0, coverage: 0 });
+  });
+
+  test('a failed addTerm or updateTerm leaves no partial coverage behind', async () => {
+    const term = {
+      startDate: new Date('2024-01-01T00:00:00Z'),
+      endDate: new Date('2024-12-31T00:00:00Z'),
+      vehicleCoverage: { vehicleIds: ['v-1'] },
+    };
+    const policy = await repo.create({ company: 'Co', terms: [term] }, USER_ID);
+    const termId = policy.terms[0]?.id ?? '';
+    const before = counts();
+
+    const twice = { vehicleIds: ['v-2', 'v-2'] };
+    await expect(
+      repo.addTerm(policy.id, { ...term, vehicleCoverage: twice }, USER_ID)
+    ).rejects.toThrow(DatabaseError);
+    expect(counts()).toEqual(before);
+
+    await expect(
+      repo.updateTerm(policy.id, termId, { policyNumber: 'X-1', vehicleCoverage: twice }, USER_ID)
+    ).rejects.toThrow(DatabaseError);
+    expect(counts()).toEqual(before);
+    const stored = sqliteDb
+      .query('SELECT policy_number AS n FROM insurance_terms WHERE id = ?')
+      .get(termId) as { n: string | null };
+    expect(stored.n).toBeNull();
   });
 });
+
+function counts() {
+  const n = (table: string) =>
+    (sqliteDb.query(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+  return {
+    policies: n('insurance_policies'),
+    terms: n('insurance_terms'),
+    coverage: n('insurance_term_vehicles'),
+  };
+}
 
 describe('insurance term CRUD round-trip', () => {
   test('addTerm inserts a term row and junction rows retrievable via findById', async () => {

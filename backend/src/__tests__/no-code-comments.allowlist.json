@@ -46,7 +46,6 @@
   "backend/src/api/financing/__tests__/financing-balance.property.test.ts: vehicle_financing is unique per vehicle, so each financing record needs its own vehicle.",
   "backend/src/api/financing/routes.ts: update() skips undefined keys, so every reset field must be set to null explicitly.",
   "backend/src/api/insurance/claims-validation.ts: Use nullish, not optional: JSON drops undefined, so null is the only way to clear a column.",
-  "backend/src/api/insurance/hooks.ts: Delete and recreate are not atomic: a failed recreate must throw rather than silently drop the premium.",
   "backend/src/api/insurance/hooks.ts: Photo files must be removed first: deleteBySource drops photo rows with raw SQL and orphans the files.",
   "backend/src/api/insurance/repository.ts: Owner-scoped lookups keep writes safe even if a caller skips the route ownership check.",
   "backend/src/api/insurance/routes.ts: Photos have no FK, so they must be removed before the policy cascade orphans them.",
