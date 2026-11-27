@@ -290,3 +290,57 @@ describe('A one-off backup keeps the saved settings usable and the sync anchor h
     expect(calls[0]?.providerConfig).toMatchObject({ enabled: false, sheetsSyncEnabled: true });
   });
 });
+
+describe('A one-off backup does not undo changes made while it ran', () => {
+  async function registerDuring(change: () => void): Promise<void> {
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    backupStrategyRegistry.register(FAKE_TYPE, {
+      async execute(): Promise<BackupStrategyResult> {
+        change();
+        return { success: true, capabilities: { zip: { success: true } } };
+      },
+    });
+  }
+
+  test('backups turned on for the provider during its first one-off backup stay on', async () => {
+    await seedProvider('new-f', FAKE_TYPE, null);
+    await registerDuring(() => {
+      ctx.sqlite.run('UPDATE user_preferences SET backup_config = ? WHERE user_id = ?', [
+        JSON.stringify({
+          providers: { 'new-f': { enabled: true, folderPath: 'Mine', retentionCount: 3 } },
+        }),
+        ctx.user.id,
+      ]);
+    });
+
+    const res = await ctx.authed('POST', '/api/v1/sync', {
+      syncTypes: ['backup'],
+      force: true,
+      providerIds: ['new-f'],
+    });
+
+    expect(res.status).toBe(200);
+    expect(savedConfig().providers['new-f']).toMatchObject({
+      enabled: true,
+      folderPath: 'Mine',
+      retentionCount: 3,
+      lastBackupAt: expect.any(String),
+    });
+  });
+
+  test('a provider removed during its backup gets no settings entry', async () => {
+    await seedProvider('new-g', FAKE_TYPE, null);
+    await registerDuring(() => {
+      ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['new-g']);
+    });
+
+    const res = await ctx.authed('POST', '/api/v1/sync', {
+      syncTypes: ['backup'],
+      force: true,
+      providerIds: ['new-g'],
+    });
+
+    expect(res.status).toBe(200);
+    expect(savedConfig().providers['new-g']).toBeUndefined();
+  });
+});

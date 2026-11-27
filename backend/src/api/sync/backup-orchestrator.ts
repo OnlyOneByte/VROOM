@@ -59,6 +59,22 @@ export function chosenProviders(
   });
 }
 
+type ConfigPatch = Record<string, Record<string, string | number | boolean | null>>;
+
+async function patchForCurrentProviders(userId: string, patch: ConfigPatch): Promise<ConfigPatch> {
+  const [prefs, live] = await Promise.all([
+    repos().preferences.getOrCreate(userId),
+    loadProviderTypes(userId),
+  ]);
+  const saved = (prefs.backupConfig as BackupConfig | null)?.providers ?? {};
+  const result: ConfigPatch = {};
+  for (const [id, entry] of Object.entries(patch)) {
+    if (!live.has(id)) continue;
+    result[id] = saved[id] ? entry : { ...NEW_PROVIDER_BACKUP_SETTINGS, enabled: false, ...entry };
+  }
+  return result;
+}
+
 export function needsZipGeneration(
   enabledProviders: [string, ProviderBackupSettings][],
   providerTypes: ProviderTypes
@@ -252,7 +268,7 @@ export class BackupOrchestrator {
       const settled = await Promise.allSettled(strategyPromises);
 
       const results: Record<string, BackupStrategyResult> = {};
-      const configPatch: Record<string, Record<string, string | number | boolean | null>> = {};
+      const configPatch: ConfigPatch = {};
       let anySuccess = false;
       const failedProviders: string[] = [];
 
@@ -289,9 +305,7 @@ export class BackupOrchestrator {
 
         if (result.success) {
           anySuccess = true;
-          configPatch[providerId] = config.providers[providerId]
-            ? { lastBackupAt: timestamp }
-            : { ...NEW_PROVIDER_BACKUP_SETTINGS, enabled: false, lastBackupAt: timestamp };
+          configPatch[providerId] = { lastBackupAt: timestamp };
         } else {
           failedProviders.push(providerId);
         }
@@ -322,7 +336,7 @@ export class BackupOrchestrator {
 
       if (Object.keys(configPatch).length > 0) {
         await repos().preferences.mergeJsonField(userId, 'backupConfig', {
-          providers: configPatch,
+          providers: await patchForCurrentProviders(userId, configPatch),
         });
       }
       const coveredEveryEnabled =
