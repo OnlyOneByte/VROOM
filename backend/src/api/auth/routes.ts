@@ -265,7 +265,7 @@ export async function updateExistingUserProfile(
   authRowId: string,
   userInfo: { email: string; displayName: string; avatarUrl?: string }
 ) {
-  const db = appContext().asyncDb;
+  const db = appContext().db;
   await repos().authProviders.updateProfile(authRowId, userId, {
     email: userInfo.email,
     displayName: userInfo.displayName,
@@ -866,7 +866,7 @@ async function updateExistingProvider(
   refreshToken: string,
   email: string
 ): Promise<void> {
-  const db = appContext().asyncDb;
+  const db = appContext().db;
   const existing = await db
     .select()
     .from(userProviders)

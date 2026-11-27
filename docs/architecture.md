@@ -142,8 +142,9 @@ connection as `appContext().db`, and repositories move to it area by area. The s
 auth-provider, photo-ref, insurance-claim, financing, push, vehicle, trip and share
 repositories are on it so far, and so are analytics, community stats, insurance policies,
 photos, drivers, the calendar feed, the settings and providers routes, provider resolution,
-the storage provider registry, Lucia's session adapter, and the plain reads and writes in the
-auth, demo, signup, shares and vehicles routes outside their transactions.
+the storage provider registry and Lucia's session adapter. The auth, demo, signup, shares and
+vehicles routes have started: some of their reads and writes are on it, and the rest move with
+the permission resolver or in part C.
 `BaseRepository`'s shared methods run on it for every subclass. In `src/api/drivers/`,
 `carShareEnabled` and `ensureMemberDriver` take only a sync transaction handle, because the
 share-accept and car-share transactions call them; code outside a transaction reads a
@@ -161,8 +162,9 @@ A sync read that gates a later write stays sync until part C, even outside a tra
 the sync driver nothing runs between the read and the write; on the async session another
 request can, so the check could pass on data that has changed by the time the write lands.
 That covers the role, override and share guards in `src/api/roles/routes.ts` and
-`src/api/shares/routes.ts`, and the invite and signup-settings writes in
-`src/api/signup/store.ts`. In part C each such check moves inside the async transaction that
+`src/api/shares/routes.ts`, the invite and signup-settings writes in
+`src/api/signup/store.ts`, and the profile backfill and provider token update in
+`src/api/auth/routes.ts`. In part C each such check moves inside the async transaction that
 does the write. The permission resolver in `src/permissions/grants.ts` is synchronous too and
 moves in its own step.
 
