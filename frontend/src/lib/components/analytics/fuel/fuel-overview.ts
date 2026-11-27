@@ -1,4 +1,5 @@
 import type { FuelAdvancedResponse, FuelStatsResponse } from '#lib/types/index.ts';
+import { CHARGER_TYPE_LABELS } from '#lib/types/index.ts';
 
 export interface PriceSummary {
 	fuelType: string;
@@ -9,34 +10,47 @@ export interface PriceSummary {
 	months: number;
 }
 
-function mainFuelType(history: FuelStatsResponse['gasPriceHistory']): string | null {
-	const counts = new Map<string, number>();
-	for (const item of history) counts.set(item.fuelType, (counts.get(item.fuelType) ?? 0) + 1);
-	let best: string | null = null;
-	for (const [type, count] of counts) {
-		if (best == null || count > (counts.get(best) ?? 0)) best = type;
+type PriceEntry = FuelStatsResponse['gasPriceHistory'][number];
+
+function mainFuelType(history: PriceEntry[]): string | null {
+	const types = new Map<string, { count: number; last: string }>();
+	for (const item of history) {
+		const t = types.get(item.fuelType) ?? { count: 0, last: '' };
+		t.count += 1;
+		if (item.date > t.last) t.last = item.date;
+		types.set(item.fuelType, t);
 	}
-	return best;
+	let best: { type: string; count: number; last: string } | null = null;
+	for (const [type, t] of types) {
+		if (!best || t.count > best.count || (t.count === best.count && t.last > best.last)) {
+			best = { type, ...t };
+		}
+	}
+	return best?.type ?? null;
 }
 
-export function priceSummary(history: FuelStatsResponse['gasPriceHistory']): PriceSummary | null {
+function weightedMean(items: PriceEntry[]): number {
+	let sum = 0;
+	let weight = 0;
+	for (const item of items) {
+		const w = item.volume ?? 1;
+		sum += item.pricePerVolume * w;
+		weight += w;
+	}
+	return sum / weight;
+}
+
+export function priceSummary(history: PriceEntry[]): PriceSummary | null {
 	const fuelType = mainFuelType(history);
 	if (fuelType == null) return null;
 	const fills = history.filter(item => item.fuelType === fuelType);
-	const byMonth = new Map<string, { sum: number; count: number }>();
-	let sum = 0;
-	for (const item of fills) {
-		sum += item.pricePerVolume;
-		const month = byMonth.get(item.month) ?? { sum: 0, count: 0 };
-		month.sum += item.pricePerVolume;
-		month.count += 1;
-		byMonth.set(item.month, month);
-	}
-	const monthly = [...byMonth].map(([month, m]) => ({ month, avg: m.sum / m.count }));
+	const byMonth = new Map<string, PriceEntry[]>();
+	for (const item of fills) byMonth.set(item.month, [...(byMonth.get(item.month) ?? []), item]);
+	const monthly = [...byMonth].map(([month, items]) => ({ month, avg: weightedMean(items) }));
 	const cheapest = monthly.reduce((a, b) => (b.avg < a.avg ? b : a));
 	return {
 		fuelType,
-		average: sum / fills.length,
+		average: weightedMean(fills),
 		low: cheapest.avg,
 		high: Math.max(...monthly.map(m => m.avg)),
 		cheapestMonth: cheapest.month,
@@ -62,4 +76,65 @@ export function economyRows(radar: FuelAdvancedResponse['vehicleRadar']): Econom
 		value: v.value,
 		share: max > 0 ? v.value / max : 0
 	}));
+}
+
+export interface FillupRow {
+	vehicleId: string;
+	label: string;
+	count: number;
+	volume: number;
+	avgPrice: number | null;
+}
+
+export function fillupRows(totals: FuelStatsResponse['fillupsByVehicle']): FillupRow[] {
+	return (totals ?? []).map(t => ({
+		vehicleId: t.vehicleId,
+		label: t.vehicleName,
+		count: t.count,
+		volume: t.volume,
+		avgPrice: t.volume > 0 && t.cost > 0 ? t.cost / t.volume : null
+	}));
+}
+
+type ChargerEntry = NonNullable<FuelStatsResponse['charging']>['byChargerType'][number];
+
+export interface ChargerRow {
+	key: ChargerEntry['chargerType'];
+	label: string;
+	sessions: number;
+	share: number;
+	rate: number | null;
+}
+
+export function chargerRows(byType: ChargerEntry[] | undefined): ChargerRow[] {
+	return (byType ?? [])
+		.filter(t => t.sessions > 0)
+		.map(t => ({
+			key: t.chargerType,
+			label: t.chargerType === 'unspecified' ? 'Not set' : CHARGER_TYPE_LABELS[t.chargerType],
+			sessions: t.sessions,
+			share: t.energyShare,
+			rate: t.pricePerEnergyUnit
+		}));
+}
+
+export interface HomeSplit {
+	homeShare: number;
+	homeRate: number;
+	awayRate: number | null;
+}
+
+export function homeSplit(byType: ChargerEntry[] | undefined): HomeSplit | null {
+	const rows = (byType ?? []).filter(t => t.sessions > 0);
+	const home = rows.find(t => t.chargerType === 'home');
+	if (!home || home.pricePerEnergyUnit == null || rows.length < 2) return null;
+	const away = rows.filter(
+		t => t.chargerType !== 'home' && t.chargerType !== 'unspecified' && t.pricePerEnergyUnit != null
+	);
+	const energy = away.reduce((s, t) => s + t.energy, 0);
+	const awayRate =
+		energy > 0
+			? away.reduce((s, t) => s + (t.pricePerEnergyUnit as number) * t.energy, 0) / energy
+			: null;
+	return { homeShare: home.energyShare, homeRate: home.pricePerEnergyUnit, awayRate };
 }

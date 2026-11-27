@@ -125,9 +125,9 @@ describe('FuelStatsTab charging series', () => {
 		expect(screen.getByText('Worst mi/kWh')).toBeTruthy();
 		expect(screen.getByText('Charging Details')).toBeTruthy();
 		expect(screen.getByText('18.0 kWh')).toBeTruthy();
-		expect(screen.getByText('$0.467')).toBeTruthy();
+		expect(screen.getAllByText('$0.467')).toHaveLength(2);
 		expect(screen.getByRole('region', { name: 'Fuel and charging overview' }).textContent).toMatch(
-			/\$0\.47\s+per kWh on average across/
+			/\$0\.467\s+per kWh on average across/
 		);
 		expect(screen.getByText('Average Cost')).toBeTruthy();
 		expect(screen.getByText('Per Session')).toBeTruthy();
@@ -277,14 +277,19 @@ describe('FuelStatsTab summary and groups', () => {
 		expect(screen.getAllByText('Last Month').length).toBeGreaterThan(0);
 	});
 
-	test('puts the details, patterns and comparisons in groups that start closed below lg', () => {
+	test('puts the tiles and charts under More detail, with details, patterns and comparisons nested, all closed below lg', () => {
 		const { container } = render(FuelStatsTab, { fuelStats: stats(gas), fuelAdvanced: advanced });
 		const groups = [...container.querySelectorAll('details[data-slot="chart-group"]')];
-		expect(groups.map(g => g.querySelector('summary h2')?.textContent)).toEqual([
-			'Fill-up details',
-			'Patterns',
-			'Comparisons'
+		const title = (g: Element) => g.querySelector(':scope > summary > :is(h2, h3)');
+		expect(groups.map(g => [title(g)?.tagName, title(g)?.textContent?.trim()])).toEqual([
+			['H2', 'More detail'],
+			['H3', 'Fill-up details'],
+			['H3', 'Patterns'],
+			['H3', 'Comparisons']
 		]);
+		const moreDetail = groups[0] as HTMLDetailsElement;
+		expect(groups.slice(1).every(g => moreDetail.contains(g))).toBe(true);
+		expect(moreDetail.textContent).toContain('Fuel cost per');
 		expect(groups.every(g => !(g as HTMLDetailsElement).open)).toBe(true);
 	});
 });

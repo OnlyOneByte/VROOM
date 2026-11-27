@@ -380,351 +380,370 @@
 			electricEfficiencyUnit={electricEffLabel}
 			showCharging={hasChargeData}
 		/>
-		<StatCardGrid items={summaryItems} columns={3} />
-
-		<FuelCharts
-			{fuelStats}
-			dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns}
-			showGasCharts={showGasCards}
-			{vehicleColors}
-			group="primary"
-		/>
-
 		<ChartGroup
-			title="Fill-up details"
-			description="Counts, volume, efficiency, cost and distance for the last 12 months"
+			title="More detail"
+			description="Spending tiles, price and cost charts, fill-up details, patterns and comparisons"
 		>
 			<div class="space-y-6">
-				{#if showGasCards}
-					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
-						{@render periodCard('Fill-ups', Fuel, fuelStats.fillups, 0)}
-						{@render periodCard(volLabelLong, Droplet, fuelStats.volume, 1)}
+				<StatCardGrid items={summaryItems} columns={3} />
 
-						<Card.Root>
-							<Card.Content class="p-6">
-								<div class="mb-4 flex items-center gap-2">
-									<Gauge class="h-5 w-5 text-muted-foreground" />
-									<h3 class="font-semibold text-foreground">Fuel Consumption</h3>
-								</div>
+				<FuelCharts
+					{fuelStats}
+					dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns}
+					showGasCharts={showGasCards}
+					{vehicleColors}
+					group="primary"
+				/>
 
-								<div class="border-b pb-3 text-center">
-									<span class="text-xs text-muted-foreground">
-										Average {effLabel}
-									</span>
-									<p class="text-3xl font-bold">
-										{fuelStats.fuelConsumption.avgEfficiency != null
-											? formatNumber(fuelStats.fuelConsumption.avgEfficiency, 1)
-											: 'N/A'}
-									</p>
-								</div>
+				<ChartGroup
+					level={3}
+					title="Fill-up details"
+					description="Counts, volume, efficiency, cost and distance for the last 12 months"
+				>
+					<div class="space-y-6">
+						{#if showGasCards}
+							<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
+								{@render periodCard('Fill-ups', Fuel, fuelStats.fillups, 0)}
+								{@render periodCard(volLabelLong, Droplet, fuelStats.volume, 1)}
 
-								<div class="grid grid-cols-2 gap-4 pt-3">
-									<div class="text-center">
+								<Card.Root>
+									<Card.Content class="p-6">
+										<div class="mb-4 flex items-center gap-2">
+											<Gauge class="h-5 w-5 text-muted-foreground" />
+											<h3 class="font-semibold text-foreground">Fuel Consumption</h3>
+										</div>
+
+										<div class="border-b pb-3 text-center">
+											<span class="text-xs text-muted-foreground">
+												Average {effLabel}
+											</span>
+											<p class="text-3xl font-bold">
+												{fuelStats.fuelConsumption.avgEfficiency != null
+													? formatNumber(fuelStats.fuelConsumption.avgEfficiency, 1)
+													: 'N/A'}
+											</p>
+										</div>
+
+										<div class="grid grid-cols-2 gap-4 pt-3">
+											<div class="text-center">
+												<span class="text-xs text-muted-foreground">
+													Best {effLabel}
+												</span>
+												<p
+													class="text-xl font-bold {spreadTone(
+														fuelStats.fuelConsumption.bestEfficiency,
+														fuelStats.fuelConsumption.worstEfficiency,
+														'text-chart-2'
+													)}"
+												>
+													{fuelStats.fuelConsumption.bestEfficiency != null
+														? formatNumber(fuelStats.fuelConsumption.bestEfficiency, 1)
+														: 'N/A'}
+												</p>
+											</div>
+											<div class="text-center">
+												<span class="text-xs text-muted-foreground">
+													Worst {effLabel}
+												</span>
+												<p
+													class="text-xl font-bold {spreadTone(
+														fuelStats.fuelConsumption.bestEfficiency,
+														fuelStats.fuelConsumption.worstEfficiency,
+														'text-destructive'
+													)}"
+												>
+													{fuelStats.fuelConsumption.worstEfficiency != null
+														? formatNumber(fuelStats.fuelConsumption.worstEfficiency, 1)
+														: 'N/A'}
+												</p>
+											</div>
+										</div>
+									</Card.Content>
+								</Card.Root>
+							</div>
+						{/if}
+
+						{#if charging && hasChargeData}
+							<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
+								{@render periodCard('Charging Sessions', BatteryCharging, charging.sessions, 0)}
+								{@render periodCard(`Energy (${chargeLabel})`, Zap, charging.energy, 1)}
+
+								<Card.Root>
+									<Card.Content class="p-6">
+										<div class="mb-4 flex items-center gap-2">
+											<Gauge class="h-5 w-5 text-muted-foreground" />
+											<h3 class="font-semibold text-foreground">Charging Efficiency</h3>
+										</div>
+
+										<div class="border-b pb-3 text-center">
+											<span class="text-xs text-muted-foreground">
+												Average {electricEffLabel}
+											</span>
+											<p class="text-3xl font-bold">
+												{charging.efficiency.avgEfficiency != null
+													? formatNumber(charging.efficiency.avgEfficiency, 1)
+													: 'N/A'}
+											</p>
+										</div>
+
+										<div class="grid grid-cols-2 gap-4 pt-3">
+											<div class="text-center">
+												<span class="text-xs text-muted-foreground">
+													Best {electricEffLabel}
+												</span>
+												<p
+													class="text-xl font-bold {spreadTone(
+														charging.efficiency.bestEfficiency,
+														charging.efficiency.worstEfficiency,
+														'text-chart-2'
+													)}"
+												>
+													{charging.efficiency.bestEfficiency != null
+														? formatNumber(charging.efficiency.bestEfficiency, 1)
+														: 'N/A'}
+												</p>
+											</div>
+											<div class="text-center">
+												<span class="text-xs text-muted-foreground">
+													Worst {electricEffLabel}
+												</span>
+												<p
+													class="text-xl font-bold {spreadTone(
+														charging.efficiency.bestEfficiency,
+														charging.efficiency.worstEfficiency,
+														'text-destructive'
+													)}"
+												>
+													{charging.efficiency.worstEfficiency != null
+														? formatNumber(charging.efficiency.worstEfficiency, 1)
+														: 'N/A'}
+												</p>
+											</div>
+										</div>
+									</Card.Content>
+								</Card.Root>
+
+								<Card.Root>
+									<Card.Content class="p-6">
+										<div class="mb-4 flex items-center gap-2">
+											<Plug class="h-5 w-5 text-muted-foreground" />
+											<h3 class="font-semibold text-foreground">Charging Details</h3>
+										</div>
+
+										<div class="border-b pb-4 text-center">
+											<span class="text-xs text-muted-foreground"> Average Session </span>
+											<p class="text-3xl font-bold">
+												{charging.sessionDetails.avgEnergy != null
+													? formatNumber(charging.sessionDetails.avgEnergy, 1) + ' ' + chargeLabel
+													: 'N/A'}
+											</p>
+										</div>
+
+										<div class="space-y-2 pt-3">
+											<div class="flex items-center justify-between text-sm">
+												<span class="text-muted-foreground">Min Session</span>
+												<span class="font-semibold">
+													{charging.sessionDetails.minEnergy != null
+														? formatNumber(charging.sessionDetails.minEnergy, 1) + ' ' + chargeLabel
+														: 'N/A'}
+												</span>
+											</div>
+											<div class="flex items-center justify-between text-sm">
+												<span class="text-muted-foreground">Max Session</span>
+												<span class="font-semibold">
+													{charging.sessionDetails.maxEnergy != null
+														? formatNumber(charging.sessionDetails.maxEnergy, 1) + ' ' + chargeLabel
+														: 'N/A'}
+												</span>
+											</div>
+											<div class="flex items-center justify-between text-sm">
+												<span class="text-muted-foreground">Cost per {chargeLabel}</span>
+												<span class="font-semibold">
+													{charging.averageCost.perEnergyUnit != null
+														? formatCurrency(charging.averageCost.perEnergyUnit, undefined, 3)
+														: 'N/A'}
+												</span>
+											</div>
+											<div class="flex items-center justify-between text-sm">
+												<span class="text-muted-foreground">Cost per Session</span>
+												<span class="font-semibold">
+													{charging.averageCost.perSession != null
+														? formatCurrency(charging.averageCost.perSession)
+														: 'N/A'}
+												</span>
+											</div>
+										</div>
+									</Card.Content>
+								</Card.Root>
+							</div>
+						{/if}
+
+						<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
+							{#if showGasCards}
+								<Card.Root>
+									<Card.Content class="p-6">
+										<div class="mb-4 flex items-center gap-2">
+											<Droplet class="h-5 w-5 text-muted-foreground" />
+											<h3 class="font-semibold text-foreground">Fill-up Details</h3>
+										</div>
+
+										<div class="border-b pb-4 text-center">
+											<span class="text-xs text-muted-foreground"> Average Fill-up </span>
+											<p class="text-3xl font-bold">
+												{fuelStats.fillupDetails.avgVolume != null
+													? formatNumber(fuelStats.fillupDetails.avgVolume, 1) + ' ' + volLabelShort
+													: 'N/A'}
+											</p>
+										</div>
+
+										<div class="space-y-2 pt-3">
+											<div class="flex items-center justify-between text-sm">
+												<span class="text-muted-foreground">Min Fill-up</span>
+												<span class="font-semibold">
+													{fuelStats.fillupDetails.minVolume != null
+														? formatNumber(fuelStats.fillupDetails.minVolume, 1) +
+															' ' +
+															volLabelShort
+														: 'N/A'}
+												</span>
+											</div>
+											<div class="flex items-center justify-between text-sm">
+												<span class="text-muted-foreground">Max Fill-up</span>
+												<span class="font-semibold">
+													{fuelStats.fillupDetails.maxVolume != null
+														? formatNumber(fuelStats.fillupDetails.maxVolume, 1) +
+															' ' +
+															volLabelShort
+														: 'N/A'}
+												</span>
+											</div>
+										</div>
+									</Card.Content>
+								</Card.Root>
+							{/if}
+
+							<Card.Root>
+								<Card.Content class="p-6">
+									<div class="mb-4 flex items-center gap-2">
+										<DollarSign class="h-5 w-5 text-muted-foreground" />
+										<h3 class="font-semibold text-foreground">Average Cost</h3>
+									</div>
+
+									<div class="border-b pb-4 text-center">
 										<span class="text-xs text-muted-foreground">
-											Best {effLabel}
+											{showGasCards ? 'Per Fill-up' : 'Per Session'}
 										</span>
-										<p
-											class="text-xl font-bold {spreadTone(
-												fuelStats.fuelConsumption.bestEfficiency,
-												fuelStats.fuelConsumption.worstEfficiency,
-												'text-chart-2'
-											)}"
-										>
-											{fuelStats.fuelConsumption.bestEfficiency != null
-												? formatNumber(fuelStats.fuelConsumption.bestEfficiency, 1)
-												: 'N/A'}
+										<p class="text-3xl font-bold">
+											{perVisitCost != null ? formatCurrency(perVisitCost) : 'N/A'}
 										</p>
 									</div>
-									<div class="text-center">
-										<span class="text-xs text-muted-foreground">
-											Worst {effLabel}
-										</span>
-										<p
-											class="text-xl font-bold {spreadTone(
-												fuelStats.fuelConsumption.bestEfficiency,
-												fuelStats.fuelConsumption.worstEfficiency,
-												'text-destructive'
-											)}"
-										>
-											{fuelStats.fuelConsumption.worstEfficiency != null
-												? formatNumber(fuelStats.fuelConsumption.worstEfficiency, 1)
-												: 'N/A'}
+
+									<div class="space-y-2 pt-3">
+										<div class="flex items-center justify-between text-sm">
+											<span class="text-muted-foreground">Best {costPerDistLabel}</span>
+											<span class="font-semibold">
+												{fuelStats.averageCost.bestCostPerDistance != null
+													? formatCurrency(fuelStats.averageCost.bestCostPerDistance)
+													: 'N/A'}
+											</span>
+										</div>
+										<div class="flex items-center justify-between text-sm">
+											<span class="text-muted-foreground">Worst {costPerDistLabel}</span>
+											<span class="font-semibold">
+												{fuelStats.averageCost.worstCostPerDistance != null
+													? formatCurrency(fuelStats.averageCost.worstCostPerDistance)
+													: 'N/A'}
+											</span>
+										</div>
+										{#if fuelStats.averageCost.avgCostPerDay != null}
+											<div class="flex items-center justify-between text-sm">
+												<span class="text-muted-foreground">Avg Cost/Day</span>
+												<span class="font-semibold">
+													{formatCurrency(fuelStats.averageCost.avgCostPerDay)}
+												</span>
+											</div>
+										{/if}
+									</div>
+								</Card.Content>
+							</Card.Root>
+
+							<Card.Root>
+								<Card.Content class="p-6">
+									<div class="mb-4 flex items-center gap-2">
+										<Navigation class="h-5 w-5 text-muted-foreground" />
+										<h3 class="font-semibold text-foreground">Distance with VROOM</h3>
+									</div>
+
+									<div class="border-b pb-4 text-center">
+										<span class="text-xs text-muted-foreground"> Total Distance </span>
+										<p class="text-3xl font-bold">
+											{formatNumberUpTo(fuelStats.distance.totalDistance, 1)}
+											{distLabelShort}
 										</p>
 									</div>
-								</div>
-							</Card.Content>
-						</Card.Root>
+
+									<div class="space-y-2 pt-3">
+										<div class="flex items-center justify-between text-sm">
+											<span class="text-muted-foreground">Avg/Day</span>
+											<span class="font-semibold">
+												{fuelStats.distance.avgPerDay != null
+													? formatNumber(fuelStats.distance.avgPerDay, 1) + ' ' + distLabelShort
+													: 'N/A'}
+											</span>
+										</div>
+										<div class="flex items-center justify-between text-sm">
+											<span class="text-muted-foreground">Avg/Month</span>
+											<span class="font-semibold">
+												{fuelStats.distance.avgPerMonth != null
+													? formatNumber(fuelStats.distance.avgPerMonth, 0) + ' ' + distLabelShort
+													: 'N/A'}
+											</span>
+										</div>
+									</div>
+								</Card.Content>
+							</Card.Root>
+						</div>
 					</div>
+				</ChartGroup>
+
+				{#if showGasCards || fuelAdvanced}
+					<ChartGroup
+						level={3}
+						title="Patterns"
+						description="When you fill up: by day of the week, by season and how often"
+					>
+						<div class="space-y-4 md:space-y-6">
+							<FuelCharts
+								{fuelStats}
+								dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns}
+								showGasCharts={showGasCards}
+								{vehicleColors}
+								group="patterns"
+							/>
+							{#if fuelAdvanced}
+								<AdvancedCharts {fuelAdvanced} {vehicleColors} group="patterns" />
+							{/if}
+						</div>
+					</ChartGroup>
 				{/if}
 
-				{#if charging && hasChargeData}
-					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
-						{@render periodCard('Charging Sessions', BatteryCharging, charging.sessions, 0)}
-						{@render periodCard(`Energy (${chargeLabel})`, Zap, charging.energy, 1)}
-
-						<Card.Root>
-							<Card.Content class="p-6">
-								<div class="mb-4 flex items-center gap-2">
-									<Gauge class="h-5 w-5 text-muted-foreground" />
-									<h3 class="font-semibold text-foreground">Charging Efficiency</h3>
-								</div>
-
-								<div class="border-b pb-3 text-center">
-									<span class="text-xs text-muted-foreground">
-										Average {electricEffLabel}
-									</span>
-									<p class="text-3xl font-bold">
-										{charging.efficiency.avgEfficiency != null
-											? formatNumber(charging.efficiency.avgEfficiency, 1)
-											: 'N/A'}
-									</p>
-								</div>
-
-								<div class="grid grid-cols-2 gap-4 pt-3">
-									<div class="text-center">
-										<span class="text-xs text-muted-foreground">
-											Best {electricEffLabel}
-										</span>
-										<p
-											class="text-xl font-bold {spreadTone(
-												charging.efficiency.bestEfficiency,
-												charging.efficiency.worstEfficiency,
-												'text-chart-2'
-											)}"
-										>
-											{charging.efficiency.bestEfficiency != null
-												? formatNumber(charging.efficiency.bestEfficiency, 1)
-												: 'N/A'}
-										</p>
-									</div>
-									<div class="text-center">
-										<span class="text-xs text-muted-foreground">
-											Worst {electricEffLabel}
-										</span>
-										<p
-											class="text-xl font-bold {spreadTone(
-												charging.efficiency.bestEfficiency,
-												charging.efficiency.worstEfficiency,
-												'text-destructive'
-											)}"
-										>
-											{charging.efficiency.worstEfficiency != null
-												? formatNumber(charging.efficiency.worstEfficiency, 1)
-												: 'N/A'}
-										</p>
-									</div>
-								</div>
-							</Card.Content>
-						</Card.Root>
-
-						<Card.Root>
-							<Card.Content class="p-6">
-								<div class="mb-4 flex items-center gap-2">
-									<Plug class="h-5 w-5 text-muted-foreground" />
-									<h3 class="font-semibold text-foreground">Charging Details</h3>
-								</div>
-
-								<div class="border-b pb-4 text-center">
-									<span class="text-xs text-muted-foreground"> Average Session </span>
-									<p class="text-3xl font-bold">
-										{charging.sessionDetails.avgEnergy != null
-											? formatNumber(charging.sessionDetails.avgEnergy, 1) + ' ' + chargeLabel
-											: 'N/A'}
-									</p>
-								</div>
-
-								<div class="space-y-2 pt-3">
-									<div class="flex items-center justify-between text-sm">
-										<span class="text-muted-foreground">Min Session</span>
-										<span class="font-semibold">
-											{charging.sessionDetails.minEnergy != null
-												? formatNumber(charging.sessionDetails.minEnergy, 1) + ' ' + chargeLabel
-												: 'N/A'}
-										</span>
-									</div>
-									<div class="flex items-center justify-between text-sm">
-										<span class="text-muted-foreground">Max Session</span>
-										<span class="font-semibold">
-											{charging.sessionDetails.maxEnergy != null
-												? formatNumber(charging.sessionDetails.maxEnergy, 1) + ' ' + chargeLabel
-												: 'N/A'}
-										</span>
-									</div>
-									<div class="flex items-center justify-between text-sm">
-										<span class="text-muted-foreground">Cost per {chargeLabel}</span>
-										<span class="font-semibold">
-											{charging.averageCost.perEnergyUnit != null
-												? formatCurrency(charging.averageCost.perEnergyUnit, undefined, 3)
-												: 'N/A'}
-										</span>
-									</div>
-									<div class="flex items-center justify-between text-sm">
-										<span class="text-muted-foreground">Cost per Session</span>
-										<span class="font-semibold">
-											{charging.averageCost.perSession != null
-												? formatCurrency(charging.averageCost.perSession)
-												: 'N/A'}
-										</span>
-									</div>
-								</div>
-							</Card.Content>
-						</Card.Root>
+				<ChartGroup
+					level={3}
+					title="Comparisons"
+					description="Your vehicles side by side: cost per distance, odometer, performance and spending"
+				>
+					<div class="space-y-4 md:space-y-6">
+						<FuelCharts
+							{fuelStats}
+							showGasCharts={showGasCards}
+							{vehicleColors}
+							group="comparisons"
+						/>
+						{#if fuelAdvanced}
+							<AdvancedCharts {fuelAdvanced} {vehicleColors} group="comparisons" />
+						{/if}
 					</div>
-				{/if}
-
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
-					{#if showGasCards}
-						<Card.Root>
-							<Card.Content class="p-6">
-								<div class="mb-4 flex items-center gap-2">
-									<Droplet class="h-5 w-5 text-muted-foreground" />
-									<h3 class="font-semibold text-foreground">Fill-up Details</h3>
-								</div>
-
-								<div class="border-b pb-4 text-center">
-									<span class="text-xs text-muted-foreground"> Average Fill-up </span>
-									<p class="text-3xl font-bold">
-										{fuelStats.fillupDetails.avgVolume != null
-											? formatNumber(fuelStats.fillupDetails.avgVolume, 1) + ' ' + volLabelShort
-											: 'N/A'}
-									</p>
-								</div>
-
-								<div class="space-y-2 pt-3">
-									<div class="flex items-center justify-between text-sm">
-										<span class="text-muted-foreground">Min Fill-up</span>
-										<span class="font-semibold">
-											{fuelStats.fillupDetails.minVolume != null
-												? formatNumber(fuelStats.fillupDetails.minVolume, 1) + ' ' + volLabelShort
-												: 'N/A'}
-										</span>
-									</div>
-									<div class="flex items-center justify-between text-sm">
-										<span class="text-muted-foreground">Max Fill-up</span>
-										<span class="font-semibold">
-											{fuelStats.fillupDetails.maxVolume != null
-												? formatNumber(fuelStats.fillupDetails.maxVolume, 1) + ' ' + volLabelShort
-												: 'N/A'}
-										</span>
-									</div>
-								</div>
-							</Card.Content>
-						</Card.Root>
-					{/if}
-
-					<Card.Root>
-						<Card.Content class="p-6">
-							<div class="mb-4 flex items-center gap-2">
-								<DollarSign class="h-5 w-5 text-muted-foreground" />
-								<h3 class="font-semibold text-foreground">Average Cost</h3>
-							</div>
-
-							<div class="border-b pb-4 text-center">
-								<span class="text-xs text-muted-foreground">
-									{showGasCards ? 'Per Fill-up' : 'Per Session'}
-								</span>
-								<p class="text-3xl font-bold">
-									{perVisitCost != null ? formatCurrency(perVisitCost) : 'N/A'}
-								</p>
-							</div>
-
-							<div class="space-y-2 pt-3">
-								<div class="flex items-center justify-between text-sm">
-									<span class="text-muted-foreground">Best {costPerDistLabel}</span>
-									<span class="font-semibold">
-										{fuelStats.averageCost.bestCostPerDistance != null
-											? formatCurrency(fuelStats.averageCost.bestCostPerDistance)
-											: 'N/A'}
-									</span>
-								</div>
-								<div class="flex items-center justify-between text-sm">
-									<span class="text-muted-foreground">Worst {costPerDistLabel}</span>
-									<span class="font-semibold">
-										{fuelStats.averageCost.worstCostPerDistance != null
-											? formatCurrency(fuelStats.averageCost.worstCostPerDistance)
-											: 'N/A'}
-									</span>
-								</div>
-								{#if fuelStats.averageCost.avgCostPerDay != null}
-									<div class="flex items-center justify-between text-sm">
-										<span class="text-muted-foreground">Avg Cost/Day</span>
-										<span class="font-semibold">
-											{formatCurrency(fuelStats.averageCost.avgCostPerDay)}
-										</span>
-									</div>
-								{/if}
-							</div>
-						</Card.Content>
-					</Card.Root>
-
-					<Card.Root>
-						<Card.Content class="p-6">
-							<div class="mb-4 flex items-center gap-2">
-								<Navigation class="h-5 w-5 text-muted-foreground" />
-								<h3 class="font-semibold text-foreground">Distance with VROOM</h3>
-							</div>
-
-							<div class="border-b pb-4 text-center">
-								<span class="text-xs text-muted-foreground"> Total Distance </span>
-								<p class="text-3xl font-bold">
-									{formatNumberUpTo(fuelStats.distance.totalDistance, 1)}
-									{distLabelShort}
-								</p>
-							</div>
-
-							<div class="space-y-2 pt-3">
-								<div class="flex items-center justify-between text-sm">
-									<span class="text-muted-foreground">Avg/Day</span>
-									<span class="font-semibold">
-										{fuelStats.distance.avgPerDay != null
-											? formatNumber(fuelStats.distance.avgPerDay, 1) + ' ' + distLabelShort
-											: 'N/A'}
-									</span>
-								</div>
-								<div class="flex items-center justify-between text-sm">
-									<span class="text-muted-foreground">Avg/Month</span>
-									<span class="font-semibold">
-										{fuelStats.distance.avgPerMonth != null
-											? formatNumber(fuelStats.distance.avgPerMonth, 0) + ' ' + distLabelShort
-											: 'N/A'}
-									</span>
-								</div>
-							</div>
-						</Card.Content>
-					</Card.Root>
-				</div>
-			</div>
-		</ChartGroup>
-
-		{#if showGasCards || fuelAdvanced}
-			<ChartGroup
-				title="Patterns"
-				description="When you fill up: by day of the week, by season and how often"
-			>
-				<div class="space-y-4 md:space-y-6">
-					<FuelCharts
-						{fuelStats}
-						dayOfWeekPatterns={fuelAdvanced?.dayOfWeekPatterns}
-						showGasCharts={showGasCards}
-						{vehicleColors}
-						group="patterns"
-					/>
-					{#if fuelAdvanced}
-						<AdvancedCharts {fuelAdvanced} {vehicleColors} group="patterns" />
-					{/if}
-				</div>
-			</ChartGroup>
-		{/if}
-
-		<ChartGroup
-			title="Comparisons"
-			description="Your vehicles side by side: cost per distance, odometer, performance and spending"
-		>
-			<div class="space-y-4 md:space-y-6">
-				<FuelCharts {fuelStats} showGasCharts={showGasCards} {vehicleColors} group="comparisons" />
-				{#if fuelAdvanced}
-					<AdvancedCharts {fuelAdvanced} {vehicleColors} group="comparisons" />
-				{/if}
+				</ChartGroup>
 			</div>
 		</ChartGroup>
 	</div>
