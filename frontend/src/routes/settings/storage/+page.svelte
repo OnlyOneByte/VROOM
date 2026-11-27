@@ -217,9 +217,14 @@
 	}
 
 	function handleRestoreComplete(result: RestoreResult) {
-		if (result.imported) {
-			const total = Object.values(result.imported).reduce((sum, count) => sum + count, 0);
-			appStore.showSuccess(`Successfully restored ${total} records`);
+		const sum = (counts: Record<string, number>) =>
+			Object.values(counts).reduce((total, count) => total + count, 0);
+		if (result.imported && result.kept) {
+			appStore.showSuccess(
+				`Added ${sum(result.imported)} records from the backup. ${sum(result.kept)} were already here.`
+			);
+		} else if (result.imported) {
+			appStore.showSuccess(`Successfully restored ${sum(result.imported)} records`);
 		}
 		settingsStore.load();
 		isInitialized = false;
