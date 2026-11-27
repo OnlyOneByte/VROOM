@@ -143,7 +143,7 @@ const SERVER_OWNED_BACKUP_FIELDS = new Set([
 function clientBackupConfigPatch(
   existing: BackupConfig | null | undefined,
   incoming: BackupConfigUpdate
-): Record<string, unknown> {
+): Record<string, Record<string, unknown>> {
   const providers: Record<string, Record<string, unknown>> = {};
   for (const [providerId, settings] of Object.entries(incoming.providers)) {
     const entry: Record<string, unknown> = {};
@@ -155,7 +155,7 @@ function clientBackupConfigPatch(
     }
     providers[providerId] = entry;
   }
-  return { providers };
+  return providers;
 }
 
 function consentUpdate(
@@ -302,9 +302,8 @@ routes.put('/', authorize(ownAccount), async (c) => {
   }
   if (backupConfig) {
     updatedSettings =
-      (await repos().preferences.mergeJsonField(
+      (await repos().preferences.mergeLiveBackupProviders(
         user.id,
-        'backupConfig',
         clientBackupConfigPatch(existingSettings.backupConfig, backupConfig)
       )) ?? updatedSettings;
   }

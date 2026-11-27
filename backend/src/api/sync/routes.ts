@@ -160,8 +160,8 @@ routes.post(
     const prefs = await repos().preferences.getOrCreate(userId);
     const config = prefs?.backupConfig as BackupConfig | null;
     if (config?.providers?.[providerId]?.sheetsAutoPausedAt) {
-      await repos().preferences.mergeJsonField(userId, 'backupConfig', {
-        providers: { [providerId]: { sheetsAutoPausedAt: null } },
+      await repos().preferences.mergeLiveBackupProviders(userId, {
+        [providerId]: { sheetsAutoPausedAt: null },
       });
     }
     return c.json(createSuccessResponse(undefined, 'Automatic Sheets backups resumed'));
