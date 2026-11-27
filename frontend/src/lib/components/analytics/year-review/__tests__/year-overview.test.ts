@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { AnalyticsQueryResponse } from '#lib/types/index.ts';
 import {
 	biggestMonth,
+	carsWithSpending,
 	cheapestToRun,
 	mostFills,
 	percentChange,
@@ -56,6 +57,24 @@ describe('yearRequests', () => {
 			start: secs(new Date(2024, 0, 1)),
 			end: secs(new Date(2025, 0, 1))
 		});
+	});
+});
+
+describe('cars with spending', () => {
+	test('the cars request groups the whole year by vehicle, all costs', () => {
+		expect(yearRequests(2026, NOW).cars).toEqual({
+			metric: 'cost',
+			interval: 'none',
+			groupBy: 'vehicle',
+			include: 'all',
+			start: secs(new Date(2026, 0, 1)),
+			end: secs(new Date(2026, 10, 28))
+		});
+	});
+
+	test('counts only cars whose year total is above zero', () => {
+		expect(carsWithSpending(series({ Civic: 120, RAV4: 0, F150: null, Golf: -5 }))).toBe(1);
+		expect(carsWithSpending(null)).toBe(0);
 	});
 });
 

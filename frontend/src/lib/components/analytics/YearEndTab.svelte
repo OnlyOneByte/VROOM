@@ -107,7 +107,6 @@
 		)
 	);
 	let carCount = $derived(carsWithSpending(results?.cars ?? null));
-	const carName = (v: Vehicle) => v.nickname || `${v.year} ${v.make} ${v.model}`;
 	const listOf = (items: string[]) =>
 		new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(items);
 	let total = $derived(monthly?.totals.value ?? 0);
@@ -366,7 +365,7 @@
 {#snippet sharedNote()}
 	{#if otherCurrency.length > 0}
 		<p class="text-sm text-muted-foreground">
-			Not included: {listOf(otherCurrency.map(carName))}, shared with you in {listOf([
+			Not included: cars shared with you in {listOf([
 				...new Set(otherCurrency.map(v => v.ownerCurrency ?? ''))
 			])}. These figures are in {currency}.
 		</p>

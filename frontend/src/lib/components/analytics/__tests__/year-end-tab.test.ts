@@ -47,7 +47,7 @@ function respond(p: AnalyticsQueryParams) {
 	}
 	if (p.metric === 'cost' && p.groupBy === 'vehicle') {
 		return {
-			series: [one('Civic', 3000), one('RAV4', 1055), one('F-150', 500), one('Golf', 0)],
+			series: [one('Civic', 3000), one('RAV4', 1055), one('F-150', 500), one('Outback', 0)],
 			totals: { value: 4555 }
 		};
 	}
@@ -168,7 +168,7 @@ describe('YearEndTab', () => {
 		render(YearEndTab);
 		expect(await screen.findByText('2026 so far · 3 vehicles with spending')).toBeTruthy();
 		expect(text()).toContain(
-			'Not included: 2021 VW Golf, shared with you in EUR. These figures are in USD.'
+			'Not included: cars shared with you in EUR. These figures are in USD.'
 		);
 	});
 
@@ -180,6 +180,15 @@ describe('YearEndTab', () => {
 		expect(text()).not.toMatch(/4 vehicles|Not included|Transit/);
 	});
 
+	test('a car in another currency is never named, even one whose expenses you cannot read', async () => {
+		const unreadable = { ...SHARED_EUR, id: 'van', make: 'Ford', model: 'Transit' };
+		getVehicles.mockResolvedValue([...OWNED, unreadable]);
+		render(YearEndTab);
+		await screen.findByText('2026 so far · 3 vehicles with spending');
+		expect(text()).toContain('Not included: cars shared with you in EUR.');
+		expect(text()).not.toMatch(/Transit|Golf/);
+	});
+
 	test('several cars in other currencies read as a list', async () => {
 		const gbp = { ...SHARED, id: 'mini', make: 'Mini', model: 'Cooper', ownerCurrency: 'GBP' };
 		const cad = { ...SHARED, id: 'jeep', make: 'Jeep', model: 'Wrangler', ownerCurrency: 'CAD' };
@@ -187,7 +196,7 @@ describe('YearEndTab', () => {
 		render(YearEndTab);
 		await screen.findByText('2026 so far · 3 vehicles with spending');
 		expect(text()).toContain(
-			'Not included: 2021 VW Golf, 2021 Mini Cooper, and 2021 Jeep Wrangler, shared with you in EUR, GBP, and CAD.'
+			'Not included: cars shared with you in EUR, GBP, and CAD. These figures are in USD.'
 		);
 	});
 
@@ -226,7 +235,7 @@ describe('YearEndTab', () => {
 		expect(
 			await screen.findByRole('heading', { level: 2, name: 'No expenses in 2026' })
 		).toBeTruthy();
-		expect(text()).toContain('Not included: 2021 VW Golf, shared with you in EUR.');
+		expect(text()).toContain('Not included: cars shared with you in EUR.');
 	});
 
 	test('a failed request shows the error card, and Retry loads the year again', async () => {
