@@ -12,6 +12,7 @@ import { LATE_QUERY, takeTransactionViolations } from '../../test-helpers/transa
 import {
   type AsyncPgDatabase,
   bunSqlConnection,
+  MultipleStatementsError,
   openAsyncPostgres,
   pgliteConnection,
 } from '../async-postgres';
@@ -19,6 +20,7 @@ import {
   inAsyncTransaction,
   RawTransactionControlError,
   TransactionEndedError,
+  TransactionRolledBackError,
 } from '../async-sqlite';
 import { roles, sessions, users } from '../pg/schema';
 
@@ -166,9 +168,123 @@ describe('the async Postgres session', () => {
     expect((await level()).transaction_isolation).toBe('read committed');
   });
 
-  test('roles seeded by the migration are readable through the session', async () => {
+  test('a boolean column round-trips through the session', async () => {
     await db.insert(roles).values({ id: 'r1', scope: 'server', name: 'R', builtIn: false });
-    expect((await db.select({ id: roles.id }).from(roles)).map((r) => r.id)).toContain('r1');
+    const [row] = await db.select({ builtIn: roles.builtIn }).from(roles).where(eq(roles.id, 'r1'));
+    expect(row?.builtIn).toBe(false);
+  });
+
+  test('a builder returned after an await inside a transaction runs in that transaction', async () => {
+    const seen = await session.transaction(async (tx) => {
+      await tx.insert(users).values(user('a'));
+      const read = async () => {
+        await tx.select().from(users);
+        return tx.select({ id: users.id }).from(users);
+      };
+      return read();
+    });
+    expect(seen).toEqual([{ id: 'a' }]);
+  });
+
+  test('a builder made in a transaction and awaited after it ended is refused and reported', async () => {
+    let built: PromiseLike<unknown> = Promise.resolve();
+    await session.transaction(async (tx) => {
+      await tx.insert(users).values(user('a'));
+      built = tx.insert(users).values(user('late'));
+    });
+    expect(
+      causeOf(
+        await Promise.resolve(built).then(
+          () => null,
+          (e: unknown) => e
+        )
+      )
+    ).toBeInstanceOf(TransactionEndedError);
+    expect(await ids()).toEqual(['a']);
+    expect(takeTransactionViolations()).toEqual([LATE_QUERY]);
+  });
+
+  test('a detached nested transaction cannot touch a later transaction', async () => {
+    let detached: Promise<unknown> = Promise.resolve();
+    await session.transaction(async () => {
+      detached = session
+        .transaction(async (inner) => {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          await inner.insert(users).values(user('detached'));
+        })
+        .then(
+          () => null,
+          (e: unknown) => e
+        );
+    });
+    await session.transaction(async (tx) => {
+      await tx.insert(users).values(user('b'));
+      await tx
+        .insert(users)
+        .values(user('b'))
+        .catch(() => undefined);
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      await tx.insert(users).values(user('c'));
+    });
+    expect(causeOf(await detached)).toBeInstanceOf(TransactionEndedError);
+    expect(await ids()).toEqual(['b', 'c']);
+    expect(takeTransactionViolations()).toEqual([LATE_QUERY, LATE_QUERY]);
+  });
+
+  test('a query sent just before a transaction opens does not run inside it', async () => {
+    const before = db
+      .insert(users)
+      .values(user('outside'))
+      .then(() => undefined);
+    const tx = session.transaction(async (inner) => {
+      await inner.insert(users).values(user('inside'));
+      throw new Error('roll back');
+    });
+    await before;
+    await expect(tx).rejects.toThrow('roll back');
+    expect(await ids()).toEqual(['outside']);
+  });
+
+  test('a query with a second statement is refused', async () => {
+    const error = await db.execute(sql.raw('select 1; commit')).catch((e: unknown) => e);
+    expect(causeOf(error)).toBeInstanceOf(MultipleStatementsError);
+    const ok = await db.execute(sql.raw(`select ';' as semi -- trailing; comment`));
+    expect(ok).toEqual([{ semi: ';' }]);
+  });
+});
+
+describe('a failed savepoint control', () => {
+  test('rolls the transaction back and rejects, instead of committing', async () => {
+    const real = pgliteConnection(client);
+    let failNextRelease = false;
+    const flaky = openAsyncPostgres({
+      async query(text, params, rowMode) {
+        if (failNextRelease && text === 'RELEASE SAVEPOINT vroom_statement') {
+          failNextRelease = false;
+          throw new Error('connection hiccup');
+        }
+        return real.query(text, params, rowMode);
+      },
+    });
+    const outcome = await flaky
+      .transaction(async (tx) => {
+        await tx.insert(users).values(user('a'));
+        failNextRelease = true;
+        await tx
+          .insert(users)
+          .values(user('b'))
+          .catch(() => undefined);
+        await tx
+          .insert(users)
+          .values(user('c'))
+          .catch(() => undefined);
+      })
+      .then(
+        () => 'committed',
+        (e: unknown) => e
+      );
+    expect(outcome).toBeInstanceOf(TransactionRolledBackError);
+    expect(await ids()).toEqual([]);
   });
 });
 
@@ -182,7 +298,7 @@ describe('the Bun.sql connection', () => {
         return Object.assign(rows, { values: () => Promise.resolve([['a']]) });
       },
     };
-    const connection = bunSqlConnection(reserved);
+    const connection = bunSqlConnection(reserved as never);
     expect(await connection.query('select $1', [1], 'array')).toEqual([['a']]);
     expect(await connection.query('select $1', [2], 'object')).toEqual([{ id: 'a' }]);
     expect(calls).toEqual(['select $1 [1]', 'select $1 [2]']);
