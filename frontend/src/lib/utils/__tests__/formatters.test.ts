@@ -41,9 +41,32 @@ describe('plainDecimal', () => {
 		[0.0000001, '0.0000001'],
 		[0.4163, '0.4163'],
 		[1234567.5, '1234567.5'],
-		[300, '300']
+		[300, '300'],
+		[1e-21, '0.000000000000000000001'],
+		[1.5e-25, '0.00000000000000000000000015'],
+		[0.0000000000000000000123456789, '0.0000000000000000000123456789']
 	])('%s is written as %s, never with an exponent or grouping', (value, expected) => {
 		expect(plainDecimal(value)).toBe(expected);
+	});
+
+	test('a browser that allows only 20 decimals still shows the rate, to 20 decimals', () => {
+		const real = Number.prototype.toLocaleString;
+		const capped = vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(function (
+			this: number,
+			locales,
+			options
+		) {
+			if ((options?.maximumFractionDigits ?? 0) > 20) {
+				throw new RangeError('maximumFractionDigits value is out of range.');
+			}
+			return real.call(this, locales, options);
+		});
+		try {
+			expect(plainDecimal(0.4163)).toBe('0.4163');
+			expect(plainDecimal(0.0000000000000000000123456789)).toBe('0.00000000000000000001');
+		} finally {
+			capped.mockRestore();
+		}
 	});
 });
 
