@@ -25,6 +25,7 @@ export function pendingExpenseRow(entry: OfflineExpense): Expense {
 		...(entry.volume !== undefined && { volume: entry.volume }),
 		...(entry.charge !== undefined && { charge: entry.charge }),
 		...(entry.fuelType !== undefined && { fuelType: entry.fuelType }),
+		...(entry.chargerType && { chargerType: entry.chargerType }),
 		...(entry.description && { description: entry.description }),
 		...(entry.location !== undefined && { location: entry.location }),
 		...(entry.missedFillup !== undefined && { missedFillup: entry.missedFillup }),

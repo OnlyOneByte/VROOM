@@ -2,7 +2,7 @@ import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 import { toBackendExpense } from '#lib/services/api-transformer.ts';
 import { browser } from '$app/env';
 import { fromMinor, toMinor } from '#lib/utils/formatters.ts';
-import type { Expense, ExpenseCategory, Vehicle } from '#lib/types/index.ts';
+import type { ChargerType, Expense, ExpenseCategory, Vehicle } from '#lib/types/index.ts';
 
 const OFFLINE_STORAGE_KEY = 'vroom_offline_expenses';
 const VEHICLE_CACHE_KEY = 'vroom_offline_vehicles';
@@ -26,6 +26,7 @@ export interface OfflineExpense {
 	charge?: number;
 	// Must be kept: the sync transform routes charge vs volume solely on this.
 	fuelType?: string;
+	chargerType?: ChargerType | null;
 	// Must be kept: a missed fill-up is excluded from MPG pairing.
 	missedFillup?: boolean;
 	description?: string;
@@ -56,6 +57,7 @@ export function offlineExpenseToBackend(
 			volume: expense.volume,
 			charge: expense.charge,
 			fuelType: expense.fuelType,
+			chargerType: expense.chargerType,
 			missedFillup: options.clearEmptyFields
 				? (expense.missedFillup ?? false)
 				: expense.missedFillup,

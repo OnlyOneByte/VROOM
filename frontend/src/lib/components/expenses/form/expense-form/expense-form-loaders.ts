@@ -78,6 +78,7 @@ export async function loadQueuedExpense(state: ExpenseFormState, id: string): Pr
 	state.formData.volume = queued.volume?.toString() ?? '';
 	state.formData.charge = queued.charge?.toString() ?? '';
 	state.formData.fuelType = queued.fuelType ?? '';
+	state.formData.chargerType = queued.chargerType ?? '';
 	state.formData.description = queued.description ?? '';
 	state.formData.location = queued.location ?? '';
 	state.formData.missedFillup = queued.missedFillup ?? false;
@@ -186,6 +187,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 		state.formData.volume = expense.volume?.toString() ?? '';
 		state.formData.charge = expense.charge?.toString() ?? '';
 		state.formData.fuelType = expense.fuelType || '';
+		state.formData.chargerType = expense.chargerType ?? '';
 		state.formData.description = expense.description || '';
 		state.formData.location = expense.location || '';
 		state.formData.missedFillup = expense.missedFillup ?? false;

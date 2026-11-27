@@ -103,6 +103,7 @@ function restorePayload({ before, payload }: PendingEdit): EditPayload {
 		volume: before.volume,
 		charge: before.charge,
 		fuelType: before.fuelType,
+		chargerType: before.chargerType ?? null,
 		description: before.description,
 		location: before.location,
 		currency: before.currency,

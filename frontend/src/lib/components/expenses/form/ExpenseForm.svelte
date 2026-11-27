@@ -400,6 +400,7 @@
 				<FuelTypeFields
 					{energyMode}
 					bind:fuelType={form.formData.fuelType}
+					bind:chargerType={form.formData.chargerType}
 					bind:missedFillup={form.formData.missedFillup}
 					onBlur={form.handleBlur}
 				/>

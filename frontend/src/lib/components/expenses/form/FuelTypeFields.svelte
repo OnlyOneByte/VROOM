@@ -3,16 +3,31 @@
 	import Label from '#lib/components/ui/label/label.svelte';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
+	import { CHARGER_TYPE_LABELS, CHARGER_TYPES, type ChargerType } from '#lib/types/index.ts';
 	import type { EnergyMode } from './FuelFieldsSection.svelte';
 
 	interface Props {
 		energyMode: EnergyMode;
 		fuelType: string;
+		chargerType?: ChargerType | '';
 		missedFillup: boolean;
 		onBlur: (_field: string) => void;
 	}
 
-	let { energyMode, fuelType = $bindable(), missedFillup = $bindable(), onBlur }: Props = $props();
+	let {
+		energyMode,
+		fuelType = $bindable(),
+		chargerType = $bindable(''),
+		missedFillup = $bindable(),
+		onBlur
+	}: Props = $props();
+
+	const NO_CHARGER = 'none';
+
+	function chooseChargingType(value: string) {
+		fuelType = value;
+		if (value === 'DC Fast Charging' && !chargerType) chargerType = 'dc_fast';
+	}
 
 	let showCustomFuelType = $state(false);
 
@@ -85,9 +100,7 @@
 		<Select.Root
 			type="single"
 			value={fuelType || ''}
-			onValueChange={v => {
-				fuelType = v || '';
-			}}
+			onValueChange={v => chooseChargingType(v || '')}
 		>
 			<Select.Trigger id="fuelType" class="w-full">
 				{#if fuelType}
@@ -99,6 +112,29 @@
 			<Select.Content>
 				{#each CHARGING_TYPE_OPTIONS as option (option.value)}
 					<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
+	</div>
+
+	<div class="space-y-2">
+		<Label for="chargerType">Where you charged</Label>
+		<Select.Root
+			type="single"
+			value={chargerType || NO_CHARGER}
+			onValueChange={v => {
+				chargerType = v && v !== NO_CHARGER ? (v as ChargerType) : '';
+			}}
+		>
+			<Select.Trigger id="chargerType" class="w-full">
+				{chargerType ? CHARGER_TYPE_LABELS[chargerType] : 'Not set (optional)'}
+			</Select.Trigger>
+			<Select.Content>
+				<Select.Item value={NO_CHARGER} label="Not set">Not set</Select.Item>
+				{#each CHARGER_TYPES as type (type)}
+					<Select.Item value={type} label={CHARGER_TYPE_LABELS[type]}>
+						{CHARGER_TYPE_LABELS[type]}
+					</Select.Item>
 				{/each}
 			</Select.Content>
 		</Select.Root>

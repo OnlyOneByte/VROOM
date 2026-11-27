@@ -1,3 +1,4 @@
+import type { ChargerType } from '#lib/types/index.ts';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 
 type QueuedExpenseInput = Omit<
@@ -15,6 +16,7 @@ export interface ParsedExpenseForm {
 	volume?: number | undefined;
 	charge?: number | undefined;
 	fuelType?: string | undefined;
+	chargerType?: ChargerType | null | undefined;
 	description?: string | undefined;
 	location?: string | undefined;
 	missedFillup?: boolean | undefined;
@@ -34,6 +36,7 @@ export function toOfflineExpense(expense: ParsedExpenseForm): QueuedExpenseInput
 		...(expense.volume !== undefined && { volume: expense.volume }),
 		...(expense.charge !== undefined && { charge: expense.charge }),
 		...(expense.fuelType !== undefined && { fuelType: expense.fuelType }),
+		...(expense.chargerType && { chargerType: expense.chargerType }),
 		...(expense.location !== undefined && { location: expense.location }),
 		...(expense.missedFillup !== undefined && { missedFillup: expense.missedFillup }),
 		...(expense.sourceType !== undefined && { sourceType: expense.sourceType }),

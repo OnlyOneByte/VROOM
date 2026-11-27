@@ -1,4 +1,9 @@
-import type { BackendExpenseResponse, Expense, ExpenseCategory } from '#lib/types/index.ts';
+import type {
+	BackendExpenseResponse,
+	ChargerType,
+	Expense,
+	ExpenseCategory
+} from '#lib/types/index.ts';
 import { isElectricFuelType } from '#lib/utils/units.ts';
 
 interface BackendExpenseRequest {
@@ -10,6 +15,7 @@ interface BackendExpenseRequest {
 	mileage?: number;
 	volume?: number;
 	fuelType?: string | null;
+	chargerType?: ChargerType | null;
 	description?: string | null;
 	location?: string | null;
 	missedFillup?: boolean;
@@ -60,6 +66,11 @@ export function toBackendExpense(
 		backendExpense.fuelType = frontendExpense.fuelType;
 	} else if (options.isEdit) {
 		backendExpense.fuelType = null;
+	}
+	if (frontendExpense.chargerType) {
+		backendExpense.chargerType = frontendExpense.chargerType;
+	} else if (options.isEdit || frontendExpense.chargerType === null) {
+		backendExpense.chargerType = null;
 	}
 	if (frontendExpense.description) {
 		backendExpense.description = frontendExpense.description;
@@ -115,6 +126,9 @@ export function fromBackendExpense(backendExpense: BackendExpenseResponse): Expe
 	}
 	if (backendExpense.fuelType) {
 		frontendExpense.fuelType = backendExpense.fuelType;
+	}
+	if (backendExpense.chargerType) {
+		frontendExpense.chargerType = backendExpense.chargerType;
 	}
 	if (backendExpense.description) {
 		frontendExpense.description = backendExpense.description;

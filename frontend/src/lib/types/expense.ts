@@ -2,6 +2,15 @@ import type { ExpenseCategory } from '#lib/constants/expense-categories.ts';
 
 export type { ExpenseCategory };
 
+export const CHARGER_TYPES = ['home', 'workplace', 'public_l2', 'dc_fast'] as const;
+export type ChargerType = (typeof CHARGER_TYPES)[number];
+export const CHARGER_TYPE_LABELS: Record<ChargerType, string> = {
+	home: 'Home',
+	workplace: 'Workplace',
+	public_l2: 'Public Level 2',
+	dc_fast: 'DC fast'
+};
+
 export const COMMON_EXPENSE_TAGS = [
 	'fuel',
 	'tolls',
@@ -44,6 +53,7 @@ export interface Expense {
 	volume?: number;
 	charge?: number;
 	fuelType?: string;
+	chargerType?: ChargerType | null;
 	description?: string;
 	location?: string;
 	missedFillup?: boolean;
@@ -95,6 +105,7 @@ export interface BackendExpenseResponse {
 	mileage?: number;
 	volume?: number;
 	fuelType?: string | null;
+	chargerType?: ChargerType | null;
 	description?: string | null;
 	location?: string | null;
 	missedFillup?: boolean;
