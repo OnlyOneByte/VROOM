@@ -25,6 +25,7 @@
 	let rangePhrase = $derived(
 		/^(Last |Year to date|All time)/.test(rangeText) ? rangeText.toLowerCase() : rangeText
 	);
+	let unitWord = $derived(distanceUnit === 'km' ? 'kilometer' : 'mile');
 	let rate = (v: number) => formatCurrency(v, undefined, 2);
 	let whole = (v: number) => formatCurrency(v, undefined, 0);
 	const flush =
@@ -60,8 +61,12 @@
 			Which car costs the most to run, and to own? <strong class="text-foreground">
 				{hero.cheapest}
 			</strong>
-			is cheapest to run; <strong class="text-foreground">{hero.costliest}</strong> costs the most
-			per {distanceUnit} all in{#if hero.reason}, mostly {hero.reason}{/if}.
+			{#if hero.cheapest === hero.costliest}
+				is cheapest to run but costs the most per {unitWord} all in{#if hero.reason}, mostly {hero.reason}{/if}.
+			{:else}
+				is cheapest to run; <strong class="text-foreground">{hero.costliest}</strong> costs the most
+				per {unitWord} all in{#if hero.reason}, mostly {hero.reason}{/if}.
+			{/if}
 		</p>
 	{/if}
 
@@ -84,7 +89,7 @@
 		<div class="space-y-2">
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 			<div
-				class="relative w-full overflow-x-auto"
+				class="relative w-full overflow-x-auto rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 				role="region"
 				aria-label="Where the money went, all time"
 				tabindex="0"
@@ -97,16 +102,16 @@
 					</TableCaption>
 					<TableHeader>
 						<TableRow>
-							<TableHead>Category</TableHead>
+							<TableHead scope="col">Category</TableHead>
 							{#each matrix.cars as car (car.vehicleId)}
-								<TableHead class="text-right">{car.label}</TableHead>
+								<TableHead scope="col" class="text-right">{car.label}</TableHead>
 							{/each}
 						</TableRow>
 					</TableHeader>
 					<TableBody>
 						{#each matrix.rows as row (row.category)}
 							<TableRow>
-								<TableCell>{row.label}</TableCell>
+								<TableHead scope="row" class="font-normal">{row.label}</TableHead>
 								{#each row.amounts as amount, i (matrix.cars[i]?.vehicleId)}
 									<TableCell class="text-right tabular-nums">
 										{#if amount == null}

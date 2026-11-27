@@ -71,18 +71,36 @@
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let distShortLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
+	let lifetime: { key: string; data: ReturnType<typeof loadLifetime> } | null = null;
+
+	function loadLifetime(overview: ReturnType<typeof overviewRequests>) {
+		return Promise.all([
+			analyticsApi.getFinancing({ vehicleIds }),
+			analyticsApi.getInsurance({ vehicleIds }),
+			...[overview.allIn, ...overview.categories].map(params =>
+				analyticsApi.query(params).catch(() => null)
+			)
+		]);
+	}
+
 	async function loadData() {
 		const current = ++request;
 		try {
 			isLoading = true;
 			const overview = overviewRequests(dateRange, vehicleIds);
-			const [cv, fin, ins, running, allIn, ...categories] = await Promise.all([
+			const key = JSON.stringify(vehicleIds ?? null);
+			if (lifetime?.key !== key) {
+				const entry = { key, data: loadLifetime(overview) };
+				const drop = () => {
+					if (lifetime === entry) lifetime = null;
+				};
+				entry.data.then(results => results.includes(null) && drop(), drop);
+				lifetime = entry;
+			}
+			const [cv, running, [fin, ins, allIn, ...categories]] = await Promise.all([
 				analyticsApi.getCrossVehicle({ ...dateRange, vehicleIds }),
-				analyticsApi.getFinancing({ vehicleIds }),
-				analyticsApi.getInsurance({ vehicleIds }),
-				...[overview.running, overview.allIn, ...overview.categories].map(params =>
-					analyticsApi.query(params).catch(() => null)
-				)
+				analyticsApi.query(overview.running).catch(() => null),
+				lifetime.data
 			]);
 			if (current !== request) return;
 			crossVehicle = cv;
@@ -182,6 +200,13 @@
 	let hasExpenses = $derived((crossVehicle?.monthlyExpenseTrends.length ?? 0) > 0);
 
 	let fuelEffConfig = $derived(buildChartConfig(fuelEffSeries));
+
+	let hasDetail = $derived(
+		trendData.length > 0 ||
+			categoryRows.length > 0 ||
+			(costBarData.length > 0 && hasExpenses) ||
+			fuelEffData.length > 0
+	);
 </script>
 
 {#if isLoading && !error}
@@ -193,7 +218,7 @@
 {:else if crossVehicle && financing && insurance}
 	<div class="space-y-4 md:space-y-6">
 		{#if !hasExpenses && filterLabel && onClearFilters}
-			<EmptyState level={3}>
+			<EmptyState level={2}>
 				{#snippet icon()}
 					<div class="mb-4 rounded-full bg-muted p-4">
 						<SearchX class="h-8 w-8 text-muted-foreground" aria-hidden="true" />
@@ -219,87 +244,92 @@
 			distanceUnit={distShortLabel}
 		/>
 
-		<ChartGroup
-			title="More detail"
-			description="Monthly spending, spending by category, totals per car and fuel economy"
-		>
-			<div class="space-y-4 md:space-y-6">
-				{#if trendData.length > 0}
-					<ExpenseTrendChart level={3} data={trendData} title="Monthly Expense Trends">
-						{#snippet icon()}
-							<TrendingUp class="h-5 w-5 text-primary" />
-						{/snippet}
-					</ExpenseTrendChart>
-				{/if}
+		{#if hasDetail}
+			<ChartGroup
+				title="More detail"
+				description="Monthly spending, spending by category, totals per car and fuel economy"
+			>
+				<div class="space-y-4 md:space-y-6">
+					{#if trendData.length > 0}
+						<ExpenseTrendChart level={3} data={trendData} title="Monthly Expense Trends">
+							{#snippet icon()}
+								<TrendingUp class="h-5 w-5 text-primary" />
+							{/snippet}
+						</ExpenseTrendChart>
+					{/if}
 
-				<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-					{#if categoryRows.length > 0}
-						<AppBarChart
+					<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+						{#if categoryRows.length > 0}
+							<AppBarChart
+								level={3}
+								title="Expense by Category"
+								description="Spending across all vehicles"
+								data={categoryRows}
+								x="value"
+								y="label"
+								orientation="horizontal"
+								series={categorySeries}
+								config={categoryConfig}
+								height={Math.max(160, categoryRows.length * 44)}
+								padding={{ top: 4, left: 112, bottom: 24, right: 16 }}
+								xAxisProps={{ format: (v: number) => formatCurrency(v, undefined, 0), ticks: 4 }}
+								yAxisFormat={v => String(v)}
+								tooltipFormat={v => formatCurrency(Number(v))}
+							/>
+						{/if}
+
+						{#if costBarData.length > 0 && hasExpenses}
+							<AppBarChart
+								level={3}
+								title="Vehicle Cost Comparison"
+								description="Total costs by vehicle"
+								data={costBarData}
+								x="vehicleName"
+								y="totalCost"
+								series={costBarSeries}
+								config={costBarConfig}
+								padding={costBarPadding}
+								xAxisProps={{
+									ticks: costBarData.map(d => d.vehicleName),
+									format: costBarTickFormat
+								}}
+								bind:plotWidth={costBarWidth}
+							>
+								{#snippet footer()}
+									<div class="mt-4 space-y-2 border-t border-border pt-4">
+										{#each costBarData as vehicle (vehicle.vehicleId)}
+											<div class="flex items-center justify-between text-sm">
+												<span>{vehicle.vehicleName}</span>
+												<span class="font-semibold">
+													{vehicle.costPerDistance != null
+														? `${formatCurrency(vehicle.costPerDistance)}/${distShortLabel}`
+														: 'N/A'}
+												</span>
+											</div>
+										{/each}
+									</div>
+								{/snippet}
+							</AppBarChart>
+						{/if}
+					</div>
+
+					{#if fuelEffData.length > 0}
+						<AppLineChart
 							level={3}
-							title="Expense by Category"
-							description="Spending across all vehicles"
-							data={categoryRows}
-							x="value"
-							y="label"
-							orientation="horizontal"
-							series={categorySeries}
-							config={categoryConfig}
-							height={Math.max(160, categoryRows.length * 44)}
-							padding={{ top: 4, left: 112, bottom: 24, right: 16 }}
-							xAxisProps={{ format: (v: number) => formatCurrency(v, undefined, 0), ticks: 4 }}
-							yAxisFormat={v => String(v)}
-							tooltipFormat={v => formatCurrency(Number(v))}
+							title="Fuel Efficiency Comparison"
+							description="{efficiencyLabel} trends across all vehicles"
+							data={fuelEffData}
+							x="date"
+							y={fuelEffVehicleIds}
+							series={fuelEffSeries}
+							config={fuelEffConfig}
+							yAxisFormat={v => `${formatNumber(v, 0)} ${efficiencyLabel}`}
+							tooltipFormat={unitTooltip(efficiencyLabel)}
 						/>
 					{/if}
-
-					{#if costBarData.length > 0 && hasExpenses}
-						<AppBarChart
-							level={3}
-							title="Vehicle Cost Comparison"
-							description="Total costs by vehicle"
-							data={costBarData}
-							x="vehicleName"
-							y="totalCost"
-							series={costBarSeries}
-							config={costBarConfig}
-							padding={costBarPadding}
-							xAxisProps={{ ticks: costBarData.map(d => d.vehicleName), format: costBarTickFormat }}
-							bind:plotWidth={costBarWidth}
-						>
-							{#snippet footer()}
-								<div class="mt-4 space-y-2 border-t border-border pt-4">
-									{#each costBarData as vehicle (vehicle.vehicleId)}
-										<div class="flex items-center justify-between text-sm">
-											<span>{vehicle.vehicleName}</span>
-											<span class="font-semibold">
-												{vehicle.costPerDistance != null
-													? `${formatCurrency(vehicle.costPerDistance)}/${distShortLabel}`
-													: 'N/A'}
-											</span>
-										</div>
-									{/each}
-								</div>
-							{/snippet}
-						</AppBarChart>
-					{/if}
 				</div>
-
-				{#if fuelEffData.length > 0}
-					<AppLineChart
-						level={3}
-						title="Fuel Efficiency Comparison"
-						description="{efficiencyLabel} trends across all vehicles"
-						data={fuelEffData}
-						x="date"
-						y={fuelEffVehicleIds}
-						series={fuelEffSeries}
-						config={fuelEffConfig}
-						yAxisFormat={v => `${formatNumber(v, 0)} ${efficiencyLabel}`}
-						tooltipFormat={unitTooltip(efficiencyLabel)}
-					/>
-				{/if}
-			</div>
-		</ChartGroup>
+			</ChartGroup>
+		{/if}
 
 		<FinancingAnalytics {financing} />
 
