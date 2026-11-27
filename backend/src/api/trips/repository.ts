@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import type { NewTrip, Trip } from '../../db/schema';
 import { trips, vehicles } from '../../db/schema';
 import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
@@ -62,7 +63,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
         )
       )
       .orderBy(asc(trips.createdAt), asc(trips.id))
-      .get();
+      .then(firstRow);
     return result?.id ?? null;
   }
 

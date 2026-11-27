@@ -3,6 +3,7 @@ import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { appContext, repos } from '../../app-context';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import type { AsyncHandle } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import {
   expenses,
   insuranceClaims,
@@ -239,7 +240,7 @@ class RestoreService {
       .select({ currency: userPreferences.currencyUnit })
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId))
-      .get();
+      .then(firstRow);
     return row?.currency;
   }
 
@@ -769,7 +770,7 @@ class RestoreService {
       })
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId))
-      .get();
+      .then(firstRow);
   }
 
   private async ownedProviderIds(tx: AsyncHandle, userId: string): Promise<Map<string, string>> {

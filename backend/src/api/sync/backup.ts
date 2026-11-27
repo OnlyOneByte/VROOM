@@ -14,6 +14,7 @@ import {
   TABLE_SCHEMA_MAP,
 } from '../../config';
 import type { AsyncHandle } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import type { UserProvider } from '../../db/schema';
 import {
   expenses,
@@ -437,7 +438,7 @@ class BackupService {
       .select()
       .from(userProviders)
       .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
-      .get();
+      .then(firstRow);
 
     if (!providerRow) return 0;
 
@@ -478,7 +479,7 @@ class BackupService {
       .select()
       .from(userProviders)
       .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
-      .get();
+      .then(firstRow);
     if (!providerRow) return [];
 
     const config = await this.loadBackupConfig(userId);

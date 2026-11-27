@@ -3,6 +3,7 @@ import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { appContext, repos } from '../../app-context';
 import type { AsyncHandle, AsyncTransaction } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import {
   permissionOverrides,
   roleAssignments,
@@ -65,7 +66,11 @@ function transitionShare(
   { check, afterwards }: Transition
 ): Promise<VehicleShare> {
   return appContext().asyncDb.transaction(async (tx) => {
-    const before = await tx.select().from(vehicleShares).where(eq(vehicleShares.id, id)).get();
+    const before = await tx
+      .select()
+      .from(vehicleShares)
+      .where(eq(vehicleShares.id, id))
+      .then(firstRow);
     if (!before || !from.includes(before.status)) {
       throw new ConflictError('This share changed in the meantime. Reload and try again');
     }
@@ -108,7 +113,7 @@ async function vehicleOwnerId(tx: AsyncHandle, vehicleId: string): Promise<strin
     .select({ userId: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
-    .get();
+    .then(firstRow);
   return row?.userId ?? null;
 }
 
@@ -154,7 +159,7 @@ async function refuseOverSharee(
         notInArray(roleAssignments.roleId, [shareRoleId('editor'), shareRoleId('viewer')])
       )
     )
-    .get();
+    .then(firstRow);
   if (ownerSet) throw new ForbiddenError('Only the owner can change what the owner set');
   if (!removesOverrides) return;
   const overrides = await tx
@@ -187,7 +192,7 @@ routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle),
     .asyncDb.select({ email: users.email })
     .from(users)
     .where(eq(users.id, vehicle.userId))
-    .get();
+    .then(firstRow);
 
   if (email === user.email.toLowerCase()) {
     throw new ValidationError('You cannot share a vehicle with yourself');

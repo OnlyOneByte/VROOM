@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
+import { firstRow } from '../../db/first-row';
 import {
   expenses,
   odometerEntries,
@@ -217,21 +218,26 @@ async function vehicleHasMeasuredHistory(vehicleId: string): Promise<boolean> {
         )
       )
       .limit(1)
-      .get(),
+      .then(firstRow),
     db
       .select({ id: odometerEntries.id })
       .from(odometerEntries)
       .where(eq(odometerEntries.vehicleId, vehicleId))
       .limit(1)
-      .get(),
-    db.select({ id: trips.id }).from(trips).where(eq(trips.vehicleId, vehicleId)).limit(1).get(),
+      .then(firstRow),
+    db
+      .select({ id: trips.id })
+      .from(trips)
+      .where(eq(trips.vehicleId, vehicleId))
+      .limit(1)
+      .then(firstRow),
     db
       .select({ id: reminders.id })
       .from(reminders)
       .innerJoin(reminderVehicles, eq(reminderVehicles.reminderId, reminders.id))
       .where(and(eq(reminderVehicles.vehicleId, vehicleId), isNotNull(reminders.intervalMileage)))
       .limit(1)
-      .get(),
+      .then(firstRow),
     db
       .select({ id: vehicleFinancing.id })
       .from(vehicleFinancing)
@@ -239,7 +245,7 @@ async function vehicleHasMeasuredHistory(vehicleId: string): Promise<boolean> {
         and(eq(vehicleFinancing.vehicleId, vehicleId), isNotNull(vehicleFinancing.mileageLimit))
       )
       .limit(1)
-      .get(),
+      .then(firstRow),
   ]);
   return Boolean(expense || odometer || trip || mileageReminder || leaseLimit);
 }

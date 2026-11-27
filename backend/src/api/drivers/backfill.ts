@@ -1,5 +1,6 @@
 import { and, type Column, desc, eq, isNull } from 'drizzle-orm';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import {
   type BackfilledEntry,
   driverBackfills,
@@ -91,7 +92,7 @@ export async function planBackfill(
     .select({ userId: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
-    .get();
+    .then(firstRow);
   const owner = ownerRow?.userId;
   const byUser = await memberDrivers(db, vehicleId);
   return candidates.flatMap((c) => {
@@ -211,7 +212,7 @@ async function stillPaidBy(tx: AsyncHandle, entry: BackfilledEntry): Promise<boo
     .select({ payer: expenses.paidByDriverId })
     .from(expenses)
     .where(eq(expenses.id, entry.id))
-    .get();
+    .then(firstRow);
   return row?.payer === entry.driverId;
 }
 
@@ -227,7 +228,7 @@ export function undoBackfill(
       .select()
       .from(driverBackfills)
       .where(and(eq(driverBackfills.id, batchId), eq(driverBackfills.vehicleId, vehicleId)))
-      .get();
+      .then(firstRow);
     if (!batch || batch.undoneAt) throw new NotFoundError('Backfill');
     const kept: BackfilledEntry[] = [];
     let reverted = 0;

@@ -55,7 +55,75 @@ export function useTestApp(seedUser: Partial<TestUser> = {}): () => TestApp {
 let counter = 0;
 let migrated = false;
 
+export const ON_POSTGRES = process.env.TEST_DB === 'postgres';
+
+let postgres: { client: import('@electric-sql/pglite').PGlite } | undefined;
+
+const NO_RAW_SQLITE = new Proxy({} as import('bun:sqlite').Database, {
+  get() {
+    throw new Error(
+      'This test sets up data with raw SQLite, so it cannot run with TEST_DB=postgres yet'
+    );
+  },
+});
+
+async function openPostgresTestDatabase(): Promise<void> {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { drizzle } = await import('drizzle-orm/pglite');
+  const { migrate } = await import('drizzle-orm/pglite/migrator');
+  const { openAsyncPostgres, pgliteConnection } = await import('../db/async-postgres');
+  const { createPostgresAppContext, installAppContext } = await import('../app-context');
+  if (postgres) {
+    const tables = await postgres.client.query<{ name: string }>(
+      "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'"
+    );
+    const list = tables.rows.map((row) => `"${row.name}"`).join(', ');
+    await postgres.client.exec(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
+    return;
+  }
+  const client = new PGlite();
+  await migrate(drizzle(client), {
+    migrationsFolder: `${import.meta.dir}/../../drizzle-pg`,
+  });
+  installAppContext(createPostgresAppContext(openAsyncPostgres(pgliteConnection(client)).db));
+  postgres = { client };
+}
+
+async function createPostgresTestApp(seedUser: Partial<TestUser>): Promise<TestApp> {
+  await openPostgresTestDatabase();
+  const schema = await import('../db/schema');
+  const { appContext } = await import('../app-context');
+  const { app } = await import('../app');
+  const { assignServerRole, syncBuiltInRoles } = await import('../permissions/grants');
+  const db = appContext().asyncDb;
+  await syncBuiltInRoles(db);
+
+  const id = seedUser.id ?? `test-user-${++counter}`;
+  const email = seedUser.email ?? `test${counter}@example.com`;
+  const displayName = seedUser.displayName ?? 'Test User';
+  await db.insert(schema.users).values({ id, email, displayName });
+  await assignServerRole(db, id, 'member');
+  await db
+    .insert(schema.serverSettings)
+    .values({ id: 1, signupMode: 'open' })
+    .onConflictDoNothing();
+
+  const session = await appContext().lucia.createSession(id, {});
+  const sessionCookie = appContext().lucia.createSessionCookie(session.id);
+  const cookie = `${sessionCookie.name}=${sessionCookie.value}`;
+  return {
+    app,
+    user: { id, email, displayName },
+    sqlite: NO_RAW_SQLITE,
+    cookie,
+    authed: (method, path, body) => sendRequest(app, method, path, body, cookie),
+    anon: (method, path, body) => sendRequest(app, method, path, body),
+    close: () => {},
+  };
+}
+
 export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<TestApp> {
+  if (ON_POSTGRES) return createPostgresTestApp(seedUser);
   const { getDb, runMigrations } = await import('../db/connection');
   const db = getDb();
   const schema = await import('../db/schema');

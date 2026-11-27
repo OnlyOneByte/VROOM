@@ -1,5 +1,6 @@
 import { and, asc, eq, ne } from 'drizzle-orm';
 import { appContext } from '../../app-context';
+import { firstRow } from '../../db/first-row';
 import { type UserProvider, userPreferences, userProviders } from '../../db/schema';
 import { NoProviderError } from '../../errors';
 import type { DefaultProviderCapability } from '../../types';
@@ -34,7 +35,7 @@ export async function resolveProvider(
     .asyncDb.select({ providerDefaults: userPreferences.providerDefaults })
     .from(userPreferences)
     .where(eq(userPreferences.userId, userId))
-    .get();
+    .then(firstRow);
   const defaultId = prefs?.providerDefaults?.[capability];
   const builtin = capability === 'ai.vision' && localOcrEnabled();
   if (builtin && defaultId === LOCAL_OCR_PROVIDER_ID) return builtinVisionRow(userId);

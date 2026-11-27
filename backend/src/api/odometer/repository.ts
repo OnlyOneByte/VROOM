@@ -2,6 +2,7 @@ import { and, count, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from 'd
 import { repos } from '../../app-context';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import { rawAll, sqlFalse } from '../../db/dialect';
+import { firstRow } from '../../db/first-row';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
 import { odometerEntries } from '../../db/schema';
 import { DatabaseError, NotFoundError } from '../../errors';
@@ -120,7 +121,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       .select({ id: odometerEntries.id })
       .from(odometerEntries)
       .where(sameReading)
-      .get();
+      .then(firstRow);
     if (existing) {
       await db
         .update(odometerEntries)
@@ -179,7 +180,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       .select({ id: odometerEntries.id })
       .from(odometerEntries)
       .where(and(this.sameReadingWhere({ ...from, ...to }), ne(odometerEntries.id, only.id)))
-      .get();
+      .then(firstRow);
     if (target) return null;
     await db
       .update(odometerEntries)

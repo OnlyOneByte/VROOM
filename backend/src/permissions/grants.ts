@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, notInArray, type SQL } from 'drizz
 import type { Context } from 'hono';
 import { appContext } from '../app-context';
 import type { AsyncAppDatabase, AsyncHandle, AsyncTransaction } from '../db/async-sqlite';
+import { firstRow } from '../db/first-row';
 import {
   permissionOverrides,
   roleAssignments,
@@ -253,7 +254,7 @@ export async function isVehicleMember(
     .select({ id: vehicleShares.id })
     .from(vehicleShares)
     .where(memberWhere(vehicleId, userId))
-    .get();
+    .then(firstRow);
   return share !== undefined;
 }
 
@@ -294,7 +295,7 @@ function asyncGrantSource(db: AsyncHandle): AsyncGrantSource {
         .select({ ownerId: vehicles.userId })
         .from(vehicles)
         .where(eq(vehicles.id, vehicleId))
-        .get();
+        .then(firstRow);
       if (!vehicle) return null;
       const owner = vehicle.ownerId === userId;
       const member = !owner && (await isVehicleMember(db, vehicleId, userId));
@@ -315,14 +316,14 @@ function asyncGrantSource(db: AsyncHandle): AsyncGrantSource {
           .from(roleAssignments)
           .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
           .where(builtInDemoWhere(vehicle.ownerId))
-          .get()) !== undefined;
+          .then(firstRow)) !== undefined;
       return { owner, member, demoGarage, grants };
     },
   };
 }
 
 async function actorForAsync(db: AsyncHandle, userId: string): Promise<Actor> {
-  const row = await actorQuery(db, userId).get();
+  const row = await actorQuery(db, userId).then(firstRow);
   return { userId, disabled: !row || row.disabledAt !== null, demo: Boolean(row?.demoRole) };
 }
 
@@ -431,7 +432,7 @@ export async function hasPerPersonVehicleGrants(
     .select({ id: permissionOverrides.id })
     .from(permissionOverrides)
     .where(inArray(permissionOverrides.scopeId, owned))
-    .get();
+    .then(firstRow);
   const customRole = await db
     .select({ id: roleAssignments.id })
     .from(roleAssignments)
@@ -441,6 +442,6 @@ export async function hasPerPersonVehicleGrants(
         notInArray(roleAssignments.roleId, [shareRoleId('editor'), shareRoleId('viewer')])
       )
     )
-    .get();
+    .then(firstRow);
   return override !== undefined || customRole !== undefined;
 }

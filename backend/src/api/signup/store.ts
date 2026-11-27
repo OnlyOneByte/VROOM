@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { CONFIG } from '../../config';
 import type { AsyncHandle } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import {
   roleAssignments,
   serverInvites,
@@ -27,7 +28,7 @@ export async function signupSettings(db: AsyncHandle): Promise<SignupSettings> {
     .select()
     .from(serverSettings)
     .where(eq(serverSettings.id, SETTINGS_ROW))
-    .get();
+    .then(firstRow);
   const stored = row && isSignupMode(row.signupMode) ? row.signupMode : 'invite';
   const envDomains = CONFIG.signup.allowedDomains;
   return {
@@ -72,7 +73,11 @@ export async function updateSignupSettings(
 }
 
 async function hasRealAccounts(db: AsyncHandle): Promise<boolean> {
-  const row = await db.select({ id: users.id }).from(users).where(ne(users.id, DEMO_USER_ID)).get();
+  const row = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(ne(users.id, DEMO_USER_ID))
+    .then(firstRow);
   return row !== undefined;
 }
 
@@ -81,7 +86,7 @@ async function hasServerAdmin(db: AsyncHandle): Promise<boolean> {
     .select({ id: roleAssignments.id })
     .from(roleAssignments)
     .where(and(eq(roleAssignments.roleId, builtInRoleId('admin')), isNull(roleAssignments.scopeId)))
-    .get();
+    .then(firstRow);
   return row !== undefined;
 }
 
@@ -104,7 +109,7 @@ export async function ensureServerAdmin(tx: AsyncHandle): Promise<string | null>
     .select()
     .from(serverSettings)
     .where(eq(serverSettings.id, SETTINGS_ROW))
-    .get();
+    .then(firstRow);
   if (!row || row.adminAssignedAt) return null;
   if (await hasServerAdmin(tx)) {
     await markAdminAssigned(tx);
@@ -123,7 +128,7 @@ export async function ensureServerAdmin(tx: AsyncHandle): Promise<string | null>
       )
     )
     .orderBy(sql`${users.createdAt} IS NULL`, users.createdAt, users.id)
-    .get();
+    .then(firstRow);
   if (!candidate) return null;
   await assignServerRole(tx, candidate.id, 'admin');
   await markAdminAssigned(tx);
@@ -153,7 +158,7 @@ export function activeInviteFor(db: AsyncHandle, email: string, now: Date) {
         gt(serverInvites.expiresAt, now)
       )
     )
-    .get();
+    .then(firstRow);
 }
 
 export async function createInvite(
@@ -183,7 +188,11 @@ export function listInvites(db: AsyncHandle) {
 }
 
 export async function revokeInvite(tx: AsyncHandle, id: string, now: Date = new Date()) {
-  const invite = await tx.select().from(serverInvites).where(eq(serverInvites.id, id)).get();
+  const invite = await tx
+    .select()
+    .from(serverInvites)
+    .where(eq(serverInvites.id, id))
+    .then(firstRow);
   if (!invite) throw new NotFoundError('Invite');
   if (inviteStatus(invite, now) !== 'active') {
     throw new ConflictError('Only an open invite can be revoked');
@@ -224,7 +233,7 @@ export async function hasShareInvite(db: AsyncHandle, email: string): Promise<bo
         ne(users.id, DEMO_USER_ID)
       )
     )
-    .get();
+    .then(firstRow);
   return row !== undefined;
 }
 

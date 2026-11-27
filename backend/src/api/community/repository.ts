@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq, getTableColumns, gte, inArray, lte, min } from 'drizzle-orm';
 import type { AsyncAppDatabase } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import {
   type CommunityStat,
   communityNoiseKeys,
@@ -86,13 +87,13 @@ export class CommunityStatsRepository {
       .select(VEHICLE_COLUMNS)
       .from(vehicles)
       .where(eq(vehicles.id, vehicleId))
-      .get();
+      .then(firstRow);
     if (!vehicle) return null;
     const owner = await this.db
       .select(OWNER_COLUMNS)
       .from(userPreferences)
       .where(eq(userPreferences.userId, vehicle.userId))
-      .get();
+      .then(firstRow);
     const owners = new Map([
       [vehicle.userId, owner ?? { userId: vehicle.userId, currency: 'USD', region: null }],
     ]);
@@ -108,7 +109,7 @@ export class CommunityStatsRepository {
       })
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId))
-      .get();
+      .then(firstRow);
     if (row?.optIn !== true) return 'opted_out';
     const snapshot = await this.lastRefreshedAt(scope);
     const included =
@@ -286,13 +287,12 @@ export class CommunityStatsRepository {
     await this.db
       .insert(communityNoiseKeys)
       .values({ scope, noiseKey: fresh })
-      .onConflictDoNothing()
-      .run();
+      .onConflictDoNothing();
     const row = await this.db
       .select({ noiseKey: communityNoiseKeys.noiseKey })
       .from(communityNoiseKeys)
       .where(eq(communityNoiseKeys.scope, scope))
-      .get();
+      .then(firstRow);
     return row?.noiseKey ?? fresh;
   }
 
@@ -301,7 +301,7 @@ export class CommunityStatsRepository {
       .select({ refreshedAt: communityRefreshes.refreshedAt })
       .from(communityRefreshes)
       .where(eq(communityRefreshes.scope, scope))
-      .get();
+      .then(firstRow);
     return row?.refreshedAt ?? null;
   }
 
