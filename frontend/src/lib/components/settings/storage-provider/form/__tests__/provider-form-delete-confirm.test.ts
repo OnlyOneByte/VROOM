@@ -69,7 +69,11 @@ describe('ProviderForm Remove storage section asks before deleting', () => {
 	test('Delete storage opens a confirmation and deletes nothing yet', async () => {
 		await clickDeleteStorage();
 		expect(await screen.findByText('Delete My Drive?')).toBeInTheDocument();
-		expect(screen.getByText(/Backups here stop/)).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				"VROOM stops backing up here and removes this storage's settings. Your files stay in the storage itself."
+			)
+		).toBeInTheDocument();
 		expect(deleteProvider).not.toHaveBeenCalled();
 	});
 

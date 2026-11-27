@@ -50,7 +50,11 @@ describe('deleting a storage provider asks first', () => {
 	test('the trash button opens a confirmation and deletes nothing yet', async () => {
 		await clickDelete();
 		expect(await screen.findByText('Delete Family Drive?')).toBeInTheDocument();
-		expect(screen.getByText(/Backups to this provider stop/)).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				"VROOM stops backing up here and removes this storage's settings. Your files stay in the storage itself."
+			)
+		).toBeInTheDocument();
 		expect(deleteProvider).not.toHaveBeenCalled();
 	});
 
