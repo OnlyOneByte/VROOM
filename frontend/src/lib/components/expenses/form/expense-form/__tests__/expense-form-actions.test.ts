@@ -27,6 +27,8 @@ const { expenseApiMock, addNotification, gotoDynamic, addOfflineExpense, online,
 vi.mock('#lib/services/expense-api.ts', () => ({ expenseApi: expenseApiMock }));
 vi.mock('#lib/stores/app.svelte.ts', () => ({ appStore: { addNotification } }));
 vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic }));
+const auth = vi.hoisted(() => ({ user: null as { demo?: boolean } | null }));
+vi.mock('#lib/stores/auth.svelte.ts', () => ({ authStore: auth }));
 const scheduleDelete = vi.hoisted(() => vi.fn());
 vi.mock('#lib/utils/pending-deletes.svelte.ts', () => ({ scheduleDelete }));
 vi.mock('#lib/utils/offline-storage.ts', () => ({
@@ -433,6 +435,21 @@ describe('deleteExpense', () => {
 		expect(expenseApiMock.deleteExpense).not.toHaveBeenCalled();
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
 		expect(state.showDeleteConfirm).toBe(false);
+	});
+
+	test('in the demo garage nothing is scheduled and the dialog stays as it was', async () => {
+		auth.user = { demo: true };
+		try {
+			const state = createState('e1');
+			state.originalExpense = loaded;
+			state.showDeleteConfirm = true;
+			await deleteExpense(state);
+			expect(scheduleDelete).not.toHaveBeenCalled();
+			expect(gotoDynamic).not.toHaveBeenCalled();
+			expect(state.showDeleteConfirm).toBe(true);
+		} finally {
+			auth.user = null;
+		}
 	});
 
 	test('a split expense is scheduled as its whole group', async () => {
