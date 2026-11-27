@@ -230,6 +230,26 @@ describe('Settings page loading', () => {
 		logout.mockRestore();
 	});
 
+	test('a sign-out in flight disables the button, so a second click sends nothing', async () => {
+		let finish = () => {};
+		const logout = vi
+			.spyOn(authStore, 'logout')
+			.mockImplementation(() => new Promise<void>(resolve => (finish = resolve)));
+		await mount();
+		await fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+		await settle();
+
+		const busy = screen.getByRole('button', { name: /Signing out/ });
+		expect(busy).toBeDisabled();
+		await fireEvent.click(busy);
+		expect(logout).toHaveBeenCalledOnce();
+
+		finish();
+		await settle();
+		expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled();
+		logout.mockRestore();
+	});
+
 	test('only someone who manages sign-up sees the Server link', async () => {
 		await mount();
 		expect(screen.queryByTestId('settings-server-link')).toBeNull();

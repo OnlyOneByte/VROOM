@@ -42,11 +42,17 @@
 
 	let user = $derived(authStore.user);
 
+	let signingOut = $state(false);
+
 	async function handleSignOut() {
+		if (signingOut) return;
+		signingOut = true;
 		try {
 			await authStore.logout();
 		} catch (error) {
 			appStore.showError(`Couldn't sign out. ${userFacingErrorMessage(error)}`);
+		} finally {
+			signingOut = false;
 		}
 	}
 
@@ -402,25 +408,32 @@
 							</CardAction>
 						</CardHeader>
 						<CardContent class="divide-y">
-							<div class="flex items-center justify-between gap-4 [&>button]:shrink-0 pb-3">
+							<div class="flex items-center justify-between gap-4 pb-3">
 								<div class="min-w-0">
 									<p class="truncate font-medium">{user?.displayName ?? 'User'}</p>
 									{#if user?.email}
 										<p class="truncate text-sm text-muted-foreground">{user.email}</p>
 									{/if}
 								</div>
-								<Button variant="outline" class="h-10 rounded-full" onclick={handleSignOut}>
-									Sign out
+								<Button variant="outline" onclick={handleSignOut} disabled={signingOut}>
+									{#if signingOut}
+										<LoaderCircle class="animate-spin" aria-hidden="true" />
+										Signing out…
+									{:else}
+										Sign out
+									{/if}
 								</Button>
 							</div>
 							{#if managesServer}
 								<a
 									href={resolve(routes.settingsServer)}
-									class="flex items-center justify-between gap-4 py-3 hover:text-foreground"
+									class="group flex items-center justify-between gap-4 py-3"
 									data-testid="settings-server-link"
 								>
 									<span class="min-w-0">
-										<span class="block font-medium">Server</span>
+										<span class="block font-medium underline-offset-4 group-hover:underline">
+											Server
+										</span>
 										<span class="block text-sm text-muted-foreground">
 											Who can join, invites and new accounts
 										</span>
@@ -447,19 +460,14 @@
 									Couldn't load the migration tool. Check your connection and reload.
 								</p>
 							{/await}
-							<div class="flex items-center justify-between gap-4 [&>button]:shrink-0 py-3">
+							<div class="flex items-center justify-between gap-4 py-3">
 								<div class="min-w-0">
 									<p class="font-medium">Export everything</p>
 									<p class="text-sm text-muted-foreground">
 										A ZIP of CSV files you can restore later
 									</p>
 								</div>
-								<Button
-									variant="outline"
-									class="h-10 rounded-full"
-									onclick={handleBackup}
-									disabled={isBackingUp}
-								>
+								<Button variant="outline" onclick={handleBackup} disabled={isBackingUp}>
 									{#if isBackingUp}
 										<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
 										Exporting…
