@@ -2,7 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
 import type { Expense } from '#lib/types/index.ts';
-import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+import { RequestTimeoutError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 import { UNDO_WINDOW_MS } from '#lib/utils/pending-deletes.svelte.ts';
 
@@ -21,6 +21,8 @@ interface PendingEdit {
 	undoSeq?: number;
 }
 
+export const EDIT_TIMEOUT_MS = 15_000;
+
 const toastId = (id: string) => `expense-edit-${id}`;
 
 const edits = new SvelteMap<string, PendingEdit>();
@@ -35,8 +37,12 @@ function settle(id: string, seq: number, change: Partial<PendingEdit>): boolean 
 }
 
 async function put(id: string, seq: number, payload: EditPayload): Promise<void> {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(new RequestTimeoutError()), EDIT_TIMEOUT_MS);
 	try {
-		const saved: Expense | undefined = await expenseApi.updateExpense(id, payload);
+		const saved: Expense | undefined = await expenseApi.updateExpense(id, payload, {
+			signal: controller.signal
+		});
 		const entry = edits.get(id);
 		if (!entry) return;
 		const stamp = saved?.updatedAt;
@@ -58,6 +64,8 @@ async function put(id: string, seq: number, payload: EditPayload): Promise<void>
 			duration: Number.POSITIVE_INFINITY,
 			action: { label: 'Retry', onClick: () => retryEdit(id) }
 		});
+	} finally {
+		clearTimeout(timer);
 	}
 }
 

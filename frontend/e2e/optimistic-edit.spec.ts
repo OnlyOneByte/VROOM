@@ -100,3 +100,41 @@ test.describe('Editing an expense does not wait for the server', () => {
 		);
 	});
 });
+
+test.describe('A save that never answers', () => {
+	test('times out into "Changes not saved", and Retry sends the same values to the same expense', async ({
+		page,
+		context
+	}) => {
+		await addSessionCookie(context);
+		await mockApi(page);
+		await page.clock.install();
+		const bodies: unknown[] = [];
+		await page.route(
+			url => url.pathname === '/api/v1/expenses/expense-maint',
+			async route => {
+				if (route.request().method() !== 'PUT') return route.fallback();
+				bodies.push(route.request().postDataJSON());
+				if (bodies.length === 1) return;
+				return route.fallback();
+			}
+		);
+
+		await editOilChangeAmount(page);
+		const row = page.getByTestId('expense-row').filter({ hasText: 'Oil change' });
+		await expect(row.getByText('$120.00')).toBeVisible();
+		await expect.poll(() => bodies.length).toBe(1);
+
+		await page.clock.fastForward(15_000);
+		await expect(
+			row.getByText(/^Changes not saved: The server didn't answer in time/)
+		).toBeVisible();
+		await expect(row.getByText('$89.99')).toBeVisible();
+
+		await row.getByRole('button', { name: /^Retry saving changes/ }).click();
+		await expect.poll(() => bodies.length).toBe(2);
+		expect(bodies[1]).toEqual(bodies[0]);
+		await expect(row.getByText('$120.00')).toBeVisible();
+		await expect(row.getByText(/^Changes not saved:/)).toHaveCount(0);
+	});
+});

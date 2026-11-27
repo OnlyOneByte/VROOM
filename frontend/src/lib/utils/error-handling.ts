@@ -57,6 +57,13 @@ export class NetworkError extends TypeError {
 	}
 }
 
+export class RequestTimeoutError extends Error {
+	constructor() {
+		super('The request timed out');
+		this.name = 'RequestTimeoutError';
+	}
+}
+
 function isVroomError(error: unknown): error is VroomError {
 	return error instanceof VroomError;
 }
@@ -84,6 +91,8 @@ const STATUS_MESSAGES: Record<number, string> = {
 
 export const NETWORK_FAILURE_MESSAGE = 'Check your connection and try again.';
 export const SERVER_FAILURE_MESSAGE = 'Something went wrong on our side. Try again in a moment.';
+export const REQUEST_TIMEOUT_MESSAGE =
+	"The server didn't answer in time, so this may not have gone through. Try again.";
 export const UNEXPECTED_FAILURE_MESSAGE =
 	'Something went wrong. Try again, and reload the page if it keeps happening.';
 const INVALID_DETAILS_MESSAGE = "Some details aren't valid. Check them and try again.";
@@ -178,6 +187,7 @@ function serverBusyMessage(details: Record<string, unknown> | undefined): string
 
 export function userFacingErrorMessage(error: unknown): string {
 	if (isNetworkError(error)) return NETWORK_FAILURE_MESSAGE;
+	if (error instanceof RequestTimeoutError) return REQUEST_TIMEOUT_MESSAGE;
 	if (isVroomError(error)) {
 		if (error.code === 'SERVER_BUSY') return serverBusyMessage(error.details);
 		const status = error.statusCode ?? 0;
