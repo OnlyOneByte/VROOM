@@ -80,6 +80,21 @@ describe('setupAutoSync — delivery at app open', () => {
 		expect(storage.getPendingExpenses()).toHaveLength(0);
 	});
 
+	it('remembers the delivered expense with its server id, found by client id', async () => {
+		const { storage, onlineStatus, syncManager } = graph;
+		const recent = await import('../recently-synced.svelte');
+		onlineStatus.current = true;
+		storage.saveOfflineExpenses([pending('queued')]);
+
+		syncManager.setupAutoSync();
+		await vi.advanceTimersByTimeAsync(2500);
+
+		expect(recent.syncedExpenseByClientId('cid-queued')).toMatchObject({
+			id: 'server-1',
+			amount: 12.34
+		});
+	});
+
 	it('stays quiet on mount when the outbox is empty', async () => {
 		const { onlineStatus, syncManager } = graph;
 		onlineStatus.current = true;

@@ -286,7 +286,10 @@ class SyncManager {
 			if (syncResult.success) {
 				result.synced++;
 				markExpenseAsSynced(expense.id, syncResult.serverId);
-				rememberSynced(expense);
+				rememberSynced({
+					...expense,
+					...(syncResult.serverId && { serverId: syncResult.serverId })
+				});
 				clearSaveFailure(expense.id);
 				this.retryCount.delete(expense.id);
 			} else if (syncResult.conflict) {
@@ -420,7 +423,7 @@ class SyncManager {
 			const result = await this.syncSingleExpense(expense);
 			if (result.success) {
 				markExpenseAsSynced(expense.id, result.serverId);
-				rememberSynced(expense);
+				rememberSynced({ ...expense, ...(result.serverId && { serverId: result.serverId }) });
 				clearSaveFailure(expense.id);
 				this.retryCount.delete(expense.id);
 				const currentExpenses = offlineExpenseQueue.current;
