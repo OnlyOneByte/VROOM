@@ -26,7 +26,13 @@ import {
 } from '../../db/dialect';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
-import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '../../errors';
+import {
+  ConflictError,
+  DatabaseError,
+  ExpenseChangedError,
+  NotFoundError,
+  ValidationError,
+} from '../../errors';
 import { zonedCalendar } from '../../utils/analytics-charts';
 import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
@@ -73,6 +79,24 @@ const EXPENSE_SORT_COLUMNS = {
   amount: expenses.expenseAmount,
   category: expenses.category,
 } as const;
+
+const UPDATED_AT_STEP_MS = 1000;
+
+function assertNotChanged(stored: Date | null, expected: Date | undefined): void {
+  if (expected && stored?.getTime() !== expected.getTime()) {
+    throw new ExpenseChangedError(stored);
+  }
+}
+
+function latestOf(times: (Date | null)[]): Date | null {
+  const latest = Math.max(0, ...times.map((d) => d?.getTime() ?? 0));
+  return latest > 0 ? new Date(latest) : null;
+}
+
+function nextUpdatedAt(previous: (Date | null)[]): Date {
+  const latest = latestOf(previous)?.getTime() ?? 0;
+  return new Date(Math.max(Date.now(), latest + UPDATED_AT_STEP_MS));
+}
 
 interface Readings {
   at(tx: AsyncHandle, bound: 'before' | 'after', edge: Date): Promise<Date | null>;
@@ -492,16 +516,28 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async update(
     id: string,
     data: Partial<NewExpense>,
-    odometer: OdometerCheck | null = null
+    odometer: OdometerCheck | null = null,
+    expectedUpdatedAt?: Date
   ): Promise<Expense> {
     return this.db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ updatedAt: expenses.updatedAt })
+        .from(expenses)
+        .where(eq(expenses.id, id));
+      if (!current) throw new NotFoundError('Resource');
+      assertNotChanged(current.updatedAt, expectedUpdatedAt);
       await assertOdometerInOrder(tx, odometer);
       const [updated] = await tx
         .update(expenses)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(expenses.id, id))
+        .set({ ...data, updatedAt: nextUpdatedAt([current.updatedAt]) })
+        .where(
+          and(
+            eq(expenses.id, id),
+            expectedUpdatedAt ? eq(expenses.updatedAt, expectedUpdatedAt) : undefined
+          )
+        )
         .returning();
-      if (!updated) throw new NotFoundError('Resource');
+      if (!updated) throw new ExpenseChangedError(null);
       return updated;
     });
   }
@@ -932,7 +968,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async updateSplitExpense(
     groupId: string,
     data: { splitConfig: SplitConfig; totalAmount?: number },
-    userId: string
+    userId: string,
+    expectedUpdatedAt?: Date
   ): Promise<Expense[]> {
     try {
       return await this.db.transaction(async (tx) => {
@@ -944,6 +981,8 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         if (!firstOld) {
           throw new NotFoundError('Split expense');
         }
+        const legTimes = [firstOld, ...restOld].map((leg) => leg.updatedAt);
+        assertNotChanged(latestOf(legTimes), expectedUpdatedAt);
 
         const totalAmount =
           data.splitConfig.method === 'absolute'
@@ -957,10 +996,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           splitMethod: data.splitConfig.method,
           groupTotal: totalAmount,
           allocations: expenseSplitService.computeAllocations(data.splitConfig, totalAmount),
+          updatedAt: nextUpdatedAt(legTimes),
         });
       });
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError || error instanceof ExpenseChangedError) throw error;
       logger.error('Failed to update split expense', {
         groupId,
         error: error instanceof Error ? error.message : String(error),

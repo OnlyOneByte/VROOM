@@ -73,6 +73,23 @@ export class ConflictError extends AppError {
   }
 }
 
+export class ExpenseChangedError extends AppError {
+  constructor(currentUpdatedAt: Date | null) {
+    super(
+      'This expense was changed elsewhere. Reload it, then make your change again.',
+      409,
+      true,
+      {
+        updatedAt: currentUpdatedAt?.toISOString() ?? null,
+      }
+    );
+  }
+
+  override get code(): string {
+    return 'EXPENSE_CHANGED';
+  }
+}
+
 export class PayloadTooLargeError extends AppError {
   constructor(message: string) {
     super(message, 413, true);
