@@ -375,6 +375,7 @@
 			{vehicleColors}
 			{rangeText}
 			volumeUnit={volLabelShort}
+			volumeLabel={volLabelLong}
 			chargeUnit={chargeLabel}
 			efficiencyUnit={effLabel}
 			electricEfficiencyUnit={electricEffLabel}

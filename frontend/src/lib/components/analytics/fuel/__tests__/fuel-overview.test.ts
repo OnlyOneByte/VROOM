@@ -131,6 +131,7 @@ const base = {
 	vehicleColors: {},
 	rangeText: 'Last 12 months',
 	volumeUnit: 'gal',
+	volumeLabel: 'Gallons',
 	chargeUnit: 'kWh',
 	efficiencyUnit: 'mpg',
 	electricEfficiencyUnit: 'mi/kWh'

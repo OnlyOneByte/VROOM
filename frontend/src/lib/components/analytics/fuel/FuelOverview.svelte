@@ -19,6 +19,7 @@
 		vehicleColors: Record<string, string>;
 		rangeText: string;
 		volumeUnit: string;
+		volumeLabel: string;
 		chargeUnit: string;
 		efficiencyUnit: string;
 		electricEfficiencyUnit: string;
@@ -31,6 +32,7 @@
 		vehicleColors,
 		rangeText,
 		volumeUnit,
+		volumeLabel,
 		chargeUnit,
 		efficiencyUnit,
 		electricEfficiencyUnit,
@@ -46,6 +48,8 @@
 	let money = (v: number) => formatCurrency(v, undefined, 2);
 	let rate = (v: number) => formatCurrency(v, undefined, 3);
 	let percent = (share: number) => `${formatNumber(share * 100, 0)}%`;
+	const flush =
+		'[&_td:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:first-child]:pl-0 [&_th:last-child]:pr-0';
 	let monthName = (month: string) =>
 		formatDateWith(parseMonthToDate(month), { month: 'long', year: 'numeric' });
 	let rangePhrase = $derived(
@@ -134,7 +138,7 @@
 {#if fillups.length > 0 || chargers.length > 0}
 	<div class="grid gap-6 md:grid-cols-2 md:gap-10">
 		{#if fillups.length > 0}
-			<Table>
+			<Table class={flush}>
 				<TableCaption
 					class="mt-0 mb-2 caption-top text-left text-base font-semibold text-foreground"
 				>
@@ -144,7 +148,7 @@
 					<TableRow>
 						<TableHead>Car</TableHead>
 						<TableHead class="text-right">Fill-ups</TableHead>
-						<TableHead class="text-right">{volumeUnit}</TableHead>
+						<TableHead class="text-right">{volumeLabel}</TableHead>
 						<TableHead class="text-right">Avg price</TableHead>
 					</TableRow>
 				</TableHeader>
@@ -163,7 +167,7 @@
 			</Table>
 		{/if}
 		{#if chargers.length > 0}
-			<Table>
+			<Table class={flush}>
 				<TableCaption
 					class="mt-0 mb-2 caption-top text-left text-base font-semibold text-foreground"
 				>
