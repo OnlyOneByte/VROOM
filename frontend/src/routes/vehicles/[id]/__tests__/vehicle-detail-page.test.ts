@@ -350,11 +350,7 @@ describe('vehicle detail page overview', () => {
 		expect(captured['period']).toBeUndefined();
 	});
 
-	test("a car's just-synced first expense shows in place of the empty state", async () => {
-		getRecentExpenses.mockResolvedValue({
-			data: [],
-			pagination: { totalCount: 0, limit: 3, offset: 0, hasMore: false }
-		});
+	function rememberFirstExpense() {
 		rememberSynced({
 			id: 'offline-1',
 			clientId: 'c-1',
@@ -368,12 +364,33 @@ describe('vehicle detail page overview', () => {
 			synced: true,
 			version: '3.0'
 		});
+	}
+
+	test("a car's just-synced first expense shows in place of the empty state while the recent list loads", async () => {
+		getRecentExpenses.mockReturnValue(new Promise(() => {}));
+		rememberFirstExpense();
 		try {
 			await mount();
 
 			expect(await screen.findByText('Car wash on Elm')).toBeInTheDocument();
 			expect(screen.getByRole('heading', { name: 'Recent expenses' })).toBeInTheDocument();
 			expect(screen.queryByText('No expenses yet')).toBeNull();
+		} finally {
+			forgetRecentlySynced();
+		}
+	});
+
+	test('once the summary and the recent list both answer empty, a just-synced row gives way to the empty state', async () => {
+		getRecentExpenses.mockResolvedValue({
+			data: [],
+			pagination: { totalCount: 0, limit: 3, offset: 0, hasMore: false }
+		});
+		rememberFirstExpense();
+		try {
+			await mount();
+
+			expect(await screen.findByText('No expenses yet')).toBeInTheDocument();
+			expect(screen.queryByText('Car wash on Elm')).toBeNull();
 		} finally {
 			forgetRecentlySynced();
 		}

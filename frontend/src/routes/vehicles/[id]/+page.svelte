@@ -328,22 +328,24 @@
 	);
 	let tabExpenses = $derived(currentOffset === 0 ? [...pendingTabRows, ...expenses] : expenses);
 
-	let firstExpense = $derived(summary !== null && !hasExpenseData);
+	let firstExpense = $derived(
+		summary !== null &&
+			!hasExpenseData &&
+			(pending.rows.length > 0 || (!recentSettled && syncedRows.length > 0))
+	);
 	let recentExpenses = $derived(
-		[...pending.rows, ...(recentSettled && !firstExpense ? recentList : syncedRows)]
-			.slice(0, 3)
-			.map(expense => {
-				const sync = pending.states.get(expense.id);
-				return {
-					id: expense.id,
-					amount: expense.amount,
-					category: expense.category,
-					date: new Date(expense.date),
-					description: expense.description,
-					location: expense.location,
-					...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
-				};
-			})
+		[...pending.rows, ...(recentSettled ? recentList : syncedRows)].slice(0, 3).map(expense => {
+			const sync = pending.states.get(expense.id);
+			return {
+				id: expense.id,
+				amount: expense.amount,
+				category: expense.category,
+				date: new Date(expense.date),
+				description: expense.description,
+				location: expense.location,
+				...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
+			};
+		})
 	);
 
 	let coverPhotoUrl = $derived.by(() => {
@@ -924,13 +926,20 @@
 							message={summaryLoadError}
 							onRetry={loadSummary}
 						/>
-					{:else if firstExpense && overviewCards && recentExpenses.length > 0}
-						{@const [, { default: RecentActivityCard }] = overviewCards}
-						<RecentActivityCard
-							title="Recent expenses"
-							expenses={recentExpenses}
-							onSeeAll={seeAllExpenses}
-						/>
+					{:else if firstExpense && !overviewCardsFailed}
+						{#if overviewCards}
+							{@const [, { default: RecentActivityCard }] = overviewCards}
+							<RecentActivityCard
+								title="Recent expenses"
+								expenses={recentExpenses}
+								onSeeAll={seeAllExpenses}
+							/>
+						{:else}
+							<div class="space-y-1 py-4" data-testid="first-expense-loading">
+								<Skeleton class="h-4 w-32" />
+								<Skeleton class="h-3 w-48" />
+							</div>
+						{/if}
 					{:else if summary && !hasExpenseData}
 						<EmptyState>
 							{#snippet icon()}
