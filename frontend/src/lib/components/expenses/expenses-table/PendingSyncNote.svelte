@@ -51,18 +51,20 @@
 {:else if pending.kind === 'edit' && pending.conflict}
 	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="edit-conflict-note">
 		<span class="text-xs text-destructive">{pending.error}</span>
-		<Button
-			variant="outline"
-			size="sm"
-			class="h-7"
-			aria-label="Apply my changes to {label}"
-			onclick={event => {
-				event.stopPropagation();
-				applyMyChanges(entryId);
-			}}
-		>
-			Apply my changes
-		</Button>
+		{#if writable}
+			<Button
+				variant="outline"
+				size="sm"
+				class="h-7"
+				aria-label="Apply my changes to {label}"
+				onclick={event => {
+					event.stopPropagation();
+					applyMyChanges(entryId);
+				}}
+			>
+				Apply my changes
+			</Button>
+		{/if}
 		<Button
 			variant="ghost"
 			size="sm"
