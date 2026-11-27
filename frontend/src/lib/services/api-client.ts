@@ -97,7 +97,7 @@ async function fetchOrThrow(url: string, options: ApiOptions): Promise<Response>
 			body: toFetchBody(body)
 		});
 	} catch (error) {
-		if (signal?.aborted) throw error;
+		if (signal?.aborted) throw signal.reason ?? error;
 		throw new NetworkError(error);
 	}
 

@@ -361,6 +361,20 @@ describe('ExpensesTable deleting', () => {
 		expect(updateExpense).toHaveBeenCalledTimes(2);
 	});
 
+	test('without write access, a failed edit keeps its reason but offers no Retry or Edit', async () => {
+		updateExpense.mockRejectedValueOnce('offline');
+		scheduleEdit(NEW_MEDIUM, { ...NEW_MEDIUM, amount: 99 }, {} as never);
+		await waitFor(() => expect(appStore.notifications).toHaveLength(1));
+
+		mountTable({ canWrite: false });
+
+		expect(
+			screen.getByText(`Changes not saved: ${UNEXPECTED_FAILURE_MESSAGE}`)
+		).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /^Retry saving changes/ })).toBeNull();
+		expect(screen.queryByRole('link', { name: /^Edit \$75\.00/ })).toBeNull();
+	});
+
 	test('a failed delete shows the row again with its reason and Retry', async () => {
 		deleteExpense.mockRejectedValue('offline');
 		vi.useFakeTimers();

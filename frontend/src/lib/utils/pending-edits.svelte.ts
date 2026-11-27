@@ -2,7 +2,11 @@ import { SvelteMap } from 'svelte/reactivity';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
 import type { Expense } from '#lib/types/index.ts';
-import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+import {
+	RequestTimeoutError,
+	isForbiddenError,
+	userFacingErrorMessage
+} from '#lib/utils/error-handling.ts';
 import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 import { UNDO_WINDOW_MS } from '#lib/utils/pending-deletes.svelte.ts';
 
@@ -19,7 +23,11 @@ interface PendingEdit {
 	undo?: boolean;
 	undoneAt?: string;
 	undoSeq?: number;
+	retried?: boolean;
+	forbidden?: boolean;
 }
+
+export const EDIT_TIMEOUT_MS = 15_000;
 
 const toastId = (id: string) => `expense-edit-${id}`;
 
@@ -35,19 +43,39 @@ function settle(id: string, seq: number, change: Partial<PendingEdit>): boolean 
 }
 
 async function put(id: string, seq: number, payload: EditPayload): Promise<void> {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(new RequestTimeoutError()), EDIT_TIMEOUT_MS);
 	try {
-		const saved: Expense | undefined = await expenseApi.updateExpense(id, payload);
+		const saved: Expense | undefined = await expenseApi.updateExpense(id, payload, {
+			signal: controller.signal
+		});
 		const entry = edits.get(id);
 		if (!entry) return;
 		const stamp = saved?.updatedAt;
 		if (entry.seq === seq) {
 			edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
+			if (entry.retried && entry.undo) {
+				appStore.addNotification({
+					type: 'success',
+					message: 'Your changes to the expense were undone',
+					toastId: toastId(id)
+				});
+			} else if (entry.retried) {
+				appStore.addNotification({
+					type: 'success',
+					message: 'Expense updated successfully',
+					toastId: toastId(id),
+					duration: UNDO_WINDOW_MS,
+					action: { label: 'Undo', onClick: () => undoEdit(id) }
+				});
+			}
 		} else if (entry.undo && entry.undoSeq === seq && !entry.undoneAt && stamp) {
 			edits.set(id, { ...entry, undoneAt: stamp });
 		}
 	} catch (error) {
 		const reason = userFacingErrorMessage(error);
-		if (!settle(id, seq, { status: 'failed', error: reason })) return;
+		const forbidden = isForbiddenError(error);
+		if (!settle(id, seq, { status: 'failed', error: reason, forbidden })) return;
 		appStore.addNotification({
 			type: 'error',
 			message: edits.get(id)?.undo
@@ -56,8 +84,10 @@ async function put(id: string, seq: number, payload: EditPayload): Promise<void>
 			description: reason,
 			toastId: toastId(id),
 			duration: Number.POSITIVE_INFINITY,
-			action: { label: 'Retry', onClick: () => retryEdit(id) }
+			...(!forbidden && { action: { label: 'Retry', onClick: () => retryEdit(id) } })
 		});
+	} finally {
+		clearTimeout(timer);
 	}
 }
 
@@ -136,7 +166,7 @@ export function retryEdit(id: string): void {
 	const entry = edits.get(id);
 	if (entry?.status !== 'failed') return;
 	appStore.dismissToast(toastId(id));
-	edits.set(id, { ...entry, status: 'saving', error: undefined, seq: ++nextSeq });
+	edits.set(id, { ...entry, status: 'saving', error: undefined, seq: ++nextSeq, retried: true });
 	send(id);
 }
 
@@ -174,7 +204,15 @@ export function editFailureStates(expenses: readonly Expense[]): [string, Pendin
 	for (const expense of expenses) {
 		const entry = edits.get(expense.id);
 		if (entry?.status === 'failed' && covers(entry, expense)) {
-			states.push([expense.id, { status: 'failed', kind: 'edit', error: entry.error ?? '' }]);
+			states.push([
+				expense.id,
+				{
+					status: 'failed',
+					kind: 'edit',
+					error: entry.error ?? '',
+					...(entry.forbidden && { editable: false })
+				}
+			]);
 		}
 	}
 	return states;

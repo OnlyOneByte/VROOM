@@ -97,6 +97,7 @@
 		<div class="pr-3 pb-3 pl-[2.75rem]">
 			<PendingSyncNote
 				{pending}
+				{canWrite}
 				entryId={row.children[0]?.id ?? row.groupId}
 				deleteKey={row.groupId}
 				{returnTo}

@@ -157,7 +157,11 @@
 			const options = {
 				duration: notification.duration || 5000,
 				style: `--toast-duration: ${notification.duration || 5000}ms;`,
-				...(notification.toastId && { id: notification.toastId }),
+				...(notification.toastId && {
+					id: notification.toastId,
+					description: undefined,
+					action: undefined
+				}),
 				...(notification.description && { description: notification.description }),
 				...(notification.action && { action: notification.action })
 			};

@@ -15,10 +15,12 @@
 		returnTo: string;
 		label: string;
 		deleteKey?: string;
+		canWrite?: boolean;
 	}
 
-	let { pending, entryId, returnTo, label, deleteKey = entryId }: Props = $props();
+	let { pending, entryId, returnTo, label, deleteKey = entryId, canWrite = true }: Props = $props();
 	let confirmDiscard = $state(false);
+	let writable = $derived(canWrite && pending.editable !== false);
 </script>
 
 {#if pending.status === 'saving'}
@@ -31,43 +33,47 @@
 {:else if pending.kind === 'delete'}
 	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="delete-failed-note">
 		<span class="text-xs text-destructive">Not deleted: {pending.error}</span>
-		<Button
-			variant="outline"
-			size="sm"
-			class="h-7"
-			aria-label="Retry deleting {label}"
-			onclick={event => {
-				event.stopPropagation();
-				retryDelete(deleteKey);
-			}}
-		>
-			Retry
-		</Button>
+		{#if writable}
+			<Button
+				variant="outline"
+				size="sm"
+				class="h-7"
+				aria-label="Retry deleting {label}"
+				onclick={event => {
+					event.stopPropagation();
+					retryDelete(deleteKey);
+				}}
+			>
+				Retry
+			</Button>
+		{/if}
 	</div>
 {:else if pending.kind === 'edit'}
 	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="edit-failed-note">
 		<span class="text-xs text-destructive">Changes not saved: {pending.error}</span>
-		<Button
-			variant="outline"
-			size="sm"
-			class="h-7"
-			aria-label="Retry saving changes to {label}"
-			onclick={event => {
-				event.stopPropagation();
-				retryEdit(entryId);
-			}}
-		>
-			Retry
-		</Button>
-		<Button
-			variant="ghost"
-			size="sm"
-			class="h-7"
-			aria-label="Edit {label}"
-			href={expenseEditHref(entryId, returnTo)}
-		>
-			Edit
-		</Button>
+		{#if writable}
+			<Button
+				variant="outline"
+				size="sm"
+				class="h-7"
+				aria-label="Retry saving changes to {label}"
+				onclick={event => {
+					event.stopPropagation();
+					retryEdit(entryId);
+				}}
+			>
+				Retry
+			</Button>
+			<Button
+				variant="ghost"
+				size="sm"
+				class="h-7"
+				aria-label="Edit {label}"
+				href={expenseEditHref(entryId, returnTo)}
+			>
+				Edit
+			</Button>
+		{/if}
 	</div>
 {:else}
 	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="pending-sync-error">

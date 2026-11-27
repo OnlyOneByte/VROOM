@@ -80,6 +80,7 @@
 		{#if pending}
 			<PendingSyncNote
 				{pending}
+				{canWrite}
 				entryId={row.children[0]?.id ?? row.groupId}
 				deleteKey={row.groupId}
 				{returnTo}
