@@ -376,6 +376,7 @@ describe('demo garage, on', () => {
       .query("SELECT COUNT(*) AS n FROM role_assignments WHERE user_id = 'demo-garage'")
       .get() as { n: number };
     expect(left.n).toBe(0);
+    expect(await db.select().from(users).where(eq(users.id, DEMO_USER_ID))).toEqual([]);
     expect((await startDemo()).status).toBe(404);
   });
 });

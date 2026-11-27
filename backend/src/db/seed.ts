@@ -2,11 +2,10 @@ import { createId } from '@paralleldrive/cuid2';
 import { desc, eq } from 'drizzle-orm';
 import { addGuestDriver, ownDriverId, setCarShare } from '../api/drivers/repository';
 import { createTermExpenses } from '../api/insurance/hooks';
+import { appContext } from '../app-context';
 import { assignServerRole } from '../permissions/grants';
 import { logger } from '../utils/logger';
 import { dollarsToCents } from '../utils/money';
-import { openAsyncDatabase } from './async-sqlite';
-import { getDb } from './connection.js';
 import {
   expenses,
   insuranceClaims,
@@ -27,7 +26,7 @@ import {
 } from './schema.js';
 
 function seedDb() {
-  return openAsyncDatabase(getDb().$client).db;
+  return appContext().asyncDb;
 }
 
 function daysAgo(days: number): Date {
@@ -154,7 +153,11 @@ async function shareWeekendCar(pattern: DrivingPattern): Promise<void> {
   await db.update(trips).set({ driverId: jamie }).where(eq(trips.vehicleId, vehicleId));
 }
 
-export async function seedDatabase() {
+export function seedDatabase(): Promise<void> {
+  return seedDb().transaction(() => seedSampleAccount());
+}
+
+async function seedSampleAccount() {
   const db = seedDb();
   try {
     logger.info('Seeding database with sample data...');

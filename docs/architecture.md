@@ -186,6 +186,10 @@ the transaction returns, or hand it to `outsideTransaction`. Tests report every 
 query through `reportLateQueries` and fail the test even when the code swallows the error.
 Today the app's detached calls (the activity tracker in `changeTracker`, the sync worker and
 community refresh timers, and the backup lock release) all start outside any transaction.
+The guard has two limits. It cannot see detached work that runs while its transaction is still
+open: that work joins the transaction, and if the transaction rolls back the work is lost
+without a report. And its listener is process-wide, so a late query from a timer that fires
+after its own test has finished fails whichever test is running then.
 
 The role-manager count skips accounts still waiting for approval, so a role given to one can't
 stand in for the last real role manager.

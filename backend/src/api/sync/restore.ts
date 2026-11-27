@@ -44,11 +44,13 @@ import {
 } from '../../types';
 import { chunk, rowsPerInsert } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
+import { minorUnitScale } from '../../utils/money';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake } from '../../utils/vehicle-catalog';
 import { DRIVER_COLORS } from '../drivers/repository';
 import { LOCAL_OCR_PROVIDER_ID } from '../providers/domains/vlm/registry';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
+import { DEFAULT_CURRENCY } from '../settings/repository';
 import { isKnownRegion } from '../settings/validation';
 import {
   backupService,
@@ -195,12 +197,16 @@ class RestoreService {
     signal?.throwIfAborted();
     try {
       await this.db.transaction(async (tx) => {
+        signal?.throwIfAborted();
         if (mode === 'replace' && (await hasPerPersonVehicleGrants(tx, userId))) {
           throw new ConflictError(
             'Some people have their own roles or permission changes on your vehicles, and a full restore would remove them. Remove those changes first, or restore in merge mode.'
           );
         }
-        if ((await this.accountCurrency(userId, tx)) !== parsedWithCurrency) {
+        if (
+          minorUnitScale((await this.accountCurrency(userId, tx)) ?? DEFAULT_CURRENCY) !==
+          minorUnitScale(parsedWithCurrency ?? DEFAULT_CURRENCY)
+        ) {
           throw new ConflictError(
             'The currency changed while this backup was being read. Reload and try again.'
           );
@@ -212,6 +218,7 @@ class RestoreService {
           await this.deleteUserData(tx, userId, { keepPreferences: !data.userPreferences?.length });
         }
         await this.insertBackupData(tx, data, userId, consented, currentPrefs);
+        signal?.throwIfAborted();
       });
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error;

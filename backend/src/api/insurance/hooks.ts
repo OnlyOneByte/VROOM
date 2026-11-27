@@ -4,7 +4,11 @@ import { AppError, ConflictError, ValidationError } from '../../errors';
 import { termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { formatNumberForMessage } from '../../utils/money';
-import { deletePhotosForEntities } from '../photos/photo-service';
+import {
+  deletePhotosForEntities,
+  deleteStoredPhotoObjects,
+  storedPhotoObjects,
+} from '../photos/photo-service';
 import type { MonthlyPricedTerm, TermCoverageRow } from './repository';
 
 export function vehicleIdsForTerm(
@@ -220,10 +224,9 @@ export async function updateTermExpenses(
   const { termId, vehicleIds, userId } = params;
   const totalCost = effectiveTermCost(params);
   const linked = await repos().expenses.findBySource('insurance_term', termId, userId);
-  await deletePhotosForEntities(
+  const photoObjects = await storedPhotoObjects(
     'expense',
-    linked.map((expense) => expense.id),
-    userId
+    linked.map((expense) => expense.id)
   );
 
   try {
@@ -245,4 +248,5 @@ export async function updateTermExpenses(
       500
     );
   }
+  await deleteStoredPhotoObjects(photoObjects, userId);
 }

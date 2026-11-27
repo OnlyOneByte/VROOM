@@ -161,3 +161,37 @@ describe('a replace restore that fails on its last step', () => {
     expect(snapshot()).toEqual(before);
   });
 });
+
+describe('a restore whose deadline passes while its transaction is open', () => {
+  test('rolls back instead of committing after the caller was told it timed out', async () => {
+    await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2021 });
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
+
+    const controller = new AbortController();
+    const timedOut = new Error('Restore from backup timed out');
+    const reader = restoreService as unknown as {
+      knownProviderIds: (...args: unknown[]) => Promise<Set<string>>;
+    };
+    const known = reader.knownProviderIds.bind(restoreService);
+    const spy = spyOn(reader, 'knownProviderIds').mockImplementation(async (...args) => {
+      controller.abort(timedOut);
+      return known(...args);
+    });
+    try {
+      await expect(
+        restoreService.restoreFromBackup(ctx.user.id, zip, 'replace', controller.signal)
+      ).rejects.toBe(timedOut);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(
+      vehicleRows()
+        .map((v) => v.make)
+        .sort()
+    ).toEqual(['Honda', 'Subaru']);
+  });
+});

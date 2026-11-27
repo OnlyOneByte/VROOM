@@ -18,7 +18,7 @@ import { DEFAULT_UNIT_PREFERENCES } from '../../types';
 import { minorUnitScale } from '../../utils/money';
 import { type BackupTables, MONEY_CENTS_FIELDS, rescaleMoneyTables } from '../sync/backup';
 
-const DEFAULT_CURRENCY = 'USD';
+export const DEFAULT_CURRENCY = 'USD';
 
 const JSON_FIELD_COLUMNS = {
   storageConfig: 'storage_config',
