@@ -255,10 +255,30 @@ describe('insetTimeTicks (no x label inside the inset under the y labels)', () =
 				.range([0, 295]);
 			const kept = (insetTimeTicks(4) as (s: typeof phone) => Date[])(phone);
 
-			expect(kept.length).toBeGreaterThan(0);
+			expect(kept.length).toBeGreaterThanOrEqual(2);
 			expect(kept.length).toBeLessThanOrEqual(4);
 			const gaps = kept.slice(1).map((t, i) => phone(t) - phone(kept[i] as Date));
 			expect(Math.min(...gaps)).toBeGreaterThanOrEqual(295 / 4 - 1);
+		}
+	);
+
+	test.each([
+		[24, 4, 295],
+		[24, 6, 900],
+		[36, 6, 900],
+		[18, 6, 900]
+	])(
+		'over %i months with %i ticks at %ipx, thinning keeps a January tick so the year still shows',
+		(months, count, width) => {
+			const axis = scaleTime()
+				.domain([new Date(2024, 0, 1), new Date(2024, months - 1, 1)])
+				.range([0, width]);
+			expect(axis.ticks(count).some(t => t.getMonth() === 0)).toBe(true);
+
+			const kept = (insetTimeTicks(count) as (s: typeof axis) => Date[])(axis);
+
+			expect(kept.length).toBeLessThanOrEqual(count);
+			expect(kept.some(t => t.getMonth() === 0 && t.getDate() === 1)).toBe(true);
 		}
 	);
 

@@ -72,7 +72,9 @@ export function insetTimeTicks(ticks: unknown): TicksConfig | undefined {
 			.filter((tick: Date) => scale(tick) >= TIME_X_PADDING[0]);
 		if (!inside) return inside;
 		const step = Math.ceil(inside.length / Math.max(1, ticks));
-		return inside.filter((_, i) => i % step === 0);
+		const firstJanuary = inside.findIndex(tick => tick.getMonth() === 0 && tick.getDate() === 1);
+		const phase = firstJanuary < 0 ? 0 : firstJanuary % step;
+		return inside.filter((_, i) => i % step === phase);
 	};
 }
 
