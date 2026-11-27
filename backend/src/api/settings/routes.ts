@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
+import { firstRow } from '../../db/first-row';
 import {
   type NewUserPreferences,
   type UserPreferences,
@@ -78,7 +79,7 @@ async function assertDefaultsOwned(
           eq(userProviders.domain, CAPABILITY_DOMAIN[capability as DefaultProviderCapability])
         )
       )
-      .get();
+      .then(firstRow);
     if (!owned) {
       throw new ValidationError(
         `Provider '${providerId}' not found or does not belong to this user`

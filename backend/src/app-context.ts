@@ -18,15 +18,24 @@ import { PreferencesRepository, SyncStateRepository } from './api/settings/repos
 import { VehicleShareRepository } from './api/shares/repository';
 import { TripRepository } from './api/trips/repository';
 import { VehicleRepository } from './api/vehicles/repository';
-import { openAsyncDatabase } from './db/async-sqlite';
+import type { AsyncPgDatabase } from './db/async-postgres';
+import { type AsyncAppDatabase, openAsyncDatabase } from './db/async-sqlite';
 import { getDb } from './db/connection';
 
 export function createAppContext(sqlite: Database) {
   const asyncDb = openAsyncDatabase(sqlite).db;
+  return contextOn(asyncDb, createLucia(asyncDb));
+}
+
+export function createPostgresAppContext(db: AsyncPgDatabase): AppContext {
+  return contextOn(db as unknown as AsyncAppDatabase, createLucia(db, 'pg'));
+}
+
+function contextOn(asyncDb: AsyncAppDatabase, lucia: ReturnType<typeof createLucia>) {
   const analyticsQuery = new AnalyticsQueryRepository(asyncDb);
   return {
     asyncDb,
-    lucia: createLucia(asyncDb),
+    lucia,
     repos: {
       analytics: new AnalyticsRepository(asyncDb),
       analyticsInsights: new AnalyticsInsightsRepository(asyncDb, analyticsQuery),
@@ -58,6 +67,10 @@ let current: AppContext | null = null;
 export function appContext(): AppContext {
   current ??= createAppContext(getDb().$client);
   return current;
+}
+
+export function installAppContext(context: AppContext): void {
+  current = context;
 }
 
 export function repos(): AppContext['repos'] {

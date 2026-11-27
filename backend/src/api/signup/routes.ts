@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { appContext } from '../../app-context';
 import { CONFIG } from '../../config';
 import type { AsyncHandle } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import { type serverInvites, users } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
@@ -65,7 +66,7 @@ async function pendingUser(tx: AsyncHandle, id: string) {
     .select({ id: users.id, email: users.email })
     .from(users)
     .where(and(eq(users.id, id), isNotNull(users.pendingApprovalAt)))
-    .get();
+    .then(firstRow);
   if (!user || user.id === DEMO_USER_ID) throw new NotFoundError('Waiting account');
   return user;
 }

@@ -1,5 +1,6 @@
 import { and, eq, gte, inArray, isNotNull } from 'drizzle-orm';
 import { appContext } from '../../app-context';
+import { firstRow } from '../../db/first-row';
 import {
   type CalendarFeedOptions,
   insurancePolicies,
@@ -222,7 +223,7 @@ export async function buildFeedEvents(
     .asyncDb.select({ currency: userPreferences.currencyUnit })
     .from(userPreferences)
     .where(eq(userPreferences.userId, userId))
-    .get();
+    .then(firstRow);
   const currency = prefs?.currency ?? 'USD';
   const formatter = new Intl.NumberFormat('en-US', currencyFormatOptions(currency));
   const timeZone = options.timeZone && isValidTimeZone(options.timeZone) ? options.timeZone : null;

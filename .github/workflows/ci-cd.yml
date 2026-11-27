@@ -94,6 +94,8 @@ jobs:
 
       - name: Run the Postgres portability suite
         run: bun run test:postgres
+      - name: Run the backend suites that already pass on Postgres
+        run: bun run test:postgres-suites
 
   changes:
     name: Detect changes

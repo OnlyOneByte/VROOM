@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AsyncAppDatabase } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import { expenses, vehicles } from '../../db/schema';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
 import type { Period } from './distance';
@@ -48,7 +49,7 @@ export async function readRules(db: AsyncAppDatabase, vehicleId: string): Promis
     .select({ rules: vehicles.carShareRules })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
-    .get();
+    .then(firstRow);
   const parsed = rulesSchema.safeParse(row?.rules);
   return parsed.success ? parsed.data : DEFAULT_RULES;
 }

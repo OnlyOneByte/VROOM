@@ -24,6 +24,7 @@ import {
   sqlTrue,
   sumNum,
 } from '../../db/dialect';
+import { firstRow } from '../../db/first-row';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
 import {
@@ -108,7 +109,7 @@ function expenseReadings(vehicleId: string, excludeId?: string): Readings {
         .where(where(side === 'before' ? lt(expenses.date, edge) : gte(expenses.date, edge)))
         .orderBy(side === 'before' ? desc(expenses.date) : asc(expenses.date))
         .limit(1)
-        .get();
+        .then(firstRow);
       return row?.date ?? null;
     },
     bound: async (tx, kind, from, to) => {
@@ -116,7 +117,7 @@ function expenseReadings(vehicleId: string, excludeId?: string): Readings {
         .select({ value: kind === 'max' ? max(expenses.mileage) : min(expenses.mileage) })
         .from(expenses)
         .where(where(gte(expenses.date, from), lt(expenses.date, to)))
-        .get();
+        .then(firstRow);
       return row?.value ?? null;
     },
   };
@@ -138,7 +139,7 @@ function manualReadings(vehicleId: string, excludeId?: string): Readings {
         .where(where(side === 'before' ? lt(at, edge) : gte(at, edge)))
         .orderBy(side === 'before' ? desc(at) : asc(at))
         .limit(1)
-        .get();
+        .then(firstRow);
       return row?.date ?? null;
     },
     bound: async (tx, kind, from, to) => {
@@ -148,7 +149,7 @@ function manualReadings(vehicleId: string, excludeId?: string): Readings {
         })
         .from(odometerEntries)
         .where(where(gte(at, from), lt(at, to)))
-        .get();
+        .then(firstRow);
       return row?.value ?? null;
     },
   };
@@ -488,7 +489,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             .select()
             .from(expenses)
             .where(and(eq(expenses.clientId, clientId), eq(expenses.userId, userId)))
-            .get();
+            .then(firstRow);
           if (existing) return replayFor(existing, data.vehicleId);
         }
         await assertOdometerInOrder(tx, odometer);

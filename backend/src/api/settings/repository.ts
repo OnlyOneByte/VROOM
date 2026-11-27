@@ -1,6 +1,7 @@
 import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import { jsonAddMissingEntries, jsonMergePatch } from '../../db/dialect';
+import { firstRow } from '../../db/first-row';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
 import {
   expenses,
@@ -248,7 +249,7 @@ export function updatePreferencesWithCurrency(
       .select({ currency: userPreferences.currencyUnit })
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId))
-      .get();
+      .then(firstRow);
     const from = minorUnitScale(current?.currency ?? DEFAULT_CURRENCY);
     const to = minorUnitScale(updates.currencyUnit);
     if (from !== to) await rescaleOwnedMoney(tx, userId, from, to);

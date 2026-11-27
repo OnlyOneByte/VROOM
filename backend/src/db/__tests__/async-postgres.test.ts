@@ -253,6 +253,61 @@ describe('the async Postgres session', () => {
   });
 });
 
+describe('per-statement savepoints', () => {
+  function recording() {
+    const real = pgliteConnection(client);
+    const sent: string[] = [];
+    let failNext: string | null = null;
+    const recorder = openAsyncPostgres({
+      async query(text, params, rowMode) {
+        sent.push(text);
+        if (failNext === text) {
+          failNext = null;
+          throw new Error('connection hiccup');
+        }
+        return real.query(text, params, rowMode);
+      },
+    });
+    return { recorder, sent, failOn: (text: string) => (failNext = text) };
+  }
+
+  test('each one is released, also after a caught failure', async () => {
+    const { recorder, sent } = recording();
+    await recorder.transaction(async (tx) => {
+      await tx.insert(users).values(user('a'));
+      for (let i = 0; i < 3; i++)
+        await tx
+          .insert(users)
+          .values(user('a'))
+          .catch(() => undefined);
+    });
+    const count = (text: string) => sent.filter((s) => s === text).length;
+    expect(count('SAVEPOINT vroom_statement')).toBe(4);
+    expect(count('RELEASE SAVEPOINT vroom_statement')).toBe(4);
+    expect(count('ROLLBACK TO SAVEPOINT vroom_statement')).toBe(3);
+    expect(await ids()).toEqual(['a']);
+  });
+
+  test('a failed SAVEPOINT rolls the transaction back and rejects', async () => {
+    const { recorder, failOn } = recording();
+    const outcome = await recorder
+      .transaction(async (tx) => {
+        await tx.insert(users).values(user('a'));
+        failOn('SAVEPOINT vroom_statement');
+        await tx
+          .insert(users)
+          .values(user('b'))
+          .catch(() => undefined);
+      })
+      .then(
+        () => 'committed',
+        (e: unknown) => e
+      );
+    expect(outcome).toBeInstanceOf(TransactionRolledBackError);
+    expect(await ids()).toEqual([]);
+  });
+});
+
 describe('a failed savepoint control', () => {
   test('rolls the transaction back and rejects, instead of committing', async () => {
     const real = pgliteConnection(client);

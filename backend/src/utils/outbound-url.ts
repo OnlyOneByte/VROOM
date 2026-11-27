@@ -4,6 +4,7 @@ import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { DEMO_USER_ID } from '../api/auth/demo-account';
 import { appContext } from '../app-context';
 import { CONFIG } from '../config';
+import { firstRow } from '../db/first-row';
 import { users } from '../db/schema';
 import { ValidationError } from '../errors';
 import { resolverFor } from '../permissions/grants';
@@ -209,7 +210,7 @@ async function hasSecondAccount(): Promise<boolean> {
     .asyncDb.select({ accounts: count() })
     .from(users)
     .where(ne(users.id, DEMO_USER_ID))
-    .get();
+    .then(firstRow);
   return (row?.accounts ?? 0) > 1;
 }
 
@@ -232,7 +233,7 @@ export async function isNetworkAdmin(userId: string): Promise<boolean> {
     .asyncDb.select({ email: users.email })
     .from(users)
     .where(eq(users.id, userId))
-    .get();
+    .then(firstRow);
   if (row?.email && CONFIG.adminEmails.includes(row.email.toLowerCase())) return true;
   const server = { kind: 'server' } as const;
   const resolver = await resolverFor(userId, [server]);
@@ -257,7 +258,7 @@ export async function adminEmailWarnings(adminEmails: readonly string[]): Promis
       )
     )
     .limit(1)
-    .get();
+    .then(firstRow);
   if (!listedAccount) {
     warnings.push(
       'No active account uses an ADMIN_EMAILS address yet: until that person signs in, only users whose role grants private network access can use private network targets'

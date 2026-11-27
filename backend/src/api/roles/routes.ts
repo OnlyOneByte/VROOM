@@ -4,6 +4,7 @@ import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { appContext } from '../../app-context';
 import type { AsyncHandle } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import {
   permissionOverrides,
   type Role,
@@ -89,7 +90,7 @@ async function roleView(db: AsyncHandle, role: Role) {
 }
 
 async function findRole(db: AsyncHandle, id: string): Promise<Role> {
-  const role = await db.select().from(roles).where(eq(roles.id, id)).get();
+  const role = await db.select().from(roles).where(eq(roles.id, id)).then(firstRow);
   if (!role) throw new NotFoundError('Role');
   return role;
 }
@@ -119,7 +120,7 @@ async function authorityAt(
     .select({ id: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, scopeId))
-    .get();
+    .then(firstRow);
   return {
     scopeId,
     ownerId: owner?.id ?? null,
@@ -138,7 +139,11 @@ async function requireTarget(db: AsyncHandle, authority: Authority, userId: stri
     if (!(await isVehicleMember(db, authority.scopeId, userId))) throw new NotFoundError('Member');
     return;
   }
-  const user = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).get();
+  const user = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .then(firstRow);
   if (!user) throw new NotFoundError('User');
 }
 
@@ -378,7 +383,7 @@ assignmentRoutes.delete(
         eq(roleAssignments.roleId, role.id),
         scopeId ? eq(roleAssignments.scopeId, scopeId) : isNull(roleAssignments.scopeId)
       );
-      const existing = await tx.select().from(roleAssignments).where(where).get();
+      const existing = await tx.select().from(roleAssignments).where(where).then(firstRow);
       if (!existing) throw new NotFoundError('Role assignment');
       refuseOverOwner(c, authority, existing.grantedBy);
       await writeAt(tx, role.scope, (write) => write.delete(roleAssignments).where(where));
@@ -440,7 +445,7 @@ overrideRoutes.put(
         overrideWhere(scope, userId, authority.scopeId),
         eq(permissionOverrides.permission, permission)
       );
-      const existing = await tx.select().from(permissionOverrides).where(where).get();
+      const existing = await tx.select().from(permissionOverrides).where(where).then(firstRow);
       refuseOverOwner(c, authority, existing?.setBy);
       return writeAt(tx, scope, async (write) => {
         await write.delete(permissionOverrides).where(where);
@@ -475,7 +480,7 @@ overrideRoutes.delete(
         overrideWhere(scope, userId, authority.scopeId),
         eq(permissionOverrides.permission, permission)
       );
-      const existing = await tx.select().from(permissionOverrides).where(where).get();
+      const existing = await tx.select().from(permissionOverrides).where(where).then(firstRow);
       if (!existing) throw new NotFoundError('Override');
       refuseOverOwner(c, authority, existing.setBy);
       await writeAt(tx, scope, (write) => write.delete(permissionOverrides).where(where));
@@ -505,7 +510,7 @@ async function peopleOn(
     .select({ id: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
-    .get();
+    .then(firstRow);
   const members = await db
     .select({ id: vehicleShares.sharedWithId })
     .from(vehicleShares)

@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { appContext } from '../../app-context';
 import { CONFIG } from '../../config';
+import { firstRow } from '../../db/first-row';
 import { type CalendarFeed, type CalendarFeedOptions, calendarFeeds } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
@@ -63,7 +64,7 @@ async function feedOf(userId: string): Promise<CalendarFeed | undefined> {
     .asyncDb.select()
     .from(calendarFeeds)
     .where(eq(calendarFeeds.userId, userId))
-    .get();
+    .then(firstRow);
 }
 
 routes.get('/feed/:file', feedRateLimiter, async (c) => {
@@ -74,7 +75,7 @@ routes.get('/feed/:file', feedRateLimiter, async (c) => {
         .asyncDb.select()
         .from(calendarFeeds)
         .where(eq(calendarFeeds.tokenHash, hashFeedToken(token)))
-        .get()
+        .then(firstRow)
     : undefined;
   if (!feed) throw new NotFoundError('Calendar feed');
   await appContext()

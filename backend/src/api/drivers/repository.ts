@@ -1,5 +1,6 @@
 import { and, count, eq, isNull } from 'drizzle-orm';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
+import { firstRow } from '../../db/first-row';
 import {
   users,
   type VehicleDriver,
@@ -33,7 +34,7 @@ async function memberName(tx: AsyncHandle, userId: string): Promise<string> {
     .select({ name: users.displayName })
     .from(users)
     .where(eq(users.id, userId))
-    .get();
+    .then(firstRow);
   return row?.name || 'Driver';
 }
 
@@ -54,7 +55,7 @@ export async function carShareEnabled(tx: AsyncHandle, vehicleId: string): Promi
     .select({ enabled: vehicles.carShareEnabled })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
-    .get();
+    .then(firstRow);
   return row?.enabled ?? false;
 }
 
@@ -84,7 +85,7 @@ export async function findDriver(
     .select()
     .from(vehicleDrivers)
     .where(and(eq(vehicleDrivers.id, driverId), eq(vehicleDrivers.vehicleId, vehicleId)))
-    .get();
+    .then(firstRow);
   return row ?? null;
 }
 
@@ -103,7 +104,7 @@ export async function ownDriverId(
         isNull(vehicleDrivers.archivedAt)
       )
     )
-    .get();
+    .then(firstRow);
   return row?.id ?? null;
 }
 
@@ -116,7 +117,7 @@ export async function ensureMemberDriver(
     .select({ id: vehicleDrivers.id })
     .from(vehicleDrivers)
     .where(and(eq(vehicleDrivers.vehicleId, vehicleId), eq(vehicleDrivers.userId, userId)))
-    .get();
+    .then(firstRow);
   if (existing) {
     await tx
       .update(vehicleDrivers)
@@ -148,7 +149,7 @@ export async function setCarShare(
       .select({ userId: vehicles.userId })
       .from(vehicles)
       .where(eq(vehicles.id, vehicleId))
-      .get();
+      .then(firstRow);
     const members = await tx
       .select({ userId: vehicleShares.sharedWithId })
       .from(vehicleShares)

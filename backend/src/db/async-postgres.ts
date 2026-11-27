@@ -109,14 +109,19 @@ export function openAsyncPostgres(connection: PgConnection) {
   }
 
   async function statement(scope: Scope, text: string, params: unknown[], rowMode: RowMode) {
-    await control('SAVEPOINT vroom_statement');
+    await control('SAVEPOINT vroom_statement').catch((error: unknown) => {
+      scope.root.aborted = true;
+      throw error;
+    });
     let rows: unknown[];
     try {
       rows = await connection.query(text, params, rowMode);
     } catch (error) {
-      await control('ROLLBACK TO SAVEPOINT vroom_statement').catch(() => {
-        scope.root.aborted = true;
-      });
+      await control('ROLLBACK TO SAVEPOINT vroom_statement')
+        .then(() => control('RELEASE SAVEPOINT vroom_statement'))
+        .catch(() => {
+          scope.root.aborted = true;
+        });
       throw error;
     }
     await control('RELEASE SAVEPOINT vroom_statement').catch((error: unknown) => {
