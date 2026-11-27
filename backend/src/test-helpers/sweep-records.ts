@@ -3,6 +3,26 @@ import type { TestApp } from './http-client';
 
 const JUNE_2024 = 1_717_200_000;
 const JUNE_2025 = 1_748_736_000;
+const PHOTO_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+
+const photoStoreOf = (id: string) => `${id}-photos`;
+const sweepPhotoIds = (id: string) => [id, `${id}-2`];
+
+export async function storeSweepPhotos(ctx: TestApp, id: string): Promise<void> {
+  const { getStorageProviderRegistry } = await import('../api/providers/domains/storage/registry');
+  const store = await getStorageProviderRegistry().getProvider(photoStoreOf(id), ctx.user.id);
+  for (const photoId of sweepPhotoIds(id)) {
+    await store.upload({
+      fileName: `${photoId}.jpg`,
+      buffer: PHOTO_BYTES,
+      mimeType: 'image/jpeg',
+      entityType: 'vehicle',
+      entityId: id,
+      pathHint: '',
+      rawPath: 'sweep',
+    });
+  }
+}
 
 export function seedSweepRecords(ctx: TestApp, id: string, inviterId: string): void {
   const owner = ctx.user.id;
@@ -22,10 +42,18 @@ export function seedSweepRecords(ctx: TestApp, id: string, inviterId: string): v
       [`${id}-${account}`, owner]
     );
   }
-  for (const photoId of [id, `${id}-2`]) {
+  run(
+    "INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status) VALUES (?, ?, 'storage', 'fake', 'Sweep photos', '', 'active')",
+    [photoStoreOf(id), owner]
+  );
+  for (const photoId of sweepPhotoIds(id)) {
     run(
-      "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size) VALUES (?, ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 4)",
-      [photoId, owner, id]
+      "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size) VALUES (?, ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', ?)",
+      [photoId, owner, id, PHOTO_BYTES.length]
+    );
+    run(
+      "INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status) VALUES (?, ?, ?, ?, 'active')",
+      [photoId, photoId, photoStoreOf(id), `sweep/${photoId}.jpg`]
     );
   }
   run("INSERT INTO vehicle_drivers (id, vehicle_id, name, created_by) VALUES (?, ?, 'Sweep', ?)", [

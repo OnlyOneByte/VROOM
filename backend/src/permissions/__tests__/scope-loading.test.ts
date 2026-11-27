@@ -12,7 +12,7 @@ import {
 } from '../../test-helpers/http-client';
 import { type Members, seedCar, seedMembers } from '../../test-helpers/members';
 import { type SweepCall, sendSweepCall, writeRouteCalls } from '../../test-helpers/route-bodies';
-import { seedSweepRecords } from '../../test-helpers/sweep-records';
+import { seedSweepRecords, storeSweepPhotos } from '../../test-helpers/sweep-records';
 import { logger } from '../../utils/logger';
 import { loadResolver, requestResolver } from '../grants';
 import {
@@ -97,25 +97,31 @@ const SWEPT_KEYS = Object.entries(ROUTE_PERMISSIONS)
 
 const isWrite = (method: string) => method !== 'GET' && method !== 'DELETE';
 
-const HANDLER_PRECONDITIONS: Record<string, string> = {
+type Preconditions = Record<string, string>;
+
+const WRITE_PRECONDITIONS: Preconditions = {
   'POST /api/v1/vehicles/:vehicleId/photos': 'No storage provider configured',
   'POST /api/v1/photos/:entityType/:entityId': 'No storage provider configured',
   'POST /api/v1/providers': 'Missing nonce',
   'POST /api/v1/assistant/chat': 'No assistant (LLM) provider is configured',
   'POST /api/v1/sync/restore/from-provider': 'Provider not found or inactive',
   'POST /api/v1/sync/restore/from-backup': 'not a readable VROOM backup ZIP',
+};
+
+const READ_PRECONDITIONS: Preconditions = {
   'GET /api/v1/photos/receipt-drafts': 'Connect Google Photos in Settings',
 };
 
-const preconditionKeys = (wanted: (key: string) => boolean) =>
-  Object.keys(HANDLER_PRECONDITIONS).filter(wanted).sort();
-
 const quietPush = { send: async () => ({ kind: 'ok' as const }) };
 
-const config = CONFIG as { disableRateLimit: boolean };
-const rateLimitsWere = config.disableRateLimit;
-const rateLimitsOff = (off: boolean) => {
-  config.disableRateLimit = off || rateLimitsWere;
+const config = CONFIG as { disableRateLimit: boolean; allowFakeStorageProvider: boolean };
+const configWas = {
+  disableRateLimit: config.disableRateLimit,
+  allowFakeStorageProvider: config.allowFakeStorageProvider,
+};
+const sweepConfig = (on: boolean) => {
+  config.disableRateLimit = on || configWas.disableRateLimit;
+  config.allowFakeStorageProvider = on || configWas.allowFakeStorageProvider;
 };
 
 function sweepRequests(
@@ -130,11 +136,15 @@ function sweepRequests(
   });
 }
 
-async function inputOutcome(key: string, res: Response): Promise<string | 'precondition' | null> {
+async function inputOutcome(
+  preconditions: Preconditions,
+  key: string,
+  res: Response
+): Promise<string | 'precondition' | null> {
   if (res.status === 401 || res.status === 429 || res.status >= 500) return String(res.status);
   if (res.status !== 400) return null;
   const text = await res.text();
-  const expected = HANDLER_PRECONDITIONS[key];
+  const expected = preconditions[key];
   return expected && text.includes(expected) ? 'precondition' : text.slice(0, 160);
 }
 
@@ -143,6 +153,7 @@ async function seedSweepCar(ctx: TestApp): Promise<Members> {
   ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 1 WHERE id = ?', [VEHICLE_ID]);
   const members = await seedMembers(ctx, VEHICLE_ID, 'sweep');
   seedSweepRecords(ctx, VEHICLE_ID, members.stranger.id);
+  await storeSweepPhotos(ctx, VEHICLE_ID);
   return members;
 }
 
@@ -152,13 +163,13 @@ describe('the sweep sends each route with a body one it accepts', () => {
 
   beforeEach(async () => {
     ctx = await createTestApp();
+    sweepConfig(true);
     members = await seedSweepCar(ctx);
     setPushSenderForTest(quietPush);
-    rateLimitsOff(true);
   }, SETUP_TIMEOUT_MS);
   afterEach(() => {
     setPushSenderForTest(null);
-    rateLimitsOff(false);
+    sweepConfig(false);
     ctx.close();
   });
 
@@ -172,9 +183,10 @@ describe('the sweep sends each route with a body one it accepts', () => {
     const refused: string[] = [];
     const preconditionsHit = new Set<string>();
     for (const [key, method, path, call] of sweepRequests(members.editor.id)) {
-      if (!call) continue;
+      if (!call || method === 'GET') continue;
       const { cookie } = await requestAs(ctx, ctx.user.id);
       const outcome = await inputOutcome(
+        WRITE_PRECONDITIONS,
         key,
         await sendSweepCall(ctx.app, cookie, method, path, call)
       );
@@ -182,9 +194,7 @@ describe('the sweep sends each route with a body one it accepts', () => {
       else if (outcome) refused.push(`${key} -> ${outcome}`);
     }
     expect(refused).toEqual([]);
-    expect([...preconditionsHit].sort()).toEqual(
-      preconditionKeys((key) => !key.startsWith('GET '))
-    );
+    expect([...preconditionsHit].sort()).toEqual(Object.keys(WRITE_PRECONDITIONS).sort());
   }, 120_000);
 
   test('in sweep order, the owner finds the record behind every path id', async () => {
@@ -197,21 +207,22 @@ describe('the sweep sends each route with a body one it accepts', () => {
     expect(missing).toEqual([]);
   }, 120_000);
 
-  test('the owner gets past input validation on every read', async () => {
+  test('the owner gets past input validation and stored-data checks on every read', async () => {
     const refused: string[] = [];
     const preconditionsHit = new Set<string>();
     for (const [key, method, path, call] of sweepRequests(members.editor.id)) {
       if (method !== 'GET') continue;
       const { cookie } = await requestAs(ctx, ctx.user.id);
-      const outcome = await inputOutcome(
-        key,
-        await sendSweepCall(ctx.app, cookie, method, path, call ?? {})
-      );
+      const res = await sendSweepCall(ctx.app, cookie, method, path, call ?? {});
+      const outcome =
+        res.status === 422
+          ? `422 ${(await res.text()).slice(0, 160)}`
+          : await inputOutcome(READ_PRECONDITIONS, key, res);
       if (outcome === 'precondition') preconditionsHit.add(key);
       else if (outcome) refused.push(`${key} -> ${outcome}`);
     }
     expect(refused).toEqual([]);
-    expect([...preconditionsHit].sort()).toEqual(preconditionKeys((key) => key.startsWith('GET ')));
+    expect([...preconditionsHit].sort()).toEqual(Object.keys(READ_PRECONDITIONS).sort());
   }, 120_000);
 });
 
@@ -221,13 +232,13 @@ describe('every mapped route loads the scopes it checks', () => {
 
   beforeEach(async () => {
     ctx = await createTestApp();
+    sweepConfig(true);
     members = await seedSweepCar(ctx);
     setPushSenderForTest(quietPush);
-    rateLimitsOff(true);
   }, SETUP_TIMEOUT_MS);
   afterEach(() => {
     setPushSenderForTest(null);
-    rateLimitsOff(false);
+    sweepConfig(false);
     ctx.close();
   });
 
