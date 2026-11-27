@@ -333,6 +333,10 @@ export function shownExpense<T extends Expense>(listed: T): T {
 	return entry ? { ...expense, ...entry.after } : expense;
 }
 
+export function stillInView<T extends Expense>(listed: T, inView: (shown: T) => boolean): boolean {
+	return !overlay(withLatest(listed)) || inView(shownExpense(listed));
+}
+
 export function editedRows(expenses: readonly Expense[]): { before: Expense[]; after: Expense[] } {
 	const before: Expense[] = [];
 	const after: Expense[] = [];

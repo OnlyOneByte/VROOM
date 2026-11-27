@@ -53,7 +53,7 @@
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { forgetRecentlySynced, recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
-	import { editedRows } from '#lib/utils/pending-edits.svelte.ts';
+	import { editedRows, stillInView } from '#lib/utils/pending-edits.svelte.ts';
 	import FilterPills from '#lib/components/expenses/FilterPills.svelte';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
@@ -134,7 +134,12 @@
 		)
 	]);
 	let deletingRows = $derived(expenses.filter(isDeleteHidden));
-	let edited = $derived(editedRows(expenses.filter(expense => !isDeleteHidden(expense))));
+	let viewFilters = $derived({ ...pendingFilters, search: undefined });
+	const inView = (row: Expense) => matchesFilters(row, viewFilters);
+	let edited = $derived.by(() => {
+		const rows = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
+		return { before: rows.before, after: rows.after.filter(inView) };
+	});
 	let shownSummary = $derived.by(() => {
 		const now = Date.now();
 		const withQueued = withPendingInSummary(summary, pending.saving, now);
@@ -559,10 +564,12 @@
 		return withPendingByMonth(withoutRemoved, edited.after);
 	});
 	let displayExpenses = $derived<ExpenseWithVehicle[]>(
-		[...pendingListRows, ...expenses].map(expense => ({
-			...expense,
-			vehicle: vehicleById.get(expense.vehicleId)
-		}))
+		[...pendingListRows, ...expenses.filter(expense => stillInView(expense, inView))].map(
+			expense => ({
+				...expense,
+				vehicle: vehicleById.get(expense.vehicleId)
+			})
+		)
 	);
 </script>
 

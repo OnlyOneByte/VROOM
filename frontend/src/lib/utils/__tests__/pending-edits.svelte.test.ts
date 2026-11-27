@@ -19,7 +19,9 @@ import {
 	resetPendingEdits,
 	retryEdit,
 	scheduleEdit,
-	shownExpense
+	shownExpense,
+	stillInView,
+	undoEdit
 } from '../pending-edits.svelte.ts';
 
 const saved = {
@@ -732,5 +734,36 @@ describe('an edit refused because the expense changed elsewhere', () => {
 			...signal,
 			expectedUpdatedAt: elsewhere
 		});
+	});
+});
+
+describe('an edit that moves an expense out of the view', () => {
+	beforeEach(() => vi.resetAllMocks());
+	afterEach(() => resetPendingEdits());
+
+	const onCar = (vehicleId: string) => (row: Expense) => row.vehicleId === vehicleId;
+
+	test('a vehicle change takes the row off the old car, and Undo brings it back', async () => {
+		vi.mocked(expenseApi.updateExpense).mockReturnValue(new Promise(() => {}));
+		expect(stillInView(saved, onCar('v1'))).toBe(true);
+
+		scheduleEdit(saved, { ...saved, vehicleId: 'v2' }, payload);
+		expect(stillInView(saved, onCar('v1'))).toBe(false);
+		expect(stillInView(saved, onCar('v2'))).toBe(true);
+
+		undoEdit('e1');
+		expect(stillInView(saved, onCar('v1'))).toBe(true);
+	});
+
+	test('a category change leaves a list filtered to the old category', () => {
+		vi.mocked(expenseApi.updateExpense).mockReturnValue(new Promise(() => {}));
+		const fuelOnly = (row: Expense) => row.category === 'fuel';
+
+		scheduleEdit(saved, { ...saved, category: 'maintenance' }, payload);
+		expect(stillInView(saved, fuelOnly)).toBe(false);
+	});
+
+	test('a row with no pending edit is never taken out, whatever the view', () => {
+		expect(stillInView(saved, () => false)).toBe(true);
 	});
 });

@@ -47,7 +47,7 @@
 		withRowsInBreakdowns,
 		withoutRowsInBreakdowns
 	} from '#lib/utils/sync/pending-rows.ts';
-	import { editedRows } from '#lib/utils/pending-edits.svelte.ts';
+	import { editedRows, stillInView } from '#lib/utils/pending-edits.svelte.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
@@ -189,11 +189,13 @@
 	let filters = $state<ExpenseFilters>({});
 	let expenseCategoryFilter = $state<string>('');
 
+	const onThisCar = (row: Expense) => row.vehicleId === vehicleId;
+
 	let chartSummary = $derived.by(() => {
 		const edited = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
 		const removed = [...expenses.filter(isDeleteHidden), ...edited.before];
 		return withRowsInBreakdowns(withoutRowsInBreakdowns(summary, removed), [
-			...edited.after,
+			...edited.after.filter(onThisCar),
 			...pending.saving
 		]);
 	});
@@ -321,18 +323,23 @@
 			row => row.vehicleId === vehicleId && !pending.rows.some(p => p.id === row.id)
 		)
 	);
+	let tabFilters = $derived({
+		categories: expenseCategoryFilter.split(',').filter(Boolean),
+		startDate: filters.startDate,
+		endDate: filters.endDate,
+		tags: filters.tags ?? []
+	});
 	let pendingTabRows = $derived(
 		(expensesFetched ? pending.rows : [...pending.rows, ...syncedRows]).filter(row =>
-			matchesFilters(row, {
-				categories: expenseCategoryFilter.split(',').filter(Boolean),
-				startDate: filters.startDate,
-				endDate: filters.endDate,
-				search: searchTerm,
-				tags: filters.tags ?? []
-			})
+			matchesFilters(row, { ...tabFilters, search: searchTerm })
 		)
 	);
-	let tabExpenses = $derived(currentOffset === 0 ? [...pendingTabRows, ...expenses] : expenses);
+	let tabListed = $derived(
+		expenses.filter(expense =>
+			stillInView(expense, row => onThisCar(row) && matchesFilters(row, tabFilters))
+		)
+	);
+	let tabExpenses = $derived(currentOffset === 0 ? [...pendingTabRows, ...tabListed] : tabListed);
 	let tabWaiting = $derived(!expensesLoaded && tabExpenses.length === 0);
 
 	let firstExpense = $derived(
@@ -341,18 +348,23 @@
 			(pending.rows.length > 0 || (!recentSettled && syncedRows.length > 0))
 	);
 	let recentExpenses = $derived(
-		[...pending.rows, ...(recentSettled ? recentList : syncedRows)].slice(0, 3).map(expense => {
-			const sync = pending.states.get(expense.id);
-			return {
-				id: expense.id,
-				amount: expense.amount,
-				category: expense.category,
-				date: new Date(expense.date),
-				description: expense.description,
-				location: expense.location,
-				...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
-			};
-		})
+		[
+			...pending.rows,
+			...(recentSettled ? recentList.filter(row => stillInView(row, onThisCar)) : syncedRows)
+		]
+			.slice(0, 3)
+			.map(expense => {
+				const sync = pending.states.get(expense.id);
+				return {
+					id: expense.id,
+					amount: expense.amount,
+					category: expense.category,
+					date: new Date(expense.date),
+					description: expense.description,
+					location: expense.location,
+					...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
+				};
+			})
 	);
 
 	let coverPhotoUrl = $derived.by(() => {
