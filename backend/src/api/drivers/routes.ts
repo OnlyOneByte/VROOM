@@ -264,13 +264,20 @@ driverRoutes.post(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     await requireCarShare(vehicleId);
-    const { db, asyncDb } = appContext();
+    const { asyncDb } = appContext();
     const body = c.req.valid('json');
     const userId = c.get('user').id;
     const hide = await hidesFinancials(vehicleId, userId);
     const request = await backfillRequest(vehicleId, body);
     const planned = await planBackfill(asyncDb, vehicleId, request, hide);
-    const { batchId, entries } = applyBackfill(db, vehicleId, body.mode, planned, userId, hide);
+    const { batchId, entries } = await applyBackfill(
+      asyncDb,
+      vehicleId,
+      body.mode,
+      planned,
+      userId,
+      hide
+    );
     const data = { batchId, ...(await summarize(asyncDb, vehicleId, entries)) };
     return c.json({ success: true, data }, batchId ? 201 : 200);
   }
@@ -284,7 +291,7 @@ driverRoutes.post(
     const { vehicleId, batchId } = c.req.valid('param');
     await requireCarShare(vehicleId);
     const hide = await hidesFinancials(vehicleId, c.get('user').id);
-    const reverted = undoBackfill(appContext().db, vehicleId, batchId, hide);
+    const reverted = await undoBackfill(appContext().asyncDb, vehicleId, batchId, hide);
     return c.json({ success: true, data: { reverted } });
   }
 );
@@ -328,8 +335,8 @@ carShareRoutes.put(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     const { enabled } = c.req.valid('json');
-    const { db, asyncDb } = appContext();
-    setCarShare(db, vehicleId, enabled);
+    const { asyncDb } = appContext();
+    await setCarShare(asyncDb, vehicleId, enabled);
     return c.json({
       success: true,
       data: { enabled, drivers: enabled ? await listDrivers(asyncDb, vehicleId) : [] },

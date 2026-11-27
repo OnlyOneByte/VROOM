@@ -1,32 +1,10 @@
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { google, type sheets_v4 } from 'googleapis';
 import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
-import {
-  expenses,
-  insuranceClaims,
-  insurancePolicies,
-  insuranceTerms,
-  insuranceTermVehicleSelectionOrder,
-  insuranceTermVehicles,
-  odometerEntries,
-  photoRefs,
-  photos,
-  reminderNotifications,
-  reminders,
-  reminderVehicles,
-  syncState,
-  trips,
-  userPreferences,
-  userProviders,
-  vehicleDrivers,
-  vehicleFinancing,
-  vehicleShares,
-  vehicles,
-} from '../../../db/schema';
+import { userProviders } from '../../../db/schema';
 import { NotFoundError, SyncError, SyncErrorCode, ValidationError } from '../../../errors';
 import { logger } from '../../../utils/logger';
-import { ownedVehiclesScope } from '../../../utils/vehicle-access';
 import { decryptRefreshToken } from '../domains/storage/registry';
 import { GoogleDriveService } from './google-drive-service';
 
@@ -480,121 +458,18 @@ export class GoogleSheetsService {
     }
   }
 
-  private async queryIfNonEmpty<T>(
-    ids: readonly unknown[],
-    query: () => Promise<T[]>
-  ): Promise<T[]> {
-    return ids.length > 0 ? query() : [];
-  }
-
   private async updateSpreadsheetWithUserData(
     spreadsheetId: string,
     userId: string
   ): Promise<void> {
     await this.ensureRequiredSheets(spreadsheetId);
-    const db = appContext().asyncDb;
-
-    const [userVehicles, userExpenses, userInsurance, userFinancing, userOdometer] =
-      await Promise.all([
-        db.select().from(vehicles).where(ownedVehiclesScope(userId)),
-        db.select().from(expenses).where(eq(expenses.userId, userId)),
-        db.select().from(insurancePolicies).where(eq(insurancePolicies.userId, userId)),
-        db
-          .select()
-          .from(vehicleFinancing)
-          .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
-          .where(ownedVehiclesScope(userId)),
-        db
-          .select()
-          .from(odometerEntries)
-          .innerJoin(vehicles, eq(odometerEntries.vehicleId, vehicles.id))
-          .where(ownedVehiclesScope(userId)),
-      ]);
-
-    const policyIds = userInsurance.map((p) => p.id);
-    const userInsuranceTerms = await this.queryIfNonEmpty(policyIds, () =>
-      db.select().from(insuranceTerms).where(inArray(insuranceTerms.policyId, policyIds))
-    );
-
-    const termIds = userInsuranceTerms.map((t) => t.id);
-    const userInsuranceTermVehicles = await this.queryIfNonEmpty(termIds, () =>
-      db
-        .select()
-        .from(insuranceTermVehicles)
-        .where(inArray(insuranceTermVehicles.termId, termIds))
-        .orderBy(insuranceTermVehicleSelectionOrder)
-    );
-
-    const userInsuranceClaims = await this.queryIfNonEmpty(policyIds, () =>
-      db.select().from(insuranceClaims).where(inArray(insuranceClaims.policyId, policyIds))
-    );
-
-    const userPhotos = await db.select().from(photos).where(eq(photos.userId, userId));
-
-    // SQLite caps bound parameters per statement; batch to stay under it.
-    const photoIds = userPhotos.map((p) => p.id);
-    const userPhotoRefs: (typeof photoRefs.$inferSelect)[] = [];
-    const BATCH_SIZE = 500;
-    for (let i = 0; i < photoIds.length; i += BATCH_SIZE) {
-      const batch = photoIds.slice(i, i + BATCH_SIZE);
-      const rows = await db.select().from(photoRefs).where(inArray(photoRefs.photoId, batch));
-      userPhotoRefs.push(...rows);
-    }
-
-    const userPreferencesRows = await db
-      .select()
-      .from(userPreferences)
-      .where(eq(userPreferences.userId, userId));
-    const syncStateRows = await db.select().from(syncState).where(eq(syncState.userId, userId));
-
-    const userReminders = await db.select().from(reminders).where(eq(reminders.userId, userId));
-
-    const reminderIds = userReminders.map((r) => r.id);
-    const userReminderVehicles = await this.queryIfNonEmpty(reminderIds, () =>
-      db.select().from(reminderVehicles).where(inArray(reminderVehicles.reminderId, reminderIds))
-    );
-    const userReminderNotifications = await db
-      .select()
-      .from(reminderNotifications)
-      .where(eq(reminderNotifications.userId, userId));
-
-    const userTrips = await db.select().from(trips).where(eq(trips.userId, userId));
-
-    const userVehicleShares = await db
-      .select()
-      .from(vehicleShares)
-      .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
-
-    const userDrivers = await db
-      .select()
-      .from(vehicleDrivers)
-      .innerJoin(vehicles, eq(vehicleDrivers.vehicleId, vehicles.id))
-      .where(ownedVehiclesScope(userId));
-
-    const rowsByTable: Record<SheetTableKey, Record<string, unknown>[]> = {
-      vehicles: userVehicles,
-      expenses: userExpenses,
-      insurance: userInsurance,
-      insuranceTerms: userInsuranceTerms,
-      insuranceTermVehicles: userInsuranceTermVehicles,
-      insuranceClaims: userInsuranceClaims,
-      financing: userFinancing.map((f) => f.vehicle_financing),
-      odometer: userOdometer.map((o) => o.odometer_entries),
-      photos: userPhotos,
-      photoRefs: userPhotoRefs,
-      userPreferences: userPreferencesRows,
-      syncState: syncStateRows,
-      reminders: userReminders,
-      reminderVehicles: userReminderVehicles,
-      reminderNotifications: userReminderNotifications,
-      trips: userTrips,
-      vehicleShares: userVehicleShares,
-      vehicleDrivers: userDrivers.map((d) => d.vehicle_drivers),
-    };
+    const { backupService } = await import('../../sync/backup');
+    const { metadata: _metadata, ...snapshot } = await backupService.createBackup(userId);
+    const rowsByTable: Partial<Record<SheetTableKey, Record<string, unknown>[]>> = snapshot;
 
     const tables = (Object.keys(SHEET_TABS) as SheetTableKey[]).map((key) => ({
       title: SHEET_TABS[key] as string,
-      rows: rowsByTable[key],
+      rows: rowsByTable[key] ?? [],
       headers: SHEET_HEADERS[key] as readonly string[],
     }));
     tables.push({

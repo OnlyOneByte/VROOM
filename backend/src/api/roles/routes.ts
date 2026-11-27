@@ -3,6 +3,7 @@ import type { MiddlewareHandler } from 'hono';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { appContext } from '../../app-context';
+import type { AsyncHandle } from '../../db/async-sqlite';
 import {
   permissionOverrides,
   type Role,
@@ -13,7 +14,6 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
 import {
   ConflictError,
   ForbiddenError,
@@ -31,7 +31,7 @@ import {
   refuseUngrantable,
   refuseUnheld,
   requestResolver,
-  syncResolverFor,
+  resolverFor,
 } from '../../permissions/grants';
 import { PERMISSION_REGISTRY } from '../../permissions/registry';
 import type { Resource } from '../../permissions/resolve';
@@ -62,27 +62,34 @@ const overrideResource: ResourceOf = async (c) => {
   return scopedResource(target.scope === 'vehicle' ? target.scopeId : null);
 };
 
-function writeAt<T>(scope: RoleScope, change: (tx: DrizzleTransaction) => T): T {
-  const db = appContext().db;
-  return scope === 'server' ? keepingARoleManager(db, change) : db.transaction(change);
+function inTransaction<T>(work: (tx: AsyncHandle) => Promise<T>): Promise<T> {
+  return appContext().asyncDb.transaction(work);
 }
 
-function permissionsOf(roleId: string): string[] {
-  return appContext()
-    .db.select({ permission: rolePermissions.permission })
+function writeAt<T>(
+  tx: AsyncHandle,
+  scope: RoleScope,
+  change: (tx: AsyncHandle) => Promise<T>
+): Promise<T> {
+  return scope === 'server' ? keepingARoleManager(appContext().asyncDb, change) : change(tx);
+}
+
+async function permissionsOf(db: AsyncHandle, roleId: string): Promise<string[]> {
+  const rows = await db
+    .select({ permission: rolePermissions.permission })
     .from(rolePermissions)
-    .where(eq(rolePermissions.roleId, roleId))
-    .all()
-    .map((row) => row.permission);
+    .where(eq(rolePermissions.roleId, roleId));
+  return rows.map((row) => row.permission);
 }
 
-function roleView(role: Role) {
+async function roleView(db: AsyncHandle, role: Role) {
   const { id, scope, key, name, color, builtIn, ownerUserId } = role;
-  return { id, scope, key, name, color, builtIn, ownerUserId, permissions: permissionsOf(id) };
+  const permissions = await permissionsOf(db, id);
+  return { id, scope, key, name, color, builtIn, ownerUserId, permissions };
 }
 
-function findRole(id: string): Role {
-  const role = appContext().db.select().from(roles).where(eq(roles.id, id)).get();
+async function findRole(db: AsyncHandle, id: string): Promise<Role> {
+  const role = await db.select().from(roles).where(eq(roles.id, id)).get();
   if (!role) throw new NotFoundError('Role');
   return role;
 }
@@ -93,7 +100,12 @@ interface Authority {
   holds: (permission: string) => boolean;
 }
 
-function authorityAt(c: Context, scope: RoleScope, scopeId: string | null | undefined): Authority {
+async function authorityAt(
+  c: Context,
+  db: AsyncHandle,
+  scope: RoleScope,
+  scopeId: string | null | undefined
+): Promise<Authority> {
   const resolver = requestResolver(c);
   if (scope === 'server') {
     if (scopeId) throw new ValidationError('A server role or override takes no scopeId');
@@ -103,8 +115,8 @@ function authorityAt(c: Context, scope: RoleScope, scopeId: string | null | unde
   if (!scopeId) throw new ValidationError('A vehicle role or override needs the vehicle id');
   const vehicle: Resource = { kind: 'vehicle', vehicleId: scopeId };
   enforce(resolver.can('vehicle.share.manage', vehicle), 'Vehicle');
-  const owner = appContext()
-    .db.select({ id: vehicles.userId })
+  const owner = await db
+    .select({ id: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, scopeId))
     .get();
@@ -121,17 +133,12 @@ function refuseOverOwner(c: Context, authority: Authority, setBy: string | null 
   }
 }
 
-function requireTarget(authority: Authority, userId: string): void {
+async function requireTarget(db: AsyncHandle, authority: Authority, userId: string) {
   if (authority.scopeId) {
-    if (!isVehicleMember(appContext().db, authority.scopeId, userId))
-      throw new NotFoundError('Member');
+    if (!(await isVehicleMember(db, authority.scopeId, userId))) throw new NotFoundError('Member');
     return;
   }
-  const user = appContext()
-    .db.select({ id: users.id })
-    .from(users)
-    .where(eq(users.id, userId))
-    .get();
+  const user = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).get();
   if (!user) throw new NotFoundError('User');
 }
 
@@ -146,8 +153,8 @@ function requireLibrary(c: Context): string {
   return userId;
 }
 
-function roleFor(c: Context, id: string, change: boolean): Role {
-  const role = findRole(id);
+async function roleFor(c: Context, db: AsyncHandle, id: string, change: boolean): Promise<Role> {
+  const role = await findRole(db, id);
   if (role.scope === 'server') {
     requireRoleManager(c);
   } else if (requireLibrary(c) !== role.ownerUserId && !role.builtIn) {
@@ -206,93 +213,101 @@ roleRoutes.use('*', requireAuth);
 roleRoutes.use('*', changeTracker);
 roleRoutes.use('*', loadRoleScopes);
 
-roleRoutes.get('/', zValidator('query', z.object({ scope: z.enum(SCOPES) })), (c) => {
+roleRoutes.get('/', zValidator('query', z.object({ scope: z.enum(SCOPES) })), async (c) => {
   const { scope } = c.req.valid('query');
-  const rows = appContext()
-    .db.select()
-    .from(roles)
-    .where(visibleRoles(c, scope))
-    .orderBy(roles.createdAt)
-    .all();
-  return c.json({ success: true, data: rows.map(roleView) });
+  const db = appContext().asyncDb;
+  const rows = await db.select().from(roles).where(visibleRoles(c, scope)).orderBy(roles.createdAt);
+  const data = [];
+  for (const row of rows) data.push(await roleView(db, row));
+  return c.json({ success: true, data });
 });
 
-roleRoutes.post('/', zValidator('json', createRoleSchema), (c) => {
+roleRoutes.post('/', zValidator('json', createRoleSchema), async (c) => {
   const { scope, name, color, copyFrom } = c.req.valid('json');
   const ownerUserId = scope === 'vehicle' ? requireLibrary(c) : requireRoleManager(c);
-  const copied = copyFrom ? roleFor(c, copyFrom, false) : null;
-  if (copied) refuseDemoRole(copied);
-  if (copied && copied.scope !== scope) {
-    throw new ValidationError('A role can only be copied into a role of the same scope');
-  }
-  const permissions = [
-    ...new Set([...(copied ? permissionsOf(copied.id) : []), ...c.req.valid('json').permissions]),
-  ];
-  refuseUngrantable(scope, permissions);
-  refuseUnheld(permissions, holdsForRole(c, scope));
-  const role = appContext().db.transaction((tx) => {
-    const created = tx
+  const data = await inTransaction(async (tx) => {
+    const copied = copyFrom ? await roleFor(c, tx, copyFrom, false) : null;
+    if (copied) refuseDemoRole(copied);
+    if (copied && copied.scope !== scope) {
+      throw new ValidationError('A role can only be copied into a role of the same scope');
+    }
+    const permissions = [
+      ...new Set([
+        ...(copied ? await permissionsOf(tx, copied.id) : []),
+        ...c.req.valid('json').permissions,
+      ]),
+    ];
+    refuseUngrantable(scope, permissions);
+    refuseUnheld(permissions, holdsForRole(c, scope));
+    const [created] = await tx
       .insert(roles)
       .values({ scope, name, color: color ?? null, ownerUserId })
-      .returning()
-      .get();
+      .returning();
+    if (!created) throw new Error('Role insert returned no row');
     if (permissions.length > 0) {
-      tx.insert(rolePermissions)
-        .values(permissions.map((permission) => ({ roleId: created.id, permission })))
-        .run();
+      await tx
+        .insert(rolePermissions)
+        .values(permissions.map((permission) => ({ roleId: created.id, permission })));
     }
-    return created;
+    return roleView(tx, created);
   });
-  return c.json({ success: true, data: roleView(role) }, 201);
+  return c.json({ success: true, data }, 201);
 });
 
 roleRoutes.patch(
   '/:id',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', updateRoleSchema),
-  (c) => {
-    const role = roleFor(c, c.req.valid('param').id, true);
-    const updated = appContext()
-      .db.update(roles)
-      .set({ ...c.req.valid('json'), updatedAt: new Date() })
-      .where(eq(roles.id, role.id))
-      .returning()
-      .get();
-    return c.json({ success: true, data: roleView(updated ?? role) });
+  async (c) => {
+    const data = await inTransaction(async (tx) => {
+      const role = await roleFor(c, tx, c.req.valid('param').id, true);
+      const [updated] = await tx
+        .update(roles)
+        .set({ ...c.req.valid('json'), updatedAt: new Date() })
+        .where(eq(roles.id, role.id))
+        .returning();
+      return roleView(tx, updated ?? role);
+    });
+    return c.json({ success: true, data });
   }
 );
 
-roleRoutes.delete('/:id', zValidator('param', commonSchemas.idParam), (c) => {
-  const role = roleFor(c, c.req.valid('param').id, true);
-  writeAt(role.scope, (tx) => tx.delete(roles).where(eq(roles.id, role.id)).run());
+roleRoutes.delete('/:id', zValidator('param', commonSchemas.idParam), async (c) => {
+  await inTransaction(async (tx) => {
+    const role = await roleFor(c, tx, c.req.valid('param').id, true);
+    await writeAt(tx, role.scope, (write) => write.delete(roles).where(eq(roles.id, role.id)));
+  });
   return c.json({ success: true, message: 'Role deleted' });
 });
 
-roleRoutes.get('/:id/permissions', zValidator('param', commonSchemas.idParam), (c) => {
-  const role = roleFor(c, c.req.valid('param').id, false);
-  return c.json({ success: true, data: { permissions: permissionsOf(role.id) } });
+roleRoutes.get('/:id/permissions', zValidator('param', commonSchemas.idParam), async (c) => {
+  const db = appContext().asyncDb;
+  const role = await roleFor(c, db, c.req.valid('param').id, false);
+  return c.json({ success: true, data: { permissions: await permissionsOf(db, role.id) } });
 });
 
 roleRoutes.put(
   '/:id/permissions',
   zValidator('param', commonSchemas.idParam),
   zValidator('json', z.strictObject({ permissions: permissionList })),
-  (c) => {
-    const role = roleFor(c, c.req.valid('param').id, true);
+  async (c) => {
     const permissions = [...new Set(c.req.valid('json').permissions)];
-    const current = new Set(permissionsOf(role.id));
-    refuseUngrantable(role.scope, permissions);
-    refuseUnheld(
-      permissions.filter((p) => !current.has(p)),
-      holdsForRole(c, role.scope)
-    );
-    writeAt(role.scope, (tx) => {
-      tx.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id)).run();
-      if (permissions.length > 0) {
-        tx.insert(rolePermissions)
-          .values(permissions.map((permission) => ({ roleId: role.id, permission })))
-          .run();
-      }
+    await inTransaction(async (tx) => {
+      const role = await roleFor(c, tx, c.req.valid('param').id, true);
+      const current = new Set(await permissionsOf(tx, role.id));
+      refuseUngrantable(role.scope, permissions);
+      refuseUnheld(
+        permissions.filter((p) => !current.has(p)),
+        holdsForRole(c, role.scope)
+      );
+      await writeAt(tx, role.scope, async (write) => {
+        await write.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
+        if (permissions.length > 0) {
+          await write
+            .insert(rolePermissions)
+            .values(permissions.map((permission) => ({ roleId: role.id, permission })));
+        }
+      });
     });
     return c.json({ success: true, data: { permissions } });
   }
@@ -310,14 +325,14 @@ function refuseDemoRole(role: Role): void {
   }
 }
 
-function assignable(c: Context, input: z.infer<typeof assignmentSchema>) {
-  const role = findRole(input.roleId);
-  const authority = authorityAt(c, role.scope, input.scopeId);
+async function assignable(c: Context, tx: AsyncHandle, input: z.infer<typeof assignmentSchema>) {
+  const role = await findRole(tx, input.roleId);
+  const authority = await authorityAt(c, tx, role.scope, input.scopeId);
   if (role.scope === 'vehicle' && !role.builtIn && role.ownerUserId !== authority.ownerId) {
     throw new NotFoundError('Role');
   }
-  requireTarget(authority, input.userId);
-  refuseUnheld(permissionsOf(role.id), authority.holds);
+  await requireTarget(tx, authority, input.userId);
+  refuseUnheld(await permissionsOf(tx, role.id), authority.holds);
   return { role, scopeId: authority.scopeId, authority };
 }
 
@@ -330,16 +345,18 @@ assignmentRoutes.post(
   '/',
   zValidator('json', assignmentSchema),
   authorize(assignmentResource),
-  (c) => {
+  async (c) => {
     const input = c.req.valid('json');
-    refuseDemoRole(findRole(input.roleId));
-    const { role, scopeId } = assignable(c, input);
     try {
-      const created = appContext()
-        .db.insert(roleAssignments)
-        .values({ userId: input.userId, roleId: role.id, scopeId, grantedBy: c.get('user').id })
-        .returning()
-        .get();
+      const created = await inTransaction(async (tx) => {
+        refuseDemoRole(await findRole(tx, input.roleId));
+        const { role, scopeId } = await assignable(c, tx, input);
+        const [row] = await tx
+          .insert(roleAssignments)
+          .values({ userId: input.userId, roleId: role.id, scopeId, grantedBy: c.get('user').id })
+          .returning();
+        return row;
+      });
       return c.json({ success: true, data: created }, 201);
     } catch (error) {
       if (isUniqueConstraintError(error)) throw new ConflictError('They already hold this role');
@@ -352,18 +369,20 @@ assignmentRoutes.delete(
   '/',
   zValidator('query', assignmentSchema),
   authorize(assignmentResource),
-  (c) => {
+  async (c) => {
     const input = c.req.valid('query');
-    const { role, scopeId, authority } = assignable(c, input);
-    const where = and(
-      eq(roleAssignments.userId, input.userId),
-      eq(roleAssignments.roleId, role.id),
-      scopeId ? eq(roleAssignments.scopeId, scopeId) : isNull(roleAssignments.scopeId)
-    );
-    const existing = appContext().db.select().from(roleAssignments).where(where).get();
-    if (!existing) throw new NotFoundError('Role assignment');
-    refuseOverOwner(c, authority, existing.grantedBy);
-    writeAt(role.scope, (tx) => tx.delete(roleAssignments).where(where).run());
+    await inTransaction(async (tx) => {
+      const { role, scopeId, authority } = await assignable(c, tx, input);
+      const where = and(
+        eq(roleAssignments.userId, input.userId),
+        eq(roleAssignments.roleId, role.id),
+        scopeId ? eq(roleAssignments.scopeId, scopeId) : isNull(roleAssignments.scopeId)
+      );
+      const existing = await tx.select().from(roleAssignments).where(where).get();
+      if (!existing) throw new NotFoundError('Role assignment');
+      refuseOverOwner(c, authority, existing.grantedBy);
+      await writeAt(tx, role.scope, (write) => write.delete(roleAssignments).where(where));
+    });
     return c.json({ success: true, message: 'Role removed' });
   }
 );
@@ -387,14 +406,16 @@ overrideRoutes.use('*', requireAuth);
 overrideRoutes.use('*', changeTracker);
 overrideRoutes.use('*', loadRoleScopes);
 
-overrideRoutes.get('/', zValidator('query', overrideTargetSchema), (c) => {
+overrideRoutes.get('/', zValidator('query', overrideTargetSchema), async (c) => {
   const { userId, scope, scopeId } = c.req.valid('query');
-  if (userId !== c.get('user').id) requireTarget(authorityAt(c, scope, scopeId), userId);
-  const rows = appContext()
-    .db.select()
+  const db = appContext().asyncDb;
+  if (userId !== c.get('user').id) {
+    await requireTarget(db, await authorityAt(c, db, scope, scopeId), userId);
+  }
+  const rows = await db
+    .select()
     .from(permissionOverrides)
-    .where(overrideWhere(scope, userId, scope === 'server' ? null : (scopeId ?? null)))
-    .all();
+    .where(overrideWhere(scope, userId, scope === 'server' ? null : (scopeId ?? null)));
   return c.json({ success: true, data: rows });
 });
 
@@ -408,35 +429,34 @@ overrideRoutes.put(
     })
   ),
   authorize(overrideResource),
-  (c) => {
+  async (c) => {
     const { userId, scope, scopeId, permission, effect } = c.req.valid('json');
-    const authority = authorityAt(c, scope, scopeId);
-    requireTarget(authority, userId);
-    refuseUngrantable(scope, [permission]);
-    refuseUnheld([permission], authority.holds);
-    const where = and(
-      overrideWhere(scope, userId, authority.scopeId),
-      eq(permissionOverrides.permission, permission)
-    );
-    refuseOverOwner(
-      c,
-      authority,
-      appContext().db.select().from(permissionOverrides).where(where).get()?.setBy
-    );
-    const saved = writeAt(scope, (tx) => {
-      tx.delete(permissionOverrides).where(where).run();
-      return tx
-        .insert(permissionOverrides)
-        .values({
-          userId,
-          scope,
-          scopeId: authority.scopeId,
-          permission,
-          effect,
-          setBy: c.get('user').id,
-        })
-        .returning()
-        .get();
+    const saved = await inTransaction(async (tx) => {
+      const authority = await authorityAt(c, tx, scope, scopeId);
+      await requireTarget(tx, authority, userId);
+      refuseUngrantable(scope, [permission]);
+      refuseUnheld([permission], authority.holds);
+      const where = and(
+        overrideWhere(scope, userId, authority.scopeId),
+        eq(permissionOverrides.permission, permission)
+      );
+      const existing = await tx.select().from(permissionOverrides).where(where).get();
+      refuseOverOwner(c, authority, existing?.setBy);
+      return writeAt(tx, scope, async (write) => {
+        await write.delete(permissionOverrides).where(where);
+        const [row] = await write
+          .insert(permissionOverrides)
+          .values({
+            userId,
+            scope,
+            scopeId: authority.scopeId,
+            permission,
+            effect,
+            setBy: c.get('user').id,
+          })
+          .returning();
+        return row;
+      });
     });
     return c.json({ success: true, data: saved });
   }
@@ -446,81 +466,89 @@ overrideRoutes.delete(
   '/',
   zValidator('query', overrideTargetSchema.extend({ permission: z.string().min(1) })),
   authorize(overrideResource),
-  (c) => {
+  async (c) => {
     const { userId, scope, scopeId, permission } = c.req.valid('query');
-    const authority = authorityAt(c, scope, scopeId);
-    refuseUnheld([permission], authority.holds);
-    const where = and(
-      overrideWhere(scope, userId, authority.scopeId),
-      eq(permissionOverrides.permission, permission)
-    );
-    const existing = appContext().db.select().from(permissionOverrides).where(where).get();
-    if (!existing) throw new NotFoundError('Override');
-    refuseOverOwner(c, authority, existing.setBy);
-    writeAt(scope, (tx) => tx.delete(permissionOverrides).where(where).run());
+    await inTransaction(async (tx) => {
+      const authority = await authorityAt(c, tx, scope, scopeId);
+      refuseUnheld([permission], authority.holds);
+      const where = and(
+        overrideWhere(scope, userId, authority.scopeId),
+        eq(permissionOverrides.permission, permission)
+      );
+      const existing = await tx.select().from(permissionOverrides).where(where).get();
+      if (!existing) throw new NotFoundError('Override');
+      refuseOverOwner(c, authority, existing.setBy);
+      await writeAt(tx, scope, (write) => write.delete(permissionOverrides).where(where));
+    });
     return c.json({ success: true, message: 'Override removed' });
   }
 );
 
-export function vehiclePeople(c: Context) {
-  const vehicleId = c.req.param('id') ?? '';
-  const vehicle: Resource = { kind: 'vehicle', vehicleId };
+export async function vehiclePeople(c: Context) {
+  const vehicle = { kind: 'vehicle' as const, vehicleId: c.req.param('id') ?? '' };
   const caller = requestResolver(c);
   enforce(caller.can('vehicle.share.read', vehicle), 'Vehicle');
   const detailed = caller.can('vehicle.share.manage', vehicle).allow;
-  const db = appContext().db;
-  const owner = db
+  const people = await appContext().asyncDb.transaction((tx) => peopleOn(tx, vehicle, detailed), {
+    behavior: 'deferred',
+  });
+  return c.json({ success: true, data: people });
+}
+
+async function peopleOn(
+  db: AsyncHandle,
+  vehicle: Resource & { kind: 'vehicle' },
+  detailed: boolean
+) {
+  const { vehicleId } = vehicle;
+  const owner = await db
     .select({ id: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
     .get();
-  const memberIds = db
+  const members = await db
     .select({ id: vehicleShares.sharedWithId })
     .from(vehicleShares)
-    .where(and(eq(vehicleShares.vehicleId, vehicleId), eq(vehicleShares.status, 'accepted')))
-    .all()
-    .flatMap((row) => (row.id ? [row.id] : []));
-  const people = db
+    .where(and(eq(vehicleShares.vehicleId, vehicleId), eq(vehicleShares.status, 'accepted')));
+  const memberIds = members.flatMap((row) => (row.id ? [row.id] : []));
+  const persons = await db
     .select({ id: users.id, displayName: users.displayName })
     .from(users)
-    .where(inArray(users.id, [owner?.id ?? '', ...memberIds]))
-    .all()
-    .map((person) => {
-      const heldRoles = db
-        .select({ id: roles.id, key: roles.key, name: roles.name, builtIn: roles.builtIn })
-        .from(roleAssignments)
-        .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
-        .where(and(eq(roleAssignments.userId, person.id), eq(roleAssignments.scopeId, vehicleId)))
-        .all();
-      const owned = person.id === owner?.id;
-      if (!detailed) {
-        return {
-          displayName: person.displayName,
-          owner: owned,
-          roles: heldRoles.map(({ name }) => ({ name })),
-        };
-      }
-      const resolver = syncResolverFor(db, person.id);
-      return {
-        userId: person.id,
+    .where(inArray(users.id, [owner?.id ?? '', ...memberIds]));
+  const people = [];
+  for (const person of persons) {
+    const heldRoles = await db
+      .select({ id: roles.id, key: roles.key, name: roles.name, builtIn: roles.builtIn })
+      .from(roleAssignments)
+      .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
+      .where(and(eq(roleAssignments.userId, person.id), eq(roleAssignments.scopeId, vehicleId)));
+    const owned = person.id === owner?.id;
+    if (!detailed) {
+      people.push({
         displayName: person.displayName,
         owner: owned,
-        roles: heldRoles,
-        overrides: db
-          .select({
-            permission: permissionOverrides.permission,
-            effect: permissionOverrides.effect,
-          })
-          .from(permissionOverrides)
-          .where(overrideWhere('vehicle', person.id, vehicleId))
-          .all(),
-        permissions: VEHICLE_PERMISSIONS.flatMap(({ id }) => {
-          const decision = resolver.can(id, vehicle);
-          return decision.allow
-            ? [{ permission: id, via: decision.via, roleIds: decision.roleIds }]
-            : [];
-        }),
-      };
+        roles: heldRoles.map(({ name }) => ({ name })),
+      });
+      continue;
+    }
+    const resolver = await resolverFor(person.id, [vehicle], db);
+    const overrides = await db
+      .select({ permission: permissionOverrides.permission, effect: permissionOverrides.effect })
+      .from(permissionOverrides)
+      .where(overrideWhere('vehicle', person.id, vehicleId));
+    people.push({
+      userId: person.id,
+      displayName: person.displayName,
+      owner: owned,
+      roles: heldRoles,
+      overrides,
+      permissions: VEHICLE_PERMISSIONS.flatMap(({ id }) => {
+        const decision = resolver.can(id, vehicle);
+        return decision.allow
+          ? [{ permission: id, via: decision.via, roleIds: decision.roleIds }]
+          : [];
+      }),
     });
-  return c.json({ success: true, data: people });
+  }
+  return people;
 }

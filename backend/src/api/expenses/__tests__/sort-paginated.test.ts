@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import type { AppDatabase } from '../../../db/connection';
 import type { NewExpense } from '../../../db/schema';
 import * as schema from '../../../db/schema';
@@ -30,7 +31,7 @@ beforeEach(() => {
   sqliteDb.run('PRAGMA foreign_keys = ON');
   for (const m of loadMigrations()) applyMigration(sqliteDb, m);
   db = drizzle(sqliteDb, { schema });
-  repo = new ExpenseRepository(db);
+  repo = new ExpenseRepository(openAsyncDatabase(db.$client).db);
   seed();
 });
 

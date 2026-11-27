@@ -1,6 +1,5 @@
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
-import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import {
   jsonArrayIsEmpty,
   jsonArraySome,
@@ -580,8 +579,8 @@ function itemsWhere(
 export class AnalyticsQueryRepository {
   private db: AsyncAppDatabase;
 
-  constructor(syncDb: AppDatabase) {
-    this.db = openAsyncDatabase(syncDb.$client).db;
+  constructor(db: AsyncAppDatabase) {
+    this.db = db;
   }
 
   async query(userId: string, query: AnalyticsQuery): Promise<AnalyticsQueryResult> {

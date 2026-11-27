@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
   createTestDb,
@@ -14,7 +15,7 @@ let repo: AnalyticsRepository;
 
 beforeEach(() => {
   testDb = createTestDb();
-  repo = new AnalyticsRepository(testDb.drizzle);
+  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 });
 
 afterEach(() => {

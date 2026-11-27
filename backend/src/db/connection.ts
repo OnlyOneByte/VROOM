@@ -6,7 +6,6 @@ import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { ensureServerAdmin } from '../api/signup/store';
 import { CONFIG } from '../config';
-import { handleDatabaseError, isAppError, isSyncError } from '../errors';
 import { syncBuiltInRoles } from '../permissions/grants';
 import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
@@ -43,24 +42,6 @@ export function getDb(): AppDatabase {
   return opened;
 }
 
-type AppTransaction = Parameters<AppDatabase['transaction']>[0] extends (tx: infer U) => unknown
-  ? U
-  : never;
-
-// bun:sqlite transactions must use a synchronous callback: an awaited statement autocommits on its own.
-export async function transaction<T>(
-  callback: (tx: AppTransaction) => T | Promise<T>,
-  database: AppDatabase = getDb()
-): Promise<T> {
-  try {
-    return (await database.transaction(callback as Parameters<AppDatabase['transaction']>[0])) as T;
-  } catch (error) {
-    if (isAppError(error) || isSyncError(error)) throw error;
-    logger.error('Transaction failed', { error });
-    throw handleDatabaseError(error);
-  }
-}
-
 export function foldUserEmailCase(database: AppDatabase): void {
   const folded = database.transaction((tx) => {
     const rows = tx
@@ -92,14 +73,15 @@ export function foldUserEmailCase(database: AppDatabase): void {
   if (folded > 0) logger.info(`Lowercased ${folded} user email(s)`);
 }
 
-export function runMigrations(): void {
+export async function runMigrations(): Promise<void> {
   try {
     logger.info('Running database migrations...');
     const db = getDb();
     migrate(db, { migrationsFolder: './drizzle' });
     foldUserEmailCase(db);
-    syncBuiltInRoles(db);
-    const admin = ensureServerAdmin(db);
+    const asyncDb = openAsyncDatabase(db.$client).db;
+    await syncBuiltInRoles(asyncDb);
+    const admin = await asyncDb.transaction((tx) => ensureServerAdmin(tx));
     if (admin) logger.info('Made the oldest eligible account the server admin', { userId: admin });
     logger.info('Database migrations completed successfully');
   } catch (error) {

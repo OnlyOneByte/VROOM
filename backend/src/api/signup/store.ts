@@ -1,7 +1,6 @@
 import { and, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { CONFIG } from '../../config';
-import type { AsyncAppDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncHandle } from '../../db/async-sqlite';
 import {
   roleAssignments,
   serverInvites,
@@ -9,13 +8,10 @@ import {
   users,
   vehicleShares,
 } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
 import { ConflictError, NotFoundError } from '../../errors';
 import { assignServerRole, builtInRoleId } from '../../permissions/grants';
 import { DEMO_USER_ID } from '../auth/demo-account';
 import { isSignupMode, parseDomains, type SignupMode } from './policy';
-
-type Db = AppDatabase | DrizzleTransaction;
 
 const SETTINGS_ROW = 1;
 
@@ -26,8 +22,12 @@ export interface SignupSettings {
   domainsLocked: boolean;
 }
 
-export function signupSettings(db: Db): SignupSettings {
-  const row = db.select().from(serverSettings).where(eq(serverSettings.id, SETTINGS_ROW)).get();
+export async function signupSettings(db: AsyncHandle): Promise<SignupSettings> {
+  const row = await db
+    .select()
+    .from(serverSettings)
+    .where(eq(serverSettings.id, SETTINGS_ROW))
+    .get();
   const stored = row && isSignupMode(row.signupMode) ? row.signupMode : 'invite';
   const envDomains = CONFIG.signup.allowedDomains;
   return {
@@ -38,16 +38,16 @@ export function signupSettings(db: Db): SignupSettings {
   };
 }
 
-export function ensureServerSettings(db: Db): void {
-  db.insert(serverSettings).values({ id: SETTINGS_ROW }).onConflictDoNothing().run();
+async function ensureServerSettings(db: AsyncHandle): Promise<void> {
+  await db.insert(serverSettings).values({ id: SETTINGS_ROW }).onConflictDoNothing();
 }
 
-export function updateSignupSettings(
-  db: Db,
+export async function updateSignupSettings(
+  tx: AsyncHandle,
   change: { mode?: SignupMode; allowedDomains?: string[] },
   actorId: string
-): SignupSettings {
-  const current = signupSettings(db);
+): Promise<SignupSettings> {
+  const current = await signupSettings(tx);
   if (change.mode !== undefined && current.modeLocked) {
     throw new ConflictError('The sign-up mode is set by SIGNUP_MODE on the server');
   }
@@ -56,8 +56,9 @@ export function updateSignupSettings(
       'Allowed email domains are set by SIGNUP_ALLOWED_DOMAINS on the server'
     );
   }
-  ensureServerSettings(db);
-  db.update(serverSettings)
+  await ensureServerSettings(tx);
+  await tx
+    .update(serverSettings)
     .set({
       ...(change.mode !== undefined && { signupMode: change.mode }),
       ...(change.allowedDomains !== undefined && {
@@ -66,52 +67,51 @@ export function updateSignupSettings(
       updatedAt: new Date(),
       updatedBy: actorId,
     })
-    .where(eq(serverSettings.id, SETTINGS_ROW))
-    .run();
-  return signupSettings(db);
+    .where(eq(serverSettings.id, SETTINGS_ROW));
+  return signupSettings(tx);
 }
 
-export function hasRealAccounts(db: Db): boolean {
-  return (
-    db.select({ id: users.id }).from(users).where(ne(users.id, DEMO_USER_ID)).get() !== undefined
-  );
+async function hasRealAccounts(db: AsyncHandle): Promise<boolean> {
+  const row = await db.select({ id: users.id }).from(users).where(ne(users.id, DEMO_USER_ID)).get();
+  return row !== undefined;
 }
 
-export function hasServerAdmin(db: Db): boolean {
-  return (
-    db
-      .select({ id: roleAssignments.id })
-      .from(roleAssignments)
-      .where(
-        and(eq(roleAssignments.roleId, builtInRoleId('admin')), isNull(roleAssignments.scopeId))
-      )
-      .get() !== undefined
-  );
+async function hasServerAdmin(db: AsyncHandle): Promise<boolean> {
+  const row = await db
+    .select({ id: roleAssignments.id })
+    .from(roleAssignments)
+    .where(and(eq(roleAssignments.roleId, builtInRoleId('admin')), isNull(roleAssignments.scopeId)))
+    .get();
+  return row !== undefined;
 }
 
-export function becomesFirstAdmin(db: Db, email: string): boolean {
-  if (hasServerAdmin(db)) return false;
+export async function becomesFirstAdmin(tx: AsyncHandle, email: string): Promise<boolean> {
+  if (await hasServerAdmin(tx)) return false;
   const listed = CONFIG.adminEmails;
-  return listed.length > 0 ? listed.includes(email.toLowerCase()) : !hasRealAccounts(db);
+  return listed.length > 0 ? listed.includes(email.toLowerCase()) : !(await hasRealAccounts(tx));
 }
 
-export function markAdminAssigned(db: Db, now: Date = new Date()): void {
-  ensureServerSettings(db);
-  db.update(serverSettings)
+export async function markAdminAssigned(tx: AsyncHandle, now: Date = new Date()): Promise<void> {
+  await ensureServerSettings(tx);
+  await tx
+    .update(serverSettings)
     .set({ adminAssignedAt: now })
-    .where(and(eq(serverSettings.id, SETTINGS_ROW), isNull(serverSettings.adminAssignedAt)))
-    .run();
+    .where(and(eq(serverSettings.id, SETTINGS_ROW), isNull(serverSettings.adminAssignedAt)));
 }
 
-export function ensureServerAdmin(db: Db): string | null {
-  const row = db.select().from(serverSettings).where(eq(serverSettings.id, SETTINGS_ROW)).get();
+export async function ensureServerAdmin(tx: AsyncHandle): Promise<string | null> {
+  const row = await tx
+    .select()
+    .from(serverSettings)
+    .where(eq(serverSettings.id, SETTINGS_ROW))
+    .get();
   if (!row || row.adminAssignedAt) return null;
-  if (hasServerAdmin(db)) {
-    markAdminAssigned(db);
+  if (await hasServerAdmin(tx)) {
+    await markAdminAssigned(tx);
     return null;
   }
   const listed = CONFIG.adminEmails;
-  const candidate = db
+  const candidate = await tx
     .select({ id: users.id })
     .from(users)
     .where(
@@ -125,8 +125,8 @@ export function ensureServerAdmin(db: Db): string | null {
     .orderBy(sql`${users.createdAt} IS NULL`, users.createdAt, users.id)
     .get();
   if (!candidate) return null;
-  assignServerRole(db, candidate.id, 'admin');
-  markAdminAssigned(db);
+  await assignServerRole(tx, candidate.id, 'admin');
+  await markAdminAssigned(tx);
   return candidate.id;
 }
 
@@ -141,7 +141,7 @@ export function inviteStatus(
   return invite.expiresAt <= now ? 'expired' : 'active';
 }
 
-export function activeInviteFor(db: Db, email: string, now: Date) {
+export function activeInviteFor(db: AsyncHandle, email: string, now: Date) {
   return db
     .select()
     .from(serverInvites)
@@ -156,16 +156,16 @@ export function activeInviteFor(db: Db, email: string, now: Date) {
     .get();
 }
 
-export function createInvite(
-  db: Db,
+export async function createInvite(
+  tx: AsyncHandle,
   input: { email: string; expiresInDays: number; createdBy: string },
   now: Date = new Date()
 ) {
   const email = input.email.trim().toLowerCase();
-  if (activeInviteFor(db, email, now)) {
+  if (await activeInviteFor(tx, email, now)) {
     throw new ConflictError('That email already has an open invite');
   }
-  return db
+  const [invite] = await tx
     .insert(serverInvites)
     .values({
       email,
@@ -173,37 +173,44 @@ export function createInvite(
       createdAt: now,
       expiresAt: new Date(now.getTime() + input.expiresInDays * 24 * 60 * 60 * 1000),
     })
-    .returning()
-    .get();
+    .returning();
+  if (!invite) throw new Error('Invite insert returned no row');
+  return invite;
 }
 
-export function listInvites(db: AsyncAppDatabase) {
+export function listInvites(db: AsyncHandle) {
   return db.select().from(serverInvites).orderBy(desc(serverInvites.createdAt));
 }
 
-export function revokeInvite(db: Db, id: string, now: Date = new Date()) {
-  const invite = db.select().from(serverInvites).where(eq(serverInvites.id, id)).get();
+export async function revokeInvite(tx: AsyncHandle, id: string, now: Date = new Date()) {
+  const invite = await tx.select().from(serverInvites).where(eq(serverInvites.id, id)).get();
   if (!invite) throw new NotFoundError('Invite');
   if (inviteStatus(invite, now) !== 'active') {
     throw new ConflictError('Only an open invite can be revoked');
   }
-  return db
+  const [revoked] = await tx
     .update(serverInvites)
     .set({ revokedAt: now })
     .where(eq(serverInvites.id, id))
-    .returning()
-    .get();
+    .returning();
+  if (!revoked) throw new NotFoundError('Invite');
+  return revoked;
 }
 
-export function consumeInvite(db: Db, id: string, userId: string, now: Date): void {
-  db.update(serverInvites)
+export async function consumeInvite(
+  tx: AsyncHandle,
+  id: string,
+  userId: string,
+  now: Date
+): Promise<void> {
+  await tx
+    .update(serverInvites)
     .set({ usedAt: now, usedBy: userId })
-    .where(and(eq(serverInvites.id, id), isNull(serverInvites.usedAt)))
-    .run();
+    .where(and(eq(serverInvites.id, id), isNull(serverInvites.usedAt)));
 }
 
-export function hasShareInvite(db: Db, email: string): boolean {
-  const row = db
+export async function hasShareInvite(db: AsyncHandle, email: string): Promise<boolean> {
+  const row = await db
     .select({ id: vehicleShares.id })
     .from(vehicleShares)
     .innerJoin(users, eq(users.id, vehicleShares.ownerId))
@@ -221,7 +228,7 @@ export function hasShareInvite(db: Db, email: string): boolean {
   return row !== undefined;
 }
 
-export function pendingAccounts(db: AsyncAppDatabase) {
+export function pendingAccounts(db: AsyncHandle) {
   return db
     .select({
       id: users.id,

@@ -15,8 +15,7 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
-import { openAsyncDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import {
   countNum,
   formatYearMonth,
@@ -27,8 +26,13 @@ import {
 } from '../../db/dialect';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, odometerEntries, photos, vehicles } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
-import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '../../errors';
+import {
+  ConflictError,
+  DatabaseError,
+  ExpenseChangedError,
+  NotFoundError,
+  ValidationError,
+} from '../../errors';
 import { zonedCalendar } from '../../utils/analytics-charts';
 import { getPeriodStartDate } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
@@ -37,6 +41,7 @@ import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
 import { expenseSplitService } from './split-service';
+import { latestOf, nextUpdatedAt, nextUpdatedAtFor } from './updated-at';
 import {
   type OdometerCheck,
   type OdometerNeighbours,
@@ -76,9 +81,15 @@ const EXPENSE_SORT_COLUMNS = {
   category: expenses.category,
 } as const;
 
+function assertNotChanged(stored: Date | null, expected: Date | undefined): void {
+  if (expected && stored?.getTime() !== expected.getTime()) {
+    throw new ExpenseChangedError(stored);
+  }
+}
+
 interface Readings {
-  at(tx: DrizzleTransaction, bound: 'before' | 'after', edge: Date): Date | null;
-  bound(tx: DrizzleTransaction, kind: 'max' | 'min', from: Date, to: Date): number | null;
+  at(tx: AsyncHandle, bound: 'before' | 'after', edge: Date): Promise<Date | null>;
+  bound(tx: AsyncHandle, kind: 'max' | 'min', from: Date, to: Date): Promise<number | null>;
 }
 
 function expenseReadings(vehicleId: string, excludeId?: string): Readings {
@@ -90,20 +101,24 @@ function expenseReadings(vehicleId: string, excludeId?: string): Readings {
       excludeId ? ne(expenses.id, excludeId) : undefined
     );
   return {
-    at: (tx, side, edge) =>
-      tx
+    at: async (tx, side, edge) => {
+      const row = await tx
         .select({ date: expenses.date })
         .from(expenses)
         .where(where(side === 'before' ? lt(expenses.date, edge) : gte(expenses.date, edge)))
         .orderBy(side === 'before' ? desc(expenses.date) : asc(expenses.date))
         .limit(1)
-        .get()?.date ?? null,
-    bound: (tx, kind, from, to) =>
-      tx
+        .get();
+      return row?.date ?? null;
+    },
+    bound: async (tx, kind, from, to) => {
+      const row = await tx
         .select({ value: kind === 'max' ? max(expenses.mileage) : min(expenses.mileage) })
         .from(expenses)
         .where(where(gte(expenses.date, from), lt(expenses.date, to)))
-        .get()?.value ?? null,
+        .get();
+      return row?.value ?? null;
+    },
   };
 }
 
@@ -116,22 +131,26 @@ function manualReadings(vehicleId: string, excludeId?: string): Readings {
     );
   const at = odometerEntries.recordedAt;
   return {
-    at: (tx, side, edge) =>
-      tx
+    at: async (tx, side, edge) => {
+      const row = await tx
         .select({ date: at })
         .from(odometerEntries)
         .where(where(side === 'before' ? lt(at, edge) : gte(at, edge)))
         .orderBy(side === 'before' ? desc(at) : asc(at))
         .limit(1)
-        .get()?.date ?? null,
-    bound: (tx, kind, from, to) =>
-      tx
+        .get();
+      return row?.date ?? null;
+    },
+    bound: async (tx, kind, from, to) => {
+      const row = await tx
         .select({
           value: kind === 'max' ? max(odometerEntries.odometer) : min(odometerEntries.odometer),
         })
         .from(odometerEntries)
         .where(where(gte(at, from), lt(at, to)))
-        .get()?.value ?? null,
+        .get();
+      return row?.value ?? null;
+    },
   };
 }
 
@@ -141,41 +160,48 @@ function pick(values: (number | null)[], kind: 'max' | 'min'): number | null {
   return kind === 'max' ? Math.max(...present) : Math.min(...present);
 }
 
-function odometerNeighbours(
-  tx: DrizzleTransaction,
+async function inTurn<T, R>(items: T[], each: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (const item of items) results.push(await each(item));
+  return results;
+}
+
+async function odometerNeighbours(
+  tx: AsyncHandle,
   { vehicleId, date, timeZone, excludeId }: OdometerCheck
-): OdometerNeighbours {
+): Promise<OdometerNeighbours> {
   const sources = [expenseReadings(vehicleId, excludeId), manualReadings(vehicleId, excludeId)];
   const day = zonedDayWindow(date, timeZone);
-  const nearest = (side: 'before' | 'after') => {
-    const times = sources
-      .map((s) => s.at(tx, side, side === 'before' ? day.dayStart : day.nextDay)?.getTime())
+  const nearest = async (side: 'before' | 'after') => {
+    const edge = side === 'before' ? day.dayStart : day.nextDay;
+    const times = (await inTurn(sources, (s) => s.at(tx, side, edge)))
+      .map((at) => at?.getTime())
       .filter((t): t is number => t != null);
     if (times.length === 0) return null;
     const time = side === 'before' ? Math.max(...times) : Math.min(...times);
     return zonedDayWindow(new Date(time), timeZone);
   };
-  const earlierDay = nearest('before');
-  const laterDay = nearest('after');
+  const earlierDay = await nearest('before');
+  const laterDay = await nearest('after');
   return {
     before: earlierDay
       ? pick(
-          sources.map((s) => s.bound(tx, 'max', earlierDay.dayStart, day.dayStart)),
+          await inTurn(sources, (s) => s.bound(tx, 'max', earlierDay.dayStart, day.dayStart)),
           'max'
         )
       : null,
     after: laterDay
-      ? pick(
-          sources.map((s) => s.bound(tx, 'min', day.nextDay, laterDay.nextDay)),
-          'min'
-        )
+      ? pick(await inTurn(sources, (s) => s.bound(tx, 'min', day.nextDay, laterDay.nextDay)), 'min')
       : null,
   };
 }
 
-export function assertOdometerInOrder(tx: DrizzleTransaction, check: OdometerCheck | null): void {
+export async function assertOdometerInOrder(
+  tx: AsyncHandle,
+  check: OdometerCheck | null
+): Promise<void> {
   if (!check) return;
-  const neighbours = odometerNeighbours(tx, check);
+  const neighbours = await odometerNeighbours(tx, check);
   const error = odometerOrderError(check.mileage, neighbours, check.initialMileage);
   if (error) throw new ValidationError(error);
 }
@@ -364,12 +390,12 @@ function replayFor(existing: Expense, vehicleId: string): Expense {
 }
 
 export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
-  constructor(private syncDb: AppDatabase) {
-    super(openAsyncDatabase(syncDb.$client).db, expenses);
+  constructor(db: AsyncAppDatabase) {
+    super(db, expenses);
   }
 
   async findByIdAndUserId(id: string, userId: string): Promise<Expense | null> {
-    const result = await this.syncDb
+    const result = await this.db
       .select()
       .from(expenses)
       .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
@@ -386,7 +412,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async findBySource(sourceType: string, sourceId: string, userId: string): Promise<Expense[]> {
-    return this.syncDb
+    return this.db
       .select()
       .from(expenses)
       .where(this.sourceScope(sourceType, sourceId, userId))
@@ -402,7 +428,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async findIdsByGroupId(groupId: string, userId: string): Promise<string[]> {
-    const rows = await this.syncDb
+    const rows = await this.db
       .select({ id: expenses.id })
       .from(expenses)
       .where(this.groupOwnedBy(groupId, userId));
@@ -415,7 +441,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     authors: (string | null)[];
     sourceType: string | null;
   } | null> {
-    const rows = await this.syncDb
+    const rows = await this.db
       .select({
         vehicleId: expenses.vehicleId,
         userId: expenses.userId,
@@ -434,7 +460,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async findByClientId(clientId: string, userId: string): Promise<Expense | null> {
-    const result = await this.syncDb
+    const result = await this.db
       .select()
       .from(expenses)
       .where(and(eq(expenses.clientId, clientId), eq(expenses.userId, userId)))
@@ -453,17 +479,19 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   ): Promise<Expense> {
     const { clientId, userId } = data;
     try {
-      return this.syncDb.transaction((tx) => {
+      return await this.db.transaction(async (tx) => {
         if (clientId) {
-          const existing = tx
+          const existing = await tx
             .select()
             .from(expenses)
             .where(and(eq(expenses.clientId, clientId), eq(expenses.userId, userId)))
             .get();
           if (existing) return replayFor(existing, data.vehicleId);
         }
-        assertOdometerInOrder(tx, odometer);
-        return tx.insert(expenses).values(data).returning().get();
+        await assertOdometerInOrder(tx, odometer);
+        const [created] = await tx.insert(expenses).values(data).returning();
+        if (!created) throw new Error('Expense insert returned no row');
+        return created;
       });
     } catch (error) {
       if (!clientId || error instanceof ValidationError || error instanceof ConflictError)
@@ -477,38 +505,63 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async update(
     id: string,
     data: Partial<NewExpense>,
-    odometer: OdometerCheck | null = null
+    odometer: OdometerCheck | null = null,
+    expectedUpdatedAt?: Date
   ): Promise<Expense> {
-    return this.syncDb.transaction((tx) => {
-      assertOdometerInOrder(tx, odometer);
-      const updated = tx
+    return this.db.transaction(async (tx) => {
+      const storedVersion = async () => {
+        const [row] = await tx
+          .select({ updatedAt: expenses.updatedAt, groupId: expenses.groupId })
+          .from(expenses)
+          .where(eq(expenses.id, id));
+        return row;
+      };
+      const current = await storedVersion();
+      if (!current) throw new NotFoundError('Resource');
+      assertNotChanged(current.updatedAt, expectedUpdatedAt);
+      await assertOdometerInOrder(tx, odometer);
+      const legTimes = current.groupId
+        ? (
+            await tx
+              .select({ updatedAt: expenses.updatedAt })
+              .from(expenses)
+              .where(eq(expenses.groupId, current.groupId))
+          ).map((leg) => leg.updatedAt)
+        : [];
+      const [updated] = await tx
         .update(expenses)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(expenses.id, id))
-        .returning()
-        .get();
-      if (!updated) throw new NotFoundError('Resource');
+        .set({ ...data, updatedAt: nextUpdatedAt([current.updatedAt, ...legTimes]) })
+        .where(
+          and(
+            eq(expenses.id, id),
+            expectedUpdatedAt ? eq(expenses.updatedAt, expectedUpdatedAt) : undefined
+          )
+        )
+        .returning();
+      if (!updated) {
+        const now = await storedVersion();
+        if (!now) throw new NotFoundError('Resource');
+        throw new ExpenseChangedError(now.updatedAt);
+      }
       return updated;
     });
   }
 
-  // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
   async importExpenses(
     rows: NewExpense[],
     userId: string
   ): Promise<{ imported: number; duplicates: number }> {
     if (rows.length === 0) return { imported: 0, duplicates: 0 };
     try {
-      const present = await this.syncDb
-        .select({ clientId: expenses.clientId })
-        .from(expenses)
-        .where(and(eq(expenses.userId, userId), isNotNull(expenses.clientId)));
-      const seenClientIds = new Set<string>();
-      for (const row of present) {
-        if (row.clientId) seenClientIds.add(row.clientId);
-      }
-
-      return this.syncDb.transaction((tx) => {
+      return await this.db.transaction(async (tx) => {
+        const present = await tx
+          .select({ clientId: expenses.clientId })
+          .from(expenses)
+          .where(and(eq(expenses.userId, userId), isNotNull(expenses.clientId)));
+        const seenClientIds = new Set<string>();
+        for (const row of present) {
+          if (row.clientId) seenClientIds.add(row.clientId);
+        }
         let imported = 0;
         let duplicates = 0;
         for (const row of rows) {
@@ -516,9 +569,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             duplicates += 1;
             continue;
           }
-          tx.insert(expenses)
-            .values({ ...row, userId })
-            .run();
+          await tx.insert(expenses).values({ ...row, userId });
           if (row.clientId) seenClientIds.add(row.clientId);
           imported += 1;
         }
@@ -542,7 +593,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const baseWhere = and(eq(expenses.userId, filters.userId ?? ''), ...conditions);
 
-      const [countResult] = await this.syncDb
+      const [countResult] = await this.db
         .select({ count: countNum() })
         .from(expenses)
         .where(baseWhere);
@@ -551,7 +602,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const sortColumn = EXPENSE_SORT_COLUMNS[filters.sortBy ?? 'date'];
       const dir = filters.sortDir === 'asc' ? asc : desc;
-      const data = await this.syncDb
+      const data = await this.db
         .select()
         .from(expenses)
         .where(baseWhere)
@@ -576,7 +627,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     try {
       const conditions = buildExpenseConditions(filters);
 
-      const result = await this.syncDb
+      const result = await this.db
         .select()
         .from(expenses)
         .where(and(eq(expenses.userId, filters.userId ?? ''), ...conditions))
@@ -595,7 +646,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async getMonthlyTotals(
     filters: ExpenseFilters
   ): Promise<Array<{ month: string; amount: number; count: number }>> {
-    const rows = await this.syncDb
+    const rows = await this.db
       .select({ date: expenses.date, amount: expenses.expenseAmount })
       .from(expenses)
       .where(and(eq(expenses.userId, filters.userId ?? ''), ...buildExpenseConditions(filters)));
@@ -617,7 +668,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     where: SQL | undefined,
     timeZone: string
   ): Promise<Array<{ period: string; amount: number; count: number }>> {
-    const rows = await this.syncDb
+    const rows = await this.db
       .select({ date: expenses.date, amount: expenses.expenseAmount })
       .from(expenses)
       .where(where);
@@ -659,7 +710,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
       const [totals, categoryBreakdown, monthlyTrend, recentTotals, costBuckets] =
         await Promise.all([
-          this.syncDb
+          this.db
             .select({
               totalAmount: sumNum(expenses.expenseAmount),
               expenseCount: countNum(),
@@ -667,7 +718,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             .from(expenses)
             .where(periodWhere),
 
-          this.syncDb
+          this.db
             .select({
               category: expenses.category,
               amount: sumNum(expenses.expenseAmount),
@@ -679,7 +730,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
           filters.timeZone
             ? this.zonedMonthlyTrend(periodWhere, filters.timeZone)
-            : this.syncDb
+            : this.db
                 .select({
                   period: formatYearMonth(expenses.date).as('period'),
                   amount: sumNum(expenses.expenseAmount),
@@ -690,7 +741,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
                 .groupBy(formatYearMonth(expenses.date))
                 .orderBy(formatYearMonth(expenses.date)),
 
-          this.syncDb
+          this.db
             .select({
               amount: sumNum(expenses.expenseAmount),
             })
@@ -748,7 +799,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     const bucketSum = (when: SQL) =>
       sumNum(sql`CASE WHEN ${when} THEN ${expenses.expenseAmount} ELSE 0 END`);
 
-    const rows = await this.syncDb
+    const rows = await this.db
       .select({
         vehicleId: expenses.vehicleId,
         ownershipTotal: bucketSum(sql`${inCurrent} AND ${isOwnership}`),
@@ -783,25 +834,19 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   // photo-service imports this module, so receipt file removal has to stay with the caller.
   async deleteBySource(sourceType: string, sourceId: string, userId: string): Promise<number> {
     try {
-      const linked = await this.syncDb
-        .select({ id: expenses.id })
-        .from(expenses)
-        .where(this.sourceScope(sourceType, sourceId, userId));
-
-      if (linked.length === 0) return 0;
-
-      const linkedIds = linked.map((e) => e.id);
-
-      this.syncDb.transaction((tx) => {
-        tx.delete(photos)
-          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)))
-          .run();
-        tx.delete(expenses)
-          .where(this.sourceScope(sourceType, sourceId, userId))
-          .run();
+      return await this.db.transaction(async (tx) => {
+        const linked = await tx
+          .select({ id: expenses.id })
+          .from(expenses)
+          .where(this.sourceScope(sourceType, sourceId, userId));
+        if (linked.length === 0) return 0;
+        const linkedIds = linked.map((e) => e.id);
+        await tx
+          .delete(photos)
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, linkedIds)));
+        await tx.delete(expenses).where(this.sourceScope(sourceType, sourceId, userId));
+        return linked.length;
       });
-
-      return linked.length;
     } catch (error) {
       logger.error('Failed to delete expenses by source', {
         sourceType,
@@ -814,11 +859,14 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
   async clearSource(sourceType: string, sourceId: string, userId: string): Promise<number> {
     try {
-      const result = await this.syncDb
-        .update(expenses)
-        .set({ sourceType: null, sourceId: null })
-        .where(this.sourceScope(sourceType, sourceId, userId))
-        .returning();
+      const scope = this.sourceScope(sourceType, sourceId, userId);
+      const result = await this.db.transaction(async (tx) =>
+        tx
+          .update(expenses)
+          .set({ sourceType: null, sourceId: null, updatedAt: await nextUpdatedAtFor(tx, scope) })
+          .where(scope)
+          .returning({ id: expenses.id })
+      );
 
       return result.length;
     } catch (error) {
@@ -859,11 +907,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       );
       const splitMethod: SplitMethod = data.splitConfig.method;
 
-      // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
-      return this.syncDb.transaction((tx) => {
+      return await this.db.transaction(async (tx) => {
         const groupId = createId();
 
-        return expenseSplitService.createSiblingsSync(tx, {
+        return expenseSplitService.createSiblings(tx, {
           groupId,
           userId: ownerId,
           createdBy,
@@ -890,7 +937,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async getSplitExpense(groupId: string, userId: string): Promise<Expense[]> {
-    const siblings = await this.syncDb
+    const siblings = await this.db
       .select()
       .from(expenses)
       .where(this.groupOwnedBy(groupId, userId));
@@ -903,26 +950,21 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   }
 
   async deleteSplitExpense(groupId: string, userId: string): Promise<void> {
-    const siblings = await this.syncDb
-      .select({ id: expenses.id })
-      .from(expenses)
-      .where(this.groupOwnedBy(groupId, userId));
-
-    if (siblings.length === 0) {
-      throw new NotFoundError('Split expense');
-    }
-
-    const siblingIds = siblings.map((s) => s.id);
-
     try {
-      this.syncDb.transaction((tx) => {
-        tx.delete(photos)
-          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)))
-          .run();
-
-        tx.delete(expenses).where(this.groupOwnedBy(groupId, userId)).run();
+      await this.db.transaction(async (tx) => {
+        const siblings = await tx
+          .select({ id: expenses.id })
+          .from(expenses)
+          .where(this.groupOwnedBy(groupId, userId));
+        if (siblings.length === 0) throw new NotFoundError('Split expense');
+        const siblingIds = siblings.map((s) => s.id);
+        await tx
+          .delete(photos)
+          .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, siblingIds)));
+        await tx.delete(expenses).where(this.groupOwnedBy(groupId, userId));
       });
     } catch (error) {
+      if (error instanceof NotFoundError) throw error;
       logger.error('Failed to delete split expense', {
         groupId,
         error: error instanceof Error ? error.message : String(error),
@@ -934,37 +976,39 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
   async updateSplitExpense(
     groupId: string,
     data: { splitConfig: SplitConfig; totalAmount?: number },
-    userId: string
+    userId: string,
+    expectedUpdatedAt?: Date
   ): Promise<Expense[]> {
     try {
-      // bun:sqlite transactions must stay synchronous; an async callback autocommits each insert alone.
-      return this.syncDb.transaction((tx) => {
-        const [firstOld, ...restOld] = tx
+      return await this.db.transaction(async (tx) => {
+        const [firstOld, ...restOld] = await tx
           .select()
           .from(expenses)
           .where(this.groupOwnedBy(groupId, userId))
-          .orderBy(asc(expenses.createdAt), asc(expenses.id))
-          .all();
+          .orderBy(asc(expenses.createdAt), asc(expenses.id));
         if (!firstOld) {
           throw new NotFoundError('Split expense');
         }
+        const legTimes = [firstOld, ...restOld].map((leg) => leg.updatedAt);
+        assertNotChanged(latestOf(legTimes), expectedUpdatedAt);
 
         const totalAmount =
           data.splitConfig.method === 'absolute'
             ? data.splitConfig.allocations.reduce((sum, a) => sum + a.amount, 0)
             : (data.totalAmount ?? firstOld.groupTotal ?? firstOld.expenseAmount);
 
-        return expenseSplitService.updateSiblingsSync(tx, {
+        return expenseSplitService.updateSiblings(tx, {
           groupId,
           existing: [firstOld, ...restOld],
           createdBy: firstOld.createdBy,
           splitMethod: data.splitConfig.method,
           groupTotal: totalAmount,
           allocations: expenseSplitService.computeAllocations(data.splitConfig, totalAmount),
+          updatedAt: nextUpdatedAt(legTimes),
         });
       });
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError || error instanceof ExpenseChangedError) throw error;
       logger.error('Failed to update split expense', {
         groupId,
         error: error instanceof Error ? error.message : String(error),

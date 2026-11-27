@@ -58,7 +58,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   bucket = new FakeStorageProvider();
   createInstance = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockImplementation(
-    () => bucket
+    async () => bucket
   );
   encrypt = (await import('../../../utils/encryption')).encrypt;
   seedProvider('p-s3', 's3');

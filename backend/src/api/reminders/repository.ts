@@ -1,11 +1,8 @@
 import { and, desc, eq, inArray, isNotNull, isNull, lte, ne, type SQL } from 'drizzle-orm';
 import { CONFIG } from '../../config';
-import { openAsyncDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
-import { transaction } from '../../db/connection';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import type { NewReminder, Reminder, ReminderNotification } from '../../db/schema';
 import { reminderNotifications, reminders, reminderVehicles } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
@@ -23,30 +20,25 @@ interface ReminderFilters {
 }
 
 export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
-  constructor(private syncDb: AppDatabase) {
-    super(openAsyncDatabase(syncDb.$client).db, reminders);
+  constructor(db: AsyncAppDatabase) {
+    super(db, reminders);
   }
 
-  private getVehicleIdsSync(
-    handle: AppDatabase | DrizzleTransaction,
-    reminderId: string
-  ): string[] {
-    return handle
+  private async getVehicleIds(handle: AsyncHandle, reminderId: string): Promise<string[]> {
+    const rows = await handle
       .select({ vehicleId: reminderVehicles.vehicleId })
       .from(reminderVehicles)
-      .where(eq(reminderVehicles.reminderId, reminderId))
-      .all()
-      .map((r) => r.vehicleId);
+      .where(eq(reminderVehicles.reminderId, reminderId));
+    return rows.map((r) => r.vehicleId);
   }
 
-  // bun:sqlite: an async transaction callback autocommits each write, so keep this synchronous.
-  private insertVehicleJunctionsSync(
-    tx: DrizzleTransaction,
+  private async insertVehicleJunctions(
+    tx: AsyncHandle,
     reminderId: string,
     vehicleIds: string[]
-  ): void {
+  ): Promise<void> {
     for (const vehicleId of vehicleIds) {
-      tx.insert(reminderVehicles).values({ reminderId, vehicleId }).run();
+      await tx.insert(reminderVehicles).values({ reminderId, vehicleId });
     }
   }
 
@@ -54,7 +46,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     const map = new Map<string, string[]>();
     if (reminderIds.length === 0) return map;
 
-    const rows = await this.syncDb
+    const rows = await this.db
       .select({
         reminderId: reminderVehicles.reminderId,
         vehicleId: reminderVehicles.vehicleId,
@@ -94,14 +86,14 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       let reminderList: Reminder[];
 
       if (filters?.vehicleId) {
-        const rows = await this.syncDb
+        const rows = await this.db
           .select({ reminder: reminders })
           .from(reminders)
           .innerJoin(reminderVehicles, eq(reminders.id, reminderVehicles.reminderId))
           .where(and(...conditions, eq(reminderVehicles.vehicleId, filters.vehicleId)));
         reminderList = rows.map((r) => r.reminder);
       } else {
-        reminderList = await this.syncDb
+        reminderList = await this.db
           .select()
           .from(reminders)
           .where(and(...conditions));
@@ -118,7 +110,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   async findByIdAndUserId(id: string, userId: string): Promise<ReminderWithVehicles | null> {
-    const result = await this.syncDb
+    const result = await this.db
       .select()
       .from(reminders)
       .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
@@ -127,22 +119,22 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     const reminder = result[0];
     if (!reminder) return null;
 
-    const vehicleIds = this.getVehicleIdsSync(this.syncDb, id);
+    const vehicleIds = await this.getVehicleIds(this.db, id);
     return { reminder, vehicleIds };
   }
 
   // Unscoped by user: callers must authorize against the returned vehicleIds.
   async findByIdWithVehicles(id: string): Promise<ReminderWithVehicles | null> {
-    const result = await this.syncDb.select().from(reminders).where(eq(reminders.id, id)).limit(1);
+    const result = await this.db.select().from(reminders).where(eq(reminders.id, id)).limit(1);
     const reminder = result[0];
     if (!reminder) return null;
-    const vehicleIds = this.getVehicleIdsSync(this.syncDb, id);
+    const vehicleIds = await this.getVehicleIds(this.db, id);
     return { reminder, vehicleIds };
   }
 
   async findOverdue(userId: string, now: Date): Promise<ReminderWithVehicles[]> {
     try {
-      const reminderList = await this.syncDb
+      const reminderList = await this.db
         .select()
         .from(reminders)
         .where(
@@ -165,7 +157,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
 
   async findMileageTracking(userId: string): Promise<ReminderWithVehicles[]> {
     try {
-      const reminderList = await this.syncDb
+      const reminderList = await this.db
         .select()
         .from(reminders)
         .where(
@@ -193,7 +185,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     dueOdometer: number
   ): Promise<ReminderNotification | null> {
     try {
-      const [created] = await this.syncDb
+      const [created] = await this.db
         .insert(reminderNotifications)
         .values({ reminderId, userId, dueDate: null, dueOdometer, isRead: false })
         .returning();
@@ -208,13 +200,12 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
 
   async createWithVehicles(data: NewReminder, vehicleIds: string[]): Promise<ReminderWithVehicles> {
     try {
-      return transaction((tx) => {
-        const reminder = tx.insert(reminders).values(data).returning().get();
-
-        this.insertVehicleJunctionsSync(tx, reminder.id, vehicleIds);
-
+      return await this.db.transaction(async (tx) => {
+        const [reminder] = await tx.insert(reminders).values(data).returning();
+        if (!reminder) throw new Error('Reminder insert returned no row');
+        await this.insertVehicleJunctions(tx, reminder.id, vehicleIds);
         return { reminder, vehicleIds };
-      }, this.syncDb);
+      });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
       logger.error('Failed to create reminder with vehicles', {
@@ -231,33 +222,21 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     vehicleIds?: string[]
   ): Promise<ReminderWithVehicles> {
     try {
-      return transaction((tx) => {
-        const existing = tx
-          .select()
-          .from(reminders)
-          .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
-          .limit(1)
-          .all();
-
-        if (existing.length === 0) {
-          throw new NotFoundError('Reminder');
-        }
-
-        const updateData = { ...data, updatedAt: new Date() };
-        const reminder = tx
+      return await this.db.transaction(async (tx) => {
+        const [reminder] = await tx
           .update(reminders)
-          .set(updateData)
-          .where(eq(reminders.id, id))
-          .returning()
-          .get();
+          .set({ ...data, updatedAt: new Date() })
+          .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
+          .returning();
+        if (!reminder) throw new NotFoundError('Reminder');
 
         if (vehicleIds) {
-          tx.delete(reminderVehicles).where(eq(reminderVehicles.reminderId, id)).run();
-          this.insertVehicleJunctionsSync(tx, id, vehicleIds);
+          await tx.delete(reminderVehicles).where(eq(reminderVehicles.reminderId, id));
+          await this.insertVehicleJunctions(tx, id, vehicleIds);
         }
 
-        return { reminder, vehicleIds: vehicleIds ?? this.getVehicleIdsSync(tx, id) };
-      }, this.syncDb);
+        return { reminder, vehicleIds: vehicleIds ?? (await this.getVehicleIds(tx, id)) };
+      });
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
       logger.error('Failed to update reminder with vehicles', {
@@ -273,38 +252,36 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     expectedCurrentDueDate: Date,
     nextDueDate: Date
   ): Promise<void> {
-    await this.syncDb
+    await this.db
       .update(reminders)
       .set({ nextDueDate, updatedAt: new Date() })
       .where(and(eq(reminders.id, id), eq(reminders.nextDueDate, expectedCurrentDueDate)));
   }
 
-  // bun:sqlite: awaited statements inside a transaction autocommit separately, so keep this synchronous.
-  claimPeriodSync(
-    tx: DrizzleTransaction,
+  async claimPeriod(
+    tx: AsyncHandle,
     id: string,
     expectedCurrentDueDate: Date,
     nextDueDate: Date,
     lastTriggeredAt: Date
-  ): boolean {
-    const claimed = tx
+  ): Promise<Reminder | null> {
+    const [claimed] = await tx
       .update(reminders)
       .set({ nextDueDate, lastTriggeredAt, updatedAt: new Date() })
       .where(and(eq(reminders.id, id), eq(reminders.nextDueDate, expectedCurrentDueDate)))
-      .returning({ id: reminders.id })
-      .all();
-    return claimed.length > 0;
+      .returning();
+    return claimed ?? null;
   }
 
   async deactivate(id: string, userId: string): Promise<void> {
-    await this.syncDb
+    await this.db
       .update(reminders)
       .set({ isActive: false, updatedAt: new Date() })
       .where(and(eq(reminders.id, id), eq(reminders.userId, userId)));
   }
 
   async deleteOwned(id: string, userId: string): Promise<void> {
-    const result = await this.syncDb
+    const result = await this.db
       .delete(reminders)
       .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
       .returning({ id: reminders.id });
@@ -312,7 +289,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   async deactivateVehicleless(userId: string): Promise<number> {
-    const orphanRows = await this.syncDb
+    const orphanRows = await this.db
       .select({ id: reminders.id })
       .from(reminders)
       .leftJoin(reminderVehicles, eq(reminders.id, reminderVehicles.reminderId))
@@ -325,7 +302,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       );
     const ids = orphanRows.map((r) => r.id);
     if (ids.length === 0) return 0;
-    await this.syncDb
+    await this.db
       .update(reminders)
       .set({ isActive: false, updatedAt: new Date() })
       .where(and(eq(reminders.userId, userId), inArray(reminders.id, ids)));
@@ -337,29 +314,31 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     userId: string,
     deletedVehicleId: string
   ): Promise<number> {
-    const rows = await this.syncDb
-      .select({ id: reminders.id, expenseSplitConfig: reminders.expenseSplitConfig })
-      .from(reminders)
-      .where(and(eq(reminders.userId, userId), isNotNull(reminders.expenseSplitConfig)));
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ id: reminders.id, expenseSplitConfig: reminders.expenseSplitConfig })
+        .from(reminders)
+        .where(and(eq(reminders.userId, userId), isNotNull(reminders.expenseSplitConfig)));
 
-    let changed = 0;
-    for (const row of rows) {
-      const config = row.expenseSplitConfig;
-      if (!config) continue;
-      const pruned = pruneVehicleFromSplitConfig(config, deletedVehicleId);
-      if (pruned === config) continue;
-      const absoluteTotal = absoluteTotalAfterPrune(config, deletedVehicleId);
-      await this.syncDb
-        .update(reminders)
-        .set({
-          expenseSplitConfig: pruned,
-          ...(absoluteTotal === null ? {} : { expenseAmount: absoluteTotal }),
-          updatedAt: new Date(),
-        })
-        .where(and(eq(reminders.id, row.id), eq(reminders.userId, userId)));
-      changed++;
-    }
-    return changed;
+      let changed = 0;
+      for (const row of rows) {
+        const config = row.expenseSplitConfig;
+        if (!config) continue;
+        const pruned = pruneVehicleFromSplitConfig(config, deletedVehicleId);
+        if (pruned === config) continue;
+        const absoluteTotal = absoluteTotalAfterPrune(config, deletedVehicleId);
+        await tx
+          .update(reminders)
+          .set({
+            expenseSplitConfig: pruned,
+            ...(absoluteTotal === null ? {} : { expenseAmount: absoluteTotal }),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(reminders.id, row.id), eq(reminders.userId, userId)));
+        changed++;
+      }
+      return changed;
+    });
   }
 
   async markServiced(
@@ -371,7 +350,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       nextDueDate?: Date | null;
     }
   ): Promise<Reminder> {
-    const result = await this.syncDb
+    const result = await this.db
       .update(reminders)
       .set({ ...fields, lastTriggeredAt: new Date(), updatedAt: new Date() })
       .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
@@ -389,7 +368,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         conditions.push(eq(reminderNotifications.isRead, false));
       }
 
-      return await this.syncDb
+      return await this.db
         .select()
         .from(reminderNotifications)
         .where(and(...conditions))
@@ -406,7 +385,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
   }
 
   async markNotificationRead(id: string, userId: string): Promise<void> {
-    const result = await this.syncDb
+    const result = await this.db
       .update(reminderNotifications)
       .set({ isRead: true, updatedAt: new Date() })
       .where(and(eq(reminderNotifications.id, id), eq(reminderNotifications.userId, userId)))

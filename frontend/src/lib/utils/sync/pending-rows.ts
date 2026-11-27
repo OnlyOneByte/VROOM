@@ -6,6 +6,7 @@ export interface PendingRowState {
 	status: 'saving' | 'failed';
 	kind?: 'delete' | 'edit';
 	error?: string;
+	conflict?: boolean;
 	editable?: boolean;
 	reachedServer?: boolean;
 }

@@ -179,11 +179,13 @@ routes.post('/', zValidator('json', createPolicySchema), authorize(ownAccount), 
   for (const term of data.terms) {
     assertTermPremiumWithinCap({ ...term, totalCost: term.totalCost ?? 0 }, scale);
   }
-  const policy = await repos().insurancePolicies.create(data, user.id);
+  const policy = await repos().preferences.writeAtScale(user.id, scale, () =>
+    repos().insurancePolicies.create(data, user.id)
+  );
 
   try {
     for (const term of policy.terms) {
-      await createTermExpenses(termExpenseParams(policy, term, user.id));
+      await createTermExpenses(termExpenseParams(policy, term, user.id), scale);
     }
   } catch (error) {
     for (const term of policy.terms) {
@@ -262,20 +264,25 @@ routes.post(
     const scale = await ownScale(c);
     const termData = insuranceTermFromApi(c.req.valid('json'), scale);
     assertTermPremiumWithinCap({ ...termData, totalCost: termData.totalCost ?? 0 }, scale);
-    const policy = await repos().insurancePolicies.addTerm(id, termData, user.id);
+    const policy = await repos().preferences.writeAtScale(user.id, scale, () =>
+      repos().insurancePolicies.addTerm(id, termData, user.id)
+    );
 
     const termVehicleIds = vehicleIdsForTerm(policy.termVehicleCoverage, policy.newTermId);
     try {
-      await createTermExpenses({
-        termId: policy.newTermId,
-        vehicleIds: termVehicleIds,
-        totalCost: termData.totalCost ?? 0,
-        monthlyCost: termData.monthlyCost,
-        startDate: termData.startDate,
-        endDate: termData.endDate,
-        policyNumber: termData.policyNumber,
-        userId: user.id,
-      });
+      await createTermExpenses(
+        {
+          termId: policy.newTermId,
+          vehicleIds: termVehicleIds,
+          totalCost: termData.totalCost ?? 0,
+          monthlyCost: termData.monthlyCost,
+          startDate: termData.startDate,
+          endDate: termData.endDate,
+          policyNumber: termData.policyNumber,
+          userId: user.id,
+        },
+        scale
+      );
     } catch (error) {
       await repos().insurancePolicies.deleteTerm(id, policy.newTermId, user.id);
       throw error;
@@ -320,11 +327,13 @@ routes.put(
         scale
       );
     }
-    const policy = await repos().insurancePolicies.updateTerm(id, termId, updates, user.id);
+    const policy = await repos().preferences.writeAtScale(user.id, scale, () =>
+      repos().insurancePolicies.updateTerm(id, termId, updates, user.id)
+    );
 
     const updatedTerm = policy.terms.find((t) => t.id === termId);
     if (updatedTerm) {
-      await updateTermExpenses(termExpenseParams(policy, updatedTerm, user.id), previous);
+      await updateTermExpenses(termExpenseParams(policy, updatedTerm, user.id), previous, scale);
     }
 
     return c.json({
@@ -398,9 +407,9 @@ routes.post(
     await validateInsuranceOwnership(id, user.id);
     const data = c.req.valid('json');
     await validateClaimRefs(data, id, user.id);
-    const claim = await repos().insuranceClaims.create(
-      id,
-      insuranceClaimFromApi(data, await ownScale(c))
+    const scale = await ownScale(c);
+    const claim = await repos().preferences.writeAtScale(user.id, scale, () =>
+      repos().insuranceClaims.create(id, insuranceClaimFromApi(data, scale))
     );
     return c.json(
       {
@@ -424,10 +433,9 @@ routes.put(
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
     await validateClaimRefs(updates, id, user.id);
-    const claim = await repos().insuranceClaims.update(
-      id,
-      claimId,
-      insuranceClaimFromApi(updates, await ownScale(c))
+    const scale = await ownScale(c);
+    const claim = await repos().preferences.writeAtScale(user.id, scale, () =>
+      repos().insuranceClaims.update(id, claimId, insuranceClaimFromApi(updates, scale))
     );
     return c.json({
       success: true,

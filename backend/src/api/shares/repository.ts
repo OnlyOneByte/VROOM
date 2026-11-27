@@ -1,8 +1,7 @@
 // vehicle_shares.ownerId is a denormalized copy for listing only; never use it as the access gate.
 
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
-import type { AsyncAppDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import type { NewVehicleShare, VehicleShare } from '../../db/schema';
 import { users, vehicleShares, vehicles } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
@@ -63,12 +62,13 @@ export async function findInviteeId(
   return match?.id ?? null;
 }
 
-export function attachPendingInvites(
-  tx: Pick<AppDatabase, 'update'>,
+export async function attachPendingInvites(
+  tx: AsyncHandle,
   userId: string,
   email: string
-): void {
-  tx.update(vehicleShares)
+): Promise<void> {
+  await tx
+    .update(vehicleShares)
     .set({ sharedWithId: userId })
     .where(
       and(
@@ -81,8 +81,7 @@ export function attachPendingInvites(
           sql`, `
         )}))`
       )
-    )
-    .run();
+    );
 }
 
 export class VehicleShareRepository extends BaseRepository<VehicleShare, NewVehicleShare> {

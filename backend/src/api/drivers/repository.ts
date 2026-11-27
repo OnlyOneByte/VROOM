@@ -1,6 +1,5 @@
 import { and, count, eq, isNull } from 'drizzle-orm';
-import type { AsyncAppDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import {
   users,
   type VehicleDriver,
@@ -8,7 +7,6 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
 
 export const DRIVER_COLORS = [
   'chart-1',
@@ -30,8 +28,12 @@ export interface DriverView {
   archived: boolean;
 }
 
-function memberName(tx: DrizzleTransaction, userId: string): string {
-  const row = tx.select({ name: users.displayName }).from(users).where(eq(users.id, userId)).get();
+async function memberName(tx: AsyncHandle, userId: string): Promise<string> {
+  const row = await tx
+    .select({ name: users.displayName })
+    .from(users)
+    .where(eq(users.id, userId))
+    .get();
   return row?.name || 'Driver';
 }
 
@@ -39,17 +41,16 @@ function colorAfter(used: number): string {
   return DRIVER_COLORS[used % DRIVER_COLORS.length] ?? 'chart-1';
 }
 
-function nextColor(tx: DrizzleTransaction, vehicleId: string): string {
-  const [row] = tx
+async function nextColor(db: AsyncHandle, vehicleId: string): Promise<string> {
+  const [row] = await db
     .select({ used: count() })
     .from(vehicleDrivers)
-    .where(eq(vehicleDrivers.vehicleId, vehicleId))
-    .all();
+    .where(eq(vehicleDrivers.vehicleId, vehicleId));
   return colorAfter(row?.used ?? 0);
 }
 
-export function carShareEnabled(tx: DrizzleTransaction, vehicleId: string): boolean {
-  const row = tx
+export async function carShareEnabled(tx: AsyncHandle, vehicleId: string): Promise<boolean> {
+  const row = await tx
     .select({ enabled: vehicles.carShareEnabled })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
@@ -106,53 +107,54 @@ export async function ownDriverId(
   return row?.id ?? null;
 }
 
-export function ensureMemberDriver(
-  tx: DrizzleTransaction,
+export async function ensureMemberDriver(
+  tx: AsyncHandle,
   vehicleId: string,
   userId: string
-): void {
-  const existing = tx
+): Promise<void> {
+  const existing = await tx
     .select({ id: vehicleDrivers.id })
     .from(vehicleDrivers)
     .where(and(eq(vehicleDrivers.vehicleId, vehicleId), eq(vehicleDrivers.userId, userId)))
     .get();
   if (existing) {
-    tx.update(vehicleDrivers)
+    await tx
+      .update(vehicleDrivers)
       .set({ archivedAt: null })
-      .where(eq(vehicleDrivers.id, existing.id))
-      .run();
+      .where(eq(vehicleDrivers.id, existing.id));
     return;
   }
-  tx.insert(vehicleDrivers)
-    .values({
-      vehicleId,
-      userId,
-      name: memberName(tx, userId),
-      color: nextColor(tx, vehicleId),
-      createdBy: userId,
-    })
-    .run();
+  await tx.insert(vehicleDrivers).values({
+    vehicleId,
+    userId,
+    name: await memberName(tx, userId),
+    color: await nextColor(tx, vehicleId),
+    createdBy: userId,
+  });
 }
 
-export function setCarShare(db: AppDatabase, vehicleId: string, enabled: boolean): void {
-  db.transaction((tx) => {
-    tx.update(vehicles)
+export async function setCarShare(
+  asyncDb: AsyncAppDatabase,
+  vehicleId: string,
+  enabled: boolean
+): Promise<void> {
+  await asyncDb.transaction(async (tx) => {
+    await tx
+      .update(vehicles)
       .set({ carShareEnabled: enabled, updatedAt: new Date() })
-      .where(eq(vehicles.id, vehicleId))
-      .run();
+      .where(eq(vehicles.id, vehicleId));
     if (!enabled) return;
-    const owner = tx
+    const owner = await tx
       .select({ userId: vehicles.userId })
       .from(vehicles)
       .where(eq(vehicles.id, vehicleId))
       .get();
-    const members = tx
+    const members = await tx
       .select({ userId: vehicleShares.sharedWithId })
       .from(vehicleShares)
-      .where(and(eq(vehicleShares.vehicleId, vehicleId), eq(vehicleShares.status, 'accepted')))
-      .all();
+      .where(and(eq(vehicleShares.vehicleId, vehicleId), eq(vehicleShares.status, 'accepted')));
     for (const userId of [owner?.userId, ...members.map((m) => m.userId)]) {
-      if (userId) ensureMemberDriver(tx, vehicleId, userId);
+      if (userId) await ensureMemberDriver(tx, vehicleId, userId);
     }
   });
 }
@@ -163,14 +165,7 @@ export async function addGuestDriver(
   input: { name: string; color?: string },
   createdBy: string
 ): Promise<string> {
-  let color = input.color;
-  if (!color) {
-    const [row] = await db
-      .select({ used: count() })
-      .from(vehicleDrivers)
-      .where(eq(vehicleDrivers.vehicleId, vehicleId));
-    color = colorAfter(row?.used ?? 0);
-  }
+  const color = input.color ?? (await nextColor(db, vehicleId));
   const [row] = await db
     .insert(vehicleDrivers)
     .values({ vehicleId, name: input.name, color, createdBy })

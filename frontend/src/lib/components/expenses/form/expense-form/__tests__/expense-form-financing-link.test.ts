@@ -64,7 +64,7 @@ describe('editing a financing payment', () => {
 			expect(expenseApiMock.updateExpense).toHaveBeenLastCalledWith(
 				'e1',
 				expect.objectContaining({ sourceType: undefined, sourceId: undefined }),
-				{ signal: expect.any(AbortSignal) }
+				expect.objectContaining({ signal: expect.any(AbortSignal) })
 			)
 		);
 
@@ -76,7 +76,7 @@ describe('editing a financing payment', () => {
 			expect(expenseApiMock.updateExpense).toHaveBeenLastCalledWith(
 				'e1',
 				expect.objectContaining({ sourceType: null, sourceId: null }),
-				{ signal: expect.any(AbortSignal) }
+				expect.objectContaining({ signal: expect.any(AbortSignal) })
 			)
 		);
 	});

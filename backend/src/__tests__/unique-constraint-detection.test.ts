@@ -1,13 +1,11 @@
 import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
-import { transaction } from '../db/connection';
 import { isDriverError } from '../db/dialect';
 import {
   ConflictError,
   DatabaseError,
   handleDatabaseError,
   isUniqueConstraintError,
-  NotFoundError,
 } from '../errors';
 
 function sqliteError(sql: string): unknown {
@@ -47,6 +45,14 @@ describe('isUniqueConstraintError', () => {
 });
 
 describe('handleDatabaseError', () => {
+  test('maps a non-unique driver failure to a generic DatabaseError without the driver text', () => {
+    const mapped = handleDatabaseError(
+      Object.assign(new Error('disk I/O error'), { code: 'SQLITE_IOERR' })
+    );
+    expect(mapped).toBeInstanceOf(DatabaseError);
+    expect(mapped.message).toBe('A database error occurred');
+  });
+
   test('maps a unique violation to a conflict', () => {
     expect(handleDatabaseError(sqliteError("INSERT INTO t VALUES ('b', 'a@x')"))).toBeInstanceOf(
       ConflictError
@@ -60,34 +66,5 @@ describe('isDriverError', () => {
     expect(isDriverError(driverError)).toBe(true);
     expect(isDriverError(new Error('wrapped', { cause: driverError }))).toBe(true);
     expect(isDriverError(new Error('plain failure'))).toBe(false);
-  });
-});
-
-describe('transaction', () => {
-  test('a driver failure surfaces as a generic error without the driver text', async () => {
-    const driverError = sqliteError("INSERT INTO t VALUES ('b', 'a@x')");
-    const failing = transaction(() => {
-      throw driverError;
-    });
-    await expect(failing).rejects.toBeInstanceOf(ConflictError);
-    const thrown = await failing.catch((e: unknown) => e as Error);
-    expect(thrown.message).not.toContain('UNIQUE');
-    expect((thrown as ConflictError).details).toBeUndefined();
-  });
-
-  test('a non-unique driver failure becomes a generic DatabaseError', async () => {
-    const failing = transaction(() => {
-      throw Object.assign(new Error('disk I/O error'), { code: 'SQLITE_IOERR' });
-    });
-    const thrown = await failing.catch((e: unknown) => e as Error);
-    expect(thrown).toBeInstanceOf(DatabaseError);
-    expect(thrown.message).toBe('A database error occurred');
-  });
-
-  test('an application error thrown inside passes through unchanged', async () => {
-    const failing = transaction(() => {
-      throw new NotFoundError('Vehicle');
-    });
-    await expect(failing).rejects.toBeInstanceOf(NotFoundError);
   });
 });

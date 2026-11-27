@@ -51,12 +51,12 @@ export { routes };
 
 ```typescript
 import { and, desc, eq } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { type Entity, entityTable, type NewEntity } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 
 export class EntityRepository extends BaseRepository<Entity, NewEntity> {
-  constructor(db: AppDatabase) {
+  constructor(db: AsyncAppDatabase) {
     super(db, entityTable);
   }
 
@@ -66,17 +66,17 @@ export class EntityRepository extends BaseRepository<Entity, NewEntity> {
 ```
 
 Don't export an instance. Register the repository in `createAppContext` (`backend/src/app-context.ts`)
-and call it as `repos().entity.findByUserId(...)`; tests build `createAppContext(db)` on their own
-database. Code outside a repository that needs the database itself uses `appContext().db`, inside
-a function, never at module scope. Only the context factory and the DB tooling call `getDb()`, which
-opens the database on first call; `db-access-ratchet.test.ts` fails on any other call and on any
-module-level repository instance: a top-level `const`/`let` holding one, `export default new
-…Repository(...)`, or one inside a top-level object literal (`export const repos = { … }`).
-Inside a repository, pass `this.db` to `transaction(fn, this.db)`
-so the transaction runs on the injected database.
+and call it as `repos().entity.findByUserId(...)`; tests build `createAppContext(sqlite)` on their
+own connection. Code outside a repository that needs the database itself uses
+`appContext().asyncDb`, inside a function, never at module scope. Only the context factory and the
+DB tooling call `getDb()`, which opens the database on first call; `db-access-ratchet.test.ts`
+fails on any other call and on any module-level repository instance: a top-level `const`/`let`
+holding one, `export default new …Repository(...)`, or one inside a top-level object literal
+(`export const repos = { … }`). Inside a repository, open a transaction with
+`this.db.transaction(async (tx) => …)` so it runs on the injected session.
 
 `BaseRepository` supplies `findById`/`create`/`update`/`delete` (the last two throw
-`NotFoundError` on a missing row). Take `AppDatabase`, never `BunSQLiteDatabase` — the alias
+`NotFoundError` on a missing row). Take `AsyncAppDatabase`, never a driver type — the alias
 is the seam for a future non-SQLite dialect.
 
 Extending it is the default, not a requirement: 8 repositories do. Its signature is
@@ -127,6 +127,25 @@ need; don't reshape a repository to qualify.
   and are applied in the owning `routes.ts`. A config entry nothing applies is a bug.
 - `idempotency({ required })` replays a cached 2xx JSON body per `Idempotency-Key`
   (`sync/routes.ts`); a non-JSON 2xx is intentionally left uncached.
+
+### Stale-write check (expenses)
+- `PUT /api/v1/expenses/:id` and `PUT /api/v1/expenses/split/:id` take an optional
+  `expectedUpdatedAt`: the ISO `updatedAt` the client last saw (for a split, the latest
+  `updatedAt` among its legs).
+- If it is set and the stored value differs, the server writes nothing and answers **409** with
+  code `EXPENSE_CHANGED` and `details.updatedAt` (the current value). If it is not set, the update
+  behaves as before, so imports and older clients are unaffected.
+- Every write to an expense row moves `updated_at` forward, including writes that are not edits:
+  clearing a financing or other source link, deactivating a loan, the driver payer backfill, a
+  split group's total recompute and the amount rescale on a currency change. Without that, an edit
+  read before such a write would overwrite it unchecked. (A driver is archived, not deleted, so the
+  `paid_by_driver_id` foreign key only clears when its vehicle, and so the expense, goes too.)
+- `updated_at` is stored in whole seconds, so each write sets it to at least one second past the
+  latest value among the rows it touches (`nextUpdatedAt` and `nextUpdatedAtFor` in
+  `api/expenses/updated-at.ts`). Two writes inside one second therefore never share a value.
+  `expense-writes-stamp.test.ts` fails on a production `.update(expenses).set({ … })` that does
+  not set `updatedAt`. It reads that literal form only; a write through a table variable, such as
+  the currency rescale, has its own test in `stale-write.test.ts`.
 
 ### Ownership & Authorization
 - Every route checks access *before* the repository call. Don't delegate it downstream.

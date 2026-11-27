@@ -70,14 +70,14 @@ export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<T
     migrated = true;
   } else {
     resetAllTables(sqlite);
-    syncBuiltInRoles(db);
+    await syncBuiltInRoles(appContext().asyncDb);
   }
 
   const id = seedUser.id ?? `test-user-${++counter}`;
   const email = seedUser.email ?? `test${counter}@example.com`;
   const displayName = seedUser.displayName ?? 'Test User';
   await db.insert(schema.users).values({ id, email, displayName });
-  assignServerRole(db, id, 'member');
+  await assignServerRole(appContext().asyncDb, id, 'member');
   db.insert(schema.serverSettings)
     .values({ id: 1, signupMode: 'open' })
     .onConflictDoNothing()

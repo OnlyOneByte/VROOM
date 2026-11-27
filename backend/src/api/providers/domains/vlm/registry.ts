@@ -109,7 +109,7 @@ export function localOcrEnabled(): boolean {
   return BUILTIN_VISION_PROVIDERS['local-ocr'].availability() === 'available';
 }
 
-export function getVlmProvider(row: UserProvider): VlmProvider {
+export async function getVlmProvider(row: UserProvider): Promise<VlmProvider> {
   if (row.id === LOCAL_OCR_PROVIDER_ID) return BUILTIN_VISION_PROVIDERS['local-ocr'].create();
   return getUserVlmProvider(row);
 }

@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { getColumnNames } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { logger } from '../../../utils/logger';
 import {
   createTestDb,
@@ -64,7 +65,7 @@ function setOptIn(id: string, optIn: boolean): void {
 
 beforeEach(() => {
   db = createTestDb();
-  repository = new CommunityStatsRepository(db.drizzle);
+  repository = new CommunityStatsRepository(openAsyncDatabase(db.drizzle.$client).db);
 });
 
 afterEach(() => {

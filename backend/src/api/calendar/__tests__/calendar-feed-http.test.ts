@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
+import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
 import { getDb } from '../../../db/connection';
 import { calendarFeeds, reminders, reminderVehicles, users, vehicles } from '../../../db/schema';
@@ -148,7 +149,7 @@ describe('the calendar feed link', () => {
     await db
       .insert(users)
       .values({ id: otherId, email: 'other@example.com', displayName: 'Other' });
-    assignServerRole(db, otherId, 'member');
+    await assignServerRole(appContext().asyncDb, otherId, 'member');
     await ownGarage(otherId);
     await db.update(reminders).set({ name: 'Secret service' }).where(eq(reminders.userId, otherId));
     const [theirCar] = await db.select().from(vehicles).where(eq(vehicles.userId, otherId));

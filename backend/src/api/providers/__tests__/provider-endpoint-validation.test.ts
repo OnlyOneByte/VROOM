@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { Readable } from 'node:stream';
+import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
-import { getDb } from '../../../db/connection';
 import type { UserProvider } from '../../../db/schema';
 import { ValidationError } from '../../../errors';
 import { assignServerRole, builtInRoleId } from '../../../permissions/grants';
@@ -66,8 +66,8 @@ function modelBody(baseUrl: string) {
   };
 }
 
-function sendS3(request: Record<string, unknown>) {
-  const handler = s3RequestHandlerFor(privateEndpointPolicy()) as unknown as {
+async function sendS3(request: Record<string, unknown>) {
+  const handler = s3RequestHandlerFor(await privateEndpointPolicy()) as unknown as {
     handle: (request: unknown) => Promise<{
       response: {
         statusCode: number;
@@ -280,7 +280,7 @@ describe('model transport', () => {
     }) as unknown as typeof fetch;
     await expect(
       postModelJson({
-        outbound: privateEndpointPolicy(),
+        outbound: await privateEndpointPolicy(),
         domain: 'LLM',
         providerType: 'openai-compatible',
         model: 'm',
@@ -300,7 +300,7 @@ describe('model transport', () => {
     }) as unknown as typeof fetch;
     await expect(
       postModelJson({
-        outbound: privateEndpointPolicy(),
+        outbound: await privateEndpointPolicy(),
         domain: 'LLM',
         providerType: 'openai-compatible',
         model: 'm',
@@ -338,13 +338,13 @@ function storedModelRow(baseUrl: string): UserProvider {
 }
 
 describe('stored model rows and model updates', () => {
-  test('a stored model row with a link-local base URL is refused when resolved', () => {
-    expect(() => resolveModelSettings(storedModelRow('http://169.254.169.254/v1'), 'LLM')).toThrow(
-      ValidationError
-    );
-    expect(resolveModelSettings(storedModelRow('http://localhost:11434/v1'), 'LLM').baseUrl).toBe(
-      'http://localhost:11434/v1'
-    );
+  test('a stored model row with a link-local base URL is refused when resolved', async () => {
+    await expect(
+      resolveModelSettings(storedModelRow('http://169.254.169.254/v1'), 'LLM')
+    ).rejects.toThrow(ValidationError);
+    expect(
+      (await resolveModelSettings(storedModelRow('http://localhost:11434/v1'), 'LLM')).baseUrl
+    ).toBe('http://localhost:11434/v1');
   });
 
   test('an update cannot move a model base URL to a link-local host', async () => {
@@ -401,7 +401,7 @@ describe('outbound requests connect to the validated address', () => {
     outboundResolver.connectUrl = urlForAddress;
     try {
       const body = await postModelJson<{ ok: boolean }>({
-        outbound: privateEndpointPolicy(),
+        outbound: await privateEndpointPolicy(),
         domain: 'LLM',
         providerType: 'openai-compatible',
         model: 'm',
@@ -579,7 +579,7 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
       `${memberId}@example.com`,
       'Member',
     ]);
-    assignServerRole(getDb(), memberId, 'member');
+    await assignServerRole(appContext().asyncDb, memberId, 'member');
     member = await requestAs(ctx, memberId);
   });
   afterEach(() => {
@@ -660,7 +660,7 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
       sent.push(String(input));
       return new Response('{}');
     }) as typeof fetch;
-    const handler = s3RequestHandlerFor(privateEndpointPolicyFor(memberId)) as unknown as {
+    const handler = s3RequestHandlerFor(await privateEndpointPolicyFor(memberId)) as unknown as {
       handle: (request: unknown) => Promise<unknown>;
     };
     await expect(
@@ -673,7 +673,7 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
       })
     ).rejects.toThrow(ValidationError);
 
-    const settings = resolveModelSettings(
+    const settings = await resolveModelSettings(
       {
         id: 'm',
         userId: memberId,

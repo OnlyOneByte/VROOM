@@ -16,7 +16,7 @@ export async function createInvitee(
   idPrefix: string,
   displayName?: string
 ): Promise<Invitee> {
-  const db = (await import('../db/connection')).getDb();
+  const db = (await import('../app-context')).appContext().asyncDb;
   const schema = await import('../db/schema');
   const { assignServerRole } = await import('../permissions/grants');
 
@@ -24,7 +24,7 @@ export async function createInvitee(
   const id = `${idPrefix}-${n}`;
   const email = `${idPrefix}-${n}@test.com`;
   await db.insert(schema.users).values({ id, email, displayName: displayName ?? `Invitee ${n}` });
-  assignServerRole(db, id, 'member');
+  await assignServerRole(db, id, 'member');
   const { cookie, request } = await requestAs(ctx, id);
 
   const acceptShare = async (vehicleId: string, level: 'viewer' | 'editor'): Promise<void> => {

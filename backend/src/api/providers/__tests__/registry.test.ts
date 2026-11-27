@@ -280,37 +280,37 @@ describe('StorageProviderRegistry', () => {
   });
 
   describe('createProviderInstance', () => {
-    test('creates GoogleDriveProvider for google-drive type', () => {
+    test('creates GoogleDriveProvider for google-drive type', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
 
-      const provider = registry.createProviderInstance(baseProvider);
+      const provider = await registry.createProviderInstance(baseProvider);
       expect(provider.type).toBe('google-drive');
     });
 
-    test('throws ValidationError for unknown provider type', () => {
+    test('throws ValidationError for unknown provider type', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
 
       const unknownProvider = { ...baseProvider, providerType: 'dropbox' };
 
-      expect(() => registry.createProviderInstance(unknownProvider)).toThrow(
+      await expect(registry.createProviderInstance(unknownProvider)).rejects.toThrow(
         'Unsupported provider type: dropbox'
       );
     });
 
-    test('throws ValidationError when credentials lack refreshToken', () => {
+    test('throws ValidationError when credentials lack refreshToken', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
 
       const badCreds = { ...baseProvider, credentials: enc({ noToken: true }) };
 
-      expect(() => registry.createProviderInstance(badCreds)).toThrow(
+      await expect(registry.createProviderInstance(badCreds)).rejects.toThrow(
         'Provider has no refresh token'
       );
     });
 
-    test('creates GooglePhotosProvider for google-photos type (reuses cached albumId from config)', () => {
+    test('creates GooglePhotosProvider for google-photos type (reuses cached albumId from config)', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
       const row = {
@@ -319,10 +319,10 @@ describe('StorageProviderRegistry', () => {
         credentials: enc({ refreshToken: 'tok-gp' }),
         config: { albumId: 'album-xyz' },
       };
-      expect(registry.createProviderInstance(row).type).toBe('google-photos');
+      expect((await registry.createProviderInstance(row)).type).toBe('google-photos');
     });
 
-    test('throws when google-photos credentials lack refreshToken', () => {
+    test('throws when google-photos credentials lack refreshToken', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
       const row = {
@@ -330,10 +330,12 @@ describe('StorageProviderRegistry', () => {
         providerType: 'google-photos',
         credentials: enc({ noToken: true }),
       };
-      expect(() => registry.createProviderInstance(row)).toThrow('Provider has no refresh token');
+      await expect(registry.createProviderInstance(row)).rejects.toThrow(
+        'Provider has no refresh token'
+      );
     });
 
-    test('creates S3CompatProvider for s3 type with valid credentials + config', () => {
+    test('creates S3CompatProvider for s3 type with valid credentials + config', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
       const row = {
@@ -342,10 +344,10 @@ describe('StorageProviderRegistry', () => {
         credentials: enc({ accessKeyId: 'AK', secretAccessKey: 'SK' }),
         config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
       };
-      expect(registry.createProviderInstance(row).type).toBe('s3');
+      expect((await registry.createProviderInstance(row)).type).toBe('s3');
     });
 
-    test('throws when s3 credentials lack accessKeyId/secretAccessKey', () => {
+    test('throws when s3 credentials lack accessKeyId/secretAccessKey', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
       const row = {
@@ -354,12 +356,12 @@ describe('StorageProviderRegistry', () => {
         credentials: enc({ accessKeyId: 'AK' }),
         config: { endpoint: 'https://s3.example.com', bucket: 'b', region: 'us-east-1' },
       };
-      expect(() => registry.createProviderInstance(row)).toThrow(
+      await expect(registry.createProviderInstance(row)).rejects.toThrow(
         'Invalid S3 credentials: missing accessKeyId or secretAccessKey'
       );
     });
 
-    test('throws when s3 config is missing endpoint/bucket/region', () => {
+    test('throws when s3 config is missing endpoint/bucket/region', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
       const row = {
@@ -368,17 +370,17 @@ describe('StorageProviderRegistry', () => {
         credentials: enc({ accessKeyId: 'AK', secretAccessKey: 'SK' }),
         config: { bucket: 'b' },
       };
-      expect(() => registry.createProviderInstance(row)).toThrow(
+      await expect(registry.createProviderInstance(row)).rejects.toThrow(
         'Invalid S3 config: missing endpoint, bucket, or region'
       );
     });
 
-    test('a fake provider is REJECTED when allowFakeStorageProvider is off (the prod-safety default)', () => {
+    test('a fake provider is REJECTED when allowFakeStorageProvider is off (the prod-safety default)', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
       const fakeRow = { ...baseProvider, providerType: 'fake' };
 
-      expect(() => registry.createProviderInstance(fakeRow)).toThrow(
+      await expect(registry.createProviderInstance(fakeRow)).rejects.toThrow(
         'Fake storage provider is not enabled'
       );
     });
@@ -391,7 +393,7 @@ describe('StorageProviderRegistry', () => {
       try {
         const registry = new StorageProviderRegistry(createMockDb([]) as never);
         const row = { ...baseProvider, id: 'fake-persist-1', providerType: 'fake' };
-        await registry.createProviderInstance(row).upload({
+        await (await registry.createProviderInstance(row)).upload({
           fileName: 'vroom-backup-1.zip',
           buffer: Buffer.from('zip'),
           mimeType: 'application/zip',
@@ -401,16 +403,16 @@ describe('StorageProviderRegistry', () => {
           rawPath: 'Backups',
         });
 
-        const again = await registry.createProviderInstance(row).list('Backups');
+        const again = await (await registry.createProviderInstance(row)).list('Backups');
         expect(again.map((f) => f.name)).toEqual(['vroom-backup-1.zip']);
-        const other = registry.createProviderInstance({ ...row, id: 'fake-persist-2' });
+        const other = await registry.createProviderInstance({ ...row, id: 'fake-persist-2' });
         expect(await other.list('Backups')).toEqual([]);
       } finally {
         config.allowFakeStorageProvider = previous;
       }
     });
 
-    test('the fake gate SHORT-CIRCUITS before decrypt (a fake row with garbage creds still throws the GATE error, not a decrypt/parse error)', () => {
+    test('the fake gate SHORT-CIRCUITS before decrypt (a fake row with garbage creds still throws the GATE error, not a decrypt/parse error)', async () => {
       const db = createMockDb([]);
       const registry = new StorageProviderRegistry(db as never);
       const fakeRowBadCreds = {
@@ -419,7 +421,7 @@ describe('StorageProviderRegistry', () => {
         credentials: 'not-valid-json{{{',
       };
 
-      expect(() => registry.createProviderInstance(fakeRowBadCreds)).toThrow(
+      await expect(registry.createProviderInstance(fakeRowBadCreds)).rejects.toThrow(
         'Fake storage provider is not enabled'
       );
     });

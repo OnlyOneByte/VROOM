@@ -1,6 +1,6 @@
 import { and, eq, isNull, notInArray, type SQL, sql } from 'drizzle-orm';
 import { appContext } from '../app-context';
-import type { AsyncAppDatabase } from '../db/async-sqlite';
+import type { AsyncHandle } from '../db/async-sqlite';
 import { expenses, vehicleShares, vehicles } from '../db/schema';
 import { NotFoundError } from '../errors';
 import { resolverFor } from '../permissions/grants';
@@ -18,7 +18,7 @@ const FINANCIAL_READS = ['vehicle.financing.read', 'vehicle.insurance.read'] as 
 const FINANCIAL_WRITES = ['vehicle.financing.write', 'vehicle.insurance.write'] as const;
 
 async function memberFinancials(
-  db: AsyncAppDatabase,
+  db: AsyncHandle,
   vehicleId: string,
   userId: string
 ): Promise<VehicleAccess['financials']> {
@@ -39,7 +39,7 @@ const ROLES_FOR_MODE: Record<VehicleAccessMode, readonly VehicleRole[]> = {
 export async function resolveVehicleAccess(
   vehicleId: string,
   userId: string,
-  db: AsyncAppDatabase = appContext().asyncDb
+  db: AsyncHandle = appContext().asyncDb
 ): Promise<VehicleAccess | null> {
   const rows = await db
     .select({ ownerId: vehicles.userId, level: vehicleShares.level })
@@ -78,7 +78,7 @@ export async function requireVehicleAccess(
   vehicleId: string,
   userId: string,
   mode: VehicleAccessMode,
-  db: AsyncAppDatabase = appContext().asyncDb
+  db: AsyncHandle = appContext().asyncDb
 ): Promise<VehicleAccess> {
   const access = await resolveVehicleAccess(vehicleId, userId, db);
   // 404, not 403, so a non-member cannot learn that the vehicle exists.
@@ -90,7 +90,7 @@ export async function requireVehiclesAccess(
   vehicleIds: readonly string[],
   userId: string,
   mode: VehicleAccessMode,
-  db: AsyncAppDatabase = appContext().asyncDb
+  db: AsyncHandle = appContext().asyncDb
 ): Promise<Set<string>> {
   const ownerIds = new Set<string>();
   for (const vehicleId of new Set(vehicleIds)) {

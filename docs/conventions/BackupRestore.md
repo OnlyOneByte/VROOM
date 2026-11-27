@@ -86,11 +86,15 @@ every amount.
    `upgradeBackupTables`, then `coerceRow` per row.
 2. `validateBackupData` — metadata and `backupVersionError`, then `createInsertSchema(table)` per row, then
    `validateReferentialIntegrity` (which also runs `validateUniqueConstraints`).
-3. `restoreFromBackup` — wipe (replace mode only) and insert in ONE synchronous `db.transaction`.
+3. `restoreFromBackup` — wipe (replace mode only) and insert in ONE transaction on the async
+   session (`appContext().asyncDb`). Inside it, the restore re-checks the guards that must hold at
+   write time: no per-person grants in replace mode, and the account currency still the one the
+   backup was parsed with.
 
 All validation runs before the replace-mode wipe; it is the only thing between a corrupt download and
-an emptied account. Keep the transaction callback and its helpers synchronous — an async callback
-leaves the wipe committed when an insert throws.
+an emptied account. Download, unzip, decryption and parsing all happen before the transaction opens;
+inside it, await only database work. A throw anywhere inside rolls back the wipe with the inserts,
+which `restore-atomicity.test.ts` checks by failing the last step of a replace restore.
 
 Coerce at parse time rather than through `createInsertSchema` field overrides: `TABLE_SCHEMAS` is
 deliberately bare `createInsertSchema(table)`, so both restore paths share one coercion layer.

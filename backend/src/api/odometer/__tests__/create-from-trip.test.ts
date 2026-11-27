@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 import { OdometerRepository } from '../repository';
@@ -41,7 +42,7 @@ describe('OdometerRepository.createFromTrip', () => {
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('${VEHICLE_ID}', '${USER_ID}', 'Toyota', 'Camry', 2022)`
     );
     db = drizzle(sqliteDb, { schema });
-    repo = new OdometerRepository(db);
+    repo = new OdometerRepository(openAsyncDatabase(db.$client).db);
   });
 
   afterEach(() => sqliteDb.close());

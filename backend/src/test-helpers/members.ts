@@ -1,5 +1,4 @@
-import { getDb } from '../db/connection';
-import { builtInRoleId, grantShareRole } from '../permissions/grants';
+import { builtInRoleId, shareRoleId } from '../permissions/grants';
 import type { TestApp } from './http-client';
 import { createInvitee, type Invitee } from './invitee';
 
@@ -28,7 +27,10 @@ export function shareCar(
     "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, ?, 'accepted', ?)",
     [`share-${vehicleId}-${member.id}`, vehicleId, ctx.user.id, member.id, level, member.email]
   );
-  grantShareRole(getDb(), { vehicleId, sharedWithId: member.id, level, grantedBy: ctx.user.id });
+  ctx.sqlite.run(
+    'INSERT OR IGNORE INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
+    [`ra-${vehicleId}-${member.id}`, member.id, shareRoleId(level), vehicleId, ctx.user.id]
+  );
 }
 
 export function overrideOn(

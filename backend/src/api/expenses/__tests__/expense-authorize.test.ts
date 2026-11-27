@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { getDb } from '../../../db/connection';
+import { appContext } from '../../../app-context';
 import { builtInRoleId, grantShareRole } from '../../../permissions/grants';
 import {
   createTestApp,
@@ -34,12 +34,17 @@ function insertExpense(
   );
 }
 
-function seedMember(member: Invitee, level: 'viewer' | 'editor'): void {
+async function seedMember(member: Invitee, level: 'viewer' | 'editor'): Promise<void> {
   ctx.sqlite.run(
     "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, ?, 'accepted', ?)",
     [`share-${member.id}`, vehicleId, ctx.user.id, member.id, level, member.email]
   );
-  grantShareRole(getDb(), { vehicleId, sharedWithId: member.id, level, grantedBy: ctx.user.id });
+  await grantShareRole(appContext().asyncDb, {
+    vehicleId,
+    sharedWithId: member.id,
+    level,
+    grantedBy: ctx.user.id,
+  });
 }
 
 function override(member: Invitee, permission: string, effect: 'allow' | 'deny'): void {
@@ -77,7 +82,7 @@ beforeEach(async () => {
     [viewer, 'viewer'],
     [disabled, 'editor'],
   ] as const) {
-    seedMember(member, level);
+    await seedMember(member, level);
   }
   ctx.sqlite.run(
     'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
@@ -150,7 +155,7 @@ describe('split updates cannot delete legs the caller may not delete', () => {
       .query('SELECT vehicle_id, created_by FROM expenses WHERE group_id = ? ORDER BY vehicle_id')
       .all(groupId) as { vehicle_id: string; created_by: string | null }[];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     for (const car of cars) {
       ctx.sqlite.run(
         "INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Mazda', 'CX-5', 2021)",
@@ -160,7 +165,7 @@ describe('split updates cannot delete legs the caller may not delete', () => {
         "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status) VALUES (?, ?, ?, ?, 'editor', 'accepted')",
         [`share-${car}`, car, ctx.user.id, editor.id]
       );
-      grantShareRole(getDb(), {
+      await grantShareRole(appContext().asyncDb, {
         vehicleId: car,
         sharedWithId: editor.id,
         level: 'editor',

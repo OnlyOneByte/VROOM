@@ -12,8 +12,7 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
-import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { countNum, sqlFalse, sumNum } from '../../db/dialect';
 import {
   expenses,
@@ -459,8 +458,8 @@ export class AnalyticsRepository {
 
   private db: AsyncAppDatabase;
 
-  constructor(syncDb: AppDatabase) {
-    this.db = openAsyncDatabase(syncDb.$client).db;
+  constructor(db: AsyncAppDatabase) {
+    this.db = db;
   }
 
   private getCachedVehicleNames(cacheKey: string, now: number): Map<string, string> | undefined {
