@@ -184,6 +184,14 @@ function resolveImportVehicleId(
   return { vehicleId: match };
 }
 
+function parseChargerType(cell: string): { value: ChargerType | null } | { error: string } {
+  const value = cell.trim().toLowerCase();
+  if (!value) return { value: null };
+  return (CHARGER_TYPES as readonly string[]).includes(value)
+    ? { value: value as ChargerType }
+    : { error: `Charger type must be one of ${CHARGER_TYPES.join(', ')}, or empty` };
+}
+
 function parseRow(
   record: Record<string, string>,
   vehicleByName: Map<string, string | null>,
@@ -222,11 +230,9 @@ function parseRow(
   const mileage = mileageResult.value;
   const volume = volumeResult.value;
   const fuelType = fuelTypeResult.value;
-  const chargerCell = get('chargerType').trim().toLowerCase();
-  if (chargerCell && !(CHARGER_TYPES as readonly string[]).includes(chargerCell)) {
-    return { error: `Charger type must be one of ${CHARGER_TYPES.join(', ')}, or empty` };
-  }
-  const chargerType = (chargerCell || null) as ChargerType | null;
+  const chargerResult = parseChargerType(get('chargerType'));
+  if ('error' in chargerResult) return chargerResult;
+  const chargerType = chargerResult.value;
   const missedFillup = /^(true|1|yes)$/i.test(get('missedFillup'));
 
   if (category === 'fuel' && (!volume || mileage === null)) {

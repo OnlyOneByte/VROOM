@@ -624,6 +624,14 @@ const exportQuerySchema = z.object({
     .transform((val) => (val ? val.split(',').map((t) => t.trim()) : undefined)),
 });
 
+function exportFuelCells(e: {
+  volume: number | null;
+  fuelType: string | null;
+  chargerType: string | null;
+}) {
+  return { volume: e.volume ?? '', fuelType: e.fuelType ?? '', chargerType: e.chargerType ?? '' };
+}
+
 export const EXPORT_COLUMNS = [
   'date',
   'vehicle',
@@ -689,9 +697,7 @@ routes.get(
         amount: e.expenseAmount / scale,
         currency,
         mileage: e.mileage || '',
-        volume: e.volume ?? '',
-        fuelType: e.fuelType ?? '',
-        chargerType: e.chargerType ?? '',
+        ...exportFuelCells(e),
         description: e.description ?? '',
         location: e.location ?? '',
         tags: Array.isArray(e.tags) ? e.tags.join('; ') : '',
