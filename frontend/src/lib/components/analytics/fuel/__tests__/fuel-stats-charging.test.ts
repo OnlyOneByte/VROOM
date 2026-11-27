@@ -375,7 +375,9 @@ describe('FuelStatsTab with shared cars in another currency', () => {
 			coverage: coverage(['EUR', 'GBP', 'EUR'])
 		});
 		expect(
-			screen.getByText('Not included: cars shared with you in EUR and GBP. These figures are in USD.')
+			screen.getByText(
+				'Not included: cars shared with you in EUR and GBP. These figures are in USD.'
+			)
 		).toBeTruthy();
 	});
 
