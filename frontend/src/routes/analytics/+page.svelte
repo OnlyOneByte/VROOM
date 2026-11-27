@@ -22,7 +22,9 @@
 		type AnalyticsFilters
 	} from '#lib/components/analytics/analytics-filters.ts';
 	import {
+		exploreRequest,
 		parseExplore,
+		prefetchExplore,
 		writeExplore,
 		type ExploreQuery
 	} from '#lib/components/analytics/explore/query-state.ts';
@@ -210,6 +212,10 @@
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
 	onMount(() => {
+		if (activeTab === 'explore') {
+			prefetchExplore(exploreRequest(explore, dateRange, vehicleIds));
+			void import('#lib/components/analytics/explore/ExploreTab.svelte');
+		}
 		void loadVehicles();
 	});
 </script>

@@ -7,6 +7,7 @@ const summaryCall = vi.hoisted(() => vi.fn());
 vi.mock('#lib/components/analytics/fuel/FuelStatsTab.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: {
+		query: () => new Promise(() => {}),
 		getSummary: () => summaryCall()
 	},
 	getDefaultDateRange: () => ({})

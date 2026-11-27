@@ -11,7 +11,10 @@ vi.mock('#lib/components/analytics/CrossVehicleTab.svelte', failedChunk);
 vi.mock('#lib/components/analytics/PerVehicleTab.svelte', failedChunk);
 vi.mock('#lib/components/analytics/YearEndTab.svelte', failedChunk);
 vi.mock('#lib/services/analytics-api.ts', () => ({
-	analyticsApi: { getSummary: () => Promise.reject(new Error('offline')) },
+	analyticsApi: {
+		query: () => new Promise(() => {}),
+		getSummary: () => Promise.reject(new Error('offline'))
+	},
 	getDefaultDateRange: () => ({})
 }));
 

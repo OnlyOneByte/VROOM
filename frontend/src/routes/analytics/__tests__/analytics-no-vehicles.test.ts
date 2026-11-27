@@ -7,6 +7,7 @@ vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('#lib/components/analytics/fuel/FuelStatsTab.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: {
+		query: () => new Promise(() => {}),
 		getSummary: () =>
 			Promise.resolve({
 				quickStats: {

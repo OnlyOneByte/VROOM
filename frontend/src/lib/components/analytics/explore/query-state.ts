@@ -1,10 +1,12 @@
+import { analyticsApi } from '#lib/services/analytics-api.ts';
 import type {
 	AnalyticsQueryCompare,
 	AnalyticsQueryEnergy,
 	AnalyticsQueryGroupBy,
 	AnalyticsQueryInclude,
 	AnalyticsQueryInterval,
-	AnalyticsQueryMetric
+	AnalyticsQueryMetric,
+	AnalyticsQueryResponse
 } from '#lib/types/index.ts';
 
 export const EXPLORE_METRICS = [
@@ -160,6 +162,38 @@ export function apiQuery(query: ExploreQuery) {
 		include: query.inc,
 		compare: query.compare === 'none' || query.compare === 'cars' ? 'prevPeriod' : query.compare
 	} as const;
+}
+
+export function exploreRequest(
+	query: ExploreQuery,
+	range: { startDate: number; endDate: number },
+	vehicleIds?: string[]
+) {
+	return {
+		...apiQuery(query),
+		start: range.startDate,
+		end: range.endDate,
+		vehicleIds,
+		...(['bars', 'stacked', 'grouped', 'line'].includes(chartForm(query)) && {
+			annotations: ['services', 'trips'] as Array<'services' | 'trips'>
+		})
+	};
+}
+
+const prefetched = new Map<string, Promise<AnalyticsQueryResponse>>();
+
+export function prefetchExplore(params: ReturnType<typeof exploreRequest>): void {
+	const key = JSON.stringify(params);
+	if (prefetched.has(key)) return;
+	const pending = analyticsApi.query(params);
+	pending.catch(() => {});
+	prefetched.set(key, pending);
+}
+
+export function takePrefetched(key: string): Promise<AnalyticsQueryResponse> | undefined {
+	const pending = prefetched.get(key);
+	prefetched.delete(key);
+	return pending;
 }
 
 export type ChartForm = 'stacked' | 'grouped' | 'bars' | 'line' | 'ranking' | 'compare' | 'panels';

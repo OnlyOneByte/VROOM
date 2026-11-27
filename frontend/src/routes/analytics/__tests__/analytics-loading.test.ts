@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/svelte';
 vi.mock('#lib/components/analytics/fuel/FuelStatsTab.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: {
+		query: () => new Promise(() => {}),
 		getSummary: () => new Promise(() => {})
 	},
 	getDefaultDateRange: () => ({})
