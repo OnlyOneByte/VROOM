@@ -1,5 +1,6 @@
 import { and, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { CONFIG } from '../../config';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import {
   roleAssignments,
@@ -176,8 +177,8 @@ export function createInvite(
     .get();
 }
 
-export function listInvites(db: Db) {
-  return db.select().from(serverInvites).orderBy(desc(serverInvites.createdAt)).all();
+export function listInvites(db: AsyncAppDatabase) {
+  return db.select().from(serverInvites).orderBy(desc(serverInvites.createdAt));
 }
 
 export function revokeInvite(db: Db, id: string, now: Date = new Date()) {
@@ -220,7 +221,7 @@ export function hasShareInvite(db: Db, email: string): boolean {
   return row !== undefined;
 }
 
-export function pendingAccounts(db: Db) {
+export function pendingAccounts(db: AsyncAppDatabase) {
   return db
     .select({
       id: users.id,
@@ -230,6 +231,5 @@ export function pendingAccounts(db: Db) {
     })
     .from(users)
     .where(and(ne(users.id, DEMO_USER_ID), isNotNull(users.pendingApprovalAt)))
-    .orderBy(users.pendingApprovalAt)
-    .all();
+    .orderBy(users.pendingApprovalAt);
 }

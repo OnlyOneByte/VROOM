@@ -141,8 +141,10 @@ own pooled transaction, so call sites won't change again.
 connection as `appContext().db`, and repositories move to it area by area. The settings,
 auth-provider, photo-ref, insurance-claim, financing, push, vehicle, trip and share
 repositories are on it so far, and so are analytics, community stats, insurance policies,
-photos, drivers, the calendar feed, the settings and providers routes, provider resolution and
-the storage provider registry outside their transactions.
+photos, drivers, the calendar feed, the settings and providers routes, provider resolution,
+the storage provider registry and Lucia's session adapter. The auth, demo, signup, shares and
+vehicles routes have started: some of their reads and writes are on it, and the rest move with
+the permission resolver or in part C.
 `BaseRepository`'s shared methods run on it for every subclass. In `src/api/drivers/`,
 `carShareEnabled` and `ensureMemberDriver` take only a sync transaction handle, because the
 share-accept and car-share transactions call them; code outside a transaction reads a
@@ -155,6 +157,16 @@ insurance policies and photos use `syncDb` only to open their transactions (and 
 its vehicle access checks). When you edit one of these, use the transaction handle `tx`
 inside a transaction callback and the async session outside it, and never pass `syncDb` to
 code that runs on the async session. The sync transactions and `syncDb` go in part C.
+
+A sync read that gates a later write stays sync until part C, even outside a transaction. On
+the sync driver nothing runs between the read and the write; on the async session another
+request can, so the check could pass on data that has changed by the time the write lands.
+That covers the role, override and share guards in `src/api/roles/routes.ts` and
+`src/api/shares/routes.ts`, the invite and signup-settings writes in
+`src/api/signup/store.ts`, and the profile backfill and provider token update in
+`src/api/auth/routes.ts`. In part C each such check moves inside the async transaction that
+does the write. The permission resolver in `src/permissions/grants.ts` is synchronous too and
+moves in its own step.
 
 One ordering rule holds the migration together: sync queries must be gone before the first
 async transaction ships, because a sync query issued while an async transaction is open runs

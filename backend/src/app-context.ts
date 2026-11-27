@@ -26,7 +26,7 @@ export function createAppContext(db: AppDatabase) {
   return {
     db,
     asyncDb,
-    lucia: createLucia(db),
+    lucia: createLucia(asyncDb),
     repos: {
       analytics: new AnalyticsRepository(db),
       analyticsInsights: new AnalyticsInsightsRepository(db, analyticsQuery),

@@ -23,18 +23,18 @@ export function isDemoAvailable(): boolean {
 }
 
 export async function prepareDemoGarage(): Promise<void> {
-  const db = appContext().db;
+  const { db, asyncDb } = appContext();
   demoReady = false;
-  await db.delete(users).where(eq(users.id, DEMO_USER_ID));
+  await asyncDb.delete(users).where(eq(users.id, DEMO_USER_ID));
   if (!CONFIG.demo.enabled) return;
   try {
-    await db
+    await asyncDb
       .insert(users)
       .values({ id: DEMO_USER_ID, email: DEMO_USER_EMAIL, displayName: 'Demo Garage' });
     assignServerRole(db, DEMO_USER_ID, DEMO_ROLE_KEY);
     await seedGarage(DEMO_USER_ID);
   } catch (error) {
-    await db
+    await asyncDb
       .delete(users)
       .where(eq(users.id, DEMO_USER_ID))
       .catch((cleanupError: unknown) =>
@@ -51,7 +51,7 @@ export async function prepareDemoGarage(): Promise<void> {
 export async function startDemoSession(c: Context): Promise<Date> {
   const now = Date.now();
   await appContext()
-    .db.delete(sessions)
+    .asyncDb.delete(sessions)
     .where(and(eq(sessions.userId, DEMO_USER_ID), lte(sessions.expiresAt, Math.floor(now / 1000))));
   const sessionId = `${DEMO_SESSION_PREFIX}${now}_${generateIdFromEntropySize(25)}`;
   await appContext().lucia.createSession(DEMO_USER_ID, {}, { sessionId });

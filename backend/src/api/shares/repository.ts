@@ -52,7 +52,7 @@ export function toOwnerView(
 }
 
 export async function findInviteeId(
-  db: Pick<AppDatabase, 'select'>,
+  db: Pick<AsyncAppDatabase, 'select'>,
   email: string
 ): Promise<string | null> {
   const [match] = await db

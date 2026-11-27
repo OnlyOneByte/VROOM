@@ -198,7 +198,7 @@ function renamedWithoutCatalogModel(
 }
 
 async function vehicleHasMeasuredHistory(vehicleId: string): Promise<boolean> {
-  const db = appContext().db;
+  const db = appContext().asyncDb;
   const [expense, odometer, trip, mileageReminder, leaseLimit] = await Promise.all([
     db
       .select({ id: expenses.id })
@@ -496,7 +496,7 @@ async function splitGroupIdsForVehicle(vehicleId: string, userId: string): Promi
 }
 
 async function shrinkSplitGroupsToSurvivingLegs(userId: string, groupIds: string[]): Promise<void> {
-  const db = appContext().db;
+  const db = appContext().asyncDb;
   // SQLite caps bound parameters, and inArray binds one per id: keep batches small.
   for (const batch of chunk(groupIds)) {
     await db

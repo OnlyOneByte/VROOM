@@ -1,7 +1,7 @@
 import { DrizzleSQLiteAdapter } from '@lucia-auth/adapter-drizzle';
 import { type DatabaseSession, type DatabaseUser, Lucia, TimeSpan } from 'lucia';
 import { CONFIG } from '../../config';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { User } from '../../db/schema';
 import { sessions, users } from '../../db/schema';
 import { demoSessionExpiresAt } from './utils';
@@ -33,7 +33,7 @@ class SessionAdapter extends DrizzleSQLiteAdapter {
   }
 }
 
-export function createLucia(db: AppDatabase) {
+export function createLucia(db: AsyncAppDatabase) {
   return new Lucia(new SessionAdapter(db, sessions, users), {
     sessionCookie: {
       attributes: {
