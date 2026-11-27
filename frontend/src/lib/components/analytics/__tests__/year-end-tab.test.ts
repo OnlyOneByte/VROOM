@@ -21,8 +21,8 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({ vehicleApi: { getVehicles } }))
 import YearEndTab from '../YearEndTab.svelte';
 
 const OWNED = [
-	{ id: 'civic', year: 2019, make: 'Honda', model: 'Civic' },
-	{ id: 'rav4', year: 2022, make: 'Toyota', model: 'RAV4' }
+	{ id: 'civic', year: 2019, make: 'Honda', model: 'Civic', ownerCurrency: 'USD' },
+	{ id: 'rav4', year: 2022, make: 'Toyota', model: 'RAV4', ownerCurrency: 'USD' }
 ];
 const SHARED = {
 	id: 'f150',
@@ -43,6 +43,12 @@ function respond(p: AnalyticsQueryParams) {
 			series: [{ key: 'total', label: 'Cost', values: [1000, 3055, 500] }],
 			totals: { value: 4555, perBucket: 1518, perDistance: 0.5, distance: 9110 },
 			unit: 'USD'
+		};
+	}
+	if (p.metric === 'cost' && p.groupBy === 'vehicle') {
+		return {
+			series: [one('Civic', 3000), one('RAV4', 1055), one('F-150', 500), one('Golf', 0)],
+			totals: { value: 4555 }
 		};
 	}
 	if (p.metric === 'cost' && p.groupBy === 'category') {
@@ -108,7 +114,7 @@ describe('YearEndTab', () => {
 	test('the hero, the category bars and the monthly chart tell the same total', async () => {
 		getVehicles.mockResolvedValue(OWNED);
 		render(YearEndTab);
-		const label = await screen.findByText('2026 so far · 2 vehicles');
+		const label = await screen.findByText('2026 so far · 3 vehicles with spending');
 		expect(label.parentElement?.parentElement?.textContent).toContain('$4,555');
 		const bars = screen.getByRole('list', { name: 'Where it went, 2026' });
 		expect(bars.textContent).toMatch(/Financial.*\$3,000.*Fuel.*\$1,055.*Maintenance.*\$500/s);
@@ -119,7 +125,7 @@ describe('YearEndTab', () => {
 
 	test('the summary counts, names the biggest month and compares with the same point last year', async () => {
 		render(YearEndTab);
-		await screen.findByText('2026 so far · 3 vehicles');
+		await screen.findByText('2026 so far · 3 vehicles with spending');
 		expect(text()).toContain(
 			'Across 123 expenses and 90 fill-ups and charges. The biggest month was February ($3,055).'
 		);
@@ -149,7 +155,7 @@ describe('YearEndTab', () => {
 
 	test('a car shared with you in your currency is counted, with no note', async () => {
 		render(YearEndTab);
-		expect(await screen.findByText('2026 so far · 3 vehicles')).toBeTruthy();
+		expect(await screen.findByText('2026 so far · 3 vehicles with spending')).toBeTruthy();
 		expect(getVehicles).toHaveBeenCalledWith({ includeShared: true });
 		expect(text()).not.toMatch(/Not included|shared with you/);
 		expect(text()).toContain('$4,555');
@@ -160,15 +166,41 @@ describe('YearEndTab', () => {
 			Promise.resolve(opts?.includeShared ? [...OWNED, SHARED, SHARED_EUR] : OWNED)
 		);
 		render(YearEndTab);
-		expect(await screen.findByText('2026 so far · 3 vehicles')).toBeTruthy();
+		expect(await screen.findByText('2026 so far · 3 vehicles with spending')).toBeTruthy();
 		expect(text()).toContain(
 			'Not included: 2021 VW Golf, shared with you in EUR. These figures are in USD.'
 		);
 	});
 
+	test('the count comes from the cars the query covered, not the car list', async () => {
+		const unreadable = { ...SHARED, id: 'van', make: 'Ford', model: 'Transit' };
+		getVehicles.mockResolvedValue([...OWNED, SHARED, unreadable]);
+		render(YearEndTab);
+		expect(await screen.findByText('2026 so far · 3 vehicles with spending')).toBeTruthy();
+		expect(text()).not.toMatch(/4 vehicles|Not included|Transit/);
+	});
+
+	test('several cars in other currencies read as a list', async () => {
+		const gbp = { ...SHARED, id: 'mini', make: 'Mini', model: 'Cooper', ownerCurrency: 'GBP' };
+		const cad = { ...SHARED, id: 'jeep', make: 'Jeep', model: 'Wrangler', ownerCurrency: 'CAD' };
+		getVehicles.mockResolvedValue([...OWNED, SHARED_EUR, gbp, cad]);
+		render(YearEndTab);
+		await screen.findByText('2026 so far · 3 vehicles with spending');
+		expect(text()).toContain(
+			'Not included: 2021 VW Golf, 2021 Mini Cooper, and 2021 Jeep Wrangler, shared with you in EUR, GBP, and CAD.'
+		);
+	});
+
+	test('owned cars are never named as left out, whatever their currency', async () => {
+		getVehicles.mockResolvedValue([{ ...OWNED[0], ownerCurrency: 'EUR' }, OWNED[1]]);
+		render(YearEndTab);
+		await screen.findByText('2026 so far · 3 vehicles with spending');
+		expect(text()).not.toMatch(/Not included/);
+	});
+
 	test('the monthly chart labels each month; the fuel economy chart uses the query', async () => {
 		render(YearEndTab);
-		await screen.findByText('2026 so far · 3 vehicles');
+		await screen.findByText('2026 so far · 3 vehicles with spending');
 		const axis = chart(/All-in spend by month/)?.xAxisProps as {
 			ticks: string[];
 			format: (v: unknown) => string;
@@ -202,7 +234,7 @@ describe('YearEndTab', () => {
 		render(YearEndTab);
 		expect(await screen.findByText("Couldn't load year-end summary")).toBeTruthy();
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-		expect(await screen.findByText('2026 so far · 3 vehicles')).toBeTruthy();
+		expect(await screen.findByText('2026 so far · 3 vehicles with spending')).toBeTruthy();
 		await waitFor(() => expect(api.queryItems).toHaveBeenCalledTimes(2));
 	});
 
@@ -229,7 +261,7 @@ describe('YearEndTab', () => {
 		await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
 		await fireEvent.click(option);
 
-		const label = await screen.findByText('2025 · 3 vehicles');
+		const label = await screen.findByText('2025 · 3 vehicles with spending');
 		const hero = () => label.parentElement?.parentElement?.textContent ?? '';
 		expect(hero()).toContain('$2,222');
 		releaseFirst(ITEMS);

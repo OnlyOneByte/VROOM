@@ -34,6 +34,7 @@
 		biggestMonth,
 		cheapestToRun,
 		mostFills,
+		carsWithSpending,
 		percentChange,
 		yearCounts,
 		yearRange,
@@ -105,8 +106,10 @@
 			v => v.sharedAccess && currency && v.ownerCurrency && v.ownerCurrency !== currency
 		)
 	);
-	let carCount = $derived(vehicles.length - otherCurrency.length);
+	let carCount = $derived(carsWithSpending(results?.cars ?? null));
 	const carName = (v: Vehicle) => v.nickname || `${v.year} ${v.make} ${v.model}`;
+	const listOf = (items: string[]) =>
+		new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(items);
 	let total = $derived(monthly?.totals.value ?? 0);
 	let categories = $derived.by(() => {
 		const breakdown = (results?.categories.series ?? []).map(s => ({
@@ -158,7 +161,7 @@
 	]);
 	let effTrendConfig = $derived(buildChartConfig(effTrendSeries));
 
-	let carsText = $derived(`${carCount} ${carCount === 1 ? 'vehicle' : 'vehicles'}`);
+	let carsText = $derived(`${carCount} ${carCount === 1 ? 'vehicle' : 'vehicles'} with spending`);
 	let detailTiles = $derived.by(() => {
 		const avgEff = results?.efficiency.totals.value ?? null;
 		const perDistance = monthly?.totals.perDistance ?? null;
@@ -166,7 +169,7 @@
 			{
 				label: `Average ${efficiencyLabel}`,
 				value: avgEff != null ? formatNumber(avgEff, 1) : 'N/A',
-				subtitle: 'Fuel, across your cars'
+				subtitle: 'Fuel fill-ups only'
 			},
 			{
 				label: `Cost per ${distWord}`,
@@ -345,7 +348,7 @@
 					<AppLineChart
 						level={3}
 						title="{efficiencyLabel} by month"
-						description="Fuel economy across the cars you own, {selectedYear}"
+						description="Fuel economy across the vehicles with spending, {selectedYear}"
 						data={effTrendData}
 						x="date"
 						y="efficiency"
@@ -363,9 +366,9 @@
 {#snippet sharedNote()}
 	{#if otherCurrency.length > 0}
 		<p class="text-sm text-muted-foreground">
-			Not included: {otherCurrency.map(carName).join(', ')}, shared with you in {[
-				...new Set(otherCurrency.map(v => v.ownerCurrency))
-			].join(' and ')}. These figures are in {currency}.
+			Not included: {listOf(otherCurrency.map(carName))}, shared with you in {listOf([
+				...new Set(otherCurrency.map(v => v.ownerCurrency ?? ''))
+			])}. These figures are in {currency}.
 		</p>
 	{/if}
 {/snippet}
