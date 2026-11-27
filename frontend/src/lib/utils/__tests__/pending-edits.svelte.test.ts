@@ -389,9 +389,24 @@ describe('a save that never answers times out', () => {
 		return new ApiError('changed', 409, { updatedAt: current }, 'EXPENSE_CHANGED');
 	}
 
+	const formPayload = {
+		vehicleId: 'v1',
+		tags: [],
+		category: 'fuel' as const,
+		amount: 55,
+		date: '2026-11-20T12:00:00Z',
+		description: 'Shell',
+		currency: 'USD',
+		missedFillup: false,
+		sourceType: undefined,
+		sourceId: undefined
+	};
+
 	function store(id: string, body: PutArgs[1], updatedAt: string): Expense {
 		server.applied.push(body);
-		server.rows[id] = { ...saved, ...changed, ...body, updatedAt } as Expense;
+		const written = Object.entries(body).filter(([k, v]) => k !== 'currency' && v !== undefined);
+		const current = server.rows[id] ?? { ...saved, missedFillup: false };
+		server.rows[id] = { ...current, ...Object.fromEntries(written), updatedAt } as Expense;
 		return server.rows[id];
 	}
 
@@ -420,7 +435,7 @@ describe('a save that never answers times out', () => {
 		vi.mocked(expenseApi.updateExpense)
 			.mockImplementationOnce(appliedButNeverAnswered)
 			.mockImplementationOnce(appliedAndAnswered);
-		scheduleEdit(saved, changed, payload);
+		scheduleEdit(saved, changed, formPayload);
 		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS - 1);
 		expect(editFailureStates([saved])).toEqual([]);
 		expect(shownExpense(saved)).toMatchObject({ amount: 55 });
@@ -433,7 +448,7 @@ describe('a save that never answers times out', () => {
 		expect(failure).toMatchObject({ type: 'error', action: { label: 'Retry' } });
 
 		const again = { ...changed, amount: 70 };
-		scheduleEdit(saved, again, payload);
+		scheduleEdit(saved, again, formPayload);
 		await vi.advanceTimersByTimeAsync(0);
 		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
 	});
@@ -441,10 +456,10 @@ describe('a save that never answers times out', () => {
 	test('a save queued behind a hung one that landed goes out against the landed version', async () => {
 		vi.mocked(expenseApi.updateExpense).mockImplementation(appliedAndAnswered);
 		vi.mocked(expenseApi.updateExpense).mockImplementationOnce(appliedButNeverAnswered);
-		scheduleEdit(saved, changed, payload);
+		scheduleEdit(saved, changed, formPayload);
 		await vi.advanceTimersByTimeAsync(1000);
 		const again = { ...changed, amount: 70 };
-		const againPayload = { ...(payload as object), amount: 70 } as never;
+		const againPayload = { ...formPayload, amount: 70 };
 		scheduleEdit(saved, again, againPayload);
 
 		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS - 1001);
@@ -457,7 +472,7 @@ describe('a save that never answers times out', () => {
 			...signal,
 			expectedUpdatedAt: '2026-11-26T10:00:00.000Z'
 		});
-		expect(server.applied).toEqual([payload, againPayload]);
+		expect(server.applied).toEqual([formPayload, againPayload]);
 		expect(server.rows['e1']).toMatchObject({ amount: 70 });
 		expect(editFailureStates([saved])).toEqual([]);
 		expect(shownExpense(saved)).toMatchObject({ amount: 70 });
@@ -467,14 +482,14 @@ describe('a save that never answers times out', () => {
 		vi.mocked(expenseApi.updateExpense)
 			.mockImplementationOnce(appliedButNeverAnswered)
 			.mockImplementationOnce(appliedAndAnswered);
-		scheduleEdit(saved, changed, payload);
+		scheduleEdit(saved, changed, formPayload);
 		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS);
 		server.rows['e1'] = { ...saved, amount: 99, updatedAt: '2026-11-26T10:00:10.000Z' };
 
 		retryEdit('e1');
 		await vi.advanceTimersByTimeAsync(0);
-		expect(expenseApi.getExpense).toHaveBeenCalledWith('e1');
-		expect(server.applied).toEqual([payload]);
+		expect(expenseApi.getExpense).toHaveBeenCalledWith('e1', signal);
+		expect(server.applied).toEqual([formPayload]);
 		expect(editFailureStates([saved])).toEqual([
 			['e1', expect.objectContaining({ error: EXPENSE_CHANGED_MESSAGE, conflict: true })]
 		]);
@@ -484,7 +499,7 @@ describe('a save that never answers times out', () => {
 		vi.mocked(expenseApi.updateExpense)
 			.mockImplementationOnce(appliedButNeverAnswered)
 			.mockImplementationOnce(appliedAndAnswered);
-		scheduleEdit(saved, changed, payload);
+		scheduleEdit(saved, changed, formPayload);
 		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS);
 		expect(editFailureStates([saved])).toHaveLength(1);
 
@@ -493,8 +508,8 @@ describe('a save that never answers times out', () => {
 
 		const calls = vi.mocked(expenseApi.updateExpense).mock.calls;
 		expect(calls.map(([id]) => id)).toEqual(['e1', 'e1']);
-		expect(server.applied).toEqual([payload]);
-		expect(expenseApi.getExpense).toHaveBeenCalledWith('e1');
+		expect(server.applied).toEqual([formPayload]);
+		expect(expenseApi.getExpense).toHaveBeenCalledWith('e1', signal);
 		expect(Object.keys(server.rows)).toEqual(['e1']);
 		expect(editFailureStates([saved])).toEqual([]);
 		expect(shownExpense(saved)).toMatchObject({ amount: 55, description: 'Shell' });
@@ -503,9 +518,24 @@ describe('a save that never answers times out', () => {
 		expect(editFailureStates([reloaded])).toEqual([]);
 	});
 
+	test('Retry after a timed-out form save on a financing-linked expense also finds its own save', async () => {
+		server.rows['e1'] = { ...saved, sourceType: 'financing', sourceId: 'loan-1' } as Expense;
+		vi.mocked(expenseApi.updateExpense)
+			.mockImplementationOnce(appliedButNeverAnswered)
+			.mockImplementationOnce(appliedAndAnswered);
+		scheduleEdit(saved, changed, formPayload);
+		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS);
+
+		retryEdit('e1');
+		await vi.advanceTimersByTimeAsync(0);
+		expect(server.applied).toEqual([formPayload]);
+		expect(server.rows['e1']).toMatchObject({ sourceType: 'financing', amount: 55 });
+		expect(editFailureStates([saved])).toEqual([]);
+	});
+
 	test('a list reloaded after the timed-out save landed shows the saved values with no failure note', async () => {
 		vi.mocked(expenseApi.updateExpense).mockImplementationOnce(appliedButNeverAnswered);
-		scheduleEdit(saved, changed, payload);
+		scheduleEdit(saved, changed, formPayload);
 		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS);
 
 		const reloaded = server.rows['e1']!;

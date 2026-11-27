@@ -101,8 +101,8 @@ async function fetchPaginatedExpenses(url: string): Promise<PaginatedExpenseResp
 }
 
 export const expenseApi = {
-	async getExpense(expenseId: string): Promise<Expense> {
-		const data = await apiClient.get<BackendExpenseResponse>(`/expenses/${expenseId}`);
+	async getExpense(expenseId: string, options?: { signal?: AbortSignal }): Promise<Expense> {
+		const data = await apiClient.get<BackendExpenseResponse>(`/expenses/${expenseId}`, options);
 		return fromBackendExpense(data);
 	},
 

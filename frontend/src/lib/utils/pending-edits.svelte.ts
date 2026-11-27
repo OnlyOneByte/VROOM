@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { toBackendExpense } from '#lib/services/api-transformer.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
 import type { Expense } from '#lib/types/index.ts';
 import {
@@ -117,18 +118,23 @@ function sameValue(key: string, sent: unknown, stored: unknown): boolean {
 }
 
 function sameEdit(stored: Expense, payload: EditPayload): boolean {
-	const row = stored as unknown as Record<string, unknown>;
-	return Object.entries(payload).every(([key, sent]) => sameValue(key, sent, row[key]));
+	const sent = toBackendExpense(payload, { isEdit: true }) as unknown as Record<string, unknown>;
+	const row = toBackendExpense(stored, { isEdit: true }) as unknown as Record<string, unknown>;
+	return Object.entries(sent).every(([key, value]) => sameValue(key, value, row[key]));
 }
 
 async function ownTimedOutSave(id: string): Promise<Expense | undefined> {
 	const sent = timedOut.get(id);
 	if (!sent) return undefined;
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(new RequestTimeoutError()), EDIT_TIMEOUT_MS);
 	try {
-		const stored = await expenseApi.getExpense(id);
+		const stored = await expenseApi.getExpense(id, { signal: controller.signal });
 		return sameEdit(stored, sent) ? stored : undefined;
 	} catch {
 		return undefined;
+	} finally {
+		clearTimeout(timer);
 	}
 }
 

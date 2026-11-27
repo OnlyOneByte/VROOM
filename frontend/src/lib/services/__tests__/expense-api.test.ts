@@ -39,7 +39,7 @@ describe('getExpense (backend→frontend transform)', () => {
 	test('maps expenseAmount→amount and GETs the id path', async () => {
 		get.mockResolvedValueOnce(backendExpense({ expenseAmount: 99.9 }));
 		const result = await expenseApi.getExpense('e1');
-		expect(get).toHaveBeenCalledWith('/expenses/e1');
+		expect(get).toHaveBeenCalledWith('/expenses/e1', undefined);
 		expect(result.amount).toBe(99.9);
 		expect(result.id).toBe('e1');
 	});
