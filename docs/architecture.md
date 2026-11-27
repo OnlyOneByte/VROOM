@@ -179,10 +179,11 @@ checked. Use `outsideTransaction` for work that must start inside one and outliv
 The role-manager count skips accounts still waiting for approval, so a role given to one can't
 stand in for the last real role manager.
 
-The same holds for reads that look like one snapshot: a backup (`createBackup` in
-`src/api/sync/backup.ts`) and the Sheets mirror await each table in turn, so a write can land
-between two of their reads on either handle. A true snapshot needs a read transaction, which
-part C can add.
+A backup reads one snapshot: `createBackup` in `src/api/sync/backup.ts` reads every table in one
+deferred read transaction, and the Sheets mirror uses `createBackup` too. While it is open every
+other query waits, so it holds only the reads; zipping, CSV writing and the Sheets upload happen
+after it closes. On the seeded garage it is held for about 5 ms (median of 20 runs, 10 ms worst),
+and with 10,000 extra expenses about 33 ms (82 ms worst).
 
 Provider construction resolves its private-network policy on the async session:
 `privateEndpointPolicyFor` in `src/utils/outbound-url.ts` is async, so building a storage
@@ -192,7 +193,7 @@ async too, and the provider create and photo backfill transactions run on the as
 Restore runs its wipe and inserts in one async transaction (see
 `docs/conventions/BackupRestore.md`).
 
-What part C still has to move: a read transaction for backups, the key-rotation script, and demo and sample seeding (C4).
+What part C still has to move: the key-rotation script, and demo and sample seeding (C4).
 Connection upkeep in `src/db/connection.ts` stays sync by design.
 
 **Permissions load, then check.** A request's resolver reads its grants on the async session

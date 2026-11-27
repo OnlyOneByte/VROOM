@@ -94,7 +94,6 @@
   "backend/src/api/providers/services/google-sheets-service.ts: Keep titles space-free: ranges would otherwise need A1 quoting.",
   "backend/src/api/providers/services/google-sheets-service.ts: Order matters: the backup swap indexes each tab by position.",
   "backend/src/api/providers/services/google-sheets-service.ts: RAW, not USER_ENTERED: USER_ENTERED turns values like '=...' into formulas.",
-  "backend/src/api/providers/services/google-sheets-service.ts: SQLite caps bound parameters per statement; batch to stay under it.",
   "backend/src/api/providers/services/google-sheets-service.ts: Sheets appends new tabs at the end, so the index must be set explicitly.",
   "backend/src/api/providers/sync-worker.ts: Every skipped ref must record a failure: findPendingOrFailed is ordered by created_at, so untouched rows starve newer ones.",
   "backend/src/api/providers/sync-worker.ts: Must match the retry bound in photoRefRepository.findPendingOrFailed.",
