@@ -124,10 +124,10 @@ function createSettingsStore() {
 			}
 		},
 
-		async executeSync(syncTypes: 'backup'[], force = false) {
+		async executeSync(syncTypes: 'backup'[], force = false, providerIds?: string[]) {
 			error = null;
 			try {
-				return await settingsApi.executeSync(syncTypes, force);
+				return await settingsApi.executeSync(syncTypes, force, providerIds);
 			} catch (err) {
 				error = userFacingErrorMessage(err);
 				throw err;

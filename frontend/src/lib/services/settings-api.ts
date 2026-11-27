@@ -21,8 +21,16 @@ export const settingsApi = {
 		await apiClient.post(`/sync/sheets/${encodeURIComponent(providerId)}/resume`, {});
 	},
 
-	async executeSync(syncTypes: 'backup'[], force = false): Promise<BackupOrchestratorResult> {
-		return apiClient.post<BackupOrchestratorResult>('/sync', { syncTypes, force });
+	async executeSync(
+		syncTypes: 'backup'[],
+		force = false,
+		providerIds?: string[]
+	): Promise<BackupOrchestratorResult> {
+		return apiClient.post<BackupOrchestratorResult>('/sync', {
+			syncTypes,
+			force,
+			...(providerIds && { providerIds })
+		});
 	},
 
 	async listBackupsFromProvider(providerId: string): Promise<BackupFileInfo[]> {

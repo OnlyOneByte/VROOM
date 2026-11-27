@@ -40,6 +40,41 @@ export function filterEnabledProviders(
   );
 }
 
+export const NEW_PROVIDER_BACKUP_SETTINGS = {
+  folderPath: 'Backups',
+  retentionCount: 10,
+} as const;
+
+export function chosenProviders(
+  config: BackupConfig,
+  providerIds: readonly string[]
+): [string, ProviderBackupSettings][] {
+  return providerIds.map((id) => {
+    const saved = config.providers[id];
+    const sheetsOnly = saved?.enabled !== true && saved?.sheetsSyncEnabled === true;
+    return [id, { ...NEW_PROVIDER_BACKUP_SETTINGS, ...saved, enabled: !sheetsOnly }] as [
+      string,
+      ProviderBackupSettings,
+    ];
+  });
+}
+
+type ConfigPatch = Record<string, Record<string, string | number | boolean | null>>;
+
+async function patchForCurrentProviders(userId: string, patch: ConfigPatch): Promise<ConfigPatch> {
+  const [prefs, live] = await Promise.all([
+    repos().preferences.getOrCreate(userId),
+    loadProviderTypes(userId),
+  ]);
+  const saved = (prefs.backupConfig as BackupConfig | null)?.providers ?? {};
+  const result: ConfigPatch = {};
+  for (const [id, entry] of Object.entries(patch)) {
+    if (!live.has(id)) continue;
+    result[id] = saved[id] ? entry : { ...NEW_PROVIDER_BACKUP_SETTINGS, enabled: false, ...entry };
+  }
+  return result;
+}
+
 export function needsZipGeneration(
   enabledProviders: [string, ProviderBackupSettings][],
   providerTypes: ProviderTypes
@@ -107,7 +142,8 @@ export class BackupOrchestrator {
   async execute(
     userId: string,
     displayName: string,
-    force = false
+    force = false,
+    providerIds?: readonly string[]
   ): Promise<BackupOrchestratorResult> {
     const timestamp = new Date().toISOString();
 
@@ -146,10 +182,10 @@ export class BackupOrchestrator {
       const providerRowMap = new Map(providerRows.map((r) => [r.id, r]));
       const providerTypes = new Map(providerRows.map((r) => [r.id, r.providerType]));
 
-      const enabledProviders = filterEnabledProviders(
-        force ? config : withPausedSheetsOff(config),
-        providerTypes
-      );
+      const runConfig = force ? config : withPausedSheetsOff(config);
+      const enabledProviders = providerIds
+        ? chosenProviders(runConfig, providerIds)
+        : filterEnabledProviders(runConfig, providerTypes);
 
       if (enabledProviders.length === 0) {
         return { timestamp, outcome: 'noop', failedProviders: [], results: {} };
@@ -232,7 +268,7 @@ export class BackupOrchestrator {
       const settled = await Promise.allSettled(strategyPromises);
 
       const results: Record<string, BackupStrategyResult> = {};
-      const configPatch: Record<string, Record<string, string | null>> = {};
+      const configPatch: ConfigPatch = {};
       let anySuccess = false;
       const failedProviders: string[] = [];
 
@@ -300,10 +336,13 @@ export class BackupOrchestrator {
 
       if (Object.keys(configPatch).length > 0) {
         await repos().preferences.mergeJsonField(userId, 'backupConfig', {
-          providers: configPatch,
+          providers: await patchForCurrentProviders(userId, configPatch),
         });
       }
-      if (runOutcome === 'success') {
+      const coveredEveryEnabled =
+        !providerIds ||
+        filterEnabledProviders(runConfig, providerTypes).every(([id]) => providerIds.includes(id));
+      if (runOutcome === 'success' && coveredEveryEnabled) {
         await repos().syncState.updateSyncDate(userId, new Date(timestamp));
         await repos().syncState.updateBackupDate(userId);
       }

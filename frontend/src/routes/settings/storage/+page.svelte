@@ -13,6 +13,8 @@
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { routes } from '#lib/routes.ts';
+	import { supportsZipBackup } from '#lib/constants/providers.ts';
+	import { providerCatalog } from '#lib/stores/provider-catalog.svelte.ts';
 	import type {
 		BackupConfig,
 		BackupOrchestratorResult,
@@ -40,6 +42,21 @@
 			.filter(p => enabledIds.includes(p.id))
 			.map(p => ({ id: p.id, displayName: p.displayName, providerType: p.providerType }));
 	});
+	let backupChoices = $derived(
+		storageProviders
+			.filter(p => supportsZipBackup(p.providerType))
+			.map(p => {
+				const saved = backupConfig.providers[p.id];
+				const zip = saved?.enabled === true;
+				const sheets = saved?.sheetsSyncEnabled === true;
+				return {
+					id: p.id,
+					displayName: p.displayName,
+					savedOn: zip || sheets,
+					status: zip ? 'Backups on' : sheets ? 'Sheets backups on' : 'Backups off'
+				};
+			})
+	);
 
 	let showBackupDialog = $state(false);
 	let showRestoreDialog = $state(false);
@@ -54,6 +71,7 @@
 	onMount(() => {
 		settingsStore.load();
 		loadProviders();
+		void providerCatalog.load();
 	});
 
 	function retryLoad() {
@@ -143,12 +161,12 @@
 		);
 	}
 
-	async function handleBackupExecute() {
+	async function handleBackupExecute(providerIds?: string[]) {
 		showBackupDialog = false;
 		const toastId = toast.loading('Backup in progress...');
 
 		try {
-			const data = await settingsStore.executeSync(['backup'], true);
+			const data = await settingsStore.executeSync(['backup'], true, providerIds);
 			const providers = (count: number) => `${count} provider${count === 1 ? '' : 's'}`;
 
 			if (data.outcome === 'success') {
@@ -162,7 +180,12 @@
 					{ id: toastId }
 				);
 			} else if (data.outcome === 'noop') {
-				toast.info('Nothing to back up: no provider has backups turned on', { id: toastId });
+				toast.info(
+					providerIds
+						? 'Nothing was backed up. Reload the page to see your storage, then try again.'
+						: 'Nothing to back up: no provider has backups turned on',
+					{ id: toastId }
+				);
 			} else {
 				toast.error(`Couldn't back up. ${backupProblem(data.failedProviders, data.results)}`, {
 					id: toastId
@@ -261,8 +284,7 @@
 			{#if module}
 				<module.default
 					bind:open={showBackupDialog}
-					{backupProvidersEnabled}
-					providers={backupProviders}
+					providers={backupChoices}
 					onSync={handleBackupExecute}
 				/>
 			{/if}

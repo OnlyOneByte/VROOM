@@ -58,7 +58,7 @@
 	<span data-testid="stub-open"></span>
 {/if}
 {#if onSync}
-	<button onclick={onSync}>stub sync</button>
+	<button onclick={() => onSync?.()}>stub sync</button>
 {/if}
 {#if onDownloadBackup}
 	<button onclick={onDownloadBackup}>stub download</button>
