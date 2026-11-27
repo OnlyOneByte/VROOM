@@ -61,6 +61,7 @@
 			<div class="mt-1">
 				<PendingSyncNote
 					{pending}
+					{canWrite}
 					entryId={expense.id}
 					{returnTo}
 					label="{formatCurrency(expense.amount)} {heading.title}"
