@@ -101,6 +101,17 @@ describe('PUT /settings rescales stored money when the decimals change', () => {
     expect(allocations(after.reminder.split)).toEqual([3300, 3400, 3300]);
   });
 
+  test('a user with no vehicles or policies can change to and from a no-decimal currency', async () => {
+    ctx.sqlite.run('DELETE FROM vehicles WHERE id = ?', [vehicleId]);
+    expect(ctx.sqlite.query('SELECT COUNT(*) AS n FROM insurance_policies').get()).toEqual({
+      n: 0,
+    });
+    await setCurrency('JPY');
+    await setCurrency('USD');
+    const res = await ctx.authed('GET', '/api/v1/settings');
+    expect((await json<DataEnvelope<{ currencyUnit: string }>>(res)).data.currencyUnit).toBe('USD');
+  });
+
   test('a change between two-decimal currencies, or to the same currency, changes nothing', async () => {
     seedMoney();
     const before = stored();
