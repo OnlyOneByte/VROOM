@@ -49,7 +49,8 @@
 		expensesNote,
 		percentChange,
 		seriesFor,
-		valueFormatter
+		valueFormatter,
+		weeksNeedYear
 	} from './explore-data';
 
 	interface Props {
@@ -194,7 +195,11 @@
 			: ''
 	);
 
-	let labels = $derived(response ? response.buckets.map(b => bucketLabel(b, shown.per)) : []);
+	let withYear = $derived(weeksNeedYear(shown.per, response?.buckets.length ?? 0));
+	function labelOf(key: string): string {
+		return bucketLabel(key, shown.per, withYear);
+	}
+	let labels = $derived(response ? response.buckets.map(labelOf) : []);
 	const isMobile = new IsMobile();
 	let maxTicks = $derived(isMobile.current ? 4 : 6);
 	let tickStep = $derived(Math.max(1, Math.ceil(labels.length / maxTicks)));
@@ -352,7 +357,7 @@
 	}
 	let lineXAxis = $derived({
 		ticks: Math.min(maxTicks, lineRows.length),
-		format: (v: Date) => (v instanceof Date ? bucketLabel(keyFor(v), shown.per) : '')
+		format: (v: Date) => (v instanceof Date ? labelOf(keyFor(v)) : '')
 	});
 
 	let annotationOptions = $derived({
@@ -396,7 +401,7 @@
 	});
 	let selectionTitle = $derived(
 		response && selectedIndex >= 0
-			? `${bucketLabel(response.buckets[selectedIndex] ?? '', shown.per)}${selectedSeries ? ` · ${selectedSeries.label}` : ''}`
+			? `${labelOf(response.buckets[selectedIndex] ?? '')}${selectedSeries ? ` · ${selectedSeries.label}` : ''}`
 			: ''
 	);
 	let selectionComparison = $derived.by(() => {
@@ -692,7 +697,7 @@
 					xAxisProps={lineXAxis}
 					yAxisFormat={format.axis}
 					tooltipFormat={compareTooltip}
-					tooltipLabelFormat={v => (v instanceof Date ? bucketLabel(keyFor(v), shown.per) : '')}
+					tooltipLabelFormat={v => (v instanceof Date ? labelOf(keyFor(v)) : '')}
 				/>
 			{:else if form === 'panels'}
 				<section aria-labelledby="explore-panels-title" class="space-y-3">
@@ -767,8 +772,7 @@
 									xAxisProps={lineXAxis}
 									yAxisFormat={format.axis}
 									tooltipFormat={format.full}
-									tooltipLabelFormat={v =>
-										v instanceof Date ? bucketLabel(keyFor(v), shown.per) : ''}
+									tooltipLabelFormat={v => (v instanceof Date ? labelOf(keyFor(v)) : '')}
 								/>
 							{/if}
 						{/each}
@@ -790,7 +794,7 @@
 					xAxisProps={lineXAxis}
 					yAxisFormat={format.axis}
 					tooltipFormat={format.full}
-					tooltipLabelFormat={v => (v instanceof Date ? bucketLabel(keyFor(v), shown.per) : '')}
+					tooltipLabelFormat={v => (v instanceof Date ? labelOf(keyFor(v)) : '')}
 				/>
 			{:else}
 				<AppBarChart
@@ -838,7 +842,7 @@
 		{onOnlyCar}
 		allCars={selectedSeries && form === 'panels' && query.sel && query.sel !== 'total'
 			? {
-					label: `${vehicleIds?.length ? 'All selected cars' : 'All cars'} in ${bucketLabel(query.sel, shown.per)}`,
+					label: `${vehicleIds?.length ? 'All selected cars' : 'All cars'} in ${labelOf(query.sel)}`,
 					run: () => onQueryChange({ ...query, seg: undefined })
 				}
 			: null}

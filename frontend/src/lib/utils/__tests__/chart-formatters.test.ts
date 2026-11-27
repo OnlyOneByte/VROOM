@@ -20,9 +20,33 @@ import {
 	getXTickCount,
 	monthlyXAxisProps,
 	parseMonthToDate,
-	TIME_X_PADDING
+	TIME_X_PADDING,
+	edgeLabelShift
 } from '#lib/utils/chart-formatters.ts';
 import { formatNumber } from '#lib/utils/formatters.ts';
+
+describe('edgeLabelShift (x labels at the plot edges stay inside the chart)', () => {
+	const padding = { left: 48, right: 4 };
+
+	test('a label centred on the right edge moves left by just what sticks out', () => {
+		expect(edgeLabelShift(241, 'Nov ’26', 241, padding)).toBeCloseTo(-20.5);
+		expect(edgeLabelShift(225, 'Nov ’26', 241, padding)).toBeCloseTo(-4.5);
+	});
+
+	test('a label that sticks out past the left edge moves right by just that much', () => {
+		expect(edgeLabelShift(-46, 'Jan 1 ’25', 241, padding)).toBeCloseTo(29.5);
+	});
+
+	test('labels with room on both sides stay where they are', () => {
+		expect(edgeLabelShift(120, 'Nov ’26', 241, padding)).toBe(0);
+		expect(edgeLabelShift(0, 'Aug ’26', 241, padding)).toBe(0);
+	});
+
+	test('before the chart has a size, labels stay where they are', () => {
+		expect(edgeLabelShift(10, 'Nov ’26', 0, padding)).toBe(0);
+		expect(edgeLabelShift(undefined, 'Nov ’26', 241, padding)).toBe(0);
+	});
+});
 
 describe('chart money axis formatters', () => {
 	test('formatCurrencyAxis renders compact currency with no decimals', () => {

@@ -19,7 +19,8 @@
 		isolatedValueRows
 	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
-	import type { ChartState } from 'layerchart';
+	import type { ChartState, TextProps } from 'layerchart';
+	import EdgeTickLabel from './EdgeTickLabel.svelte';
 	import { buildChartA11y, type ChartSelectHandler } from './chart-a11y.ts';
 	import { guideTicks } from './guides.ts';
 
@@ -107,6 +108,10 @@
 	);
 </script>
 
+{#snippet edgeTickLabel({ props }: { props: TextProps })}
+	<EdgeTickLabel {props} />
+{/snippet}
+
 <ChartCard
 	{title}
 	{level}
@@ -139,7 +144,11 @@
 					xPadding={TIME_X_PADDING}
 					props={{
 						area: { curve: SMOOTH_CURVE, opacity: 0.3 },
-						xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
+						xAxis: {
+							...resolvedXAxisProps,
+							ticks: insetTimeTicks(resolvedXAxisProps['ticks']),
+							tickLabel: edgeTickLabel
+						},
 						yAxis: { format: yAxisFormat, ticks: yTicks },
 						grid: { yTicks }
 					}}

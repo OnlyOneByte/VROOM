@@ -123,6 +123,21 @@ function tickLabelWidth(label: string): number {
 	return width;
 }
 
+export function edgeLabelShift(
+	x: unknown,
+	label: unknown,
+	plotWidth: number,
+	padding: { left: number; right: number }
+): number {
+	const at = Number(x);
+	if (!Number.isFinite(at) || plotWidth <= 0) return 0;
+	const half = tickLabelWidth(String(label ?? '')) / 2;
+	const pastRight = at + half - (plotWidth + padding.right);
+	if (pastRight > 0) return -pastRight;
+	const pastLeft = -padding.left - (at - half);
+	return pastLeft > 0 ? pastLeft : 0;
+}
+
 function labelsFit(ticks: Date[], scale: AnyScale, format: (_v: unknown) => string): boolean {
 	const widths = ticks.map(tick => tickLabelWidth(format(tick)));
 	return ticks.every((tick, i) => {
