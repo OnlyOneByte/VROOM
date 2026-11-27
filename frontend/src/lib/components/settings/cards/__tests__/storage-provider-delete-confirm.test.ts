@@ -50,7 +50,11 @@ describe('deleting a storage provider asks first', () => {
 	test('the trash button opens a confirmation and deletes nothing yet', async () => {
 		await clickDelete();
 		expect(await screen.findByText('Delete Family Drive?')).toBeInTheDocument();
-		expect(screen.getByText(/Backups to this provider stop/)).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				"VROOM stops backing up here and removes this storage's settings. Your files stay in the storage itself."
+			)
+		).toBeInTheDocument();
 		expect(deleteProvider).not.toHaveBeenCalled();
 	});
 
@@ -68,12 +72,12 @@ describe('deleting a storage provider asks first', () => {
 
 	test('photos stored only there get a second, specific warning before a forced delete', async () => {
 		deleteProvider.mockRejectedValueOnce(
-			new ApiError('2 photos are stored only in this provider.', 409, { photosOnlyHere: 2 })
+			new ApiError('2 photos are stored only in this storage.', 409, { photosOnlyHere: 2 })
 		);
 		await clickDelete();
 		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 		expect(
-			await screen.findByText('2 photos are stored only in this provider.')
+			await screen.findByText('2 photos are stored only in this storage.')
 		).toBeInTheDocument();
 		await fireEvent.click(await screen.findByRole('button', { name: 'Delete anyway' }));
 		await waitFor(() => expect(deleteProvider).toHaveBeenLastCalledWith('prov-1', { force: true }));

@@ -35,26 +35,30 @@
 	<div class="space-y-2">
 		<Label for="backup-folder-path" class="text-sm">Backup folder path</Label>
 		<div
-			class="flex items-center h-9 rounded-md border {folderPathError
-				? 'border-destructive'
-				: 'border-input'} bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+			class="flex h-11.5 items-center rounded-(--r-md) bg-surface text-base md:text-sm {folderPathError
+				? 'border-2 border-destructive focus-within:ring-[3px] focus-within:ring-destructive/20 dark:focus-within:ring-destructive/40'
+				: 'border-[1.5px] border-border-strong focus-within:border-foreground focus-within:ring-[3px] focus-within:ring-ring/50'}"
 		>
 			{#if providerRootPrefix}
-				<span class="pl-3 text-muted-foreground select-none shrink-0">{providerRootPrefix}</span>
+				<span class="pl-3.5 text-muted-foreground select-none shrink-0">{providerRootPrefix}</span>
 			{/if}
 			<input
 				id="backup-folder-path"
 				bind:value={backupFolderPath}
 				placeholder="Backups"
-				class="flex-1 bg-transparent px-3 py-1 outline-none placeholder:text-muted-foreground {providerRootPrefix
+				aria-invalid={folderPathError ? true : undefined}
+				aria-describedby="backup-folder-path-help"
+				class="min-w-0 flex-1 bg-transparent px-3.5 py-1 outline-none placeholder:text-muted-foreground {providerRootPrefix
 					? 'pl-0'
 					: ''}"
 			/>
 		</div>
 		{#if folderPathError}
-			<p class="text-xs text-destructive">{folderPathError}</p>
+			<p id="backup-folder-path-help" class="text-xs text-destructive">{folderPathError}</p>
 		{:else}
-			<p class="text-xs text-muted-foreground">All backups are stored under this path</p>
+			<p id="backup-folder-path-help" class="text-xs text-muted-foreground">
+				All backups are stored under this path
+			</p>
 		{/if}
 	</div>
 

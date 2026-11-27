@@ -1,3 +1,4 @@
+import type { ChargerType } from '#lib/types/index.ts';
 import { toDateInputValue } from '#lib/utils/formatters.ts';
 
 export interface ExpenseFormData {
@@ -10,6 +11,7 @@ export interface ExpenseFormData {
 	volume: string;
 	charge: string;
 	fuelType: string;
+	chargerType: ChargerType | '';
 	description: string;
 	location: string;
 	missedFillup: boolean;
@@ -26,6 +28,7 @@ export function createEmptyFormData(today: Date = new Date()): ExpenseFormData {
 		volume: '',
 		charge: '',
 		fuelType: '',
+		chargerType: '',
 		description: '',
 		location: '',
 		missedFillup: false

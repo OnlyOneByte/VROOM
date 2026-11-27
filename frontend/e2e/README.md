@@ -147,9 +147,9 @@ before the scan, so axe samples the settled colour rather than a mid-`transition
 
 Three layers, each covering what the others cannot reach:
 
-- **`pwa.spec.ts`, `A11Y_ROUTES`.** `/`, `/auth`, `/dashboard`, `/expenses`, `/expenses/new`,
+- **`pwa.spec.ts`, `A11Y_ROUTES`.** `/`, `/auth`, `/privacypolicy`, `/termsofservice`, `/dashboard`, `/expenses`, `/expenses/new`,
   `/vehicles/new`, a vehicle's detail page, `/analytics`, `/insurance`, `/reminders`, `/trips`,
-  `/settings`, `/settings/server`, `/settings/storage`, `/profile` and the not-found page, as they first render. Each entry carries its debt list, whether it is a signed-out surface, and a
+  `/settings`, `/settings/server`, `/settings/storage`, `/settings/ai`, `/settings/providers/new`, `/profile` and the not-found page, as they first render. Each entry carries its debt list, whether it is a signed-out surface, and a
   locator that proves its own content rendered.
 - **`pwa.spec.ts`, the theme sweep.** `/dashboard` in dark mode under each non-default registry
   theme. A theme swaps the custom properties the whole app paints from, so a low-contrast palette

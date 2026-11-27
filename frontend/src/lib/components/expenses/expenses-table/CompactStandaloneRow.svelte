@@ -111,6 +111,7 @@
 		<div class="pr-3 pb-3 pl-[2.75rem]">
 			<PendingSyncNote
 				{pending}
+				{canWrite}
 				entryId={expense.id}
 				{returnTo}
 				label="{formatCurrency(expense.amount)} {heading.title}"

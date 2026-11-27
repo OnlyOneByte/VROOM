@@ -60,6 +60,7 @@ const MOCK_SUMMARY: AnalyticsSummaryData = {
       sessionDetails: { avgEnergy: null, minEnergy: null, maxEnergy: null },
       averageCost: { perSession: null, perEnergyUnit: null },
       priceHistory: [],
+      byChargerType: [],
     },
   },
   fuelAdvanced: {

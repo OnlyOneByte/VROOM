@@ -472,7 +472,7 @@ async function assertNoPhotosOnlyHere(providerId: string, force: boolean): Promi
   if (photosOnlyHere === 0) return;
   const one = photosOnlyHere === 1;
   throw new AppError(
-    `${photosOnlyHere} ${one ? 'photo is' : 'photos are'} stored only in this provider. Deleting it means ${one ? 'that photo' : 'those photos'} can no longer be shown.`,
+    `${photosOnlyHere} ${one ? 'photo is' : 'photos are'} stored only in this storage. Deleting it means ${one ? 'that photo' : 'those photos'} can no longer be shown.`,
     409,
     true,
     { photosOnlyHere }

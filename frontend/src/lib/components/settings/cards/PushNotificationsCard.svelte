@@ -121,7 +121,7 @@
 	}
 </script>
 
-<div class="py-3 outline-none" bind:this={content} tabindex={-1}>
+<div class="py-3 outline-none" bind:this={content} tabindex="-1">
 	{#if isLoading}
 		<div class="flex items-center justify-between gap-4" data-testid="push-loading">
 			<p class="font-medium">Reminder notifications</p>

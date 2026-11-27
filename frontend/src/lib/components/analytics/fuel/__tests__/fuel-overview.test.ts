@@ -2,7 +2,21 @@ import { describe, expect, test } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import type { FuelAdvancedResponse, FuelStatsResponse } from '#lib/types/index.ts';
 import FuelOverview from '../FuelOverview.svelte';
-import { economyRows, priceSummary } from '../fuel-overview';
+import { chargerRows, economyRows, fillupRows, homeSplit, priceSummary } from '../fuel-overview';
+
+type Charger = NonNullable<FuelStatsResponse['charging']>['byChargerType'][number];
+const charger = (
+	chargerType: Charger['chargerType'],
+	sessions: number,
+	energyShare: number,
+	pricePerEnergyUnit: number | null
+): Charger => ({
+	chargerType,
+	sessions,
+	energy: energyShare * 100,
+	energyShare,
+	pricePerEnergyUnit
+});
 
 const fill = (month: string, pricePerVolume: number, fuelType = 'Regular') => ({
 	date: `${month}-10`,
@@ -43,6 +57,70 @@ describe('fuel overview figures', () => {
 		expect(priceSummary([])).toBeNull();
 	});
 
+	test('a tie in fill-up count goes to the fuel type used most recently', () => {
+		const history = [
+			{ ...fill('2026-10', 3.5), date: '2026-10-01' },
+			{ ...fill('2026-11', 4.2, 'Premium'), date: '2026-11-20' },
+			{ ...fill('2026-11', 3.6), date: '2026-11-05' },
+			{ ...fill('2026-09', 4.1, 'Premium'), date: '2026-09-01' }
+		];
+		expect(priceSummary(history)?.fuelType).toBe('Premium');
+		expect(priceSummary([...history].reverse())?.fuelType).toBe('Premium');
+	});
+
+	test('without a volume on every fill-up, the average falls back to a plain mean', () => {
+		const summary = priceSummary([{ ...fill('2026-10', 3), volume: 30 }, fill('2026-10', 4)]);
+		expect(summary?.average).toBeCloseTo(3.5);
+	});
+
+	test('the average and monthly averages weight each fill-up by its volume', () => {
+		const summary = priceSummary([
+			{ ...fill('2026-10', 3), volume: 2 },
+			{ ...fill('2026-10', 4), volume: 14 },
+			{ ...fill('2026-11', 3.5), volume: 16 }
+		]);
+		expect(summary?.average).toBeCloseTo((3 * 2 + 4 * 14 + 3.5 * 16) / 32);
+		expect(summary?.high).toBeCloseTo((3 * 2 + 4 * 14) / 16);
+		expect(summary?.cheapestMonth).toBe('2026-11');
+	});
+
+	test('fill-up rows give each car its volume-weighted price', () => {
+		expect(
+			fillupRows([
+				{ vehicleId: 'a', vehicleName: 'Daily', count: 36, volume: 400, cost: 1448 },
+				{ vehicleId: 'b', vehicleName: 'Free', count: 1, volume: 10, cost: 0 }
+			])
+		).toEqual([
+			{ vehicleId: 'a', label: 'Daily', count: 36, volume: 400, avgPrice: 3.62 },
+			{ vehicleId: 'b', label: 'Free', count: 1, volume: 10, avgPrice: null }
+		]);
+		expect(fillupRows(undefined)).toEqual([]);
+	});
+
+	test('charger rows skip unused types; the home split compares home with priced public charging', () => {
+		const byType = [
+			charger('home', 40, 0.84, 0.14),
+			charger('workplace', 0, 0, null),
+			charger('public_l2', 2, 0.04, 0.3),
+			charger('dc_fast', 5, 0.12, 0.42),
+			charger('unspecified', 1, 0, null)
+		];
+		expect(chargerRows(byType).map(r => [r.label, r.sessions])).toEqual([
+			['Home', 40],
+			['Public Level 2', 2],
+			['DC fast', 5],
+			['Not set', 1]
+		]);
+		const split = homeSplit(byType);
+		expect(split).toMatchObject({ homeShare: 0.84, homeRate: 0.14 });
+		expect(split?.awayRate).toBeCloseTo((0.3 * 4 + 0.42 * 12) / 16);
+		const freeHome = homeSplit([charger('home', 40, 0.9, null), charger('dc_fast', 5, 0.1, 0.42)]);
+		expect(freeHome).toMatchObject({ homeShare: 0.9, homeRate: null });
+		expect(freeHome?.awayRate).toBeCloseTo(0.42);
+		expect(homeSplit([charger('home', 40, 1, 0.14)])).toBeNull();
+		expect(homeSplit([charger('dc_fast', 5, 1, 0.42)])).toBeNull();
+	});
+
 	test('economy bars use the real economy, skip cars without one, best first', () => {
 		const rows = economyRows([
 			car('a', 'Daily', 31),
@@ -61,6 +139,7 @@ const base = {
 	vehicleColors: {},
 	rangeText: 'Last 12 months',
 	volumeUnit: 'gal',
+	volumeLabel: 'Gallons',
 	chargeUnit: 'kWh',
 	efficiencyUnit: 'mpg',
 	electricEfficiencyUnit: 'mi/kWh'
@@ -98,6 +177,33 @@ describe('FuelOverview', () => {
 			screen.getByRole('heading', { name: 'Regular, Jun 1, 2026 – Nov 30, 2026' })
 		).toBeTruthy();
 		expect(screen.queryByText(/cheapest month/)).toBeNull();
+	});
+
+	test('the fill-ups and charging tables, and the home share of charging', () => {
+		render(FuelOverview, {
+			...base,
+			fuelStats: stats({
+				gasPriceHistory: [fill('2026-10', 3.6)],
+				fillupsByVehicle: [
+					{ vehicleId: 'a', vehicleName: 'Daily Driver', count: 36, volume: 400, cost: 1448 }
+				],
+				charging: {
+					sessions: { currentYear: 47, previousYear: 0, currentMonth: 4, previousMonth: 3 },
+					efficiency: { avgEfficiency: 4.7, bestEfficiency: null, worstEfficiency: null },
+					averageCost: { perSession: 2, perEnergyUnit: 0.193 },
+					byChargerType: [charger('home', 40, 0.84, 0.14), charger('dc_fast', 7, 0.16, 0.42)]
+				} as FuelStatsResponse['charging']
+			}),
+			showCharging: true
+		});
+		const fillups = screen.getByRole('table', { name: 'Fill-ups' });
+		expect(fillups.textContent).toMatch(/Daily Driver\s*36\s*400\s*\$3\.62/);
+		const chargingTable = screen.getByRole('table', { name: 'Charging' });
+		expect(chargingTable.textContent).toMatch(/Home\s*40\s*84%\s*\$0\.140/);
+		expect(chargingTable.textContent).toMatch(/DC fast\s*7\s*16%\s*\$0\.420/);
+		expect(screen.getByRole('region', { name: 'Fuel and charging overview' }).textContent).toMatch(
+			/84%\s*of energy came from home\s+at\s*\$0\.140\s*per kWh;\s*away from home it cost\s*\$0\.420\s*per kWh\./
+		);
 	});
 
 	test('an EV-only fleet gets the charging line and no fuel hero or economy bars', () => {

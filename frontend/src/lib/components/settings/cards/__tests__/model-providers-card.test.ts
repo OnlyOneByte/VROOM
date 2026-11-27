@@ -127,16 +127,16 @@ describe('ModelProvidersCard', () => {
 			expect(scrollIntoView).not.toHaveBeenCalled();
 
 			finish([]);
-			await settle();
 
+			await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
 			const card = document.getElementById('assistant-providers');
-			expect(scrollIntoView).toHaveBeenCalledTimes(1);
 			expect(scrollIntoView.mock.contexts[0]).toBe(card);
 			expect(card).toHaveFocus();
 		});
 
 		test('without the hash, nothing scrolls', async () => {
 			render(ModelProvidersCard, { props: { domain: 'llm' } });
+			await screen.findByText('No assistant provider connected');
 			await settle();
 
 			expect(scrollIntoView).not.toHaveBeenCalled();
@@ -144,8 +144,8 @@ describe('ModelProvidersCard', () => {
 	});
 
 	test.each([
-		['vlm', 'Receipt Scanning', 'Built-in text reader'],
-		['llm', 'Assistant (AI)', 'No assistant provider connected']
+		['vlm', 'Receipt scanning', 'Built-in text reader'],
+		['llm', 'Assistant', 'No assistant provider connected']
 	] as const)(
 		'%s domain loads its own providers and shows its copy',
 		async (domain, title, empty) => {
@@ -153,7 +153,8 @@ describe('ModelProvidersCard', () => {
 			render(ModelProvidersCard, { props: { domain } });
 
 			expect(await screen.findByText(empty)).toBeInTheDocument();
-			expect(screen.getByRole('heading', { level: 3, name: title })).toBeInTheDocument();
+			expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
+			expect(screen.getByRole('region', { name: title })).toBeInTheDocument();
 			expect(getProviders).toHaveBeenCalledWith(domain);
 			expect(document.querySelector(`[data-testid="${domain}-add-provider"]`)).not.toBeNull();
 		}
@@ -180,7 +181,7 @@ describe('ModelProvidersCard', () => {
 		await screen.findByText('No assistant provider connected');
 		const addButtons = screen.getAllByRole('button', { name: /^Add / });
 		expect(addButtons).toHaveLength(1);
-		expect(addButtons[0]).toHaveAccessibleName('Add Assistant Provider');
+		expect(addButtons[0]).toHaveAccessibleName('Add AI assistant');
 		expect(addButtons[0]?.className).toMatch(/(^|\s)h-10(\s|$)/);
 	});
 
@@ -191,7 +192,7 @@ describe('ModelProvidersCard', () => {
 		await screen.findByText('Receipt Bot');
 		const addButtons = screen.getAllByRole('button', { name: /^Add / });
 		expect(addButtons).toHaveLength(1);
-		expect(addButtons[0]).toHaveAccessibleName('Add AI Provider');
+		expect(addButtons[0]).toHaveAccessibleName('Add AI provider');
 		expect(screen.queryByText('No receipt-scanning provider connected')).toBeNull();
 	});
 
@@ -373,7 +374,7 @@ describe('ModelProvidersCard add provider', () => {
 		await type('llm-apiKey', 'sk-slow');
 		await fireEvent.click(saveButton('llm'));
 		await settle();
-		expect(saveButton('llm')).toHaveTextContent('Saving...');
+		expect(saveButton('llm')).toHaveTextContent('Saving…');
 		expect(saveButton('llm')).toBeDisabled();
 	});
 
@@ -404,7 +405,7 @@ describe('ModelProvidersCard add provider', () => {
 	test('the empty-state button also opens the add dialog', async () => {
 		render(ModelProvidersCard, { props: { domain: 'vlm' } });
 		await settle();
-		await fireEvent.click(screen.getByRole('button', { name: 'Add AI Provider' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Add AI provider' }));
 		expect(
 			await screen.findByRole('heading', { name: 'Add receipt-scanning provider' })
 		).toBeInTheDocument();

@@ -35,6 +35,7 @@
 	import { getSyncStatusInfo } from '#lib/utils/sync/sync-status.ts';
 	import { countPendingSync } from '#lib/utils/sync/pending-expenses.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
+	import Wordmark from '#lib/components/common/Wordmark.svelte';
 	import { Sheet, SheetContent, SheetHeader, SheetTitle } from '#lib/components/ui/sheet/index.ts';
 	import { cn } from '#lib/utils.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
@@ -132,13 +133,7 @@
 </script>
 
 {#snippet wordmark()}
-	<a
-		href={resolve(routes.dashboard)}
-		class="justify-self-start rounded-md font-(family-name:--font-fig) text-[22px] font-bold tracking-[0.3em] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-		aria-label="VROOM home"
-	>
-		VR<span class="text-accent-ink">O</span>OM
-	</a>
+	<Wordmark href={resolve(routes.dashboard)} class="justify-self-start" />
 {/snippet}
 
 {#snippet syncStatus()}

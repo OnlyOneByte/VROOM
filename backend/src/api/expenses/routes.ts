@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { type AppContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
-import { EXPENSE_CATEGORIES } from '../../db/types';
+import { CHARGER_TYPES, EXPENSE_CATEGORIES } from '../../db/types';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, heavyJobLimiter, rateLimiter, requireAuth } from '../../middleware';
 import {
@@ -172,6 +172,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
       `Fuel type must be ${CONFIG.validation.expense.fuelTypeMaxLength} characters or less`
     )
     .nullish(),
+  chargerType: z.enum(CHARGER_TYPES).nullish(),
   // Insurance and reminder links bypass this route's validation, so only financing links are accepted.
   sourceType: z.literal('financing').optional(),
   sourceId: z.string().min(1).optional(),
@@ -630,6 +631,14 @@ const exportQuerySchema = z.object({
     .transform((val) => (val ? val.split(',').map((t) => t.trim()) : undefined)),
 });
 
+function exportFuelCells(e: {
+  volume: number | null;
+  fuelType: string | null;
+  chargerType: string | null;
+}) {
+  return { volume: e.volume ?? '', fuelType: e.fuelType ?? '', chargerType: e.chargerType ?? '' };
+}
+
 export const EXPORT_COLUMNS = [
   'date',
   'vehicle',
@@ -639,6 +648,7 @@ export const EXPORT_COLUMNS = [
   'mileage',
   'volume',
   'fuelType',
+  'chargerType',
   'description',
   'location',
   'tags',
@@ -694,8 +704,7 @@ routes.get(
         amount: e.expenseAmount / scale,
         currency,
         mileage: e.mileage || '',
-        volume: e.volume ?? '',
-        fuelType: e.fuelType ?? '',
+        ...exportFuelCells(e),
         description: e.description ?? '',
         location: e.location ?? '',
         tags: Array.isArray(e.tags) ? e.tags.join('; ') : '',
@@ -1083,7 +1092,11 @@ routes.put(
 
     const { paidByDriverId: requestedPayer, ...withoutPayer } = updateData;
     const payer = await payerChange(c, existingExpense, updateData.vehicleId, requestedPayer);
-    const normalizedUpdate = clearFuelFieldsIfNotFuel({ ...withoutPayer, ...payer }, finalCategory);
+    const normalizedUpdate = clearFuelFieldsIfNotFuel(
+      { ...withoutPayer, ...payer },
+      finalCategory,
+      finalFuelType
+    );
     const odometer = await editedOdometerCheck(existingExpense, {
       vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
       date: updateData.date ?? existingExpense.date,

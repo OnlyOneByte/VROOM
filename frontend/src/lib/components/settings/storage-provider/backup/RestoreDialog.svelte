@@ -4,10 +4,19 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.ts';
+	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
-	import { LoaderCircle, Upload, ArrowLeft, Cloud, Database, ChevronDown } from '@lucide/svelte';
+	import {
+		LoaderCircle,
+		Upload,
+		ArrowLeft,
+		Cloud,
+		Database,
+		ChevronDown,
+		CircleAlert,
+		TriangleAlert
+	} from '@lucide/svelte';
 	import {
 		Collapsible,
 		CollapsibleContent,
@@ -308,26 +317,28 @@
 
 		<div class="space-y-4 py-4">
 			{#if error}
-				<div
-					class="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
-				>
-					{error}
-				</div>
+				<Alert variant="destructive" role="alert">
+					<CircleAlert aria-hidden="true" />
+					<AlertDescription>{error}</AlertDescription>
+				</Alert>
 			{/if}
 
 			{#if step === 1}
 				<div class="grid gap-3">
 					<button
 						type="button"
-						class="flex items-center gap-3 rounded-lg border border-border p-4 text-left transition-colors hover:bg-muted"
+						class="flex items-center gap-3 rounded-(--r-lg) border bg-surface p-4 text-left outline-none transition-colors hover:bg-sunk focus-visible:ring-[3px] focus-visible:ring-ring/50"
 						onclick={() => {
 							flowType = 'file';
 							step = 2;
 							error = null;
 						}}
 					>
-						<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-							<Upload class="h-5 w-5 text-muted-foreground" />
+						<div
+							class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+							aria-hidden="true"
+						>
+							<Upload class="size-5 text-foreground" />
 						</div>
 						<div>
 							<div class="font-medium text-foreground">Upload file</div>
@@ -337,11 +348,14 @@
 					{#if hasProviderOptions}
 						<button
 							type="button"
-							class="flex items-center gap-3 rounded-lg border border-border p-4 text-left transition-colors hover:bg-muted"
+							class="flex items-center gap-3 rounded-(--r-lg) border bg-surface p-4 text-left outline-none transition-colors hover:bg-sunk focus-visible:ring-[3px] focus-visible:ring-ring/50"
 							onclick={handleProviderFlow}
 						>
-							<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-								<Cloud class="h-5 w-5 text-muted-foreground" />
+							<div
+								class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+								aria-hidden="true"
+							>
+								<Cloud class="size-5 text-foreground" />
 							</div>
 							<div>
 								<div class="font-medium text-foreground">Restore from provider</div>
@@ -356,7 +370,7 @@
 
 			{#if step === 2 && flowType === 'file'}
 				<div class="space-y-3">
-					<Label for="backup-file">Backup File</Label>
+					<Label for="backup-file">Backup file</Label>
 					<Input id="backup-file" type="file" accept=".zip" onchange={handleFileUpload} />
 					{#if isProcessing}
 						<div class="flex items-center gap-2 text-sm text-muted-foreground">
@@ -498,43 +512,43 @@
 				{/if}
 
 				{#if restoreConflicts.length > 0}
-					<div class="rounded-lg border border-warning/30 bg-warning/5 p-4">
-						<h4 class="mb-3 font-medium text-warning">Conflicts Detected</h4>
-						<p class="mb-3 text-sm text-muted-foreground">
-							{restoreConflicts.length} conflict(s) found.
-						</p>
-						<div class="max-h-48 space-y-2 overflow-y-auto">
-							{#each restoreConflicts as conflict, i (i)}
-								<div
-									class="rounded border border-border bg-background p-2 text-sm font-medium text-foreground"
-								>
-									{conflict.table} - ID: {conflict.id}
-								</div>
-							{/each}
-						</div>
-					</div>
+					<Alert variant="warning" role="status">
+						<TriangleAlert aria-hidden="true" />
+						<AlertTitle>
+							{restoreConflicts.length === 1
+								? '1 conflict found'
+								: `${restoreConflicts.length} conflicts found`}
+						</AlertTitle>
+						<AlertDescription>
+							<ul class="mt-1 max-h-48 space-y-1 overflow-y-auto text-foreground">
+								{#each restoreConflicts as conflict, i (i)}
+									<li class="text-sm">{conflict.table} · ID {conflict.id}</li>
+								{/each}
+							</ul>
+						</AlertDescription>
+					</Alert>
 				{/if}
 
 				<div class="space-y-3">
-					<Label>Restore Mode</Label>
-					<RadioGroup.Root bind:value={restoreMode}>
-						<div class="flex items-center space-x-2">
+					<p id="restore-mode-label" class="font-medium">How to restore</p>
+					<RadioGroup.Root bind:value={restoreMode} aria-labelledby="restore-mode-label">
+						<div class="flex items-center gap-2">
 							<RadioGroup.Item value="replace" id="mode-replace" />
 							<Label for="mode-replace" class="cursor-pointer font-normal">
 								<div>
-									<div class="font-medium">Replace All</div>
+									<div class="font-medium">Replace everything</div>
 									<div class="text-sm text-muted-foreground">
-										Delete existing data and import from backup
+										Deletes what's here and brings in the backup
 									</div>
 								</div>
 							</Label>
 						</div>
-						<div class="flex items-center space-x-2 opacity-50">
+						<div class="flex items-center gap-2 opacity-50">
 							<RadioGroup.Item value="merge" id="mode-merge" disabled />
 							<Label for="mode-merge" class="cursor-not-allowed font-normal">
 								<div>
-									<div class="font-medium">Merge (Coming Soon)</div>
-									<div class="text-sm text-muted-foreground">Currently unavailable</div>
+									<div class="font-medium">Merge with what's here</div>
+									<div class="text-sm text-muted-foreground">Not available yet</div>
 								</div>
 							</Label>
 						</div>
@@ -546,16 +560,18 @@
 		<Dialog.Footer class="flex gap-2">
 			{#if step > 1}
 				<Button variant="ghost" onclick={handleBack} disabled={isProcessing}>
-					<ArrowLeft class="mr-1 h-4 w-4" />Back
+					<ArrowLeft aria-hidden="true" />Back
 				</Button>
 			{/if}
 			<div class="flex-1"></div>
 			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
 			{#if step === 3 && restorePreview}
 				<Button disabled={isProcessing || restoreMode !== 'replace'} onclick={handleRestore}>
-					{#if isProcessing}<LoaderCircle
-							class="mr-2 h-4 w-4 animate-spin"
-						/>Restoring...{:else}Restore{/if}
+					{#if isProcessing}
+						<LoaderCircle class="animate-spin" aria-hidden="true" />Restoring…
+					{:else}
+						Replace everything
+					{/if}
 				</Button>
 			{/if}
 		</Dialog.Footer>

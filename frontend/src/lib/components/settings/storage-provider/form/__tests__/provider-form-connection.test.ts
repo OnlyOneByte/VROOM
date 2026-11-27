@@ -62,7 +62,7 @@ const { settingsStore } = await import('#lib/stores/settings.svelte.ts');
 const ProviderForm = (await import('../ProviderForm.svelte')).default;
 
 const saveButton = () =>
-	screen.getByRole('button', { name: /save provider|update provider/i }) as HTMLButtonElement;
+	screen.getByRole('button', { name: /^(save storage|save changes)$/i }) as HTMLButtonElement;
 const type = (label: string, value: string) =>
 	fireEvent.input(screen.getByLabelText(label), { target: { value } });
 

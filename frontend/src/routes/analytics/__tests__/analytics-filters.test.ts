@@ -30,7 +30,7 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 	}
 }));
 vi.mock('#lib/services/analytics-api.ts', () => ({
-	analyticsApi: { getSummary: mocks.getSummary },
+	analyticsApi: { query: () => new Promise(() => {}), getSummary: mocks.getSummary },
 	getDefaultDateRange: () => ({ startDate: 1, endDate: 2, ytdStart: 1 })
 }));
 

@@ -150,7 +150,7 @@ describe('ReceiptScanButton: errors', () => {
 		[
 			'missing provider (NO_PROVIDER)',
 			new ApiError('Bad Request', 400, { capability: 'ai.vision' }, 'NO_PROVIDER'),
-			'No receipt-scanning provider is set up yet. Add one in Settings → Receipt Scanning.'
+			'No receipt-scanning provider is set up yet. Add one in Settings → AI helpers.'
 		],
 		[
 			'another 400, such as an unreadable image',

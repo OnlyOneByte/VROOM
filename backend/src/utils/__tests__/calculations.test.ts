@@ -22,6 +22,7 @@ function makeChargeExpense(overrides: {
     mileage: overrides.mileage,
     volume: overrides.volume,
     fuelType: 'Level 2 (AC)',
+    chargerType: null,
     description: null,
     location: null,
     missedFillup: overrides.missedFillup ?? false,

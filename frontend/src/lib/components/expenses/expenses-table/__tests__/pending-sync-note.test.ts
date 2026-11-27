@@ -42,6 +42,44 @@ describe('PendingSyncNote', () => {
 		expect(screen.queryByRole('link', { name: /Edit/ })).toBeNull();
 	});
 
+	test('a failed edit or delete keeps its reason but offers no Retry or Edit without write access', () => {
+		const edit = { status: 'failed', kind: 'edit', error: 'Server down' } as const;
+		const writer = render(PendingSyncNote, { props: { ...props, pending: edit } });
+		expect(
+			screen.getByRole('button', { name: 'Retry saving changes to $40.00 Arco' })
+		).toBeVisible();
+		expect(screen.getByRole('link', { name: 'Edit $40.00 Arco' })).toBeVisible();
+		writer.unmount();
+
+		const reader = render(PendingSyncNote, { props: { ...props, pending: edit, canWrite: false } });
+		expect(screen.getByText('Changes not saved: Server down')).toBeInTheDocument();
+		expect(screen.queryByRole('button')).toBeNull();
+		expect(screen.queryByRole('link')).toBeNull();
+		reader.unmount();
+
+		render(PendingSyncNote, {
+			props: {
+				...props,
+				pending: { status: 'failed', kind: 'delete', error: 'Server down' },
+				canWrite: false
+			}
+		});
+		expect(screen.getByText('Not deleted: Server down')).toBeInTheDocument();
+		expect(screen.queryByRole('button')).toBeNull();
+	});
+
+	test('a failed edit the server refused for lack of access offers no Retry or Edit', () => {
+		render(PendingSyncNote, {
+			props: {
+				...props,
+				pending: { status: 'failed', kind: 'edit', error: 'No access', editable: false }
+			}
+		});
+		expect(screen.getByText('Changes not saved: No access')).toBeInTheDocument();
+		expect(screen.queryByRole('button')).toBeNull();
+		expect(screen.queryByRole('link')).toBeNull();
+	});
+
 	test('Discard asks first, then removes the entry from this device', async () => {
 		render(PendingSyncNote, {
 			props: { ...props, pending: { status: 'failed', error: 'Mileage too low', editable: true } }

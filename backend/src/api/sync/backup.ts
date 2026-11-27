@@ -37,7 +37,7 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
-import type { SplitConfig } from '../../db/types';
+import { CHARGER_TYPES, type SplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
 import type {
   BackupConfig,
@@ -286,10 +286,20 @@ export function upgradeBackupTables(
 ): BackupTables {
   const from = parseVersion(version);
   if (!from) return tables;
-  return BACKUP_UPGRADE_STEPS.filter((step) => {
+  const upgraded = BACKUP_UPGRADE_STEPS.filter((step) => {
     const to = parseVersion(step.to);
     return to !== null && isOlderThan(from, to);
   }).reduce((current, step) => step.upgrade(current, accountCurrency), tables);
+  return withKnownChargerTypes(upgraded);
+}
+
+function withKnownChargerTypes(tables: BackupTables): BackupTables {
+  if (!tables.expenses) return tables;
+  const known = new Set<unknown>(CHARGER_TYPES);
+  const expenses = tables.expenses.map((row) =>
+    row.chargerType == null || known.has(row.chargerType) ? row : { ...row, chargerType: null }
+  );
+  return { ...tables, expenses };
 }
 
 const RESTORABLE = 'Only a backup that VROOM made, without edits, can be restored.';

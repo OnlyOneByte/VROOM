@@ -23,7 +23,7 @@ describe('ChartCard title is a heading', () => {
 	test.each([
 		[2, 3],
 		[3, 4],
-		[4, 4]
+		[4, 5]
 	] as const)('under an h%s title, the empty state is an h%s', (level, stateLevel) => {
 		render(ChartCard, { title: 'Fuel Bought', level, isEmpty: true, children: chart });
 

@@ -1,7 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import type { Expense } from '#lib/types/index.ts';
-import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+import { isForbiddenError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 import {
 	REFRESH_AFTER_DELETE_FAILED,
 	deleteExpenseRecord
@@ -17,6 +17,7 @@ interface PendingDelete {
 	expense: Expense;
 	status: Status;
 	error?: string;
+	forbidden?: boolean;
 	timer?: ReturnType<typeof setTimeout>;
 	onDeleted?: (() => Promise<void> | void) | undefined;
 }
@@ -40,14 +41,15 @@ async function send(key: string): Promise<void> {
 		await deleteExpenseRecord(entry.expense);
 	} catch (error) {
 		const reason = userFacingErrorMessage(error);
-		update(key, { status: 'failed', error: reason });
+		const forbidden = isForbiddenError(error);
+		update(key, { status: 'failed', error: reason, forbidden });
 		appStore.addNotification({
 			type: 'error',
 			message: `Couldn’t delete “${expenseName(entry.expense)}”`,
 			description: reason,
 			toastId: toastId(key),
 			duration: Number.POSITIVE_INFINITY,
-			action: { label: 'Retry', onClick: () => retryDelete(key) }
+			...(!forbidden && { action: { label: 'Retry', onClick: () => retryDelete(key) } })
 		});
 		return;
 	}
@@ -103,7 +105,15 @@ export function deleteFailureStates(expenses: readonly Expense[]): [string, Pend
 	for (const expense of expenses) {
 		const entry = deletes.get(keyOf(expense));
 		if (entry?.status === 'failed') {
-			states.push([expense.id, { status: 'failed', kind: 'delete', error: entry.error ?? '' }]);
+			states.push([
+				expense.id,
+				{
+					status: 'failed',
+					kind: 'delete',
+					error: entry.error ?? '',
+					...(entry.forbidden && { editable: false })
+				}
+			]);
 		}
 	}
 	return states;

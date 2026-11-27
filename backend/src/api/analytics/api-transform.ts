@@ -62,6 +62,10 @@ export function fuelStatsToApi(d: FuelStatsData, scale: number): FuelStatsData {
         ...g,
         pricePerVolume: c(g.pricePerVolume),
       })),
+      byChargerType: d.charging.byChargerType.map((t) => ({
+        ...t,
+        pricePerEnergyUnit: cn(t.pricePerEnergyUnit),
+      })),
     },
   };
 }

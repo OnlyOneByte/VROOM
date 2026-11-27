@@ -22,7 +22,10 @@
 		type AnalyticsFilters
 	} from '#lib/components/analytics/analytics-filters.ts';
 	import {
+		cancelPrefetch,
+		exploreRequest,
 		parseExplore,
+		prefetchExplore,
 		writeExplore,
 		type ExploreQuery
 	} from '#lib/components/analytics/explore/query-state.ts';
@@ -58,6 +61,9 @@
 		return known.length > 0 ? known : undefined;
 	});
 	let sharedCars = $derived(vehicles.filter(v => v.carShare?.enabled));
+	let hiddenFinancials = $derived(
+		new Set(vehicles.filter(v => v.sharedAccess && !v.sharedAccess.seesFinancials).map(v => v.id))
+	);
 	let filtered = $derived(!isDefaultFilters(filters));
 	let nonDefaultRange = $derived(filters.range !== DEFAULT_RANGE);
 	let vehicleOptions = $derived(
@@ -185,6 +191,7 @@
 				vehicleIds
 			});
 			if (request !== summaryRequest) return;
+			if (result.quickStats.vehicleCount === 0) cancelPrefetch();
 			summary = result;
 			error = null;
 		} catch (e) {
@@ -210,6 +217,8 @@
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
 	onMount(() => {
+		prefetchExplore(exploreRequest(explore, dateRange, vehicleIds));
+		import('#lib/components/analytics/explore/ExploreTab.svelte').catch(() => {});
 		void loadVehicles();
 	});
 </script>
@@ -360,6 +369,8 @@
 							{dateRange}
 							{vehicleIds}
 							{vehicleColors}
+							{hiddenFinancials}
+							rangeText={rangeLabel(filters, d => formatDate(d))}
 							filterLabel={filtered ? filterLabel : undefined}
 							onClearFilters={filtered ? clearFilters : undefined}
 						/>

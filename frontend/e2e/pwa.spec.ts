@@ -149,6 +149,8 @@ const expiredPolicy = (page: Page) => page.getByText('Policy #SF-1001').first();
 const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/': { anonymous: true, debt: [], ready: pageHeading('What your car really costs.') },
 	'/auth': { anonymous: true, debt: [], ready: signInControl },
+	'/privacypolicy': { anonymous: true, debt: [], ready: pageHeading('Privacy Policy') },
+	'/termsofservice': { anonymous: true, debt: [], ready: pageHeading('Terms of Service') },
 	'/dashboard': { debt: [], ready: pageHeading('Dashboard') },
 	'/expenses': {
 		debt: [],
@@ -172,6 +174,8 @@ const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/settings': { debt: [], ready: pageHeading('Settings') },
 	'/settings/server': { debt: [], ready: page => page.getByText('kim@example.com') },
 	'/settings/storage': { debt: [], ready: pageHeading('Backups and storage') },
+	'/settings/ai': { debt: [], ready: pageHeading('AI helpers') },
+	'/settings/providers/new': { debt: [], ready: pageHeading('Add storage') },
 	'/profile': { debt: [], ready: pageHeading('Profile') },
 	'/no-such-page': { debt: [], ready: pageHeading('Wrong turn') }
 };

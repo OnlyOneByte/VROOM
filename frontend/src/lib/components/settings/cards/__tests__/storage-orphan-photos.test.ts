@@ -39,14 +39,14 @@ describe('Storage Providers: photos no longer attached to anything', () => {
 	test('shows nothing when there are no such photos', async () => {
 		count.mockResolvedValue(0);
 		render(StorageProvidersCard, { props: {} });
-		await screen.findByText('No storage provider connected');
+		await screen.findByText(/No storage connected yet/);
 		expect(screen.queryByText(/no longer attached/)).toBeNull();
 	});
 
 	test('shows nothing when the count cannot be loaded', async () => {
 		count.mockRejectedValue(new Error('boom'));
 		render(StorageProvidersCard, { props: {} });
-		await screen.findByText('No storage provider connected');
+		await screen.findByText(/No storage connected yet/);
 		expect(screen.queryByText(/no longer attached/)).toBeNull();
 	});
 

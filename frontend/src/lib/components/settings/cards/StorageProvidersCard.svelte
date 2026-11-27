@@ -4,18 +4,16 @@
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { CircleAlert, HardDrive, Plus, LoaderCircle, Upload, RefreshCw } from '@lucide/svelte';
+	import { CircleAlert, Plus, LoaderCircle, Upload, RefreshCw } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import {
 		Card,
+		CardAction,
 		CardContent,
-		CardDescription,
 		CardHeader,
 		CardTitle
 	} from '#lib/components/ui/card/index.ts';
-	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import DefaultPhotoSources from '../storage-provider/DefaultPhotoSources.svelte';
 	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
 	import { startGoogleConnect } from '../storage-provider/use-google-oauth.svelte.ts';
@@ -192,7 +190,7 @@
 				photoLossConfirmOpen = true;
 				return;
 			}
-			appStore.showError(`Couldn't remove the provider. ${userFacingErrorMessage(error)}`);
+			appStore.showError(`Couldn't remove the storage. ${userFacingErrorMessage(error)}`);
 		}
 	}
 
@@ -284,172 +282,185 @@
 	}
 </script>
 
-<Card>
-	<CardHeader>
-		<div class="flex items-center gap-2">
-			<HardDrive class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={3}>Storage Providers</CardTitle>
+<div bind:this={content} tabindex="-1" class="outline-none">
+	{#if isLoading}
+		<div class="flex items-center justify-center py-8" role="status">
+			<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
+			<span class="sr-only">Loading your storage</span>
 		</div>
-		<CardDescription>Configure storage providers for photos and backups</CardDescription>
-	</CardHeader>
-	<CardContent bind:ref={content} tabindex={-1}>
-		{#if isLoading}
-			<div class="flex items-center justify-center py-8">
-				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+	{:else if error}
+		<div class="rounded-(--r-lg) border bg-card p-4">
+			<div class="mb-2 flex items-center gap-2 text-destructive">
+				<CircleAlert class="h-5 w-5 shrink-0" aria-hidden="true" />
+				<p class="font-medium">Couldn't load your storage providers</p>
 			</div>
-		{:else if error}
-			<div class="rounded-lg border bg-card p-4">
-				<div class="mb-2 flex items-center gap-2 text-destructive">
-					<CircleAlert class="h-5 w-5 shrink-0" />
-					<p class="font-medium">Couldn't load your storage providers</p>
-				</div>
-				<p class="mb-3 text-sm text-muted-foreground">{error}</p>
-				<Button class="h-10" onclick={retryLoad}>Retry</Button>
-			</div>
-		{:else}
-			<div class="space-y-4">
-				<p class="text-sm font-medium">Data Backups</p>
+			<p class="mb-3 text-sm text-muted-foreground">{error}</p>
+			<Button onclick={retryLoad}>Retry</Button>
+		</div>
+	{:else}
+		<div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
+			<div class="space-y-6">
+				<Card variant="section" role="region" aria-labelledby="storage-connected">
+					<CardHeader>
+						<CardTitle level={2} id="storage-connected" class="text-base">Connected</CardTitle>
+						<CardAction>
+							<Button onclick={() => goto(resolve(routes.settingsProviderNew))}>
+								<Plus aria-hidden="true" />
+								Add storage
+							</Button>
+						</CardAction>
+					</CardHeader>
+					<CardContent class="space-y-3">
+						{#if providers.length === 0}
+							<p class="text-sm text-muted-foreground">
+								No storage connected yet. Add Google Drive, S3 or another provider to keep photos
+								and backups in an account you own.
+							</p>
+						{:else}
+							{#each providers as provider (provider.id)}
+								<ProviderCard
+									{provider}
+									categorySettings={getCategorySettings(provider.id)}
+									backupEnabled={backupConfig.providers[provider.id]?.enabled ?? false}
+									sheetsSyncEnabled={backupConfig.providers[provider.id]?.sheetsSyncEnabled ??
+										false}
+									lastBackupAt={backupConfig.providers[provider.id]?.lastBackupAt}
+									onEdit={handleProviderEdit}
+									onReconnect={handleProviderReconnect}
+									onDelete={requestProviderDelete}
+									onBackupToggle={handleBackupToggle}
+									onSheetsSyncToggle={handleSheetsSyncToggle}
+									onUpdated={updated =>
+										(providers = providers.map(p => (p.id === updated.id ? updated : p)))}
+								/>
+							{/each}
+						{/if}
+					</CardContent>
+				</Card>
 
-				{#if unhealthyBackupProviders.length > 0}
-					<Alert role="status" variant="warning">
-						<CircleAlert aria-hidden="true" />
-						<AlertTitle class="line-clamp-none">
-							{unhealthyBackupProviders.length === 1
-								? '1 backup provider needs attention.'
-								: `${unhealthyBackupProviders.length} backup providers need attention.`}
-						</AlertTitle>
-						<AlertDescription class="text-foreground!">
-							Your backups may not reach {new Intl.ListFormat('en', {
-								type: 'conjunction'
-							}).format(unhealthyBackupProviders.map(p => p.displayName))} until you fix {unhealthyBackupProviders.length ===
-							1
-								? 'it'
-								: 'them'} below.
-						</AlertDescription>
-					</Alert>
+				{#if providers.length > 0 || orphanCount > 0}
+					<Card variant="section" role="region" aria-labelledby="storage-photos">
+						<CardHeader>
+							<CardTitle level={2} id="storage-photos" class="text-base">Photos</CardTitle>
+						</CardHeader>
+						<CardContent class="space-y-4">
+							{#if providers.length > 0}
+								<DefaultPhotoSources {storageConfig} {providers} onUpdate={handleConfigUpdate} />
+							{/if}
+							{#if orphanCount > 0}
+								<div class="flex items-center justify-between gap-4">
+									<p class="text-sm">
+										{photosNoun(orphanCount)}
+										{orphanCount === 1 ? 'is' : 'are'} no longer attached to anything.
+									</p>
+									<Button variant="outline" onclick={() => (orphanConfirmOpen = true)}>
+										{orphanCount === 1 ? 'Remove it' : 'Remove them'}
+									</Button>
+								</div>
+							{/if}
+						</CardContent>
+					</Card>
 				{/if}
+			</div>
 
-				{#if backupProviderCount > 0}
-					<div class="text-xs text-muted-foreground">Last backup: {lastBackupText}</div>
+			<Card variant="section" role="region" aria-labelledby="storage-backups">
+				<CardHeader>
+					<CardTitle level={2} id="storage-backups" class="text-base">
+						Back up now and restore
+					</CardTitle>
+				</CardHeader>
+				<CardContent class="divide-y">
+					{#if unhealthyBackupProviders.length > 0}
+						<Alert role="status" variant="warning" class="mb-3">
+							<CircleAlert aria-hidden="true" />
+							<AlertTitle class="line-clamp-none">
+								{unhealthyBackupProviders.length === 1
+									? '1 backup provider needs attention.'
+									: `${unhealthyBackupProviders.length} backup providers need attention.`}
+							</AlertTitle>
+							<AlertDescription class="text-foreground!">
+								Your backups may not reach {new Intl.ListFormat('en', {
+									type: 'conjunction'
+								}).format(unhealthyBackupProviders.map(p => p.displayName))} until you fix {unhealthyBackupProviders.length ===
+								1
+									? 'it'
+									: 'them'} under Connected.
+							</AlertDescription>
+						</Alert>
+					{/if}
 
-					<div class="space-y-2">
-						<Label for="inactivity-minutes" class="text-sm">Auto-backup after inactivity</Label>
-						<Select.Root
-							type="single"
-							value={syncInactivityMinutes.toString()}
-							onValueChange={v => {
-								if (!v || parseInt(v) === syncInactivityMinutes) return;
-								syncInactivityMinutes = parseInt(v);
-								onSyncInactivityChange?.();
-							}}
-						>
-							<Select.Trigger id="inactivity-minutes" class="w-full">
-								{syncInactivityMinutes}
-								{syncInactivityMinutes === 1 ? 'minute' : 'minutes'}
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Item value="1" label="1 minute">1 minute</Select.Item>
-								<Select.Item value="2" label="2 minutes">2 minutes</Select.Item>
-								<Select.Item value="5" label="5 minutes">5 minutes</Select.Item>
-								<Select.Item value="10" label="10 minutes">10 minutes</Select.Item>
-								<Select.Item value="15" label="15 minutes">15 minutes</Select.Item>
-								<Select.Item value="30" label="30 minutes">30 minutes</Select.Item>
-							</Select.Content>
-						</Select.Root>
+					<div class="flex items-center justify-between gap-4 py-3 first:pt-0">
+						<div class="min-w-0">
+							<p class="font-medium">Back up now</p>
+							<p class="text-sm text-muted-foreground">
+								{#if backupProviderCount > 0}
+									Sends a copy to every provider with backups on. Last backup: {lastBackupText}
+								{:else if providers.length > 0}
+									Turn on backups for a provider under Connected first.
+								{:else}
+									Add storage first, then turn on its backups.
+								{/if}
+							</p>
+						</div>
+						{#if backupProviderCount > 0}
+							<Button onclick={() => onBackupNow?.()}>
+								<RefreshCw aria-hidden="true" />
+								Back up now
+							</Button>
+						{/if}
 					</div>
-				{:else if providers.length > 0}
-					<p class="text-sm text-muted-foreground">
-						Enable backup on a provider below to sync your data to the cloud.
-					</p>
-				{/if}
 
-				<div class="flex flex-col sm:flex-row gap-2">
 					{#if backupProviderCount > 0}
-						<Button variant="outline" onclick={() => onBackupNow?.()} class="h-10 sm:flex-1">
-							<RefreshCw class="mr-2 h-4 w-4" />
-							Back Up Now
+						<div class="flex items-center justify-between gap-4 py-3">
+							<div class="min-w-0">
+								<label for="inactivity-minutes" class="font-medium">Back up automatically</label>
+								<p class="text-sm text-muted-foreground">After this long without changes</p>
+							</div>
+							<Select.Root
+								type="single"
+								value={syncInactivityMinutes.toString()}
+								onValueChange={v => {
+									if (!v || parseInt(v) === syncInactivityMinutes) return;
+									syncInactivityMinutes = parseInt(v);
+									onSyncInactivityChange?.();
+								}}
+							>
+								<Select.Trigger id="inactivity-minutes" class="w-auto shrink-0">
+									{syncInactivityMinutes}
+									{syncInactivityMinutes === 1 ? 'minute' : 'minutes'}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="1" label="1 minute">1 minute</Select.Item>
+									<Select.Item value="2" label="2 minutes">2 minutes</Select.Item>
+									<Select.Item value="5" label="5 minutes">5 minutes</Select.Item>
+									<Select.Item value="10" label="10 minutes">10 minutes</Select.Item>
+									<Select.Item value="15" label="15 minutes">15 minutes</Select.Item>
+									<Select.Item value="30" label="30 minutes">30 minutes</Select.Item>
+								</Select.Content>
+							</Select.Root>
+						</div>
+					{/if}
+
+					<div class="flex items-center justify-between gap-4 pt-3">
+						<div class="min-w-0">
+							<p class="font-medium">Restore</p>
+							<p class="text-sm text-muted-foreground">Bring your data back from a backup file</p>
+						</div>
+						<Button variant="outline" onclick={() => onRestore?.()}>
+							<Upload aria-hidden="true" />
+							Restore…
 						</Button>
-					{/if}
-					<Button variant="outline" onclick={() => onRestore?.()} class="h-10 sm:flex-1">
-						<Upload class="mr-2 h-4 w-4" />
-						Restore
-					</Button>
-				</div>
-			</div>
-
-			{#if providers.length > 0}
-				<Separator class="my-6" />
-
-				<DefaultPhotoSources {storageConfig} {providers} onUpdate={handleConfigUpdate} />
-			{/if}
-
-			{#if orphanCount > 0}
-				<div
-					class="mt-4 flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
-				>
-					<p class="text-sm">
-						{photosNoun(orphanCount)}
-						{orphanCount === 1 ? 'is' : 'are'} no longer attached to anything.
-					</p>
-					<Button
-						variant="outline"
-						class="h-10 shrink-0"
-						onclick={() => (orphanConfirmOpen = true)}
-					>
-						{orphanCount === 1 ? 'Remove it' : 'Remove them'}
-					</Button>
-				</div>
-			{/if}
-
-			<Separator class="my-6" />
-
-			<div class="space-y-3">
-				<div class="flex flex-wrap items-center justify-between gap-2">
-					{#if providers.length === 0}
-						<p class="text-sm text-muted-foreground">No storage provider connected</p>
-					{:else}
-						<p class="text-sm font-medium">Providers</p>
-					{/if}
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-10"
-						onclick={() => goto(resolve(routes.settingsProviderNew))}
-					>
-						<Plus class="h-4 w-4 mr-1" />
-						Add Storage Provider
-					</Button>
-				</div>
-
-				{#if providers.length > 0}
-					<div class="space-y-3">
-						{#each providers as provider (provider.id)}
-							<ProviderCard
-								{provider}
-								categorySettings={getCategorySettings(provider.id)}
-								backupEnabled={backupConfig.providers[provider.id]?.enabled ?? false}
-								sheetsSyncEnabled={backupConfig.providers[provider.id]?.sheetsSyncEnabled ?? false}
-								lastBackupAt={backupConfig.providers[provider.id]?.lastBackupAt}
-								onEdit={handleProviderEdit}
-								onReconnect={handleProviderReconnect}
-								onDelete={requestProviderDelete}
-								onBackupToggle={handleBackupToggle}
-								onSheetsSyncToggle={handleSheetsSyncToggle}
-								onUpdated={updated =>
-									(providers = providers.map(p => (p.id === updated.id ? updated : p)))}
-							/>
-						{/each}
 					</div>
-				{/if}
-			</div>
-		{/if}
-	</CardContent>
-</Card>
+				</CardContent>
+			</Card>
+		</div>
+	{/if}
+</div>
 
 <ConfirmDialog
 	bind:open={deleteConfirmOpen}
-	title="Delete {pendingDelete?.displayName ?? 'provider'}?"
-	description="Backups to this provider stop and its settings are removed from VROOM. Your files stay in the provider itself."
+	title="Delete {pendingDelete?.displayName ?? 'storage'}?"
+	description="VROOM stops backing up here and removes this storage's settings. Your files stay in the storage itself."
 	onConfirm={async () => {
 		if (pendingDelete) await handleProviderDelete(pendingDelete);
 	}}
@@ -457,7 +468,7 @@
 
 <ConfirmDialog
 	bind:open={photoLossConfirmOpen}
-	title="Delete {photoLossConfirm?.provider.displayName ?? 'provider'}?"
+	title="Delete {photoLossConfirm?.provider.displayName ?? 'storage'}?"
 	description={photoLossConfirm?.message ?? ''}
 	confirmLabel="Delete anyway"
 	onConfirm={async () => {

@@ -35,6 +35,7 @@ describe('buildExpenseData', () => {
 			volume: 10.5,
 			charge: undefined,
 			fuelType: '87 (Regular)',
+			chargerType: null,
 			description: 'Shell',
 			location: 'Main St',
 			currency: 'USD',
@@ -64,5 +65,20 @@ describe('buildExpenseData', () => {
 			sourceId: 'loan-1'
 		});
 		expect(data).toMatchObject({ currency: 'EUR', sourceType: 'financing', sourceId: 'loan-1' });
+	});
+
+	test('a charge keeps its charger type; a fill-up or non-fuel entry never sends one', () => {
+		const charge = {
+			fuelType: 'DC Fast Charging',
+			charge: '40',
+			volume: '',
+			chargerType: 'dc_fast' as const
+		};
+		expect(buildExpenseData(filled(charge), CTX).chargerType).toBe('dc_fast');
+		expect(buildExpenseData(filled({ ...charge, chargerType: '' }), CTX).chargerType).toBeNull();
+		expect(buildExpenseData(filled({ chargerType: 'home' }), CTX).chargerType).toBeNull();
+		expect(
+			buildExpenseData(filled({ ...charge, category: 'maintenance' }), CTX).chargerType
+		).toBeNull();
 	});
 });

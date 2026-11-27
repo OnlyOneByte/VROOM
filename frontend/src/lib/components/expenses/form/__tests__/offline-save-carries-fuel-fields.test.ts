@@ -18,6 +18,23 @@ describe('toOfflineExpense', () => {
 		expect(queued).not.toHaveProperty('volume');
 	});
 
+	test('carries the charger type through the queue to the synced request', () => {
+		const queued = toOfflineExpense({
+			...BASE,
+			fuelType: 'Electric',
+			charge: 30,
+			chargerType: 'home'
+		});
+		expect(queued.chargerType).toBe('home');
+		const synced = offlineExpenseToBackend({
+			...queued,
+			id: 'q1',
+			timestamp: 0,
+			synced: false
+		} as OfflineExpense);
+		expect(synced.chargerType).toBe('home');
+	});
+
 	test('carries missedFillup, including false, so MPG pairing stays correct', () => {
 		expect(toOfflineExpense({ ...BASE, missedFillup: true }).missedFillup).toBe(true);
 		expect(toOfflineExpense({ ...BASE, missedFillup: false }).missedFillup).toBe(false);

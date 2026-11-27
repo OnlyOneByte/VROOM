@@ -8,11 +8,12 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 }));
 
 import { expenseApi } from '#lib/services/expense-api.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import { ApiError, REQUEST_TIMEOUT_MESSAGE } from '#lib/utils/error-handling.ts';
 import {
 	applyMyChanges,
 	reloadLatest,
 	EXPENSE_CHANGED_MESSAGE,
+	EDIT_TIMEOUT_MS,
 	editFailureStates,
 	editedRows,
 	resetPendingEdits,
@@ -33,6 +34,7 @@ const saved = {
 } as unknown as Expense;
 const changed = { ...saved, amount: 55, description: 'Shell' };
 const payload = { vehicleId: 'v1', category: 'fuel', amount: 55 } as never;
+const signal = { signal: expect.any(AbortSignal) };
 
 function deferred() {
 	let resolve: (value: Expense) => void = () => {};
@@ -64,6 +66,7 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		]);
 		await vi.waitFor(() =>
 			expect(expenseApi.updateExpense).toHaveBeenCalledWith('e1', payload, {
+				...signal,
 				expectedUpdatedAt: saved.updatedAt
 			})
 		);
@@ -96,6 +99,7 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		first.reject(new ApiError('down', 500));
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
 		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith('e1', againPayload, {
+			...signal,
 			expectedUpdatedAt: saved.updatedAt
 		});
 		expect(shownExpense(saved)).toMatchObject({ amount: 70 });
@@ -145,7 +149,7 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith(
 			'e1',
 			expect.objectContaining({ amount: 40, description: 'Arco', category: 'fuel' }),
-			{ expectedUpdatedAt: '2026-11-20T12:00:01.000Z' }
+			{ ...signal, expectedUpdatedAt: '2026-11-20T12:00:01.000Z' }
 		);
 		expect(notices().filter(n => n['type'] === 'error')).toEqual([]);
 	});
@@ -230,14 +234,14 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		second.resolve(secondLanded);
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(3));
 		expect(vi.mocked(expenseApi.updateExpense).mock.calls.map(([, , o]) => o)).toEqual([
-			{ expectedUpdatedAt: saved.updatedAt },
-			{ expectedUpdatedAt: firstLanded.updatedAt },
-			{ expectedUpdatedAt: secondLanded.updatedAt }
+			{ ...signal, expectedUpdatedAt: saved.updatedAt },
+			{ ...signal, expectedUpdatedAt: firstLanded.updatedAt },
+			{ ...signal, expectedUpdatedAt: secondLanded.updatedAt }
 		]);
 		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith(
 			'e1',
 			expect.objectContaining({ amount: 40, description: 'Arco', category: 'fuel' }),
-			expect.anything()
+			expect.objectContaining(signal)
 		);
 		await flush();
 		expect(shownExpense(secondLanded)).toMatchObject({ amount: 40, description: 'Arco' });
@@ -265,7 +269,7 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith(
 			'e1',
 			expect.objectContaining({ sourceType: 'financing', sourceId: 'loan-1' }),
-			expect.anything()
+			expect.objectContaining(signal)
 		);
 
 		resetPendingEdits();
@@ -312,6 +316,162 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(shownExpense(saved)).toMatchObject({ amount: 55 });
 		await vi.waitFor(() => expect(editFailureStates([saved])).toEqual([]));
 		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
+	});
+
+	test('an edit the server refuses for lack of access offers no Retry, in the toast or on the row', async () => {
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('no access', 403));
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(notices()).toHaveLength(2));
+
+		expect(notices()[1]).toMatchObject({ type: 'error' });
+		expect(notices()[1]).not.toHaveProperty('action');
+		expect(editFailureStates([saved])).toEqual([
+			['e1', expect.objectContaining({ status: 'failed', kind: 'edit', editable: false })]
+		]);
+	});
+
+	test('a Retry that succeeds says so in place of the error toast', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockRejectedValueOnce(new ApiError('down', 500))
+			.mockResolvedValueOnce(changed);
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(editFailureStates([saved])).toHaveLength(1));
+
+		retryEdit('e1');
+		await vi.waitFor(() => expect(notices()).toHaveLength(3));
+		expect(notices()[2]).toMatchObject({
+			type: 'success',
+			message: 'Expense updated successfully',
+			toastId: 'expense-edit-e1',
+			duration: 5000,
+			action: { label: 'Undo' }
+		});
+	});
+
+	test('a retried Undo that succeeds says the changes were undone, and a plain save adds no second toast', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce(changed)
+			.mockRejectedValueOnce(new ApiError('down', 500))
+			.mockResolvedValueOnce(saved);
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+		await flush();
+		expect(notices()).toHaveLength(1);
+
+		pressUndo();
+		await vi.waitFor(() => expect(notices()).toHaveLength(2));
+		retryEdit('e1');
+		await vi.waitFor(() => expect(notices()).toHaveLength(3));
+		expect(notices()[2]).toMatchObject({
+			type: 'success',
+			message: 'Your changes to the expense were undone'
+		});
+	});
+});
+
+describe('a save that never answers times out', () => {
+	beforeEach(() => {
+		vi.resetAllMocks();
+		vi.useFakeTimers();
+	});
+	afterEach(() => {
+		resetPendingEdits();
+		vi.useRealTimers();
+	});
+
+	const server: { rows: Record<string, Expense>; applied: unknown[] } = { rows: {}, applied: [] };
+
+	function appliedButNeverAnswered(
+		...[id, body, options]: Parameters<typeof expenseApi.updateExpense>
+	) {
+		server.applied.push(body);
+		server.rows[id] = { ...saved, ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
+		return new Promise<Expense>((_, reject) => {
+			options?.signal?.addEventListener('abort', () => reject(options.signal?.reason));
+		});
+	}
+
+	function appliedAndAnswered(...[id, body]: Parameters<typeof expenseApi.updateExpense>) {
+		server.applied.push(body);
+		server.rows[id] = { ...saved, ...changed, updatedAt: '2026-11-26T10:00:20.000Z' };
+		return Promise.resolve(server.rows[id]);
+	}
+
+	beforeEach(() => {
+		server.rows = {};
+		server.applied = [];
+	});
+
+	test('it fails into "Changes not saved" with Retry, and the next save of the expense goes out', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockImplementationOnce(appliedButNeverAnswered)
+			.mockImplementationOnce(appliedAndAnswered);
+		scheduleEdit(saved, changed, payload);
+		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS - 1);
+		expect(editFailureStates([saved])).toEqual([]);
+		expect(shownExpense(saved)).toMatchObject({ amount: 55 });
+
+		await vi.advanceTimersByTimeAsync(1);
+		expect(editFailureStates([saved])).toEqual([
+			['e1', { status: 'failed', kind: 'edit', error: REQUEST_TIMEOUT_MESSAGE }]
+		]);
+		const failure = appStore.addNotification.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+		expect(failure).toMatchObject({ type: 'error', action: { label: 'Retry' } });
+
+		const again = { ...changed, amount: 70 };
+		scheduleEdit(saved, again, payload);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
+	});
+
+	test('a save queued behind a hung one goes out when the hung one times out', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockImplementationOnce(appliedButNeverAnswered)
+			.mockImplementationOnce(appliedAndAnswered);
+		scheduleEdit(saved, changed, payload);
+		await vi.advanceTimersByTimeAsync(1000);
+		const again = { ...changed, amount: 70 };
+		scheduleEdit(saved, again, payload);
+
+		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS - 1001);
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(1);
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
+		expect(editFailureStates([saved])).toEqual([]);
+		expect(shownExpense(saved)).toMatchObject({ amount: 70 });
+	});
+
+	test('Retry after a timed-out save the server had applied sends the same values to the same expense, and the row settles on them', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockImplementationOnce(appliedButNeverAnswered)
+			.mockImplementationOnce(appliedAndAnswered);
+		scheduleEdit(saved, changed, payload);
+		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS);
+		expect(editFailureStates([saved])).toHaveLength(1);
+
+		retryEdit('e1');
+		await vi.advanceTimersByTimeAsync(0);
+
+		const calls = vi.mocked(expenseApi.updateExpense).mock.calls;
+		expect(calls.map(([id]) => id)).toEqual(['e1', 'e1']);
+		expect(server.applied).toEqual([payload, payload]);
+		expect(Object.keys(server.rows)).toEqual(['e1']);
+		expect(editFailureStates([saved])).toEqual([]);
+		expect(shownExpense(saved)).toMatchObject({ amount: 55, description: 'Shell' });
+		const reloaded = server.rows['e1']!;
+		expect(shownExpense(reloaded)).toBe(reloaded);
+		expect(editFailureStates([reloaded])).toEqual([]);
+	});
+
+	test('a list reloaded after the timed-out save landed shows the saved values with no failure note', async () => {
+		vi.mocked(expenseApi.updateExpense).mockImplementationOnce(appliedButNeverAnswered);
+		scheduleEdit(saved, changed, payload);
+		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS);
+
+		const reloaded = server.rows['e1']!;
+		expect(shownExpense(reloaded)).toMatchObject({ amount: 55, description: 'Shell' });
+		expect(editFailureStates([reloaded])).toEqual([]);
 	});
 });
 
@@ -378,6 +538,7 @@ describe('an edit refused because the expense changed elsewhere', () => {
 		expect(shownExpense(saved)).toMatchObject({ amount: 55 });
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
 		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith('e1', payload, {
+			...signal,
 			expectedUpdatedAt: elsewhere
 		});
 		await vi.waitFor(() => expect(editFailureStates([saved])).toEqual([]));
@@ -394,6 +555,7 @@ describe('an edit refused because the expense changed elsewhere', () => {
 		applyMyChanges('e1');
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
 		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith('e1', payload, {
+			...signal,
 			expectedUpdatedAt: undefined
 		});
 	});
@@ -443,6 +605,7 @@ describe('an edit refused because the expense changed elsewhere', () => {
 			])
 		);
 		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith('e1', payload, {
+			...signal,
 			expectedUpdatedAt: saved.updatedAt
 		});
 	});
@@ -456,6 +619,7 @@ describe('an edit refused because the expense changed elsewhere', () => {
 		scheduleEdit(reloaded, { ...reloaded, amount: 50 }, payload);
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
 		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith('e1', payload, {
+			...signal,
 			expectedUpdatedAt: elsewhere
 		});
 	});

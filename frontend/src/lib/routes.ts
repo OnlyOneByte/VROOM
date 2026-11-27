@@ -11,6 +11,7 @@ export const routes = {
 	settingsProviderNew: '/settings/providers/new',
 	settingsServer: '/settings/server',
 	settingsStorage: '/settings/storage',
+	settingsAi: '/settings/ai',
 	profile: '/profile',
 	trips: '/trips',
 	privacyPolicy: '/privacypolicy',

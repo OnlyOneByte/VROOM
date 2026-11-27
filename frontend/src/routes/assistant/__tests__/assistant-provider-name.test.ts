@@ -44,7 +44,7 @@ describe('assistant page names its provider', () => {
 		expect(line).toHaveTextContent('Using Home OpenAI · Change');
 		expect(screen.getByRole('link', { name: 'Change the assistant provider' })).toHaveAttribute(
 			'href',
-			'/settings#assistant-providers'
+			'/settings/ai#assistant-providers'
 		);
 	});
 
@@ -70,5 +70,9 @@ describe('assistant page names its provider', () => {
 		render(Page);
 
 		expect(await screen.findByText('No assistant provider connected')).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Set up the assistant' })).toHaveAttribute(
+			'href',
+			'/settings/ai#assistant-providers'
+		);
 	});
 });

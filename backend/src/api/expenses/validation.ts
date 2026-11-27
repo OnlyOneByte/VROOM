@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { EXPENSE_CATEGORIES, type SplitConfig } from '../../db/types';
+import { EXPENSE_CATEGORIES, isElectricFuelType, type SplitConfig } from '../../db/types';
 import { dollarsToCents, expenseDollarsToCents, formatNumberForMessage } from '../../utils/money';
 import { DUPLICATE_VEHICLE_MESSAGE, dateInput, hasUniqueVehicleIds } from '../../utils/validation';
 
@@ -56,11 +56,18 @@ export function clearFuelFieldsIfNotFuel<
     category?: string;
     volume?: number | null;
     fuelType?: string | null;
+    chargerType?: string | null;
     missedFillup?: boolean;
   },
->(data: T, effectiveCategory: string | undefined = data.category): T {
-  if (effectiveCategory === undefined || effectiveCategory === 'fuel') return data;
-  return { ...data, volume: null, fuelType: null, missedFillup: false };
+>(
+  data: T,
+  effectiveCategory: string | undefined = data.category,
+  effectiveFuelType: string | null | undefined = data.fuelType
+): T {
+  if (effectiveCategory === undefined || effectiveCategory === 'fuel') {
+    return isElectricFuelType(effectiveFuelType ?? null) ? data : { ...data, chargerType: null };
+  }
+  return { ...data, volume: null, fuelType: null, chargerType: null, missedFillup: false };
 }
 
 const centsAmount = expenseDollarsToCents((n) => n.positive('Amount must be positive'));

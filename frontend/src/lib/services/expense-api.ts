@@ -194,7 +194,7 @@ export const expenseApi = {
 	async updateExpense(
 		expenseId: string,
 		expense: ExpenseInput & { vehicleId: string; category: ExpenseCategory; amount: number },
-		options: { expectedUpdatedAt?: string | undefined } = {}
+		options: { expectedUpdatedAt?: string | undefined; signal?: AbortSignal } = {}
 	): Promise<Expense> {
 		const backendExpense = {
 			...toBackendExpense(expense, { isEdit: true }),
@@ -203,7 +203,8 @@ export const expenseApi = {
 		};
 		const data = await apiClient.put<BackendExpenseResponse>(
 			`/expenses/${expenseId}`,
-			backendExpense
+			backendExpense,
+			options
 		);
 		return fromBackendExpense(data);
 	},

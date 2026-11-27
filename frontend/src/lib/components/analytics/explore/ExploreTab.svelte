@@ -23,8 +23,10 @@
 		DEFAULT_EXPLORE,
 		EXPLORE_COMPARES,
 		EXPLORE_INTERVALS,
-		apiQuery,
 		chartForm,
+		exploreRequest,
+		queryCache,
+		takePrefetched,
 		describeQuery,
 		metricInfo,
 		metricLabel,
@@ -46,7 +48,6 @@
 		bucketBounds,
 		expensesNote,
 		percentChange,
-		queryCache,
 		seriesFor,
 		valueFormatter
 	} from './explore-data';
@@ -101,15 +102,7 @@
 	let error = $state<string | null>(null);
 	let controller: AbortController | null = null;
 
-	let request = $derived({
-		...apiQuery(query),
-		start: dateRange.startDate,
-		end: dateRange.endDate,
-		vehicleIds,
-		...(['bars', 'stacked', 'grouped', 'line'].includes(chartForm(query)) && {
-			annotations: ['services', 'trips'] as Array<'services' | 'trips'>
-		})
-	});
+	let request = $derived(exploreRequest(query, dateRange, vehicleIds));
 	let requestKey = $derived(JSON.stringify(request));
 
 	async function load(params: typeof request, key: string, asked: ExploreQuery) {
@@ -128,7 +121,8 @@
 		controller = current;
 		isLoading = true;
 		try {
-			const result = await analyticsApi.query(params, { signal: current.signal });
+			const result = await (takePrefetched(key) ??
+				analyticsApi.query(params, { signal: current.signal }));
 			if (current.signal.aborted) return;
 			queryCache.set(key, result);
 			response = result;
@@ -142,6 +136,13 @@
 			if (!current.signal.aborted) isLoading = false;
 		}
 	}
+
+	let chartReady = $state(false);
+	$effect(() => {
+		if (!response || chartReady) return;
+		const frame = requestAnimationFrame(() => setTimeout(() => (chartReady = true)));
+		return () => cancelAnimationFrame(frame);
+	});
 
 	$effect(() => {
 		const asked = untrack(() => query);
@@ -579,7 +580,7 @@
 			message={error}
 			onRetry={() => load(request, requestKey, query)}
 		/>
-	{:else if !response}
+	{:else if !response || (!chartReady && hasData(response))}
 		<div aria-busy="true" aria-label="Loading the chart">
 			<Skeleton class="h-[300px] w-full" />
 		</div>

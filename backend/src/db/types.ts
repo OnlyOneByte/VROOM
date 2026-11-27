@@ -33,6 +33,9 @@ export const ELECTRIC_FUEL_TYPES = [
   'DC Fast Charging',
 ] as const;
 
+export const CHARGER_TYPES = ['home', 'workplace', 'public_l2', 'dc_fast'] as const;
+export type ChargerType = (typeof CHARGER_TYPES)[number];
+
 export function isElectricFuelType(fuelType: string | null): boolean {
   return (
     fuelType !== null &&

@@ -1,0 +1,219 @@
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import {
+  createTestApp,
+  type DataEnvelope,
+  json,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../test-helpers/http-client';
+import { seedVehicle } from '../../../test-helpers/seed';
+
+let ctx: TestApp;
+let vehicleId: string;
+
+beforeEach(async () => {
+  ctx = await createTestApp();
+  vehicleId = await seedVehicle(ctx, {
+    make: 'Tesla',
+    model: 'Model 3',
+    year: 2022,
+  });
+}, SETUP_TIMEOUT_MS);
+afterEach(() => ctx.close());
+
+interface Row {
+  id: string;
+  chargerType: string | null;
+}
+
+const charge = (chargerType: unknown, fuelType = 'Electric') => ({
+  vehicleId,
+  category: 'fuel',
+  expenseAmount: 12,
+  date: '2024-06-01T00:00:00.000Z',
+  mileage: 1000,
+  volume: 40,
+  fuelType,
+  chargerType,
+});
+
+async function create(body: object): Promise<Row> {
+  const res = await ctx.authed('POST', '/api/v1/expenses', body);
+  expect(res.status, await res.clone().text()).toBe(201);
+  return (await json<DataEnvelope<Row>>(res)).data;
+}
+
+describe('charger type on charging expenses', () => {
+  test.each(['home', 'workplace', 'public_l2', 'dc_fast'])('a charge records %s', async (type) => {
+    const row = await create(charge(type));
+    expect(row.chargerType).toBe(type);
+    const read = await ctx.authed('GET', `/api/v1/expenses/${row.id}`);
+    expect((await json<DataEnvelope<Row>>(read)).data.chargerType).toBe(type);
+  });
+
+  test('is optional and stays empty when not given', async () => {
+    const { chargerType: _omit, ...body } = charge(undefined);
+    expect((await create(body)).chargerType).toBeNull();
+  });
+
+  test('an unknown charger type is refused', async () => {
+    const res = await ctx.authed('POST', '/api/v1/expenses', charge('garage'));
+    expect(res.status).toBe(400);
+  });
+
+  test('is cleared on a fill-up that is not a charge, and on a non-fuel expense', async () => {
+    expect((await create(charge('home', 'Regular'))).chargerType).toBeNull();
+    const misc = await create({
+      vehicleId,
+      category: 'maintenance',
+      expenseAmount: 50,
+      date: '2024-06-02T00:00:00.000Z',
+      chargerType: 'home',
+    });
+    expect(misc.chargerType).toBeNull();
+  });
+
+  test('a CSV export carries it and re-imports it', async () => {
+    await create(charge('home'));
+    const exported = await ctx.authed('GET', '/api/v1/expenses/export');
+    const csv = await exported.text();
+    expect(csv.split('\n')[0]).toContain('"chargerType"');
+    expect(csv).toContain('"home"');
+
+    ctx.sqlite.run('DELETE FROM expenses');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    expect(res.status).toBe(200);
+    const row = ctx.sqlite.query('SELECT charger_type FROM expenses').get();
+    expect(row).toEqual({ charger_type: 'home' });
+  });
+
+  test('a CSV row with an unknown charger type is an error on that row', async () => {
+    const csv = [
+      'date,vehicle,category,amount,mileage,volume,fuelType,chargerType',
+      '2024-06-01T00:00:00.000Z,2022 Tesla Model 3,fuel,10,1000,30,Electric,DC_Fast',
+      '2024-06-02T00:00:00.000Z,2022 Tesla Model 3,fuel,10,1010,30,Electric,garage',
+    ].join('\n');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv, dryRun: true });
+    const body = await json<{
+      data: { rows: { row: number; status: string; message?: string }[] };
+    }>(res);
+    expect(body.data.rows.map((r) => r.status)).toEqual(['ready', 'error']);
+    expect(body.data.rows[1]?.message).toMatch(/Charger type must be one of/);
+  });
+
+  test('fuel stats split charging by charger type, with untyped charges as unspecified', async () => {
+    const day = (n: number) => `2024-06-${String(n).padStart(2, '0')}T00:00:00.000Z`;
+    const add = (n: number, kwh: number, amount: number, chargerType: string | null) =>
+      create({
+        ...charge(chargerType),
+        date: day(n),
+        mileage: 1000 + n * 10,
+        volume: kwh,
+        expenseAmount: amount,
+      });
+    await add(1, 30, 6, 'home');
+    await add(2, 30, 6, 'home');
+    await add(3, 20, 8, 'dc_fast');
+    await add(4, 10, 2, null);
+    await create({ ...charge(null, 'Regular'), date: day(5), mileage: 1050, volume: 10 });
+
+    const start = Math.floor(Date.UTC(2024, 0, 1) / 1000);
+    const end = Math.floor(Date.UTC(2025, 0, 1) / 1000);
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/fuel-stats?startDate=${start}&endDate=${end}&timeZone=UTC`
+    );
+    expect(res.status).toBe(200);
+    const body =
+      await json<
+        DataEnvelope<{
+          charging: {
+            byChargerType: {
+              chargerType: string;
+              sessions: number;
+              energy: number;
+              energyShare: number;
+              pricePerEnergyUnit: number | null;
+            }[];
+          };
+        }>
+      >(res);
+    const rows = body.data.charging.byChargerType.map((r) => ({
+      ...r,
+      energyShare: Math.round(r.energyShare * 1000) / 1000,
+    }));
+    expect(rows).toEqual([
+      { chargerType: 'home', sessions: 2, energy: 60, energyShare: 0.667, pricePerEnergyUnit: 0.2 },
+      {
+        chargerType: 'dc_fast',
+        sessions: 1,
+        energy: 20,
+        energyShare: 0.222,
+        pricePerEnergyUnit: 0.4,
+      },
+      {
+        chargerType: 'unspecified',
+        sessions: 1,
+        energy: 10,
+        energyShare: 0.111,
+        pricePerEnergyUnit: 0.2,
+      },
+    ]);
+  });
+
+  test('the price per kWh is in whole yen units for a yen account', async () => {
+    const settings = await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'JPY' });
+    expect(settings.status).toBe(200);
+    const add = (n: number, kwh: number, amount: number, chargerType: string) =>
+      create({
+        ...charge(chargerType),
+        date: `2024-06-0${n}T00:00:00.000Z`,
+        mileage: 1000 + n * 10,
+        volume: kwh,
+        expenseAmount: amount,
+      });
+    await add(1, 30, 600, 'home');
+    await add(2, 30, 500, 'home');
+    await add(3, 20, 900, 'dc_fast');
+
+    const start = Math.floor(Date.UTC(2024, 0, 1) / 1000);
+    const end = Math.floor(Date.UTC(2025, 0, 1) / 1000);
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/fuel-stats?startDate=${start}&endDate=${end}&timeZone=UTC`
+    );
+    type Bucket = { chargerType: string; pricePerEnergyUnit: number | null };
+    const body = await json<DataEnvelope<{ charging: { byChargerType: Bucket[] } }>>(res);
+    const [home, dcFast] = body.data.charging.byChargerType;
+    expect(home?.chargerType).toBe('home');
+    expect(home?.pricePerEnergyUnit).toBeCloseTo(1100 / 60, 6);
+    expect(dcFast).toEqual({ ...dcFast, chargerType: 'dc_fast', pricePerEnergyUnit: 45 });
+  });
+
+  test('is never stored on a fill-up that is not a charge, whatever the request leaves out', async () => {
+    const { fuelType: _noFuelType, ...withoutFuelType } = charge('home');
+    expect((await create(withoutFuelType)).chargerType).toBeNull();
+
+    const gas = await create(charge(null, 'Regular'));
+    const set = await ctx.authed('PUT', `/api/v1/expenses/${gas.id}`, { chargerType: 'home' });
+    expect(set.status).toBe(200);
+    expect((await json<DataEnvelope<Row>>(set)).data.chargerType).toBeNull();
+    expect(ctx.sqlite.query('SELECT charger_type FROM expenses WHERE id = ?').get(gas.id)).toEqual({
+      charger_type: null,
+    });
+  });
+
+  test('a charge keeps its charger type when an update changes something else', async () => {
+    const row = await create(charge('workplace'));
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${row.id}`, { description: 'Office' });
+    expect((await json<DataEnvelope<Row>>(res)).data.chargerType).toBe('workplace');
+  });
+
+  test('an update can set and clear it, and switching to gas clears it', async () => {
+    const row = await create(charge(null));
+    const set = await ctx.authed('PUT', `/api/v1/expenses/${row.id}`, { chargerType: 'dc_fast' });
+    expect((await json<DataEnvelope<Row>>(set)).data.chargerType).toBe('dc_fast');
+    const gas = await ctx.authed('PUT', `/api/v1/expenses/${row.id}`, { fuelType: 'Regular' });
+    expect((await json<DataEnvelope<Row>>(gas)).data.chargerType).toBeNull();
+  });
+});

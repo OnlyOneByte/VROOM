@@ -44,6 +44,7 @@ export const SHEET_HEADERS = {
     'expenseAmount',
     'volume',
     'fuelType',
+    'chargerType',
     'missedFillup',
     'date',
     'mileage',
