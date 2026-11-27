@@ -40,10 +40,7 @@ function dateTimeFormat(options: Intl.DateTimeFormatOptions): Intl.DateTimeForma
 }
 
 export function currencyFractionDigits(currency?: string): number {
-	return (
-		numberFormat({ style: 'currency', currency: userCurrency(currency) }).resolvedOptions()
-			.maximumFractionDigits ?? 2
-	);
+	return NO_DECIMAL_CURRENCIES.has(userCurrency(currency)) ? 0 : 2;
 }
 
 export function amountStep(currency?: string): string {
@@ -84,14 +81,13 @@ export function formatDateWith(date: Date, options: Intl.DateTimeFormatOptions):
 
 export function formatCurrency(amount: number, currency?: string, fractionDigits?: number): string {
 	const currencyToUse = userCurrency(currency);
+	const digits = fractionDigits ?? currencyFractionDigits(currencyToUse);
 
 	return numberFormat({
 		style: 'currency',
 		currency: currencyToUse,
-		...(fractionDigits != null && {
-			minimumFractionDigits: fractionDigits,
-			maximumFractionDigits: fractionDigits
-		})
+		minimumFractionDigits: digits,
+		maximumFractionDigits: digits
 	}).format(amount);
 }
 
