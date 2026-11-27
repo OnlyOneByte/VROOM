@@ -3,6 +3,7 @@
 </script>
 
 <script lang="ts">
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { Bell, BellRing, Ellipsis, Gauge, Pause, Pencil, Receipt, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
@@ -185,14 +186,16 @@
 					Pause
 				</Button>
 			{/if}
-			<Button
-				variant="ghost"
-				class="h-10 w-full justify-start text-destructive hover:text-destructive"
-				onclick={() => choose(onDelete)}
-			>
-				<Trash2 />
-				Delete
-			</Button>
+			{#if authStore.user?.demo !== true}
+				<Button
+					variant="ghost"
+					class="h-10 w-full justify-start text-destructive hover:text-destructive"
+					onclick={() => choose(onDelete)}
+				>
+					<Trash2 />
+					Delete
+				</Button>
+			{/if}
 		</Popover.Content>
 	</Popover.Root>
 </li>

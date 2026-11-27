@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
 	import { MapPin, Pencil, Plus, Trash2 } from '@lucide/svelte';
@@ -203,15 +204,17 @@
 			<Button variant="ghost" size="icon" aria-label="Edit trip" onclick={() => openEdit(trip)}>
 				<Pencil class="h-4 w-4" />
 			</Button>
-			<Button
-				variant="ghost"
-				size="icon"
-				class="text-destructive hover:text-destructive"
-				aria-label="Delete trip"
-				onclick={() => openDelete(trip)}
-			>
-				<Trash2 class="h-4 w-4" />
-			</Button>
+			{#if authStore.user?.demo !== true}
+				<Button
+					variant="ghost"
+					size="icon"
+					class="text-destructive hover:text-destructive"
+					aria-label="Delete trip"
+					onclick={() => openDelete(trip)}
+				>
+					<Trash2 class="h-4 w-4" />
+				</Button>
+			{/if}
 		</div>
 	</li>
 {/snippet}

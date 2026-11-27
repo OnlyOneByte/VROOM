@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { signInAsDemo } from '../../../../test-utils/demo-user';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import type {
@@ -516,5 +517,21 @@ describe('ClaimsSection deleting a claim', () => {
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't delete the claim");
 		expect(screen.getByText('Collision')).toBeInTheDocument();
 		expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+	});
+});
+
+describe('ClaimsSection in the demo', () => {
+	test('a claim keeps Edit but has no Delete', async () => {
+		getClaims.mockResolvedValue([claim()]);
+		const signOut = signInAsDemo();
+		try {
+			mount();
+			await settle();
+
+			expect(screen.getByRole('button', { name: 'Edit claim' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Delete claim' })).toBeNull();
+		} finally {
+			signOut();
+		}
 	});
 });
