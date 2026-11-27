@@ -5,6 +5,7 @@ import { createTermExpenses } from '../api/insurance/hooks';
 import { assignServerRole } from '../permissions/grants';
 import { logger } from '../utils/logger';
 import { dollarsToCents } from '../utils/money';
+import { openAsyncDatabase } from './async-sqlite';
 import { getDb } from './connection.js';
 import {
   expenses,
@@ -133,9 +134,15 @@ function loanPayments(loan: VehicleFinancing, pattern: DrivingPattern): NewExpen
 async function shareWeekendCar(pattern: DrivingPattern): Promise<void> {
   const db = getDb();
   const { vehicleId, userId } = pattern;
+  const asyncDb = openAsyncDatabase(db.$client).db;
   setCarShare(db, vehicleId, true);
-  const owner = ownDriverId(db, vehicleId, userId);
-  const jamie = addGuestDriver(db, vehicleId, { name: 'Jamie', color: 'chart-3' }, userId);
+  const owner = await ownDriverId(asyncDb, vehicleId, userId);
+  const jamie = await addGuestDriver(
+    asyncDb,
+    vehicleId,
+    { name: 'Jamie', color: 'chart-3' },
+    userId
+  );
   const rows = await db
     .select({ id: expenses.id, category: expenses.category })
     .from(expenses)

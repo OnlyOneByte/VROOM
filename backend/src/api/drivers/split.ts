@@ -1,6 +1,6 @@
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { expenses, vehicles } from '../../db/schema';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
 import type { Period } from './distance';
@@ -43,8 +43,8 @@ export const DEFAULT_RULES: SplitRules = {
   ownership: { kind: 'payer' },
 };
 
-export function readRules(db: AppDatabase, vehicleId: string): SplitRules {
-  const row = db
+export async function readRules(db: AsyncAppDatabase, vehicleId: string): Promise<SplitRules> {
+  const row = await db
     .select({ rules: vehicles.carShareRules })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
@@ -67,11 +67,15 @@ export function rulesFor(rules: SplitRules, everyone: boolean, ownDriver: string
   return { running: own(rules.running), ownership: own(rules.ownership) };
 }
 
-export function writeRules(db: AppDatabase, vehicleId: string, rules: SplitRules): void {
-  db.update(vehicles)
+export async function writeRules(
+  db: AsyncAppDatabase,
+  vehicleId: string,
+  rules: SplitRules
+): Promise<void> {
+  await db
+    .update(vehicles)
     .set({ carShareRules: rules, updatedAt: new Date() })
-    .where(eq(vehicles.id, vehicleId))
-    .run();
+    .where(eq(vehicles.id, vehicleId));
 }
 
 const UNASSIGNED = '';
@@ -160,7 +164,7 @@ export interface BalanceOptions {
   hideFinancials: boolean;
 }
 
-function spending(db: AppDatabase, vehicleId: string, options: BalanceOptions) {
+function spending(db: AsyncAppDatabase, vehicleId: string, options: BalanceOptions) {
   return db
     .select({
       category: expenses.category,
@@ -176,14 +180,17 @@ function spending(db: AppDatabase, vehicleId: string, options: BalanceOptions) {
         inArray(expenses.category, [...GROUP_CATEGORIES.running, ...GROUP_CATEGORIES.ownership]),
         options.hideFinancials ? hiddenFinancialsScope() : undefined
       )
-    )
-    .all();
+    );
 }
 
-export function computeBalances(db: AppDatabase, vehicleId: string, options: BalanceOptions) {
-  const rules = readRules(db, vehicleId);
-  const drivers = listDrivers(db, vehicleId);
-  const stats = driverStats(db, vehicleId, {
+export async function computeBalances(
+  db: AsyncAppDatabase,
+  vehicleId: string,
+  options: BalanceOptions
+) {
+  const rules = await readRules(db, vehicleId);
+  const drivers = await listDrivers(db, vehicleId);
+  const stats = await driverStats(db, vehicleId, {
     period: options.period,
     withEstimates: true,
     viewerUserId: '',
@@ -192,7 +199,7 @@ export function computeBalances(db: AppDatabase, vehicleId: string, options: Bal
     scale: 1,
   });
   const distance = new Map(stats.drivers.map((d) => [d.driverId, d.distance.total]));
-  const rows = spending(db, vehicleId, options);
+  const rows = await spending(db, vehicleId, options);
   const owed = new Map<string, number>();
   const paid = new Map<string, number>();
   let unassigned = 0;
@@ -234,7 +241,7 @@ export function computeBalances(db: AppDatabase, vehicleId: string, options: Bal
   };
 }
 
-type Balances = ReturnType<typeof computeBalances>;
+type Balances = Awaited<ReturnType<typeof computeBalances>>;
 
 export function balancesView(
   result: Balances,
