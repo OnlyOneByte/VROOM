@@ -1,4 +1,5 @@
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import { rawAll, rawJsonValue } from '../../db/dialect';
 import { userPreferences, vehicles } from '../../db/schema';
@@ -213,10 +214,14 @@ function carName(v: { year: number; make: string; model: string; nickname: strin
 }
 
 export class AnalyticsInsightsRepository {
+  private db: AsyncAppDatabase;
+
   constructor(
-    private db: AppDatabase,
+    syncDb: AppDatabase,
     private queries: AnalyticsQueryRepository
-  ) {}
+  ) {
+    this.db = openAsyncDatabase(syncDb.$client).db;
+  }
 
   async insights(userId: string, query: InsightsQuery): Promise<Insight[]> {
     try {
@@ -304,7 +309,7 @@ export class AnalyticsInsightsRepository {
       (b) => b.key === key
     );
     if (!bucket) return null;
-    const [largest] = rawAll<{
+    const [largest] = await rawAll<{
       description: string | null;
       category: string;
       vehicle_id: string;
@@ -338,7 +343,7 @@ export class AnalyticsInsightsRepository {
   }
 
   private async repairFree(ctx: Context): Promise<Insight | null> {
-    const rows = rawAll<{
+    const rows = await rawAll<{
       vehicle_id: string;
       date: number;
       tags: string | null;
@@ -448,7 +453,7 @@ export class AnalyticsInsightsRepository {
   }
 
   private async costPerTrip(ctx: Context): Promise<Insight | null> {
-    const trips = rawAll<{ vehicle_id: string; distance: number; purpose: string }>(
+    const trips = await rawAll<{ vehicle_id: string; distance: number; purpose: string }>(
       this.db,
       sql`
       SELECT t.vehicle_id, t.end_odometer - t.start_odometer AS distance, t.purpose FROM trips t
@@ -488,7 +493,7 @@ export class AnalyticsInsightsRepository {
   }
 
   private async cheapestStation(ctx: Context): Promise<Insight | null> {
-    const rows = rawAll<StationRow>(
+    const rows = await rawAll<StationRow>(
       this.db,
       sql`
       SELECT e.vehicle_id, TRIM(e.location) AS location, COALESCE(e.fuel_type, '') AS grade, e.volume,

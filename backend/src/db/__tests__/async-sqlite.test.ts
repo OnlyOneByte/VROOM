@@ -441,12 +441,14 @@ begin`,
       await tx.select().from(users);
       return tx.all(sql`select count(*) as n from users`);
     });
-    expect(raw).toEqual([[3]]);
+    expect(raw).toEqual([{ n: 3 }]);
     const rawOuter = await transaction(async (tx) => {
       await tx.select().from(users);
       return db.get(sql`select count(*) as n from users`);
     });
-    expect(rawOuter).toEqual([3]);
+    expect(rawOuter).toEqual({ n: 3 });
+    expect(await db.values(sql`select count(*) as n from users`)).toEqual([[3]]);
+    expect(await db.get(sql`select 1 as n from users where id = 'none'`)).toBeUndefined();
   });
 
   test('a query built inside a transaction and run after it ended is refused', async () => {
