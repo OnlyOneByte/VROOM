@@ -43,6 +43,32 @@ describe('the shared page header', () => {
 		expect(titleBlock?.parentElement).toHaveClass('sm:flex-row', 'sm:flex-wrap');
 	});
 
+	test('an eyebrow sits above the title and stays out of its accessible name', () => {
+		const { getByRole, getByText } = render(PageHeader, {
+			title: 'Expenses',
+			variant: 'display',
+			eyebrow: 'Log'
+		});
+
+		const title = getByRole('heading', { level: 1, name: 'Expenses' });
+		const eyebrow = getByText('Log');
+		expect(title.contains(eyebrow)).toBe(false);
+		expect(eyebrow.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+	});
+
+	test('a snippet eyebrow renders too, and no eyebrow renders nothing above the title', () => {
+		const withSnippet = render(PageHeader, {
+			title: 'Costco fill-up',
+			variant: 'display',
+			eyebrow: html('<span>Daily Driver · Mar 15</span>')
+		});
+		expect(withSnippet.getByText('Daily Driver · Mar 15')).toBeInTheDocument();
+		withSnippet.unmount();
+
+		const { getByRole } = render(PageHeader, { title: 'Expenses', variant: 'display' });
+		expect(getByRole('heading', { level: 1 }).previousElementSibling).toBeNull();
+	});
+
 	test('a short, narrow viewport drops the description so the actions stay on the first screen', () => {
 		const { getByText } = render(PageHeader, {
 			title: 'All Expenses',
