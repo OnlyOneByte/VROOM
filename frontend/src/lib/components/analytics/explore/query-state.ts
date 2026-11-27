@@ -180,20 +180,18 @@ export function exploreRequest(
 	};
 }
 
-const prefetched = new Map<string, Promise<AnalyticsQueryResponse>>();
+let prefetched: { key: string; pending: Promise<AnalyticsQueryResponse> } | null = null;
 
 export function prefetchExplore(params: ReturnType<typeof exploreRequest>): void {
-	const key = JSON.stringify(params);
-	if (prefetched.has(key)) return;
 	const pending = analyticsApi.query(params);
 	pending.catch(() => {});
-	prefetched.set(key, pending);
+	prefetched = { key: JSON.stringify(params), pending };
 }
 
 export function takePrefetched(key: string): Promise<AnalyticsQueryResponse> | undefined {
-	const pending = prefetched.get(key);
-	prefetched.delete(key);
-	return pending;
+	const hit = prefetched?.key === key ? prefetched.pending : undefined;
+	prefetched = null;
+	return hit;
 }
 
 export type ChartForm = 'stacked' | 'grouped' | 'bars' | 'line' | 'ranking' | 'compare' | 'panels';

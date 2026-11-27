@@ -212,10 +212,8 @@
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
 	onMount(() => {
-		if (activeTab === 'explore') {
-			prefetchExplore(exploreRequest(explore, dateRange, vehicleIds));
-			void import('#lib/components/analytics/explore/ExploreTab.svelte');
-		}
+		prefetchExplore(exploreRequest(explore, dateRange, vehicleIds));
+		void import('#lib/components/analytics/explore/ExploreTab.svelte');
 		void loadVehicles();
 	});
 </script>
