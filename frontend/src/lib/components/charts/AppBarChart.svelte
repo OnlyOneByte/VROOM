@@ -60,6 +60,7 @@
 		current?: unknown;
 		referenceLines?: ReferenceLine[];
 		valueLabels?: boolean;
+		fitTicks?: boolean;
 		insight?: string;
 		class?: string;
 	}
@@ -101,6 +102,7 @@
 		current,
 		referenceLines = [],
 		valueLabels = true,
+		fitTicks = false,
 		insight,
 		class: className
 	}: Props = $props();
@@ -210,9 +212,14 @@
 	let resolvedXAxisProps = $derived.by(() => {
 		const props: Record<string, unknown> = xAxisProps ?? monthlyXAxisProps(data.length);
 		const ticks = props['ticks'];
-		if (!vertical || !Array.isArray(ticks)) return props;
-		const format = (props['format'] as ((_v: unknown) => string) | undefined) ?? String;
-		return { ...props, ticks: fittedBandTicks(ticks, format) };
+		const format = props['format'] ?? String;
+		if (!fitTicks || !vertical || !Array.isArray(ticks) || typeof format !== 'function') {
+			return props;
+		}
+		return {
+			...props,
+			ticks: fittedBandTicks(ticks, format as (_v: unknown) => string, resolvedPadding.right)
+		};
 	});
 	let yTicks = $derived(
 		distinctYTicks(yAxisFormat, height - resolvedPadding.top - resolvedPadding.bottom)

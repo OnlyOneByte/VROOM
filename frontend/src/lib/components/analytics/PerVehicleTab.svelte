@@ -377,6 +377,7 @@
 							referenceLines={monthAverage != null
 								? [{ value: monthAverage, label: 'Monthly average' }]
 								: []}
+							fitTicks
 							xAxisProps={{ ticks: monthTicks, format: (v: unknown) => String(v) }}
 							yAxisFormat={v => formatCurrency(v, undefined, 0)}
 							tooltipFormat={v => formatCurrency(Number(v))}

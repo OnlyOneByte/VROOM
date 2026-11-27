@@ -67,20 +67,27 @@ describe('fittedBandTicks (bar x labels never overlap)', () => {
 		m => `${m} ’26`
 	);
 	const everyThird = months.filter((_m, i) => i % 3 === 0);
-	const band = (width: number) => scaleBand<string>().domain(months).range([0, width]);
+	const band = (domain: string[], width: number) =>
+		scaleBand<string>().domain(domain).range([0, width]).padding(0.4);
 
 	test('at 320px, every third month would collide, so it keeps every sixth', () => {
-		expect(fittedBandTicks(everyThird, String)(band(188))).toEqual(['Jan ’26', 'Jul ’26']);
+		expect(fittedBandTicks(everyThird, String)(band(months, 188))).toEqual(['Jan ’26', 'Jul ’26']);
 	});
 
 	test('with room, every tick asked for is kept', () => {
-		expect(fittedBandTicks(everyThird, String)(band(600))).toEqual(everyThird);
+		expect(fittedBandTicks(everyThird, String)(band(months, 600))).toEqual(everyThird);
 	});
 
-	test('labels already cut to their band are all kept', () => {
-		const cars = ['A', 'B', 'C', 'D'];
-		const scale = scaleBand<string>().domain(cars).range([0, 200]);
-		expect(fittedBandTicks(cars, String)(scale)).toEqual(cars);
+	test('car names cut to their band, as Cross-vehicle does, are all kept', () => {
+		const cars = [
+			'2020 Toyota Camry (Daily Driver)',
+			'2019 Honda Civic (Weekend Car)',
+			'2021 Tesla Model 3',
+			'2021 Toyota Prius',
+			'2021 Ford F-150'
+		];
+		const format = (v: unknown) => fitBandTickLabel(String(v), 300, cars.length);
+		expect(fittedBandTicks(cars, format)(band(cars, 300))).toEqual(cars);
 	});
 });
 

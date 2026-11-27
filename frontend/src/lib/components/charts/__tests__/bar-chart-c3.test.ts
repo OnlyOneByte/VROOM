@@ -90,6 +90,10 @@ function barsConfig(): Props {
 	return (seen.chart?.['props'] as Props)['bars'] as Props;
 }
 
+function xAxis(): Props {
+	return (seen.chart?.['props'] as Props)['xAxis'] as Props;
+}
+
 function measuredWidth(width: number) {
 	vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
 	vi.stubGlobal(
@@ -182,7 +186,7 @@ describe('C3 bar columns', () => {
 		expect(screen.getByRole('list', { name: 'Reference lines' })).toHaveTextContent('Avg: $311.00');
 	});
 
-	test('a plot measured narrow after it first draws moves the label under the chart', async () => {
+	test('a plot measured narrow after it first draws lists the label under the chart', async () => {
 		measuredWidth(300);
 		await mount({ ...SINGLE, referenceLines: [{ value: 311, label: 'Avg' }] });
 		await settle();
@@ -195,6 +199,39 @@ describe('C3 bar columns', () => {
 		await settle();
 		expect(seen.texts.some(t => t['value'] === 'Avg $311')).toBe(true);
 		expect(screen.queryByRole('list', { name: 'Reference lines' })).toBeNull();
+	});
+
+	test('a narrow category chart keeps every label it names', async () => {
+		measuredWidth(300);
+		const metrics = [
+			'Fuel Efficiency',
+			'Maintenance Cost',
+			'Reliability',
+			'Annual Cost',
+			'Mileage'
+		];
+		await mount({
+			...SINGLE,
+			plotWidth: 300,
+			data: metrics.map(metric => ({ metric, amount: 50 })),
+			x: 'metric',
+			xAxisProps: { ticks: metrics, format: (v: unknown) => String(v) }
+		});
+		await settle();
+		expect(xAxis()['ticks']).toEqual(metrics);
+	});
+
+	test('a chart that opts in drops month ticks that would overlap', async () => {
+		measuredWidth(300);
+		const ticks = ['Jan ’26', 'Apr ’26', 'Jul ’26', 'Oct ’26'];
+		await mount({
+			...SINGLE,
+			plotWidth: 300,
+			fitTicks: true,
+			xAxisProps: { ticks, format: (v: unknown) => String(v) }
+		});
+		await settle();
+		expect(typeof xAxis()['ticks']).toBe('function');
 	});
 
 	test('a stack rounds only the top segment that has a value', async () => {
