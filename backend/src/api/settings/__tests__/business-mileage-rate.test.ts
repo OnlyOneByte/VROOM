@@ -139,6 +139,17 @@ describe('changing the distance unit converts the stored rate', () => {
     expect(again.status).toBe(200);
   });
 
+  test('a tiny rate stays on after a unit change instead of rounding to 0', async () => {
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'miles' },
+      businessMileageRate: 0.00004,
+    });
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'kilometers' },
+    });
+    expect((await read()).businessMileageRate).toBe(0.00002485);
+  });
+
   test('changing only the fuel unit leaves the rate alone', async () => {
     await ctx.authed('PUT', '/api/v1/settings', {
       unitPreferences: { distanceUnit: 'miles' },

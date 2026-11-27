@@ -15,11 +15,37 @@ import {
 	toMinor,
 	formatNumber,
 	formatNumberUpTo,
+	formatRate,
 	formatRelativeTime,
 	getCurrencySymbol,
+	plainDecimal,
 	toAmountInput,
 	toDateInputValue
 } from '#lib/utils/formatters.ts';
+
+describe('formatRate (a mileage rate with the decimals it has)', () => {
+	test.each([
+		[0.67, 'USD', '$0.67'],
+		[0.4163, 'USD', '$0.4163'],
+		[1, 'USD', '$1.00'],
+		[300, 'KRW', '₩300'],
+		[804.672, 'KRW', '₩804.672'],
+		[0.00002485, 'USD', '$0.000025']
+	])('%s %s reads %s', (rate, currency, expected) => {
+		expect(formatRate(rate, currency)).toBe(expected);
+	});
+});
+
+describe('plainDecimal', () => {
+	test.each([
+		[0.0000001, '0.0000001'],
+		[0.4163, '0.4163'],
+		[1234567.5, '1234567.5'],
+		[300, '300']
+	])('%s is written as %s, never with an exponent or grouping', (value, expected) => {
+		expect(plainDecimal(value)).toBe(expected);
+	});
+});
 
 describe('formatCurrency', () => {
 	test('defaults to USD with 2 decimals', () => {

@@ -5,7 +5,12 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import { CURRENCIES } from '#lib/constants/currencies.ts';
-	import { currencyLabel, getCurrencySymbol, minorUnitScale } from '#lib/utils/formatters.ts';
+	import {
+		currencyLabel,
+		getCurrencySymbol,
+		minorUnitScale,
+		plainDecimal
+	} from '#lib/utils/formatters.ts';
 	import { landOn } from '#lib/utils/focus.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
@@ -44,7 +49,7 @@
 
 	$effect.pre(() => {
 		if (!rateEditing && !rateError) {
-			rateDraft = businessMileageRate > 0 ? String(businessMileageRate) : '';
+			rateDraft = businessMileageRate > 0 ? plainDecimal(businessMileageRate) : '';
 		}
 	});
 
@@ -63,7 +68,7 @@
 
 	function commitRate() {
 		const text = rateDraft.trim();
-		if (businessMileageRate > 0 && text === String(businessMileageRate)) {
+		if (businessMileageRate > 0 && text === plainDecimal(businessMileageRate)) {
 			rateError = null;
 			return;
 		}

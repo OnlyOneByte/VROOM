@@ -269,6 +269,31 @@ describe('UnitPreferencesCard', () => {
 			expect(onRateChange).not.toHaveBeenCalled();
 		});
 
+		test('a tiny saved rate shows in plain decimals and is accepted as shown', async () => {
+			const onRateChange = vi.fn();
+			mount({ businessMileageRate: 0.0000001, onRateChange });
+			expect(rate()).toHaveValue('0.0000001');
+
+			await enter('0.0000001');
+
+			expect(rate()).not.toHaveAttribute('aria-invalid');
+			expect(onRateChange).not.toHaveBeenCalled();
+		});
+
+		test('typing the saved rate back after a refused value clears the error and saves nothing', async () => {
+			const onRateChange = vi.fn();
+			mount({ currencyUnit: 'KRW', businessMileageRate: 804.672, onRateChange });
+
+			await enter('1,000');
+			expect(screen.getByRole('alert')).toHaveTextContent('Leave out thousands separators');
+
+			await enter('804.672');
+
+			expect(rate()).not.toHaveAttribute('aria-invalid');
+			expect(screen.queryByRole('alert')).toBeNull();
+			expect(onRateChange).not.toHaveBeenCalled();
+		});
+
 		test('fixing a refused rate clears the error and saves it', async () => {
 			const onRateChange = vi.fn();
 			mount({ currencyUnit: 'KRW', onRateChange });

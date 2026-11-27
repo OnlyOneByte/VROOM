@@ -91,6 +91,27 @@ export function formatCurrency(amount: number, currency?: string, fractionDigits
 	}).format(amount);
 }
 
+export function formatRate(rate: number, currency?: string): string {
+	const currencyToUse = userCurrency(currency);
+	if (rate > 0 && rate < 0.0001) {
+		return numberFormat({
+			style: 'currency',
+			currency: currencyToUse,
+			maximumSignificantDigits: 2
+		}).format(rate);
+	}
+	return numberFormat({
+		style: 'currency',
+		currency: currencyToUse,
+		minimumFractionDigits: currencyFractionDigits(currencyToUse),
+		maximumFractionDigits: 4
+	}).format(rate);
+}
+
+export function plainDecimal(value: number): string {
+	return value.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 20 });
+}
+
 export function getCurrencySymbol(currency?: string): string {
 	const currencyToUse = userCurrency(currency);
 	const parts = numberFormat({ style: 'currency', currency: currencyToUse }).formatToParts(0);
