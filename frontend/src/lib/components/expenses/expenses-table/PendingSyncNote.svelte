@@ -6,7 +6,7 @@
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 	import { retryDelete } from '#lib/utils/pending-deletes.svelte.ts';
-	import { retryEdit } from '#lib/utils/pending-edits.svelte.ts';
+	import { applyMyChanges, reloadLatest, retryEdit } from '#lib/utils/pending-edits.svelte.ts';
 	import { expenseEditHref } from './expense-table-actions';
 
 	interface Props {
@@ -42,6 +42,34 @@
 			}}
 		>
 			Retry
+		</Button>
+	</div>
+{:else if pending.kind === 'edit' && pending.conflict}
+	<div class="flex flex-wrap items-center gap-2 whitespace-normal" data-testid="edit-conflict-note">
+		<span class="text-xs text-destructive">{pending.error}</span>
+		<Button
+			variant="outline"
+			size="sm"
+			class="h-7"
+			aria-label="Apply my changes to {label}"
+			onclick={event => {
+				event.stopPropagation();
+				applyMyChanges(entryId);
+			}}
+		>
+			Apply my changes
+		</Button>
+		<Button
+			variant="ghost"
+			size="sm"
+			class="h-7"
+			aria-label="Reload {label} without my changes"
+			onclick={event => {
+				event.stopPropagation();
+				void reloadLatest(entryId);
+			}}
+		>
+			Reload
 		</Button>
 	</div>
 {:else if pending.kind === 'edit'}

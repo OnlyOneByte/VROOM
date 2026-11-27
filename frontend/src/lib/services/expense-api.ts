@@ -193,11 +193,13 @@ export const expenseApi = {
 
 	async updateExpense(
 		expenseId: string,
-		expense: ExpenseInput & { vehicleId: string; category: ExpenseCategory; amount: number }
+		expense: ExpenseInput & { vehicleId: string; category: ExpenseCategory; amount: number },
+		options: { expectedUpdatedAt?: string | undefined } = {}
 	): Promise<Expense> {
 		const backendExpense = {
 			...toBackendExpense(expense, { isEdit: true }),
-			timeZone: userTimeZone()
+			timeZone: userTimeZone(),
+			...(options.expectedUpdatedAt && { expectedUpdatedAt: options.expectedUpdatedAt })
 		};
 		const data = await apiClient.put<BackendExpenseResponse>(
 			`/expenses/${expenseId}`,

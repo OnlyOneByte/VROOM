@@ -520,16 +520,28 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     expectedUpdatedAt?: Date
   ): Promise<Expense> {
     return this.db.transaction(async (tx) => {
-      const [current] = await tx
-        .select({ updatedAt: expenses.updatedAt })
-        .from(expenses)
-        .where(eq(expenses.id, id));
+      const storedVersion = async () => {
+        const [row] = await tx
+          .select({ updatedAt: expenses.updatedAt, groupId: expenses.groupId })
+          .from(expenses)
+          .where(eq(expenses.id, id));
+        return row;
+      };
+      const current = await storedVersion();
       if (!current) throw new NotFoundError('Resource');
       assertNotChanged(current.updatedAt, expectedUpdatedAt);
       await assertOdometerInOrder(tx, odometer);
+      const legTimes = current.groupId
+        ? (
+            await tx
+              .select({ updatedAt: expenses.updatedAt })
+              .from(expenses)
+              .where(eq(expenses.groupId, current.groupId))
+          ).map((leg) => leg.updatedAt)
+        : [];
       const [updated] = await tx
         .update(expenses)
-        .set({ ...data, updatedAt: nextUpdatedAt([current.updatedAt]) })
+        .set({ ...data, updatedAt: nextUpdatedAt([current.updatedAt, ...legTimes]) })
         .where(
           and(
             eq(expenses.id, id),
@@ -537,7 +549,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
           )
         )
         .returning();
-      if (!updated) throw new ExpenseChangedError(null);
+      if (!updated) {
+        const now = await storedVersion();
+        if (!now) throw new NotFoundError('Resource');
+        throw new ExpenseChangedError(now.updatedAt);
+      }
       return updated;
     });
   }
