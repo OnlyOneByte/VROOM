@@ -93,7 +93,7 @@ function renderEdit() {
 
 const rootPathInput = () => screen.getByLabelText('Root Path') as HTMLInputElement;
 const displayNameInput = () => screen.getByLabelText('Name') as HTMLInputElement;
-const saveButton = () => screen.getByRole('button', { name: /update provider|save provider/i });
+const saveButton = () => screen.getByRole('button', { name: /^(save storage|save changes)$/i });
 
 async function awaitLoaded() {
 	await vi.waitFor(() => expect(displayNameInput().value).toBe('My Drive'));
@@ -264,6 +264,20 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 		expect(screen.getByRole('button', { name: /Google Photos/i })).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /OneDrive|Dropbox/i })).toBeNull();
 		expect(screen.queryByText('Soon')).toBeNull();
+	});
+
+	test('the type chips form a labelled group and say which one is picked', async () => {
+		render(ProviderForm, { props: {} });
+
+		const s3 = screen.getByRole('button', { name: /S3 \/ B2 \/ R2/i });
+		const drive = screen.getByRole('button', { name: /Google Drive/i });
+		expect(screen.getByRole('group', { name: 'Type' })).toContainElement(s3);
+		expect(s3).toHaveAttribute('aria-pressed', 'false');
+
+		await fireEvent.click(s3);
+
+		expect(s3).toHaveAttribute('aria-pressed', 'true');
+		expect(drive).toHaveAttribute('aria-pressed', 'false');
 	});
 
 	test('picking a type seeds its default path, and an edit of that path is what gets saved', async () => {

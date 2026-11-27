@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
-	import { ArrowLeft, Cloud, LoaderCircle, Save, Trash2 } from '@lucide/svelte';
+	import { ArrowLeft, Cloud, LoaderCircle, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import {
 		Card,
@@ -360,10 +360,10 @@
 <FormLayout>
 	<div class="mb-6">
 		<PageHeader
-			title={isEditMode ? 'Edit Provider' : 'Add Storage Provider'}
+			title={isEditMode ? 'Edit storage' : 'Add storage'}
 			description={isEditMode
-				? 'Update your storage provider configuration'
-				: 'Connect a new storage provider for your photos and backups'}
+				? 'Change how VROOM uses this storage.'
+				: 'Bring your own storage for backups and photos.'}
 		>
 			{#snippet back()}
 				<Button
@@ -373,98 +373,88 @@
 					aria-label="Back to Backups and storage"
 					onclick={navigateBack}
 				>
-					<ArrowLeft class="size-5" />
+					<ArrowLeft class="size-5" aria-hidden="true" />
 				</Button>
 			{/snippet}
 		</PageHeader>
 	</div>
 
-	<div class="space-y-6 pb-32 sm:pb-24">
+	<div class="space-y-8 pb-8">
 		{#if isEditMode}
 			{@const pt = providerTypes.find(p => p.id === selectedType)}
 			{#if pt}
 				{@const Icon = pt.icon}
-				<div class="flex items-center gap-3 rounded-lg border border-border p-3">
-					<div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-						<Icon class="h-5 w-5 text-muted-foreground" />
+				<div class="flex items-center gap-3">
+					<div
+						class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+						aria-hidden="true"
+					>
+						<Icon class="size-5 text-foreground" />
 					</div>
-					<div>
-						<p class="text-sm font-medium">{pt.label}</p>
-						<p class="text-xs text-muted-foreground">{pt.description}</p>
+					<div class="min-w-0">
+						<p class="font-medium">{pt.label}</p>
+						<p class="text-sm text-muted-foreground">{pt.description}</p>
 					</div>
 				</div>
 			{/if}
 		{:else}
-			<Card>
-				<CardHeader>
-					<CardTitle class="text-base">Provider Type</CardTitle>
-					<CardDescription>Choose your storage provider</CardDescription>
-				</CardHeader>
-				<CardContent>
-					{#if providerCatalog.error && !providerCatalog.loaded}
-						<LoadErrorCard
-							compact
-							title="Couldn't load the provider types"
-							message={providerCatalog.error}
-							onRetry={() => providerCatalog.load()}
-						/>
-					{:else if !providerCatalog.loaded}
-						<div class="flex justify-center py-6" role="status">
-							<LoaderCircle class="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
-							<span class="sr-only">Loading provider types</span>
-						</div>
-					{/if}
-					<div class="grid grid-cols-2 gap-2">
-						{#each providerTypes as pt (pt.id)}
-							{@const Icon = pt.icon}
-							<button
-								type="button"
-								class="relative flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors
-									{selectedType === pt.id
-									? 'border-primary bg-primary/5'
-									: 'border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'}"
-								onclick={() => {
-									if (pt.id !== selectedType && selectedEntry?.connect === 'oauth') oauth.forget();
-									selectedType = pt.id;
-									photoRootPath = getDefaultPhotoRootPath(pt.id);
-									folderSettings = defaultFolderSettings(pt.id);
-									resetFields(pt.id, undefined);
-								}}
-							>
-								<Icon
-									class="h-6 w-6 {selectedType === pt.id
-										? 'text-primary'
-										: 'text-muted-foreground'}"
-								/>
-								<span class="text-sm font-medium">{pt.label}</span>
-							</button>
-						{/each}
+			<div class="space-y-3" role="group" aria-labelledby="provider-type-label">
+				<p id="provider-type-label" class="text-sm font-medium">Type</p>
+				{#if providerCatalog.error && !providerCatalog.loaded}
+					<LoadErrorCard
+						compact
+						title="Couldn't load the storage types"
+						message={providerCatalog.error}
+						onRetry={() => providerCatalog.load()}
+					/>
+				{:else if !providerCatalog.loaded}
+					<div class="flex py-2" role="status">
+						<LoaderCircle class="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+						<span class="sr-only">Loading storage types</span>
 					</div>
-				</CardContent>
-			</Card>
+				{/if}
+				<div class="flex flex-wrap gap-2">
+					{#each providerTypes as pt (pt.id)}
+						{@const Icon = pt.icon}
+						{@const selected = selectedType === pt.id}
+						<button
+							type="button"
+							aria-pressed={selected}
+							class="inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none
+								{selected
+								? 'border-foreground bg-foreground text-background'
+								: 'cursor-pointer border-border bg-surface text-foreground hover:bg-sunk'}"
+							onclick={() => {
+								if (pt.id !== selectedType && selectedEntry?.connect === 'oauth') oauth.forget();
+								selectedType = pt.id;
+								photoRootPath = getDefaultPhotoRootPath(pt.id);
+								folderSettings = defaultFolderSettings(pt.id);
+								resetFields(pt.id, undefined);
+							}}
+						>
+							<Icon class="size-4" aria-hidden="true" />
+							{pt.label}
+						</button>
+					{/each}
+				</div>
+			</div>
 		{/if}
 
 		{#if selectedType && providerCatalog.loaded}
-			<Card>
-				<CardHeader>
-					<CardTitle class="text-base">Display Name</CardTitle>
-					<CardDescription>A friendly name for this provider</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<div class="space-y-2">
-						<Label for="provider-name">Name</Label>
-						<Input
-							id="provider-name"
-							bind:value={displayName}
-							placeholder="My {providerTypes.find(p => p.id === selectedType)?.label ?? 'Provider'}"
-						/>
-					</div>
-				</CardContent>
-			</Card>
+			<div class="space-y-2">
+				<Label for="provider-name">Name</Label>
+				<Input
+					id="provider-name"
+					bind:value={displayName}
+					placeholder="My {providerTypes.find(p => p.id === selectedType)?.label ?? 'storage'}"
+				/>
+			</div>
 
-			<Card>
+			<Card variant="section" role="region" aria-labelledby="provider-connection-title">
 				<CardHeader>
-					<CardTitle class="text-base">Connection Settings</CardTitle>
+					<CardTitle level={2} id="provider-connection-title" class="text-base">
+						Connection
+					</CardTitle>
 					<CardDescription>
 						{selectedForm?.description ?? selectedEntry?.description ?? 'Provider configuration'}
 					</CardDescription>
@@ -504,10 +494,10 @@
 				</CardContent>
 			</Card>
 
-			<Card>
+			<Card variant="section" role="region" aria-labelledby="provider-photos-title">
 				<CardHeader>
-					<CardTitle class="text-base">Photo Folder Settings</CardTitle>
-					<CardDescription>Configure where each photo category is stored</CardDescription>
+					<CardTitle level={2} id="provider-photos-title" class="text-base">Photos</CardTitle>
+					<CardDescription>Where each kind of photo is stored</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<ProviderFolderSettings
@@ -521,10 +511,10 @@
 			</Card>
 
 			{#if supportsZipBackup(selectedType)}
-				<Card>
+				<Card variant="section" role="region" aria-labelledby="provider-backups-title">
 					<CardHeader>
-						<CardTitle class="text-base">Backup Settings</CardTitle>
-						<CardDescription>Configure backup storage for this provider</CardDescription>
+						<CardTitle level={2} id="provider-backups-title" class="text-base">Backups</CardTitle>
+						<CardDescription>Keep copies of your data in this storage</CardDescription>
 					</CardHeader>
 					<CardContent>
 						<BackupSection
@@ -541,10 +531,14 @@
 			{/if}
 
 			{#if isEditMode}
-				<Card class="border-destructive/50">
+				<Card variant="section" role="region" aria-labelledby="provider-remove-title">
 					<CardHeader>
-						<CardTitle class="text-base text-destructive">Danger Zone</CardTitle>
-						<CardDescription>Permanently remove this provider</CardDescription>
+						<CardTitle level={2} id="provider-remove-title" class="text-base">
+							Remove storage
+						</CardTitle>
+						<CardDescription>
+							VROOM stops using it. Your files stay in the storage itself.
+						</CardDescription>
 					</CardHeader>
 					<CardContent>
 						<Button
@@ -553,34 +547,29 @@
 							disabled={isDeleting}
 						>
 							{#if isDeleting}
-								<LoaderCircle class="h-4 w-4 animate-spin mr-1" />
-								Deleting...
+								<LoaderCircle class="animate-spin" aria-hidden="true" />
+								Deleting…
 							{:else}
-								<Trash2 class="h-4 w-4 mr-1 text-destructive" />
-								Delete Provider
+								<Trash2 class="text-destructive" aria-hidden="true" />
+								Delete storage
 							{/if}
 						</Button>
 					</CardContent>
 				</Card>
 			{/if}
+
+			<div class="flex justify-end border-t pt-6">
+				<Button onclick={handleSave} disabled={!canSave || isSaving}>
+					{#if isSaving}
+						<LoaderCircle class="animate-spin" aria-hidden="true" />
+						Saving…
+					{:else}
+						{isEditMode ? 'Save changes' : 'Save storage'}
+					{/if}
+				</Button>
+			</div>
 		{/if}
 	</div>
-
-	{#if selectedType && providerCatalog.loaded}
-		<Button
-			onclick={handleSave}
-			disabled={!canSave || isSaving}
-			class="fixed sm:bottom-8 sm:right-8 bottom-4 left-4 right-4 sm:left-auto sm:w-auto w-auto sm:rounded-full rounded-full group bg-foreground hover:bg-foreground/90 text-background shadow-2xl transition-all duration-300 sm:hover:scale-110 z-50 h-16 sm:h-16 pl-6 pr-10 border-0 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-		>
-			{#if isSaving}
-				<LoaderCircle class="h-6 w-6 animate-spin transition-transform duration-300" />
-				<span class="font-bold text-lg">Saving...</span>
-			{:else}
-				<Save class="h-6 w-6 transition-transform duration-300 group-hover:scale-110" />
-				<span class="font-bold text-lg">{isEditMode ? 'Update Provider' : 'Save Provider'}</span>
-			{/if}
-		</Button>
-	{/if}
 </FormLayout>
 
 <ConfirmDialog

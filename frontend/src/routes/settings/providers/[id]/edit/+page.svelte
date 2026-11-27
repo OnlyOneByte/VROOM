@@ -99,12 +99,12 @@
 </script>
 
 <svelte:head>
-	<title>{provider?.displayName ?? 'Edit Provider'} - VROOM Car Tracker</title>
+	<title>{provider?.displayName ?? 'Edit storage'} - VROOM Car Tracker</title>
 	<meta name="description" content="Edit photo storage provider settings" />
 </svelte:head>
 
 {#snippet header()}
-	<PageHeader title="Edit Provider" description="Update your storage provider configuration">
+	<PageHeader title="Edit storage" description="Change how VROOM uses this storage.">
 		{#snippet back()}
 			<Button
 				variant="ghost"
@@ -113,7 +113,7 @@
 				aria-label="Back to Backups and storage"
 				onclick={backToSettings}
 			>
-				<ArrowLeft class="size-5" />
+				<ArrowLeft class="size-5" aria-hidden="true" />
 			</Button>
 		{/snippet}
 	</PageHeader>
