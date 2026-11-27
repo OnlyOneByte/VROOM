@@ -420,3 +420,48 @@ describe('/expenses month totals with an edit in flight', () => {
 		}
 	});
 });
+
+describe('/expenses month totals after an Undo brings an expense back into a searched view', () => {
+	const moved = {
+		id: 'e1',
+		vehicleId: 'v1',
+		userId: 'u1',
+		category: 'fuel',
+		amount: 10,
+		date: '2026-01-15T12:00:00.000Z',
+		description: 'Arco',
+		tags: [],
+		createdAt: '2026-01-01T00:00:00.000Z',
+		updatedAt: '2026-01-01T00:00:00.000Z'
+	} as unknown as Expense;
+	const january = () => (tableProps['monthTotals'] as ReadonlyMap<string, number>).get('2026-01');
+
+	async function undoWhileSearching(search: string): Promise<number | undefined> {
+		updateExpense
+			.mockResolvedValueOnce({ ...moved, vehicleId: 'v2', updatedAt: '2026-01-01T00:00:01.000Z' })
+			.mockReturnValueOnce(new Promise(() => {}));
+		getMonthlyTotals.mockResolvedValue([{ month: '2026-01', amount: 30, count: 2 }]);
+		try {
+			scheduleEdit(moved, { ...moved, vehicleId: 'v2' }, { vehicleId: 'v2' } as never);
+			await waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(1));
+			await new Promise(resolve => setTimeout(resolve, 0));
+			openAt(`?vehicleId=v1&q=${search}`);
+			await waitFor(() => expect(january()).toBe(30));
+
+			undoEdit('e1');
+			await waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(2));
+			await new Promise(resolve => setTimeout(resolve, 0));
+			return january();
+		} finally {
+			resetPendingEdits();
+		}
+	}
+
+	test('an expense that does not match the search is not added back to the month totals', async () => {
+		expect(await undoWhileSearching('shell')).toBe(30);
+	});
+
+	test('an expense that matches the search is added back to the month totals', async () => {
+		expect(await undoWhileSearching('arco')).toBe(40);
+	});
+});
