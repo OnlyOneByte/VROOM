@@ -326,7 +326,9 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(notices()[2]).toMatchObject({
 			type: 'success',
 			message: 'Expense updated successfully',
-			toastId: 'expense-edit-e1'
+			toastId: 'expense-edit-e1',
+			duration: 5000,
+			action: { label: 'Undo' }
 		});
 	});
 
@@ -404,6 +406,24 @@ describe('a save that never answers times out', () => {
 		scheduleEdit(saved, again, payload);
 		await vi.advanceTimersByTimeAsync(0);
 		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
+	});
+
+	test('a save queued behind a hung one goes out when the hung one times out', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockImplementationOnce(appliedButNeverAnswered)
+			.mockImplementationOnce(appliedAndAnswered);
+		scheduleEdit(saved, changed, payload);
+		await vi.advanceTimersByTimeAsync(1000);
+		const again = { ...changed, amount: 70 };
+		scheduleEdit(saved, again, payload);
+
+		await vi.advanceTimersByTimeAsync(EDIT_TIMEOUT_MS - 1001);
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(1);
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
+		expect(editFailureStates([saved])).toEqual([]);
+		expect(shownExpense(saved)).toMatchObject({ amount: 70 });
 	});
 
 	test('Retry after a timed-out save the server had applied sends the same values to the same expense, and the row settles on them', async () => {

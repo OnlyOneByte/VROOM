@@ -248,6 +248,16 @@ describe('network failures', () => {
 		const abortError = new DOMException('The operation was aborted.', 'AbortError');
 		mockFetch.mockRejectedValueOnce(abortError);
 		const err = await captureError(apiClient.get('/vehicles', { signal: controller.signal }));
-		expect(err).toBe(abortError);
+		expect(err).toBe(controller.signal.reason);
+		expect((err as unknown as DOMException).name).toBe('AbortError');
+	});
+
+	test('an abort with a reason rejects with that reason, even if fetch drops it', async () => {
+		const controller = new AbortController();
+		const reason = new Error('timed out');
+		controller.abort(reason);
+		mockFetch.mockRejectedValueOnce(new DOMException('The operation was aborted.', 'AbortError'));
+		const err = await captureError(apiClient.get('/vehicles', { signal: controller.signal }));
+		expect(err).toBe(reason);
 	});
 });

@@ -54,13 +54,19 @@ async function put(id: string, seq: number, payload: EditPayload): Promise<void>
 		const stamp = saved?.updatedAt;
 		if (entry.seq === seq) {
 			edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
-			if (entry.retried) {
+			if (entry.retried && entry.undo) {
 				appStore.addNotification({
 					type: 'success',
-					message: entry.undo
-						? 'Your changes to the expense were undone'
-						: 'Expense updated successfully',
+					message: 'Your changes to the expense were undone',
 					toastId: toastId(id)
+				});
+			} else if (entry.retried) {
+				appStore.addNotification({
+					type: 'success',
+					message: 'Expense updated successfully',
+					toastId: toastId(id),
+					duration: UNDO_WINDOW_MS,
+					action: { label: 'Undo', onClick: () => undoEdit(id) }
 				});
 			}
 		} else if (entry.undo && entry.undoSeq === seq && !entry.undoneAt && stamp) {
