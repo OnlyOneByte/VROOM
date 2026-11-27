@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { type AppContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import { type Expense, expenses as expensesTable, type NewExpense } from '../../db/schema';
-import { EXPENSE_CATEGORIES } from '../../db/types';
+import { CHARGER_TYPES, EXPENSE_CATEGORIES } from '../../db/types';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, heavyJobLimiter, rateLimiter, requireAuth } from '../../middleware';
 import {
@@ -171,6 +171,7 @@ const baseExpenseSchema = createInsertSchema(expensesTable, {
       `Fuel type must be ${CONFIG.validation.expense.fuelTypeMaxLength} characters or less`
     )
     .nullish(),
+  chargerType: z.enum(CHARGER_TYPES).nullish(),
   // Insurance and reminder links bypass this route's validation, so only financing links are accepted.
   sourceType: z.literal('financing').optional(),
   sourceId: z.string().min(1).optional(),
