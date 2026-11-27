@@ -389,7 +389,7 @@
 						</Alert>
 					{/if}
 
-					<div class="flex items-center justify-between gap-4 pb-3">
+					<div class="flex items-center justify-between gap-4 py-3 first:pt-0">
 						<div class="min-w-0">
 							<p class="font-medium">Back up now</p>
 							<p class="text-sm text-muted-foreground">
@@ -444,7 +444,7 @@
 					<div class="flex items-center justify-between gap-4 pt-3">
 						<div class="min-w-0">
 							<p class="font-medium">Restore</p>
-							<p class="text-sm text-muted-foreground">Replace or merge from a backup file</p>
+							<p class="text-sm text-muted-foreground">Bring your data back from a backup file</p>
 						</div>
 						<Button variant="outline" onclick={() => onRestore?.()}>
 							<Upload aria-hidden="true" />

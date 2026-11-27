@@ -59,7 +59,10 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 			props: {
 				open: true,
 				backupProvidersEnabled: true,
-				providerNames: ['Family Drive', 'Office S3'],
+				providers: [
+					{ id: 'p1', displayName: 'Family Drive' },
+					{ id: 'p2', displayName: 'Office S3' }
+				],
 				onSync
 			}
 		});
@@ -76,7 +79,7 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 			props: {
 				open: true,
 				backupProvidersEnabled: true,
-				providerNames: ['Family Drive'],
+				providers: [{ id: 'p1', displayName: 'Family Drive' }],
 				onSync: vi.fn()
 			}
 		});
@@ -86,5 +89,22 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 		render(BackupDialog, { props: { open: true, backupProvidersEnabled: false, onSync: vi.fn() } });
 		expect(await screen.findByRole('button', { name: 'Back up now' })).toBeDisabled();
 		expect(screen.getByText('Turn on backups for a storage provider first.')).toBeInTheDocument();
+	});
+
+	test('two providers with the same name both show, without a duplicate-key crash', async () => {
+		render(BackupDialog, {
+			props: {
+				open: true,
+				backupProvidersEnabled: true,
+				providers: [
+					{ id: 'p1', displayName: 'Google Drive' },
+					{ id: 'p2', displayName: 'Google Drive' }
+				],
+				onSync: vi.fn()
+			}
+		});
+		const list = await screen.findByRole('list', { name: 'Backups go to' });
+		expect(list.querySelectorAll('li')).toHaveLength(2);
+		expect(screen.getByRole('button', { name: 'Back up to 2 providers' })).toBeEnabled();
 	});
 });

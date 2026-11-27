@@ -159,7 +159,7 @@
 				</div>
 				<div class="min-w-0">
 					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-						<p class="truncate min-w-0 font-medium">{provider.displayName}</p>
+						<p class="min-w-0 font-medium break-words">{provider.displayName}</p>
 						<ProviderStatusBadge status={provider.status} />
 						{#if lastBackupAt}
 							<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>

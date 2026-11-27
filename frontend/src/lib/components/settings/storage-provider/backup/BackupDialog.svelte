@@ -6,16 +6,16 @@
 	interface Props {
 		open: boolean;
 		backupProvidersEnabled: boolean;
-		providerNames?: string[];
+		providers?: Array<{ id: string; displayName: string }>;
 		onSync: () => void;
 	}
 
-	let { open = $bindable(), backupProvidersEnabled, providerNames = [], onSync }: Props = $props();
+	let { open = $bindable(), backupProvidersEnabled, providers = [], onSync }: Props = $props();
 
 	let confirmLabel = $derived(
-		providerNames.length === 0
+		providers.length === 0
 			? 'Back up now'
-			: `Back up to ${providerNames.length} provider${providerNames.length === 1 ? '' : 's'}`
+			: `Back up to ${providers.length} provider${providers.length === 1 ? '' : 's'}`
 	);
 </script>
 
@@ -32,11 +32,11 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
-		{#if backupProvidersEnabled && providerNames.length > 0}
+		{#if backupProvidersEnabled && providers.length > 0}
 			<ul class="divide-y" aria-label="Backups go to">
-				{#each providerNames as name (name)}
+				{#each providers as provider (provider.id)}
 					<li class="py-3">
-						<p class="font-medium">{name}</p>
+						<p class="font-medium">{provider.displayName}</p>
 						<p class="text-sm text-muted-foreground">Backups on</p>
 					</li>
 				{/each}
