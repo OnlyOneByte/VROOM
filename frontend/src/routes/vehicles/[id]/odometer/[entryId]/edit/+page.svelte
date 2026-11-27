@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
@@ -284,16 +285,18 @@
 			{/if}
 
 			<div class="flex flex-wrap gap-3 border-t border-border pt-6">
-				<Button
-					type="button"
-					variant="outline"
-					size="lg"
-					onclick={() => (deleteDialogOpen = true)}
-					class="rounded-full text-destructive"
-				>
-					<Trash2 class="size-4" />
-					Delete
-				</Button>
+				{#if authStore.user?.demo !== true}
+					<Button
+						type="button"
+						variant="outline"
+						size="lg"
+						onclick={() => (deleteDialogOpen = true)}
+						class="rounded-full text-destructive"
+					>
+						<Trash2 class="size-4" />
+						Delete
+					</Button>
+				{/if}
 				<div class="ml-auto flex gap-3">
 					<Button
 						type="button"

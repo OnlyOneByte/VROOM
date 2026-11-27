@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { signInAsDemo } from '#lib/testing/demo-user.ts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type {
 	InsuranceClaim,
@@ -14,6 +15,7 @@ import {
 	makePhoto,
 	makePolicy,
 	makeTerm,
+	openTermActions,
 	photoPage,
 	settle
 } from './insurance-fixtures.ts';
@@ -407,5 +409,21 @@ describe('PolicyCard term actions', () => {
 		await confirmDelete();
 		expect(handleErrorWithNotification).toHaveBeenCalledWith(failure, "Couldn't delete the term");
 		expect(onRefresh).not.toHaveBeenCalled();
+	});
+});
+
+describe('PolicyCard in the demo', () => {
+	test('a term keeps Edit but has no Delete', async () => {
+		const signOut = signInAsDemo();
+		try {
+			mount();
+			await settle();
+			await openTermActions();
+
+			expect(screen.getByRole('button', { name: 'Edit term' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Delete term' })).toBeNull();
+		} finally {
+			signOut();
+		}
 	});
 });

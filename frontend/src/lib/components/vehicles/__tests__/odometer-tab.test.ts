@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { signInAsDemo } from '#lib/testing/demo-user.ts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import { scaleTime } from 'd3-scale';
 import type { OdometerHistoryEntry, PaginatedResponse, UnitPreferences } from '#lib/types/index.ts';
@@ -601,5 +602,21 @@ describe('OdometerTab chart range', () => {
 
 		expect(getChartHistory).toHaveBeenCalledTimes(2);
 		expect((chartProps?.['data'] as unknown[]).length).toBe(2);
+	});
+});
+
+describe('OdometerTab in the demo', () => {
+	test('a reading keeps Edit but has no Delete', async () => {
+		getHistory.mockResolvedValue(page([entry({ sourceId: 'o7' })]));
+		const signOut = signInAsDemo();
+		try {
+			mount();
+			await settle();
+
+			expect(screen.getByRole('link', { name: 'Edit reading' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Delete reading' })).toBeNull();
+		} finally {
+			signOut();
+		}
 	});
 });

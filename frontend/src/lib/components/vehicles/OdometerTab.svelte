@@ -33,6 +33,7 @@
 </script>
 
 <script lang="ts">
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { cn } from '#lib/utils.js';
 	import { onMount } from 'svelte';
@@ -353,16 +354,18 @@
 									>
 										<Pencil class="h-3.5 w-3.5" />
 									</Button>
-									<Button
-										variant="ghost"
-										size="icon"
-										class="h-8 w-8 text-destructive hover:text-destructive"
-										aria-label="Delete reading"
-										title="Delete reading"
-										onclick={() => openDeleteDialog(entry)}
-									>
-										<Trash2 class="h-3.5 w-3.5" />
-									</Button>
+									{#if authStore.user?.demo !== true}
+										<Button
+											variant="ghost"
+											size="icon"
+											class="h-8 w-8 text-destructive hover:text-destructive"
+											aria-label="Delete reading"
+											title="Delete reading"
+											onclick={() => openDeleteDialog(entry)}
+										>
+											<Trash2 class="h-3.5 w-3.5" />
+										</Button>
+									{/if}
 								</div>
 							{/if}
 						</div>

@@ -1,5 +1,6 @@
-import { cleanup, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { signInAsDemo } from '#lib/testing/demo-user.ts';
 import type { ReminderWithVehicles } from '#lib/types/index.ts';
 import ReminderRow from '../ReminderRow.svelte';
 
@@ -105,5 +106,20 @@ describe('ReminderRow status', () => {
 		expect(rowText()).toContain('Daily Driver · ');
 		expect(rowText()).toContain('~$312.00 · monthly');
 		expect(screen.getByTestId('reminder-card-r1').textContent).toContain('Dec\u00a03,\u00a02026');
+	});
+});
+
+describe('ReminderRow in the demo', () => {
+	test('the actions menu keeps Edit but has no Delete', async () => {
+		const signOut = signInAsDemo();
+		try {
+			renderRow(item(), 'upcoming');
+			await fireEvent.click(screen.getByRole('button', { name: 'More actions for Oil change' }));
+
+			expect(await screen.findByRole('button', { name: 'Edit' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+		} finally {
+			signOut();
+		}
 	});
 });

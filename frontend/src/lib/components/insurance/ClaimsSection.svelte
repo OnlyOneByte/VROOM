@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -320,15 +321,17 @@
 										>
 											<Pencil />
 										</Button>
-										<Button
-											variant="ghost"
-											size="icon"
-											class="size-10"
-											aria-label="Delete claim"
-											onclick={() => requestDelete(claim.id)}
-										>
-											<Trash2 />
-										</Button>
+										{#if authStore.user?.demo !== true}
+											<Button
+												variant="ghost"
+												size="icon"
+												class="size-10"
+												aria-label="Delete claim"
+												onclick={() => requestDelete(claim.id)}
+											>
+												<Trash2 />
+											</Button>
+										{/if}
 									{/if}
 								</div>
 							</div>

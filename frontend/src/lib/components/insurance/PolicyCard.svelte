@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { paramRoutes } from '#lib/routes.ts';
@@ -157,7 +158,7 @@
 					isCurrent={true}
 					{vehicleNames}
 					onEdit={readOnly ? undefined : handleEditTerm}
-					onDelete={readOnly ? undefined : handleDeleteTerm}
+					onDelete={readOnly || authStore.user?.demo === true ? undefined : handleDeleteTerm}
 				/>
 			</div>
 		{/if}
@@ -197,7 +198,7 @@
 					{vehicles}
 					termVehicleCoverage={policy.termVehicleCoverage}
 					{onRefresh}
-					onDeleteTerm={readOnly ? undefined : handleDeleteTerm}
+					onDeleteTerm={readOnly || authStore.user?.demo === true ? undefined : handleDeleteTerm}
 					{readOnly}
 					level={childLevel}
 				/>
