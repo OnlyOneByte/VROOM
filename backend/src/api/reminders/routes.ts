@@ -13,7 +13,7 @@ import {
   vehicleEntry,
   vehicleOrOwnAccount,
 } from '../../permissions/authorize';
-import { requestResolver } from '../../permissions/grants';
+import { loadResolver, vehicleResources } from '../../permissions/grants';
 import type { Resource } from '../../permissions/resolve';
 import { logger } from '../../utils/logger';
 import {
@@ -124,13 +124,13 @@ const fromReminder: ResourceOf = reminderResources;
 
 const fromReminderReadable: ResourceOf = async (c) => {
   const all = await reminderResources(c);
-  const resolver = requestResolver(c, appContext().db);
+  const resolver = await loadResolver(c, all);
   const readable = all.filter((r) => resolver.can('vehicle.reminder.read', r).allow);
   return readable.length > 0 ? readable : all.slice(0, 1);
 };
 
-function visibleVehicleIds(c: Context, vehicleIds: readonly string[]): string[] {
-  const resolver = requestResolver(c, appContext().db);
+async function visibleVehicleIds(c: Context, vehicleIds: readonly string[]): Promise<string[]> {
+  const resolver = await loadResolver(c, vehicleResources(vehicleIds));
   return vehicleIds.filter(
     (vehicleId) => resolver.can('vehicle.reminder.read', vehicleResource(vehicleId)).allow
   );
@@ -418,7 +418,12 @@ routes.get('/', authorize(fromQueryVehicle), async (c) => {
   const visible =
     listUserId === user.id
       ? reminders
-      : reminders.map((row) => ({ ...row, vehicleIds: visibleVehicleIds(c, row.vehicleIds) }));
+      : await Promise.all(
+          reminders.map(async (row) => ({
+            ...row,
+            vehicleIds: await visibleVehicleIds(c, row.vehicleIds),
+          }))
+        );
   const scale = await repos().preferences.moneyScale(listUserId);
   return c.json({ success: true, data: visible.map((r) => reminderWithVehiclesToApi(r, scale)) });
 });
@@ -431,11 +436,14 @@ routes.get(
     const { id } = c.req.valid('param');
     const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
-    const resolver = requestResolver(c, appContext().db);
     const materialized = await repos().expenses.findBySource(
       'reminder',
       id,
       existing.reminder.userId
+    );
+    const resolver = await loadResolver(
+      c,
+      vehicleResources(materialized.map((expense) => expense.vehicleId))
     );
     const readable = materialized.filter(
       (expense) => resolver.can('vehicle.expense.read', vehicleResource(expense.vehicleId)).allow
@@ -468,6 +476,7 @@ routes.put(
     );
 
     if (partialUpdate.vehicleIds) {
+      await loadResolver(c, vehicleResources(partialUpdate.vehicleIds));
       for (const vehicleId of partialUpdate.vehicleIds) {
         requireCan(c, 'vehicle.reminder.write', vehicleResource(vehicleId));
       }

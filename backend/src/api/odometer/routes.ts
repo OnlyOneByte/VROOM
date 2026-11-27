@@ -114,7 +114,7 @@ routes.get(
       limit,
       offset,
       hideFinancials: !seesFinancials(access),
-      includeExpenses: requestResolver(c, appContext().db).can('vehicle.expense.read', {
+      includeExpenses: requestResolver(c).can('vehicle.expense.read', {
         kind: 'vehicle',
         vehicleId,
       }).allow,
