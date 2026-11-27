@@ -25,7 +25,7 @@ Branches key on Drizzle's runtime `columnType`, each set listing both SQLite and
 ## Backup Versions
 
 `metadata.version` records the format a backup was written in (`CONFIG.backup.currentVersion`,
-`3.0.0` today), and restore keeps it as written. `backupVersionError` in `backup.ts` accepts any
+`3.1.0` today), and restore keeps it as written. `backupVersionError` in `backup.ts` accepts any
 older version, and the current major with a minor at or below the current one. It refuses a newer
 major or minor with a message telling the user to update VROOM, and a version that isn't a number.
 
@@ -39,29 +39,32 @@ There are two steps:
 - **`2.0.0`, to cents:** a pre-2.0.0 backup stored dollar floats, so this step multiplies the
   `MONEY_CENTS_FIELDS` columns by 100. `coerceRow` then rounds them, since float products such as
   12.34 × 100 land just below the integer.
-- **`3.0.0`, to the minor unit of the backup's own currency** (scale `minorUnitScale`):
+- **`3.1.0`, to the minor unit of the backup's own currency** (scale `minorUnitScale`). Backups labelled `3.0.0` were written while every currency was still stored in cents, so they go through this step too:
+  - The scale is 1 for the currencies in `noDecimals` in `backend/src/shared-currencies.json` and 100 for the rest. The list is pinned rather than read from `Intl`, because Bun and the browsers disagree on the digits of some currencies (HUF, IDR, COP, PKR, IRR and others).
   - The currency is the backup's `userPreferences.currencyUnit`. A backup without preferences (restore keeps the account's own in that case) uses the account's currency.
-  - A 2.0.0 backup holds cents, so `centsToMinorUnits` rescales each money column, rounding halves up.
-  - The legs of a split group and the absolute allocations of a reminder split are rescaled together with `rescaleParts`: each part is floored, and the units left are handed out by largest remainder (first by `id` on a tie). So the parts still add up to the rounded total, and none goes below zero.
+  - A 2.0.0 or 3.0.0 backup holds cents, so `centsToMinorUnits` rescales each money column, rounding halves away from zero.
+  - The legs of a split group and the absolute allocations of a reminder split are rescaled together with `rescaleParts`: each part is floored, and the units left are handed out by largest remainder, compared in whole numbers. Ties go to the leg with the lower `id`, and to the earlier allocation in a reminder split. So the parts still add up to the rounded total.
+  - An absolute reminder split without an allocations list is left as it is.
   - A two-decimal currency is left as it is.
+  - Migration `0028_money_minor_units` applies the same rules to stored data, once (`money_unit_migrations` records it). `migration-0028.test.ts` checks that it and this step agree for a forint user.
 
 ### Rollback and old backups
 
-- **Restoring an older backup:** a backup taken before the minor-unit migration is a 2.0.0 backup
-  in cents. Restoring it on a newer build runs the `3.0.0` step once and gives the same amounts the
-  migration would have stored.
-- **Rescaling can't run twice:** a 3.0.0 backup is never rescaled again, and an export after a
-  restore is 3.0.0. For a Sheets mirror this relies on its `Metadata` tab: a mirror whose tab was deleted is read as 2.0.0 and rescaled again.
-- **Merging into another currency:** a merge restore into an account whose currency differs in decimals from the backup's mixes two scales, as it already mixed two currencies before 3.0.0.
-- **Rolling back the build:** a build older than 3.0.0 refuses 3.0.0 backups with its "newer
+- **Restoring an older backup:** a backup taken before the minor-unit migration is a 2.0.0 or
+  3.0.0 backup in cents. Restoring it on a newer build runs the `3.1.0` step once and gives the same
+  amounts the migration would have stored.
+- **Rescaling can't run twice:** a 3.1.0 backup is never rescaled again, and an export after a
+  restore is 3.1.0. For a Sheets mirror this relies on its `Metadata` tab: a mirror whose tab was deleted is read as 2.0.0 and rescaled again.
+- **Merging into another currency:** a merge restore into an account whose currency differs in decimals from the backup's mixes two scales, as it already mixed two currencies before 3.1.0.
+- **Rolling back the build:** a build older than 3.1.0 refuses 3.1.0 backups with its "newer
   version" message. To roll back, reinstall that build and restore a backup it made. Once the minor-unit database migration has run, rolling back the build also needs the database from before it (that backup, or a copy of the database file), because the older build reads stored amounts as cents.
-- **Tests:** `backup-minor-units.test.ts` covers each case, and pins the frozen
-  `fixtures/backup-3.0.0-jpy/` fixture.
+- **Tests:** `backup-minor-units.test.ts` covers each case, including a cents-holding 3.0.0 yen
+  backup, and pins the frozen `fixtures/backup-3.1.0-jpy/` fixture.
 
 A Sheets mirror records its version in a `Metadata` tab, written last on every sync. A mirror
 without the tab was last synced by an older build: it counts as 1.x dollars only when its
 Expenses header row is present and lacks `createdBy` (added in the same release as cents), and as
-2.0.0 cents otherwise, which the `3.0.0` step then rescales. Never infer the unit from cell values: one hand-edited `45.50` would rescale
+2.0.0 cents otherwise, which the `3.1.0` step then rescales. Never infer the unit from cell values: one hand-edited `45.50` would rescale
 every amount.
 
 ### Changing the format

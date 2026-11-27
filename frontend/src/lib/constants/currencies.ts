@@ -147,3 +147,37 @@ export const CURRENCIES = [
 	'ZMW',
 	'ZWG'
 ] as const;
+
+export const NO_DECIMAL_CURRENCIES: ReadonlySet<string> = new Set([
+	'AFN',
+	'ALL',
+	'BIF',
+	'CLP',
+	'COP',
+	'DJF',
+	'GNF',
+	'HUF',
+	'IDR',
+	'IRR',
+	'ISK',
+	'JPY',
+	'KMF',
+	'KPW',
+	'KRW',
+	'LAK',
+	'LBP',
+	'MGA',
+	'MMK',
+	'PKR',
+	'PYG',
+	'RWF',
+	'SOS',
+	'SYP',
+	'UGX',
+	'VND',
+	'VUV',
+	'XAF',
+	'XOF',
+	'XPF',
+	'YER'
+]);

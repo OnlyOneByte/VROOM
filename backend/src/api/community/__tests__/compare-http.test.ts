@@ -10,6 +10,7 @@ import {
 } from '../../../test-helpers/http-client';
 import { createInvitee, type Invitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
+import { COMMUNITY_SCHEMA_VERSION } from '../aggregator';
 
 const DAY = 86_400_000;
 const MPG_PER_KM_PER_L = 3.785411784 / 1.609344;
@@ -61,8 +62,17 @@ async function seedCivic(extra: Record<string, unknown> = { catalogModelId: 'hon
 function insertBucket(bucketKey: string, metric: string, unit: string, n: number, mean: number) {
   ctx.sqlite.run(
     `INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, computed_at, schema_version)
-     VALUES (?, 'local', ?, ?, ?, ?, ?, ?, 1)`,
-    [`row-${bucketKey}`, metric, bucketKey, unit, n, mean, Math.floor(Date.now() / 1000)]
+     VALUES (?, 'local', ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      `row-${bucketKey}`,
+      metric,
+      bucketKey,
+      unit,
+      n,
+      mean,
+      Math.floor(Date.now() / 1000),
+      COMMUNITY_SCHEMA_VERSION,
+    ]
   );
   markRefreshed();
 }

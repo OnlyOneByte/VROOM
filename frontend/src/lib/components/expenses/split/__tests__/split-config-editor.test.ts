@@ -93,6 +93,21 @@ describe('SplitConfigEditor: even split', () => {
 		expect(rowText('Total')).toBe('Total $10.01');
 	});
 
+	test('splits a yen total into whole yen, as the API stores it', async () => {
+		const { settingsStore } = await import('#lib/stores/settings.svelte.ts');
+		const spy = vi
+			.spyOn(settingsStore, 'settings', 'get')
+			.mockReturnValue({ currencyUnit: 'JPY' } as NonNullable<typeof settingsStore.settings>);
+		try {
+			renderEditor('even');
+			expect(rowText('2020 Toyota Camry')).toBe('2020 Toyota Camry ¥34');
+			expect(rowText('Hauler')).toBe('Hauler ¥33');
+			expect(rowText('2020 Honda Civic')).toBe('2020 Honda Civic ¥33');
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
 	test('splits an evenly divisible total exactly', () => {
 		renderEditor('even', [], [CAMRY, RAV4], 50);
 

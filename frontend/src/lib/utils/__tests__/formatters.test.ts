@@ -330,4 +330,12 @@ describe('minor units', () => {
 		expect(fromMinor(1234, 'USD')).toBe(12.34);
 		expect(fromMinor(toMinor(19.999, 'USD'), 'USD')).toBe(20);
 	});
+
+	test('no-decimal currencies store whole units, including ones Bun and Safari give 2 digits', () => {
+		for (const code of ['JPY', 'HUF', 'IDR']) {
+			expect(minorUnitScale(code)).toBe(1);
+			expect(toMinor(1234.4, code)).toBe(1234);
+			expect(fromMinor(1234, code)).toBe(1234);
+		}
+	});
 });

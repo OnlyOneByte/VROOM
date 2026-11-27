@@ -253,6 +253,24 @@ describe('CommunityCompareCard', () => {
 		);
 	});
 
+	test('a no-decimal currency is shown in whole units, not divided by 100', async () => {
+		compare.mockResolvedValue({
+			currency: 'JPY',
+			metrics: [
+				metric('maintenance', {
+					status: 'ok',
+					unit: 'cents_per_year',
+					yours: 45_000,
+					bucket: { n: 10, mean: 60_000, computedAt: '' }
+				})
+			]
+		});
+		await mount();
+		expect(screen.getByTestId('community-compare-maintenance')).toHaveTextContent(
+			'You ¥45,000/yr · Others ¥60,000/yr'
+		);
+	});
+
 	test('too few owners never says how many there are', async () => {
 		compare.mockResolvedValue(data(metric('efficiency', { status: 'too_few', yours: 34 })));
 		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });

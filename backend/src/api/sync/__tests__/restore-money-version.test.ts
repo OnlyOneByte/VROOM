@@ -113,7 +113,8 @@ describe('backup version bump and restore shim', () => {
     expect(backupVersionError('2.1.0')).toBeNull();
     expect(backupVersionError('3.0.0')).toBeNull();
     expect(backupVersionError('3.0.9')).toBeNull();
-    expect(backupVersionError('3.1.0')).toMatch(/newer version of VROOM/);
+    expect(backupVersionError('3.1.0')).toBeNull();
+    expect(backupVersionError('3.2.0')).toMatch(/newer version of VROOM/);
     expect(backupVersionError('4.0.0')).toMatch(/newer version of VROOM/);
     expect(backupVersionError(undefined)).toMatch(/not a version number/);
     expect(backupVersionError('latest')).toMatch(/not a version number/);
