@@ -4,11 +4,7 @@ import { AppError, ConflictError, ValidationError } from '../../errors';
 import { termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { formatNumberForMessage } from '../../utils/money';
-import {
-  deletePhotosForEntities,
-  deleteStoredPhotoObjects,
-  storedPhotoObjects,
-} from '../photos/photo-service';
+import { deleteStoredPhotoObjects, storedPhotoObjects } from '../photos/photo-service';
 import type { MonthlyPricedTerm, TermCoverageRow } from './repository';
 
 export function vehicleIdsForTerm(
@@ -174,14 +170,17 @@ export async function createTermExpenses(params: TermExpenseParams, scale?: numb
 }
 
 export async function deleteTermExpenses(termId: string, userId: string): Promise<number> {
-  // Photo files must be removed first: deleteBySource drops photo rows with raw SQL and orphans the files.
-  const linked = await repos().expenses.findBySource('insurance_term', termId, userId);
-  await deletePhotosForEntities(
-    'expense',
-    linked.map((expense) => expense.id),
-    userId
-  );
-  return repos().expenses.deleteBySource('insurance_term', termId, userId);
+  let photoObjects: Awaited<ReturnType<typeof storedPhotoObjects>> = [];
+  const removed = await appContext().asyncDb.transaction(async () => {
+    const linked = await repos().expenses.findBySource('insurance_term', termId, userId);
+    photoObjects = await storedPhotoObjects(
+      'expense',
+      linked.map((expense) => expense.id)
+    );
+    return repos().expenses.deleteBySource('insurance_term', termId, userId);
+  });
+  await deleteStoredPhotoObjects(photoObjects, userId);
+  return removed;
 }
 
 function sameTime(a: Date | null | undefined, b: Date | null | undefined): boolean {
