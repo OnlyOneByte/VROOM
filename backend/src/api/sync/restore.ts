@@ -33,7 +33,7 @@ import {
   SyncError,
   ValidationError,
 } from '../../errors';
-import { changeShareRole, hasPerPersonVehicleGrants } from '../../permissions/grants';
+import { changeShareRoleInSyncTransaction, hasPerPersonVehicleGrants } from '../../permissions/grants';
 import {
   type BackupConfig,
   DEFAULT_PROVIDER_CAPABILITIES,
@@ -836,7 +836,7 @@ class RestoreService {
       .all();
     for (const share of accepted) {
       if (!share.sharedWithId) continue;
-      changeShareRole(tx, {
+      changeShareRoleInSyncTransaction(tx, {
         vehicleId: share.vehicleId,
         sharedWithId: share.sharedWithId,
         level: share.level,

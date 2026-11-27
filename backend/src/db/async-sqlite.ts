@@ -1,6 +1,7 @@
 import type { Database, Statement } from 'bun:sqlite';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { drizzle } from 'drizzle-orm/sqlite-proxy';
+import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
+import { drizzle, type SqliteRemoteResult } from 'drizzle-orm/sqlite-proxy';
 import { UPKEEP_QUERIES } from './dialect';
 import * as schema from './schema';
 
@@ -97,6 +98,8 @@ export function openAsyncDatabase(sqlite: Database) {
 }
 
 export type AsyncAppDatabase = ReturnType<typeof openAsyncDatabase>['db'];
+export type AsyncHandle = BaseSQLiteDatabase<'async', SqliteRemoteResult, typeof schema>;
+export type AsyncTransaction = Parameters<Parameters<AsyncAppDatabase['transaction']>[0]>[0];
 
 function createAsyncDatabase(sqlite: Database) {
   type Scope = {

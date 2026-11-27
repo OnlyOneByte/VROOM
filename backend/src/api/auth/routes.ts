@@ -172,8 +172,8 @@ routes.get('/providers', async (c) => {
   });
 });
 
-routes.get('/signup', (c) => {
-  const { mode, allowedDomains } = signupSettings(appContext().db);
+routes.get('/signup', async (c) => {
+  const { mode, allowedDomains } = await signupSettings(appContext().asyncDb);
   return c.json({ success: true, data: { mode, domainRestricted: allowedDomains.length > 0 } });
 });
 
@@ -314,7 +314,7 @@ export async function updateExistingUserProfile(
 }
 
 export async function attachPendingInvitesOnSignIn(userId: string): Promise<void> {
-  const { db, asyncDb } = appContext();
+  const { asyncDb } = appContext();
   try {
     const [account] = await asyncDb
       .select({ email: users.email, pendingApprovalAt: users.pendingApprovalAt })
@@ -322,7 +322,7 @@ export async function attachPendingInvitesOnSignIn(userId: string): Promise<void
       .where(eq(users.id, userId))
       .limit(1);
     if (account?.email && !account.pendingApprovalAt) {
-      attachPendingInvites(db, userId, account.email);
+      await attachPendingInvites(asyncDb, userId, account.email);
     }
   } catch (error) {
     logger.warn('Could not attach pending invites on sign-in', { userId, error });
@@ -333,7 +333,7 @@ export async function resolveNewUser(
   authProviderId: string,
   userInfo: { providerAccountId: string; email: string; displayName: string; avatarUrl?: string }
 ): Promise<{ userId: string } | { redirect: string }> {
-  const { db, asyncDb } = appContext();
+  const { asyncDb } = appContext();
   const email = userInfo.email.toLowerCase();
   const existingByEmail = await asyncDb.select().from(users).where(eq(users.email, email)).limit(1);
 
@@ -342,36 +342,34 @@ export async function resolveNewUser(
   }
 
   try {
-    // Keep this callback synchronous: bun:sqlite would autocommit each awaited insert.
-    const result = db.transaction(
-      (tx): { userId: string } | { redirect: string } => {
+    const result = await asyncDb.transaction(
+      async (tx): Promise<{ userId: string } | { redirect: string }> => {
         const now = new Date();
-        const firstAdmin = becomesFirstAdmin(tx, email);
-        const settings = signupSettings(tx);
-        const invite = activeInviteFor(tx, email, now);
+        const firstAdmin = await becomesFirstAdmin(tx, email);
+        const settings = await signupSettings(tx);
+        const invite = await activeInviteFor(tx, email, now);
         const decision = decideSignup({
           email,
           firstAdmin,
           mode: settings.mode,
           allowedDomains: settings.allowedDomains,
           serverInvite: invite !== undefined,
-          shareInvite: hasShareInvite(tx, email),
+          shareInvite: await hasShareInvite(tx, email),
         });
         if (!decision.allow) {
           logger.info('Sign-up refused', { reason: decision.reason, mode: settings.mode });
           return { redirect: `${CONFIG.frontend.url}/auth?auth_error=signup_${decision.reason}` };
         }
-        const newUser = tx
+        const [newUser] = await tx
           .insert(users)
           .values({
             email,
             displayName: userInfo.displayName,
             pendingApprovalAt: decision.role === 'pending' ? now : null,
           })
-          .returning()
-          .get();
-        tx.insert(userProviders)
-          .values({
+          .returning();
+        if (!newUser) throw new Error('User insert returned no row');
+        await tx.insert(userProviders).values({
             userId: newUser.id,
             domain: 'auth',
             providerType: authProviderId,
@@ -380,19 +378,18 @@ export async function resolveNewUser(
             credentials: '',
             config: buildAuthProviderConfig(userInfo.email, userInfo.avatarUrl),
             status: 'active',
-          })
-          .run();
-        if (decision.role !== 'pending') assignServerRole(tx, newUser.id, 'member');
+          });
+        if (decision.role !== 'pending') await assignServerRole(tx, newUser.id, 'member');
         if (decision.role === 'admin') {
-          assignServerRole(tx, newUser.id, 'admin');
-          markAdminAssigned(tx, now);
+          await assignServerRole(tx, newUser.id, 'admin');
+          await markAdminAssigned(tx, now);
           logger.info('First admin account created', { userId: newUser.id });
         }
         if (invite && decision.via === 'server_invite')
-          consumeInvite(tx, invite.id, newUser.id, now);
+          await consumeInvite(tx, invite.id, newUser.id, now);
         if (decision.role === 'pending') return { userId: newUser.id };
         try {
-          attachPendingInvites(tx, newUser.id, newUser.email);
+          await attachPendingInvites(tx, newUser.id, newUser.email);
         } catch (error) {
           logger.warn('Could not attach pending invites on signup', { userId: newUser.id, error });
         }
@@ -737,15 +734,11 @@ routes.get('/accounts', requireAuth, authorize(ownAccount), async (c) => {
 routes.delete('/accounts/:id', requireAuth, authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const accountId = c.req.param('id');
-  const db = appContext().db;
-
-  // No awaits between the count and the delete: the last-sign-in guard is read-then-write.
-  const result = db.transaction((tx) => {
-    const authRows = tx
+  const result = await appContext().asyncDb.transaction(async (tx) => {
+    const authRows = await tx
       .select({ id: userProviders.id })
       .from(userProviders)
-      .where(and(eq(userProviders.userId, user.id), eq(userProviders.domain, 'auth')))
-      .all();
+      .where(and(eq(userProviders.userId, user.id), eq(userProviders.domain, 'auth')));
 
     if (!authRows.some((row) => row.id === accountId)) {
       return { error: 'not_found' as const };
@@ -755,15 +748,15 @@ routes.delete('/accounts/:id', requireAuth, authorize(ownAccount), async (c) => 
       return { error: 'last_account' as const };
     }
 
-    tx.delete(userProviders)
+    await tx
+      .delete(userProviders)
       .where(
         and(
           eq(userProviders.id, accountId),
           eq(userProviders.userId, user.id),
           eq(userProviders.domain, 'auth')
         )
-      )
-      .run();
+      );
 
     return { success: true as const };
   });

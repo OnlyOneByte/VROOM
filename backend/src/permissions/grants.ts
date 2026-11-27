@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, notInArray, type SQL } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { appContext } from '../app-context';
-import type { AsyncAppDatabase } from '../db/async-sqlite';
+import type { AsyncAppDatabase, AsyncHandle, AsyncTransaction } from '../db/async-sqlite';
 import type { AppDatabase } from '../db/connection';
 import {
   permissionOverrides,
@@ -69,9 +69,10 @@ export function builtInRoleId(key: string): string {
   return `builtin_${key}`;
 }
 
-export function syncBuiltInRoles(db: AppDatabase): void {
-  db.transaction((tx) => {
-    tx.update(roles)
+export async function syncBuiltInRoles(db: AsyncAppDatabase): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(roles)
       .set({ key: null })
       .where(
         and(
@@ -81,11 +82,11 @@ export function syncBuiltInRoles(db: AppDatabase): void {
             ROLE_TEMPLATES.map((template) => template.key)
           )
         )
-      )
-      .run();
+      );
     for (const template of ROLE_TEMPLATES) {
       const id = builtInRoleId(template.key);
-      tx.insert(roles)
+      await tx
+        .insert(roles)
         .values({
           id,
           scope: template.scope,
@@ -93,60 +94,75 @@ export function syncBuiltInRoles(db: AppDatabase): void {
           name: template.name,
           builtIn: true,
         })
-        .onConflictDoUpdate({ target: roles.id, set: { name: template.name, builtIn: true } })
-        .run();
-      tx.delete(rolePermissions).where(eq(rolePermissions.roleId, id)).run();
-      tx.insert(rolePermissions)
-        .values(template.permissions.map((permission) => ({ roleId: id, permission })))
-        .run();
+        .onConflictDoUpdate({ target: roles.id, set: { name: template.name, builtIn: true } });
+      await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, id));
+      await tx
+        .insert(rolePermissions)
+        .values(template.permissions.map((permission) => ({ roleId: id, permission })));
     }
   });
 }
 
-export function assignServerRole(db: Db, userId: string, key: string): void {
-  db.insert(roleAssignments)
+export async function assignServerRole(
+  db: AsyncHandle,
+  userId: string,
+  key: string
+): Promise<void> {
+  await db
+    .insert(roleAssignments)
     .values({ userId, roleId: builtInRoleId(key), scopeId: null })
-    .onConflictDoNothing()
-    .run();
+    .onConflictDoNothing();
 }
 
 export function shareRoleId(level: string): string {
   return builtInRoleId(level === 'editor' ? 'editor' : 'viewer');
 }
 
-export function grantShareRole(
-  db: Db,
-  share: { vehicleId: string; sharedWithId: string; level: string; grantedBy: string }
-): void {
-  db.insert(roleAssignments)
-    .values({
-      userId: share.sharedWithId,
-      roleId: shareRoleId(share.level),
-      scopeId: share.vehicleId,
-      grantedBy: share.grantedBy,
-    })
-    .onConflictDoNothing()
-    .run();
+interface ShareGrant {
+  vehicleId: string;
+  sharedWithId: string;
+  level: string;
+  grantedBy: string;
 }
 
-export function changeShareRole(
-  db: Db,
-  share: { vehicleId: string; sharedWithId: string; level: string; grantedBy: string }
-): void {
-  db.delete(roleAssignments)
-    .where(
-      and(
-        eq(roleAssignments.userId, share.sharedWithId),
-        eq(roleAssignments.scopeId, share.vehicleId),
-        inArray(roleAssignments.roleId, [shareRoleId('editor'), shareRoleId('viewer')])
-      )
-    )
-    .run();
-  grantShareRole(db, share);
+function shareRoleValues(share: ShareGrant) {
+  return {
+    userId: share.sharedWithId,
+    roleId: shareRoleId(share.level),
+    scopeId: share.vehicleId,
+    grantedBy: share.grantedBy,
+  };
 }
 
-export function endVehicleMembership(db: Db, vehicleId: string, userId: string): void {
-  db.update(vehicleDrivers)
+function shareRolesWhere(share: ShareGrant): SQL | undefined {
+  return and(
+    eq(roleAssignments.userId, share.sharedWithId),
+    eq(roleAssignments.scopeId, share.vehicleId),
+    inArray(roleAssignments.roleId, [shareRoleId('editor'), shareRoleId('viewer')])
+  );
+}
+
+export async function grantShareRole(db: AsyncHandle, share: ShareGrant): Promise<void> {
+  await db.insert(roleAssignments).values(shareRoleValues(share)).onConflictDoNothing();
+}
+
+export async function changeShareRole(db: AsyncHandle, share: ShareGrant): Promise<void> {
+  await db.delete(roleAssignments).where(shareRolesWhere(share));
+  await grantShareRole(db, share);
+}
+
+export function changeShareRoleInSyncTransaction(tx: DrizzleTransaction, share: ShareGrant): void {
+  tx.delete(roleAssignments).where(shareRolesWhere(share)).run();
+  tx.insert(roleAssignments).values(shareRoleValues(share)).onConflictDoNothing().run();
+}
+
+export async function endVehicleMembership(
+  db: AsyncHandle,
+  vehicleId: string,
+  userId: string
+): Promise<void> {
+  await db
+    .update(vehicleDrivers)
     .set({ archivedAt: new Date() })
     .where(
       and(
@@ -154,20 +170,19 @@ export function endVehicleMembership(db: Db, vehicleId: string, userId: string):
         eq(vehicleDrivers.userId, userId),
         isNull(vehicleDrivers.archivedAt)
       )
-    )
-    .run();
-  db.delete(roleAssignments)
-    .where(and(eq(roleAssignments.userId, userId), eq(roleAssignments.scopeId, vehicleId)))
-    .run();
-  db.delete(permissionOverrides)
+    );
+  await db
+    .delete(roleAssignments)
+    .where(and(eq(roleAssignments.userId, userId), eq(roleAssignments.scopeId, vehicleId)));
+  await db
+    .delete(permissionOverrides)
     .where(
       and(
         eq(permissionOverrides.userId, userId),
         eq(permissionOverrides.scope, 'vehicle'),
         eq(permissionOverrides.scopeId, vehicleId)
       )
-    )
-    .run();
+    );
 }
 
 const OVERRIDE_COLUMNS = {
@@ -232,7 +247,7 @@ function demoRoleJoin(): SQL | undefined {
 
 const ACTOR_COLUMNS = { disabledAt: users.disabledAt, demoRole: roleAssignments.id };
 
-function actorQuery(db: AsyncAppDatabase, userId: string) {
+function actorQuery(db: AsyncHandle, userId: string) {
   return db
     .select(ACTOR_COLUMNS)
     .from(users)
@@ -328,7 +343,7 @@ export function syncResolverFor(tx: Db, userId: string): Resolver {
   return createResolver(actor, syncGrantSource(tx));
 }
 
-async function heldRolesAsync(db: AsyncAppDatabase, where: SQL | undefined): Promise<HeldRole[]> {
+async function heldRolesAsync(db: AsyncHandle, where: SQL | undefined): Promise<HeldRole[]> {
   const rows = await db
     .select({ id: roles.id, key: roles.key, builtIn: roles.builtIn })
     .from(roleAssignments)
@@ -351,7 +366,7 @@ async function heldRolesAsync(db: AsyncAppDatabase, where: SQL | undefined): Pro
   }));
 }
 
-function asyncGrantSource(db: AsyncAppDatabase): AsyncGrantSource {
+function asyncGrantSource(db: AsyncHandle): AsyncGrantSource {
   return {
     serverGrants: async (userId) => ({
       roles: await heldRolesAsync(db, serverRolesWhere(userId)),
@@ -398,14 +413,14 @@ function asyncGrantSource(db: AsyncAppDatabase): AsyncGrantSource {
   };
 }
 
-async function actorForAsync(db: AsyncAppDatabase, userId: string): Promise<Actor> {
+async function actorForAsync(db: AsyncHandle, userId: string): Promise<Actor> {
   const row = await actorQuery(db, userId).get();
   return { userId, disabled: !row || row.disabledAt !== null, demo: Boolean(row?.demoRole) };
 }
 
 export async function loadingResolverFor(
   userId: string,
-  db: AsyncAppDatabase = appContext().asyncDb
+  db: AsyncHandle = appContext().asyncDb
 ): Promise<LoadingResolver> {
   return createLoadingResolver(await actorForAsync(db, userId), asyncGrantSource(db));
 }
@@ -413,7 +428,7 @@ export async function loadingResolverFor(
 export async function resolverFor(
   userId: string,
   resources: readonly Resource[],
-  db: AsyncAppDatabase = appContext().asyncDb
+  db: AsyncHandle = appContext().asyncDb
 ): Promise<Resolver> {
   const resolver = await loadingResolverFor(userId, db);
   await resolver.load(resources);
@@ -450,16 +465,15 @@ export function requestResolver(c: Context): Resolver {
   return resolver;
 }
 
-function roleManagerCount(db: DrizzleTransaction): number {
-  const viaRoles = db
+async function roleManagerCount(tx: AsyncHandle): Promise<number> {
+  const viaRoles = await tx
     .selectDistinct({ userId: roleAssignments.userId })
     .from(roleAssignments)
     .innerJoin(rolePermissions, eq(rolePermissions.roleId, roleAssignments.roleId))
     .where(
       and(isNull(roleAssignments.scopeId), eq(rolePermissions.permission, ROLE_MANAGE_PERMISSION))
-    )
-    .all();
-  const viaOverrides = db
+    );
+  const viaOverrides = await tx
     .selectDistinct({ userId: permissionOverrides.userId })
     .from(permissionOverrides)
     .where(
@@ -468,19 +482,24 @@ function roleManagerCount(db: DrizzleTransaction): number {
         eq(permissionOverrides.permission, ROLE_MANAGE_PERMISSION),
         eq(permissionOverrides.effect, 'allow')
       )
-    )
-    .all();
-  const candidates = new Set([...viaRoles, ...viaOverrides].map((row) => row.userId));
-  return [...candidates].filter(
-    (userId) => syncResolverFor(db, userId).can(ROLE_MANAGE_PERMISSION, { kind: 'server' }).allow
-  ).length;
+    );
+  const server: Resource = { kind: 'server' };
+  let count = 0;
+  for (const userId of new Set([...viaRoles, ...viaOverrides].map((row) => row.userId))) {
+    const resolver = await resolverFor(userId, [server], tx);
+    if (resolver.can(ROLE_MANAGE_PERMISSION, server).allow) count++;
+  }
+  return count;
 }
 
-export function keepingARoleManager<T>(db: AppDatabase, change: (tx: DrizzleTransaction) => T): T {
-  return db.transaction((tx) => {
-    const before = roleManagerCount(tx);
-    const result = change(tx);
-    if (before > 0 && roleManagerCount(tx) === 0) {
+export async function keepingARoleManager<T>(
+  db: AsyncAppDatabase,
+  change: (tx: AsyncTransaction) => Promise<T>
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    const before = await roleManagerCount(tx);
+    const result = await change(tx);
+    if (before > 0 && (await roleManagerCount(tx)) === 0) {
       throw new ConflictError('At least one person must keep the permission to manage roles');
     }
     return result;

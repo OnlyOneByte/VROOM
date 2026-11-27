@@ -11,7 +11,7 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
+import type { AsyncHandle, AsyncTransaction } from '../../db/async-sqlite';
 import type { ApiResponse } from '../../errors';
 import {
   ConflictError,
@@ -53,24 +53,30 @@ const LEVELS = ['viewer', 'editor'] as const;
 
 const ANY_STATUS = ['pending', 'accepted', 'declined', 'revoked'] as const;
 
+interface Transition {
+  check?: (tx: AsyncTransaction, before: VehicleShare) => Promise<void>;
+  then: (tx: AsyncTransaction, before: VehicleShare, after: VehicleShare) => Promise<void>;
+}
+
 function transitionShare(
   id: string,
   from: readonly string[],
   change: { status?: string; level?: string },
-  then: (tx: DrizzleTransaction, before: VehicleShare, after: VehicleShare) => void
-): VehicleShare {
-  return appContext().db.transaction((tx) => {
-    const before = tx.select().from(vehicleShares).where(eq(vehicleShares.id, id)).get();
+  { check, then }: Transition
+): Promise<VehicleShare> {
+  return appContext().asyncDb.transaction(async (tx) => {
+    const before = await tx.select().from(vehicleShares).where(eq(vehicleShares.id, id)).get();
     if (!before || !from.includes(before.status)) {
       throw new ConflictError('This share changed in the meantime. Reload and try again');
     }
-    const after = tx
+    await check?.(tx, before);
+    const [after] = await tx
       .update(vehicleShares)
       .set({ ...change, updatedAt: new Date() })
       .where(eq(vehicleShares.id, id))
-      .returning()
-      .get() as VehicleShare;
-    then(tx, before, after);
+      .returning();
+    if (!after) throw new ConflictError('This share changed in the meantime. Reload and try again');
+    await then(tx, before, after);
     return after;
   });
 }
@@ -97,9 +103,9 @@ const fromShare: ResourceOf = async (c) => {
   return vehicle;
 };
 
-function vehicleOwnerId(vehicleId: string): string | null {
-  const row = appContext()
-    .db.select({ userId: vehicles.userId })
+async function vehicleOwnerId(tx: AsyncHandle, vehicleId: string): Promise<string | null> {
+  const row = await tx
+    .select({ userId: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
     .get();
@@ -117,15 +123,16 @@ function refuseUnheldLevel(c: Context, vehicleId: string, level: string): void {
   refuseUnheld(granted, holdsOn(c, vehicleId));
 }
 
-function refuseOverSharee(
+async function refuseOverSharee(
   c: Context,
+  tx: AsyncHandle,
   share: VehicleShare,
   ownerId: string | null,
   removesOverrides: boolean
-): void {
+): Promise<void> {
   if (!share.sharedWithId || !ownerId || c.get('user').id === ownerId) return;
-  const held = appContext()
-    .db.select({ permission: rolePermissions.permission })
+  const heldRows = await tx
+    .select({ permission: rolePermissions.permission })
     .from(roleAssignments)
     .innerJoin(rolePermissions, eq(rolePermissions.roleId, roleAssignments.roleId))
     .where(
@@ -133,12 +140,11 @@ function refuseOverSharee(
         eq(roleAssignments.userId, share.sharedWithId),
         eq(roleAssignments.scopeId, share.vehicleId)
       )
-    )
-    .all()
-    .map((row) => row.permission);
+    );
+  const held = heldRows.map((row) => row.permission);
   refuseUnheld([...new Set(held)], holdsOn(c, share.vehicleId));
-  const ownerSet = appContext()
-    .db.select({ id: roleAssignments.id })
+  const ownerSet = await tx
+    .select({ id: roleAssignments.id })
     .from(roleAssignments)
     .where(
       and(
@@ -151,8 +157,8 @@ function refuseOverSharee(
     .get();
   if (ownerSet) throw new ForbiddenError('Only the owner can change what the owner set');
   if (!removesOverrides) return;
-  const overrides = appContext()
-    .db.select({ permission: permissionOverrides.permission, setBy: permissionOverrides.setBy })
+  const overrides = await tx
+    .select({ permission: permissionOverrides.permission, setBy: permissionOverrides.setBy })
     .from(permissionOverrides)
     .where(
       and(
@@ -160,8 +166,7 @@ function refuseOverSharee(
         eq(permissionOverrides.scope, 'vehicle'),
         eq(permissionOverrides.scopeId, share.vehicleId)
       )
-    )
-    .all();
+    );
   refuseUnheld(
     [...new Set(overrides.map((override) => override.permission))],
     holdsOn(c, share.vehicleId)
@@ -252,19 +257,24 @@ routes.put(
     if (share.sharedWithId === user.id) {
       throw new ForbiddenError("You can't change your own access");
     }
-    const ownerId = vehicleOwnerId(share.vehicleId);
     refuseUnheldLevel(c, share.vehicleId, level);
-    refuseOverSharee(c, share, ownerId, false);
 
-    const updated = transitionShare(id, ACTIVE_SHARE_STATUSES, { level }, (tx, _, row) => {
-      if (row.status === 'accepted' && row.sharedWithId) {
-        changeShareRole(tx, {
-          vehicleId: row.vehicleId,
-          sharedWithId: row.sharedWithId,
-          level,
-          grantedBy: ownerId ?? user.id,
-        });
-      }
+    let ownerId: string | null = null;
+    const updated = await transitionShare(id, ACTIVE_SHARE_STATUSES, { level }, {
+      check: async (tx, before) => {
+        ownerId = await vehicleOwnerId(tx, before.vehicleId);
+        await refuseOverSharee(c, tx, before, ownerId, false);
+      },
+      then: async (tx, _, row) => {
+        if (row.status === 'accepted' && row.sharedWithId) {
+          await changeShareRole(tx, {
+            vehicleId: row.vehicleId,
+            sharedWithId: row.sharedWithId,
+            level,
+            grantedBy: ownerId ?? user.id,
+          });
+        }
+      },
     });
     return c.json({ success: true, data: toOwnerView(updated), message: 'Share level updated' });
   }
@@ -284,12 +294,14 @@ routes.delete(
     if (share.sharedWithId === c.get('user').id) {
       throw new ForbiddenError('To leave this vehicle, decline the share');
     }
-    refuseOverSharee(c, share, vehicleOwnerId(share.vehicleId), true);
-
-    transitionShare(id, ANY_STATUS, { status: 'revoked' }, (tx, before) => {
-      if (before.status === 'accepted' && before.sharedWithId) {
-        endVehicleMembership(tx, before.vehicleId, before.sharedWithId);
-      }
+    await transitionShare(id, ANY_STATUS, { status: 'revoked' }, {
+      check: async (tx, before) =>
+        refuseOverSharee(c, tx, before, await vehicleOwnerId(tx, before.vehicleId), true),
+      then: async (tx, before) => {
+        if (before.status === 'accepted' && before.sharedWithId) {
+          await endVehicleMembership(tx, before.vehicleId, before.sharedWithId);
+        }
+      },
     });
     return c.json({ success: true, message: 'Share revoked' });
   }
@@ -322,15 +334,19 @@ routes.post(
       throw new ConflictError('This invitation is no longer pending');
     }
 
-    const updated = transitionShare(id, ['pending'], { status: 'accepted' }, (tx, _, row) => {
-      endVehicleMembership(tx, row.vehicleId, user.id);
-      grantShareRole(tx, {
-        vehicleId: row.vehicleId,
-        sharedWithId: user.id,
-        level: row.level,
-        grantedBy: row.ownerId,
-      });
-      if (carShareEnabled(tx, row.vehicleId)) ensureMemberDriver(tx, row.vehicleId, user.id);
+    const updated = await transitionShare(id, ['pending'], { status: 'accepted' }, {
+      then: async (tx, _, row) => {
+        await endVehicleMembership(tx, row.vehicleId, user.id);
+        await grantShareRole(tx, {
+          vehicleId: row.vehicleId,
+          sharedWithId: user.id,
+          level: row.level,
+          grantedBy: row.ownerId,
+        });
+        if (await carShareEnabled(tx, row.vehicleId)) {
+          await ensureMemberDriver(tx, row.vehicleId, user.id);
+        }
+      },
     });
     return c.json({ success: true, data: updated, message: 'Invitation accepted' });
   }
@@ -352,8 +368,10 @@ routes.post(
       throw new ConflictError('This share is no longer active');
     }
 
-    transitionShare(id, ACTIVE_SHARE_STATUSES, { status: 'declined' }, (tx, before) => {
-      if (before.status === 'accepted') endVehicleMembership(tx, before.vehicleId, user.id);
+    await transitionShare(id, ACTIVE_SHARE_STATUSES, { status: 'declined' }, {
+      then: async (tx, before) => {
+        if (before.status === 'accepted') await endVehicleMembership(tx, before.vehicleId, user.id);
+      },
     });
     return c.json({ success: true, message: 'Share declined' });
   }
