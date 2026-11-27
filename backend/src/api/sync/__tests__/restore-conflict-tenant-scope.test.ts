@@ -21,9 +21,22 @@ async function createVehicle(make: string): Promise<string> {
   return body.data.id;
 }
 
-describe('restore merge conflict detection is tenant-scoped (cross-tenant read guard)', () => {
-  test("a backup vehicle id colliding with ANOTHER user's row reports NO conflict (no leak)", async () => {
+async function createExpense(vehicleId: string): Promise<string> {
+  const res = await ctx.authed('POST', '/api/v1/expenses', {
+    vehicleId,
+    category: 'maintenance',
+    expenseAmount: 80,
+    date: '2024-03-01T00:00:00.000Z',
+  });
+  const body = await json<DataEnvelope<{ id: string }>>(res);
+  expect(res.status, JSON.stringify(body)).toBeLessThan(300);
+  return body.data.id;
+}
+
+describe('restore merge stays inside the importing account', () => {
+  test("a backup car whose id belongs to another account is skipped, and nothing is added to that car", async () => {
     const myVehicleId = await createVehicle('Honda');
+    const myExpenseId = await createExpense(myVehicleId);
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const AdmZip = (await import('adm-zip')).default;
@@ -31,67 +44,56 @@ describe('restore merge conflict detection is tenant-scoped (cross-tenant read g
 
     const db = (await import('../../../db/connection')).getDb();
     const schema = await import('../../../db/schema');
-    const victimId = 'victim-user-1';
-    const victimVehicleId = 'victim-vehicle-secret-1';
-    await db
-      .insert(schema.users)
-      .values({ id: victimId, email: 'victim@test.com', displayName: 'Victim' });
+    const otherId = 'other-user-1';
+    const otherVehicleId = 'other-vehicle-1';
+    await db.insert(schema.users).values({ id: otherId, email: 'other@test.com', displayName: 'O' });
     await db.insert(schema.vehicles).values({
-      id: victimVehicleId,
-      userId: victimId,
+      id: otherVehicleId,
+      userId: otherId,
       make: 'Ferrari',
       model: 'F8',
       year: 2023,
     });
 
     const archive = new AdmZip(zip);
-    const csv = archive.getEntry('vehicles.csv')?.getData().toString('utf-8') as string;
-    expect(csv, 'export contains vehicles.csv').toBeTruthy();
-    const tampered = csv.split(myVehicleId).join(victimVehicleId);
-    expect(tampered.includes(victimVehicleId), 'tamper replaced the id').toBe(true);
-    archive.updateFile('vehicles.csv', Buffer.from(tampered, 'utf-8'));
-
-    let conflicts: NonNullable<
-      Awaited<ReturnType<typeof restoreService.restoreFromBackup>>['conflicts']
-    > = [];
-    try {
-      const result = await restoreService.restoreFromBackup(
-        ctx.user.id,
-        archive.toBuffer(),
-        'merge'
-      );
-      conflicts = result.conflicts ?? [];
-    } catch (err) {
-      expect(JSON.stringify(err instanceof Error ? err.message : err)).not.toContain('Ferrari');
+    for (const entry of archive.getEntries()) {
+      if (!entry.entryName.endsWith('.csv')) continue;
+      const csv = entry.getData().toString('utf-8');
+      archive.updateFile(entry.entryName, Buffer.from(csv.split(myVehicleId).join(otherVehicleId)));
     }
+    ctx.sqlite.run('DELETE FROM expenses WHERE id = ?', [myExpenseId]);
 
-    const leaked = conflicts.some(
-      (c) =>
-        c.id === victimVehicleId ||
-        JSON.stringify(c.localData ?? {}).includes('Ferrari') ||
-        JSON.stringify(c.localData ?? {}).includes(victimId)
-    );
-    expect(leaked, "victim's row must not be echoed in conflicts").toBe(false);
+    const result = await restoreService.restoreFromBackup(ctx.user.id, archive.toBuffer(), 'merge');
 
-    const victimRows = ctx.sqlite
-      .query('SELECT make FROM vehicles WHERE id = ?')
-      .all(victimVehicleId) as { make: string }[];
-    expect(victimRows).toHaveLength(1);
-    expect(victimRows[0].make).toBe('Ferrari');
+    expect(result.success).toBe(true);
+    expect(result.imported?.vehicles).toBe(0);
+    expect(result.imported?.expenses, 'an expense on that car is not added').toBe(0);
+    expect(result.kept?.vehicles).toBe(1);
+    expect(JSON.stringify(result)).not.toContain('Ferrari');
+    expect(JSON.stringify(result)).not.toContain(otherId);
+
+    const otherCar = ctx.sqlite
+      .query('SELECT user_id, make FROM vehicles WHERE id = ?')
+      .all(otherVehicleId) as { user_id: string; make: string }[];
+    expect(otherCar).toEqual([{ user_id: otherId, make: 'Ferrari' }]);
+    const onOtherCar = ctx.sqlite
+      .query('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?')
+      .get(otherVehicleId) as { n: number };
+    expect(onOtherCar.n).toBe(0);
   });
 
-  test('a genuine SELF-collision still reports a conflict (feature intact)', async () => {
+  test('merging a backup of exactly what is here adds nothing and keeps everything', async () => {
     const myVehicleId = await createVehicle('Toyota');
+    await createExpense(myVehicleId);
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
 
-    expect(result.success).toBe(false);
-    const conflicts = result.conflicts ?? [];
-    const mine = conflicts.find((c) => c.id === myVehicleId);
-    expect(mine, 'self-collision is still detected').toBeTruthy();
-    expect(mine?.table).toBe('vehicles');
+    expect(result.success).toBe(true);
+    expect(Object.values(result.imported ?? {}).every((n) => n === 0)).toBe(true);
+    expect(result.kept?.vehicles).toBe(1);
+    expect(result.kept?.expenses).toBe(1);
   });
 });

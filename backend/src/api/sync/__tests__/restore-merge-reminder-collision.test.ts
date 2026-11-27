@@ -21,8 +21,8 @@ async function createVehicle(make: string): Promise<string> {
   return body.data.id;
 }
 
-describe('restore merge: reminders PK collision is detected as a conflict, not a raw DB throw', () => {
-  test('merging a backup whose surviving vehicle-less reminder collides → clean conflict, not an unhandled PK throw', async () => {
+describe('restore merge: a reminder already here is kept and relinked', () => {
+  test('after the car is deleted, merge brings the car and its reminder link back without duplicating the reminder', async () => {
     const vehicleId = await createVehicle('Honda');
     const created = await ctx.authed('POST', '/api/v1/reminders', {
       name: 'Registration renewal',
@@ -50,23 +50,15 @@ describe('restore merge: reminders PK collision is detected as a conflict, not a
       .all(reminderId) as unknown[];
     expect(junctionRows, 'its junction row cascaded away').toHaveLength(0);
 
-    let reminderConflictReported = false;
-    let threw: unknown = null;
-    try {
-      const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
-      reminderConflictReported =
-        result.success === false &&
-        (result.conflicts ?? []).some((c) => c.table === 'reminders' && c.id === reminderId);
-    } catch (err) {
-      threw = err;
-    }
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
 
-    expect(
-      reminderConflictReported,
-      `merge should report the surviving reminder (${reminderId}) as a 'reminders'-table conflict, not omit ` +
-        `it (an unprobed row reaches the insert and throws a raw UNIQUE error). threw: ${
-          threw instanceof Error ? threw.message : String(threw)
-        }`
-    ).toBe(true);
+    expect(result.success).toBe(true);
+    expect(result.imported?.vehicles).toBe(1);
+    expect(result.kept?.reminders, 'the surviving reminder is kept, not inserted twice').toBe(1);
+    expect(result.imported?.reminderVehicles, 'its link to the restored car comes back').toBe(1);
+    const links = ctx.sqlite
+      .query('SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?')
+      .all(reminderId) as { vehicle_id: string }[];
+    expect(links).toEqual([{ vehicle_id: vehicleId }]);
   });
 });

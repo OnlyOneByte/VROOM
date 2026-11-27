@@ -73,8 +73,8 @@ describe('restore of a backup larger than one statement can bind', () => {
     expect(last?.name).toBe(`Reminder ${REMINDERS_OVER_CAP - 1}`);
   });
 
-  test('merge mode reports EVERY colliding row, across batch boundaries', async () => {
-    const collidingRows = 1001;
+  test('merge keeps every row already here and adds back the missing ones, across batch boundaries', async () => {
+    const collidingRows = 2001;
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2016 });
     const insert = ctx.sqlite.prepare(
       `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, missed_fillup)
@@ -89,13 +89,19 @@ describe('restore of a backup larger than one statement can bind', () => {
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
+    ctx.sqlite.run("DELETE FROM expenses WHERE CAST(substr(id, 11) AS INTEGER) % 2 = 0");
+    const deleted = Math.ceil(collidingRows / 2);
+    ctx.sqlite.run("UPDATE expenses SET expense_amount = 9999 WHERE id = 'exp-merge-1'");
+
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
 
-    expect(result.success, 'a colliding merge is reported, not inserted').toBe(false);
-    const expenseConflicts = (result.conflicts ?? []).filter((c) => c.table === 'expenses');
-    expect(expenseConflicts.length, 'every colliding expense is reported exactly once').toBe(
-      collidingRows
-    );
-    expect(new Set(expenseConflicts.map((c) => c.id)).size).toBe(collidingRows);
+    expect(result.success, JSON.stringify(result.kept)).toBe(true);
+    expect(result.imported?.expenses).toBe(deleted);
+    expect(result.kept?.expenses).toBe(collidingRows - deleted);
+    expect(countOf('expenses')).toBe(collidingRows);
+    const kept = ctx.sqlite
+      .query("SELECT expense_amount FROM expenses WHERE id = 'exp-merge-1'")
+      .get() as { expense_amount: number };
+    expect(kept.expense_amount, 'the row already here is not overwritten').toBe(9999);
   });
 });

@@ -1,5 +1,5 @@
 import { and, eq, getTableColumns, inArray, ne, type Table } from 'drizzle-orm';
-import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
+import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { appContext, repos } from '../../app-context';
 import { TABLE_SCHEMA_MAP } from '../../config';
 import type { AsyncHandle } from '../../db/async-sqlite';
@@ -61,13 +61,6 @@ import {
   upgradeBackupTables,
 } from './backup';
 
-export interface Conflict {
-  table: string;
-  id: string;
-  localData: unknown;
-  remoteData: unknown;
-}
-
 export interface ImportSummary {
   vehicles: number;
   expenses: number;
@@ -89,13 +82,29 @@ export interface ImportSummary {
   vehicleDrivers: number;
 }
 
+export interface MergeCounts {
+  imported: ImportSummary;
+  kept: ImportSummary;
+}
+
 export interface RestoreResponse {
   success: boolean;
   preview?: ImportSummary;
+  merge?: MergeCounts;
   imported?: ImportSummary;
+  kept?: ImportSummary;
   skipped?: { photos: number };
-  conflicts?: Conflict[];
 }
+
+type SummaryKey = keyof ImportSummary;
+
+class MergePreviewRollback extends Error {
+  constructor(readonly counts: MergeCounts) {
+    super('merge preview');
+  }
+}
+
+const EXPENSE_SOURCES = new Set(['reminder', 'financing', 'insurance_term']);
 
 const shareConsentKey = (vehicleId: string, sharedWithId: string): string =>
   `${vehicleId}\u0000${sharedWithId}`;
@@ -129,6 +138,16 @@ function summarizeBackup(data: ParsedBackupData): ImportSummary {
     trips: data.trips?.length ?? 0,
     vehicleShares: data.vehicleShares?.length ?? 0,
     vehicleDrivers: data.vehicleDrivers?.length ?? 0,
+  };
+}
+
+function mergeCounts(summary: ImportSummary, imported: ImportSummary): MergeCounts {
+  const keys = Object.keys(summary) as SummaryKey[];
+  return {
+    imported,
+    kept: Object.fromEntries(
+      keys.map((key) => [key, summary[key] - imported[key]])
+    ) as unknown as ImportSummary,
   };
 }
 
@@ -182,20 +201,10 @@ class RestoreService {
     const summary = summarizeBackup(data);
     const skipped = skippedPhotos > 0 ? { skipped: { photos: skippedPhotos } } : {};
 
-    if (mode === 'preview') {
-      return { success: true, preview: summary, ...skipped };
-    }
-
-    if (mode === 'merge') {
-      const conflicts = await this.detectConflicts(data, userId);
-      if (conflicts.length > 0) {
-        return { success: false, conflicts };
-      }
-    }
-
     this.assertReplaceNotEmpty(summary, mode);
 
     signal?.throwIfAborted();
+    let imported = summary;
     try {
       await this.db.transaction(async (tx) => {
         signal?.throwIfAborted();
@@ -218,10 +227,17 @@ class RestoreService {
         if (mode === 'replace') {
           await this.deleteUserData(tx, userId, { keepPreferences: !data.userPreferences?.length });
         }
-        await this.insertBackupData(tx, data, userId, consented, currentPrefs);
+        const merge = mode !== 'replace';
+        imported = await this.insertBackupData(tx, data, userId, consented, currentPrefs, merge);
+        if (mode === 'preview') {
+          throw new MergePreviewRollback(mergeCounts(summary, imported));
+        }
         signal?.throwIfAborted();
       });
     } catch (error) {
+      if (error instanceof MergePreviewRollback) {
+        return { success: true, preview: summary, merge: error.counts, ...skipped };
+      }
       if (!isUniqueConstraintError(error)) throw error;
       logger.warn('Restore rolled back on a record conflict', { error });
       throw new ConflictError(
@@ -229,6 +245,9 @@ class RestoreService {
       );
     }
 
+    if (mode === 'merge') {
+      return { success: true, ...mergeCounts(summary, imported), ...skipped };
+    }
     return { success: true, imported: summary, ...skipped };
   }
 
@@ -350,147 +369,6 @@ class RestoreService {
     return this.applyRestore(userId, sheetData, mode, skippedPhotos, currency, signal);
   }
 
-  private async detectConflicts(data: ParsedBackupData, userId: string): Promise<Conflict[]> {
-    const conflicts: Conflict[] = [];
-
-    const userVehicleRows = await this.db
-      .select({ id: vehicles.id })
-      .from(vehicles)
-      .where(ownedVehiclesScope(userId));
-    const userVehicleIds = userVehicleRows.map((v) => v.id);
-    const userPhotoRows = await this.db
-      .select({ id: photos.id })
-      .from(photos)
-      .where(eq(photos.userId, userId));
-    const userPhotoIds = userPhotoRows.map((p) => p.id);
-
-    // Scoped to the importer: an unscoped probe on an id collision would leak another user's row.
-    const tables = [
-      {
-        data: data.vehicles,
-        table: vehicles,
-        name: 'vehicles',
-        scope: ownedVehiclesScope(userId),
-        idColumn: vehicles.id,
-        idField: 'id' as const,
-      },
-      {
-        data: data.expenses,
-        table: expenses,
-        name: 'expenses',
-        scope: eq(expenses.userId, userId),
-        idColumn: expenses.id,
-        idField: 'id' as const,
-      },
-      {
-        data: data.financing,
-        table: vehicleFinancing,
-        name: 'vehicle_financing',
-        scope: inArray(vehicleFinancing.vehicleId, userVehicleIds),
-        idColumn: vehicleFinancing.id,
-        idField: 'id' as const,
-      },
-      {
-        data: data.insurance,
-        table: insurancePolicies,
-        name: 'insurance_policies',
-        scope: eq(insurancePolicies.userId, userId),
-        idColumn: insurancePolicies.id,
-        idField: 'id' as const,
-      },
-      {
-        data: data.reminders ?? [],
-        table: reminders,
-        name: 'reminders',
-        scope: eq(reminders.userId, userId),
-        idColumn: reminders.id,
-        idField: 'id' as const,
-      },
-      {
-        data: data.photos ?? [],
-        table: photos,
-        name: 'photos',
-        scope: eq(photos.userId, userId),
-        idColumn: photos.id,
-        idField: 'id' as const,
-      },
-      {
-        data: data.photoRefs ?? [],
-        table: photoRefs,
-        name: 'photo_refs',
-        scope: inArray(photoRefs.photoId, userPhotoIds),
-        idColumn: photoRefs.id,
-        idField: 'id' as const,
-      },
-      {
-        data: (data.userPreferences ?? []).map((r) => ({ ...r, id: String(r.userId) })),
-        table: userPreferences,
-        name: 'user_preferences',
-        scope: eq(userPreferences.userId, userId),
-        idColumn: userPreferences.userId,
-        idField: 'userId' as const,
-      },
-      {
-        data: (data.syncState ?? []).map((r) => ({ ...r, id: String(r.userId) })),
-        table: syncState,
-        name: 'sync_state',
-        scope: eq(syncState.userId, userId),
-        idColumn: syncState.userId,
-        idField: 'userId' as const,
-      },
-      {
-        data: data.trips ?? [],
-        table: trips,
-        name: 'trips',
-        scope: eq(trips.userId, userId),
-        idColumn: trips.id,
-        idField: 'id' as const,
-      },
-      {
-        data: data.vehicleDrivers ?? [],
-        table: vehicleDrivers,
-        name: 'vehicle_drivers',
-        scope: inArray(vehicleDrivers.vehicleId, userVehicleIds),
-        idColumn: vehicleDrivers.id,
-        idField: 'id' as const,
-      },
-      {
-        data: data.vehicleShares ?? [],
-        table: vehicleShares,
-        name: 'vehicle_shares',
-        scope: eq(vehicleShares.ownerId, userId),
-        idColumn: vehicleShares.id,
-        idField: 'id' as const,
-      },
-    ];
-
-    for (const { data: items, table, name, scope, idColumn, idField } of tables) {
-      if (items.length === 0) continue;
-      const idOf = (row: Record<string, unknown>): string => String(row[idField]);
-      const existing: Record<string, unknown>[] = [];
-      for (const idBatch of chunk(items.map((item) => String(item.id)))) {
-        const rows = await this.db
-          .select()
-          .from(table)
-          .where(and(inArray(idColumn, idBatch), scope));
-        existing.push(...(rows as Record<string, unknown>[]));
-      }
-      conflicts.push(
-        ...existing.map((e) => {
-          const eid = idOf(e);
-          return {
-            table: name,
-            id: eid,
-            localData: e,
-            remoteData: items.find((item) => String(item.id) === eid),
-          };
-        })
-      );
-    }
-
-    return conflicts;
-  }
-
   private async deleteUserData(
     tx: AsyncHandle,
     userId: string,
@@ -601,13 +479,43 @@ class RestoreService {
   private async insertRows<TTable extends SQLiteTable>(
     tx: AsyncHandle,
     table: TTable,
-    rows: Record<string, unknown>[]
-  ): Promise<void> {
-    if (rows.length === 0) return;
+    rows: Record<string, unknown>[],
+    merge: boolean
+  ): Promise<number> {
+    if (rows.length === 0) return 0;
     const columnCount = Object.keys(getTableColumns(table)).length;
+    let added = 0;
     for (const batch of chunk(rows, rowsPerInsert(columnCount))) {
-      await tx.insert(table).values(batch as unknown as TTable['$inferInsert'][]);
+      const values = batch as unknown as TTable['$inferInsert'][];
+      if (merge) {
+        added += (await tx.insert(table).values(values).onConflictDoNothing().returning()).length;
+      } else {
+        await tx.insert(table).values(values);
+        added += batch.length;
+      }
     }
+    return added;
+  }
+
+  private async mineAmong(
+    tx: AsyncHandle,
+    table: SQLiteTable,
+    idColumn: SQLiteColumn,
+    ownerColumn: SQLiteColumn,
+    ids: string[],
+    isMine: (owner: string) => boolean
+  ): Promise<Set<string>> {
+    const found = new Set<string>();
+    for (const batch of chunk([...new Set(ids)])) {
+      const rows = await tx
+        .select({ id: idColumn, owner: ownerColumn })
+        .from(table)
+        .where(inArray(idColumn, batch));
+      for (const row of rows) {
+        if (isMine(String(row.owner))) found.add(String(row.id));
+      }
+    }
+    return found;
   }
 
   private async insertBackupData(
@@ -615,88 +523,175 @@ class RestoreService {
     data: ParsedBackupData,
     userId: string,
     consentedShares: Set<string>,
-    currentPrefs: ProviderScopedPrefs | undefined
-  ): Promise<void> {
+    currentPrefs: ProviderScopedPrefs | undefined,
+    merge: boolean
+  ): Promise<ImportSummary> {
     const knownUserIds = new Set((await tx.select({ id: users.id }).from(users)).map((u) => u.id));
+    type Row = Record<string, unknown>;
+    const gate = <T extends Row>(rows: T[], keep: (row: T) => boolean): T[] =>
+      merge ? rows.filter(keep) : rows;
+    const optional = (ids: Set<string>, value: unknown): boolean =>
+      value == null || value === '' || ids.has(String(value));
+    const mine = (
+      table: SQLiteTable,
+      idColumn: SQLiteColumn,
+      ownerColumn: SQLiteColumn,
+      rows: Row[],
+      isMine: (owner: string) => boolean
+    ): Promise<Set<string>> =>
+      merge
+        ? this.mineAmong(
+            tx,
+            table,
+            idColumn,
+            ownerColumn,
+            rows.map((row) => String(row.id)),
+            isMine
+          )
+        : Promise.resolve(new Set(rows.map((row) => String(row.id))));
+    const isOwner = (owner: string): boolean => owner === userId;
+    const insert = (table: SQLiteTable, rows: Row[]): Promise<number> =>
+      this.insertRows(tx, table, rows, merge);
 
     // SQLite checks foreign keys on insert, so parents must be inserted before children.
-    await this.insertRows(
-      tx,
-      vehicles,
-      this.stampUserId(data.vehicles, userId).map((row) => ({
-        ...row,
-        catalogModelId:
-          typeof row.catalogModelId === 'string' &&
-          catalogModelMatchesMake(row.catalogModelId, String(row.make))
-            ? row.catalogModelId
-            : null,
-        vehicleKind: isVehicleKind(row.vehicleKind) ? row.vehicleKind : 'car',
-      }))
-    );
-    await this.insertRows(
-      tx,
+    const vehicleRows = this.stampUserId(data.vehicles, userId).map((row) => ({
+      ...row,
+      catalogModelId:
+        typeof row.catalogModelId === 'string' &&
+        catalogModelMatchesMake(row.catalogModelId, String(row.make))
+          ? row.catalogModelId
+          : null,
+      vehicleKind: isVehicleKind(row.vehicleKind) ? row.vehicleKind : 'car',
+    }));
+    const addedVehicles = await insert(vehicles, vehicleRows);
+    const carOk = await mine(vehicles, vehicles.id, vehicles.userId, vehicleRows, isOwner);
+    const onCar = (row: Row): boolean => carOk.has(String(row.vehicleId));
+    const ownCar = (owner: string): boolean => carOk.has(owner);
+
+    const driverRows = gate(data.vehicleDrivers ?? [], onCar).map((driver) => ({
+      ...driver,
+      userId: this.memberOfCar(driver.userId, driver.vehicleId, userId, consentedShares),
+      color: (DRIVER_COLORS as readonly unknown[]).includes(driver.color) ? driver.color : null,
+      createdBy: this.memberOfCar(driver.createdBy, driver.vehicleId, userId, consentedShares),
+    }));
+    const addedDrivers = await insert(vehicleDrivers, driverRows);
+    const driverOk = await mine(
       vehicleDrivers,
-      (data.vehicleDrivers ?? []).map((driver) => ({
-        ...driver,
-        userId: this.memberOfCar(driver.userId, driver.vehicleId, userId, consentedShares),
-        color: (DRIVER_COLORS as readonly unknown[]).includes(driver.color) ? driver.color : null,
-        createdBy: this.memberOfCar(driver.createdBy, driver.vehicleId, userId, consentedShares),
-      }))
+      vehicleDrivers.id,
+      vehicleDrivers.vehicleId,
+      driverRows,
+      ownCar
     );
-    await this.insertRows(tx, vehicleFinancing, data.financing ?? []);
-    await this.insertRows(tx, insurancePolicies, this.stampUserId(data.insurance, userId));
-    await this.insertRows(tx, insuranceTerms, data.insuranceTerms ?? []);
-    await this.insertRows(
-      tx,
+
+    const financingRows = gate(data.financing ?? [], onCar);
+    const addedFinancing = await insert(vehicleFinancing, financingRows);
+    const financingOk = await mine(
+      vehicleFinancing,
+      vehicleFinancing.id,
+      vehicleFinancing.vehicleId,
+      financingRows,
+      ownCar
+    );
+
+    const policyRows = this.stampUserId(data.insurance, userId);
+    const addedPolicies = await insert(insurancePolicies, policyRows);
+    const policyOk = await mine(
+      insurancePolicies,
+      insurancePolicies.id,
+      insurancePolicies.userId,
+      policyRows,
+      isOwner
+    );
+    const onPolicy = (row: Row): boolean => policyOk.has(String(row.policyId));
+    const termRows = gate(data.insuranceTerms ?? [], onPolicy);
+    const addedTerms = await insert(insuranceTerms, termRows);
+    const termOk = await mine(insuranceTerms, insuranceTerms.id, insuranceTerms.policyId, termRows, (
+      owner
+    ) => policyOk.has(owner));
+    const addedTermVehicles = await insert(
       insuranceTermVehicles,
-      (data.insuranceTermVehicles ?? []).map((row, index) => ({ ...row, position: index + 1 }))
+      gate(data.insuranceTermVehicles ?? [], (row) => termOk.has(String(row.termId)) && onCar(row)).map(
+        (row, index) => ({ ...row, position: index + 1 })
+      )
     );
-    await this.insertRows(tx, insuranceClaims, data.insuranceClaims ?? []);
+    const claimRows = gate(
+      data.insuranceClaims ?? [],
+      (row) => onPolicy(row) && optional(termOk, row.termId) && optional(carOk, row.vehicleId)
+    );
+    const addedClaims = await insert(insuranceClaims, claimRows);
+    const claimOk = await mine(insuranceClaims, insuranceClaims.id, insuranceClaims.policyId, claimRows, (
+      owner
+    ) => policyOk.has(owner));
+
     const reminderVehicleIds = new Map<string, string[]>();
     for (const link of data.reminderVehicles ?? []) {
       const id = String(link.reminderId);
       reminderVehicleIds.set(id, [...(reminderVehicleIds.get(id) ?? []), String(link.vehicleId)]);
     }
-    await this.insertRows(
-      tx,
-      reminders,
+    const reminderRows = this.keepMemberAuthors(
+      gate(this.stampUserId(data.reminders, userId), (row) =>
+        (reminderVehicleIds.get(String(row.id)) ?? []).every((id) => carOk.has(id))
+      ),
+      consentedShares,
+      (row) => reminderVehicleIds.get(String(row.id)) ?? ['']
+    );
+    const addedReminders = await insert(reminders, reminderRows);
+    const reminderOk = await mine(reminders, reminders.id, reminders.userId, reminderRows, isOwner);
+    const onReminder = (row: Row): boolean => reminderOk.has(String(row.reminderId));
+    const addedReminderVehicles = await insert(
+      reminderVehicles,
+      gate(data.reminderVehicles ?? [], (row) => onReminder(row) && onCar(row))
+    );
+    const addedNotifications = await insert(
+      reminderNotifications,
+      gate(this.stampUserId(data.reminderNotifications, userId), onReminder)
+    );
+
+    const sources: Record<string, Set<string>> = {
+      reminder: reminderOk,
+      financing: financingOk,
+      insurance_term: termOk,
+    };
+    const sourceOk = (row: Row): boolean =>
+      row.sourceId == null ||
+      row.sourceId === '' ||
+      (EXPENSE_SOURCES.has(String(row.sourceType)) &&
+        Boolean(sources[String(row.sourceType)]?.has(String(row.sourceId))));
+    const expenseRows = this.keepMemberAuthors(
+      gate(
+        this.stampUserId(data.expenses, userId),
+        (row) => onCar(row) && optional(driverOk, row.paidByDriverId) && sourceOk(row)
+      ),
+      consentedShares,
+      (row) => [String(row.vehicleId)]
+    );
+    const addedExpenses = await insert(expenses, expenseRows);
+    const expenseOk = await mine(expenses, expenses.id, expenses.userId, expenseRows, isOwner);
+    const driven = (row: Row): boolean => onCar(row) && optional(driverOk, row.driverId);
+    const odometerRows = this.keepMemberAuthors(
+      gate(this.stampUserId(data.odometer, userId), driven),
+      consentedShares,
+      (row) => [String(row.vehicleId)]
+    );
+    const addedOdometer = await insert(odometerEntries, odometerRows);
+    const odometerOk = await mine(
+      odometerEntries,
+      odometerEntries.id,
+      odometerEntries.vehicleId,
+      odometerRows,
+      ownCar
+    );
+    const addedTrips = await insert(
+      trips,
       this.keepMemberAuthors(
-        this.stampUserId(data.reminders, userId),
+        gate(this.stampUserId(data.trips, userId), driven),
         consentedShares,
-        (row) => reminderVehicleIds.get(String(row.id)) ?? ['']
+        (row) => [String(row.vehicleId)]
       )
     );
-    await this.insertRows(tx, reminderVehicles, data.reminderVehicles ?? []);
-    await this.insertRows(
-      tx,
-      reminderNotifications,
-      this.stampUserId(data.reminderNotifications, userId)
-    );
-    await this.insertRows(
-      tx,
-      expenses,
-      this.keepMemberAuthors(this.stampUserId(data.expenses, userId), consentedShares, (row) => [
-        String(row.vehicleId),
-      ])
-    );
-    await this.insertRows(
-      tx,
-      odometerEntries,
-      this.keepMemberAuthors(this.stampUserId(data.odometer, userId), consentedShares, (row) => [
-        String(row.vehicleId),
-      ])
-    );
-    await this.insertRows(
-      tx,
-      trips,
-      this.keepMemberAuthors(this.stampUserId(data.trips, userId), consentedShares, (row) => [
-        String(row.vehicleId),
-      ])
-    );
-    await this.insertRows(
-      tx,
+    const addedShares = await insert(
       vehicleShares,
-      (data.vehicleShares ?? [])
+      gate(data.vehicleShares ?? [], onCar)
         .filter((share) => knownUserIds.has(String(share.sharedWithId)))
         .map((share) => ({
           ...share,
@@ -705,10 +700,9 @@ class RestoreService {
           status: this.resolveShareStatus(share, consentedShares),
         }))
     );
-    await this.grantAcceptedShareRoles(tx, userId);
+    if (!merge) await this.grantAcceptedShareRoles(tx, userId);
     const ownedProviders = await this.ownedProviderIds(tx, userId);
-    await this.insertRows(
-      tx,
+    const addedPreferences = await insert(
       userPreferences,
       this.stampUserId(data.userPreferences, userId).map((row) =>
         this.withoutCommunityConsent(
@@ -716,36 +710,64 @@ class RestoreService {
         )
       )
     );
-    await this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
+    const addedSyncState = await insert(syncState, this.stampUserId(data.syncState, userId));
     const entryVehicle = new Map<string, string>(
       [...(data.expenses ?? []), ...(data.odometer ?? [])].map((row) => [
         String(row.id),
         String(row.vehicleId),
       ])
     );
-    const photoVehicle = (row: Record<string, unknown>): string =>
+    const photoVehicle = (row: Row): string =>
       row.entityType === 'vehicle'
         ? String(row.entityId)
         : (entryVehicle.get(String(row.entityId)) ?? '');
-    await this.insertRows(
-      tx,
-      photos,
-      this.keepMemberAuthors(this.stampUserId(data.photos, userId), consentedShares, (row) => [
-        photoVehicle(row),
-      ])
+    const entities: Record<string, Set<string>> = {
+      vehicle: carOk,
+      expense: expenseOk,
+      insurance_policy: policyOk,
+      insurance_claim: claimOk,
+      odometer_entry: odometerOk,
+    };
+    const photoRows = this.keepMemberAuthors(
+      gate(this.stampUserId(data.photos, userId), (row) =>
+        Boolean(entities[String(row.entityType)]?.has(String(row.entityId)))
+      ),
+      consentedShares,
+      (row) => [photoVehicle(row)]
     );
+    const addedPhotos = await insert(photos, photoRows);
+    const photoOk = await mine(photos, photos.id, photos.userId, photoRows, isOwner);
     const refRows = await this.relinkPhotoRefs(
       tx,
-      (data.photoRefs ?? []) as Record<string, unknown>[],
+      gate((data.photoRefs ?? []) as Row[], (ref) => photoOk.has(String(ref.photoId))),
       data.metadata.storageProviders ?? {},
       userId
     );
     const knownProviders = await this.knownProviderIds(tx, refRows, userId);
-    await this.insertRows(
-      tx,
+    const addedPhotoRefs = await insert(
       photoRefs,
       refRows.filter((ref) => knownProviders.has(String(ref.providerId)))
     );
+    return {
+      vehicles: addedVehicles,
+      expenses: addedExpenses,
+      financing: addedFinancing,
+      insurance: addedPolicies,
+      insuranceTerms: addedTerms,
+      insuranceTermVehicles: addedTermVehicles,
+      insuranceClaims: addedClaims,
+      reminders: addedReminders,
+      reminderVehicles: addedReminderVehicles,
+      reminderNotifications: addedNotifications,
+      odometer: addedOdometer,
+      photos: addedPhotos,
+      photoRefs: addedPhotoRefs,
+      userPreferences: addedPreferences,
+      syncState: addedSyncState,
+      trips: addedTrips,
+      vehicleShares: addedShares,
+      vehicleDrivers: addedDrivers,
+    };
   }
 
   private withoutCommunityConsent<T extends Record<string, unknown>>(row: T): T {
