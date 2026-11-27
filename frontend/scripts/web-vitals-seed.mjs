@@ -35,20 +35,29 @@ const fleet = [
 	['Toyota', 'Prius', 'hybrid', 1, 0, 'PERF002'],
 	['Ford', 'F-150', 'gas', 1, 0, 'PERF003']
 ];
+const economy = {
+	'Model 3': [3.6, 4.4],
+	Prius: [48, 55],
+	'F-150': [17, 22],
+	Camry: [28, 34],
+	Civic: [32, 38]
+};
 const categories = [
 	'fuel',
-	'fuel',
-	'fuel',
-	'fuel',
-	'fuel',
-	'fuel',
 	'maintenance',
-	'maintenance',
+	'fuel',
 	'misc',
+	'fuel',
 	'regulatory',
+	'fuel',
 	'enhancement',
-	'financial'
+	'fuel',
+	'financial',
+	'fuel',
+	'maintenance'
 ];
+const otherCategories = categories.filter(c => c !== 'fuel');
+const between = ([low, high]) => low + random() * (high - low);
 const expensesPerVehicle = 2000;
 const odometerPerVehicle = 200;
 
@@ -59,8 +68,8 @@ const insertVehicle = db.prepare(
 );
 const insertExpense = db.prepare(
 	`insert into expenses (id, vehicle_id, category, tags, date, mileage, description, location, created_at, updated_at,
-	 expense_amount, volume, fuel_type, missed_fillup, user_id, created_by)
-	 values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
+	 expense_amount, volume, fuel_type, charger_type, missed_fillup, user_id, created_by)
+	 values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
 );
 const insertOdometer = db.prepare(
 	`insert into odometer_entries (id, vehicle_id, user_id, odometer, recorded_at, note, created_at, updated_at)
@@ -84,48 +93,82 @@ db.transaction(() => {
 			now
 		);
 	}
-	const vehicles = db.query('select id, vehicle_type from vehicles where user_id = ?').all(user.id);
+	const vehicles = db
+		.query(
+			'select id, model, vehicle_type, initial_mileage, purchase_date from vehicles where user_id = ? order by created_at, id'
+		)
+		.all(user.id);
 	for (const vehicle of vehicles) {
 		const existing = db
 			.query('select count(*) as n from expenses where vehicle_id = ?')
 			.get(vehicle.id).n;
 		const count = expensesPerVehicle - existing;
-		let miles = 10000;
-		for (let i = 0; i < count; i++) {
-			const date = now - span + Math.floor((span * i) / count);
-			const category = categories[i % categories.length];
-			const isFuel = category === 'fuel';
-			miles += 45 + Math.floor(random() * 30);
-			const fuelType = isFuel
-				? vehicle.vehicle_type === 'electric'
-					? 'Level 2 (AC)'
-					: 'Regular'
+		const band = economy[vehicle.model];
+		const electric = vehicle.vehicle_type === 'electric';
+		const pool = band ? categories : otherCategories;
+		const first = db
+			.query(
+				'select date, mileage, volume from expenses where vehicle_id = ? and mileage is not null order by date limit 1'
+			)
+			.get(vehicle.id);
+		const end = first ? first.date - 86400 : now;
+		const endMiles =
+			first && band
+				? first.mileage - Math.round((first.volume ?? 0) * ((band[0] + band[1]) / 2))
 				: null;
+		const startMiles = vehicle.initial_mileage ?? 10000;
+		const start = Math.max(now - span, vehicle.purchase_date ?? 0);
+		const steps = Array.from({ length: count }, () => 0.75 + random() * 0.5);
+		const scale =
+			(endMiles == null ? count * 60 : endMiles - startMiles) / steps.reduce((a, b) => a + b, 0);
+		const dateAt = i => start + Math.floor(((end - start) * i) / count);
+		const odometer = [];
+		let exact = startMiles;
+		let miles = startMiles;
+		let lastFill = miles;
+		for (let i = 0; i < count; i++) {
+			const date = dateAt(i);
+			const category = band && i === count - 1 ? 'fuel' : pool[i % pool.length];
+			const isFuel = category === 'fuel';
+			exact += steps[i] * scale;
+			miles = Math.round(exact);
+			odometer.push(miles);
+			const fast = electric && i % 12 === 0;
+			const volume = isFuel ? Math.round(((miles - lastFill) / between(band)) * 1000) / 1000 : null;
+			const price = electric
+				? fast
+					? between([0.38, 0.48])
+					: between([0.12, 0.17])
+				: between([3.2, 4.2]);
+			if (isFuel) lastFill = miles;
 			insertExpense.run(
 				id('exp'),
 				vehicle.id,
 				category,
 				JSON.stringify([category]),
 				date,
-				isFuel || i % 3 ? miles : null,
+				band && (isFuel || i % 3) ? miles : null,
 				`Perf ${category} ${i}`,
 				i % 5 ? null : 'Main St',
 				date,
 				date,
-				1000 + Math.floor(random() * 9000),
-				isFuel ? 8 + random() * 6 : null,
-				fuelType,
+				isFuel ? Math.round(volume * price * 100) : 1000 + Math.floor(random() * 9000),
+				volume,
+				isFuel ? (electric ? (fast ? 'DC Fast Charging' : 'Level 2 (AC)') : '87 (Regular)') : null,
+				isFuel && electric ? (fast ? 'dc_fast' : 'home') : null,
 				user.id,
 				user.id
 			);
 		}
+		if (!band) continue;
 		for (let i = 0; i < odometerPerVehicle; i++) {
-			const date = now - span + Math.floor((span * i) / odometerPerVehicle);
+			const at = Math.floor((count * i) / odometerPerVehicle);
+			const date = dateAt(at);
 			insertOdometer.run(
 				id('odo'),
 				vehicle.id,
 				user.id,
-				10000 + i * 600,
+				odometer[at],
 				date,
 				i % 4 ? null : 'reading',
 				date,
