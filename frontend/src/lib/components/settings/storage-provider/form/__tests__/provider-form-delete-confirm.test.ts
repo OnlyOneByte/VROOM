@@ -87,12 +87,12 @@ describe('ProviderForm Remove storage section asks before deleting', () => {
 
 	test('photos stored only there get a second warning before a forced delete', async () => {
 		deleteProvider.mockRejectedValueOnce(
-			new ApiError('3 photos are stored only in this provider.', 409, { photosOnlyHere: 3 })
+			new ApiError('3 photos are stored only in this storage.', 409, { photosOnlyHere: 3 })
 		);
 		await clickDeleteStorage();
 		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 		expect(
-			await screen.findByText('3 photos are stored only in this provider.')
+			await screen.findByText('3 photos are stored only in this storage.')
 		).toBeInTheDocument();
 		await fireEvent.click(await screen.findByRole('button', { name: 'Delete anyway' }));
 		await waitFor(() =>
