@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { scaleLinear, scaleTime } from 'd3-scale';
+import { scaleBand, scaleLinear, scaleTime } from 'd3-scale';
 import {
 	distinctYTicks,
 	dayXAxisProps,
@@ -21,7 +21,9 @@ import {
 	monthlyXAxisProps,
 	parseMonthToDate,
 	TIME_X_PADDING,
-	edgeLabelShift
+	BAR_LABEL_GUTTER,
+	edgeLabelShift,
+	fittedBandTicks
 } from '#lib/utils/chart-formatters.ts';
 import { formatNumber } from '#lib/utils/formatters.ts';
 
@@ -47,14 +49,45 @@ describe('edgeLabelShift (x labels at the plot edges stay inside the chart)', ()
 		expect(edgeLabelShift(0, 'Aug ’26', 241, padding)).toBe(0);
 	});
 
-	test('with no left gutter allowed, the first bar label moves right to clear the y-axis labels', () => {
+	test('a bar label may use only a few px of the y-axis gutter, so it clears "$0"', () => {
 		expect(edgeLabelShift(14, 'Nov ’25', 241, padding)).toBe(0);
-		expect(edgeLabelShift(14, 'Nov ’25', 241, { left: 0, right: 4 })).toBeCloseTo(12.5);
+		expect(edgeLabelShift(14, 'Nov ’25', 241, { left: BAR_LABEL_GUTTER, right: 4 })).toBeCloseTo(
+			8.5
+		);
 	});
 
 	test('before the chart has a size, labels stay where they are', () => {
 		expect(edgeLabelShift(10, 'Nov ’26', 0, padding)).toBe(0);
 		expect(edgeLabelShift(undefined, 'Nov ’26', 241, padding)).toBe(0);
+	});
+});
+
+describe('fittedBandTicks (bar x labels never overlap)', () => {
+	const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'].map(
+		m => `${m} ’26`
+	);
+	const everyThird = months.filter((_m, i) => i % 3 === 0);
+	const band = (domain: string[], width: number) =>
+		scaleBand<string>().domain(domain).range([0, width]).padding(0.4);
+
+	test('at 320px, every third month would collide, so it keeps every sixth', () => {
+		expect(fittedBandTicks(everyThird, String)(band(months, 188))).toEqual(['Jan ’26', 'Jul ’26']);
+	});
+
+	test('with room, every tick asked for is kept', () => {
+		expect(fittedBandTicks(everyThird, String)(band(months, 600))).toEqual(everyThird);
+	});
+
+	test('car names cut to their band, as Cross-vehicle does, are all kept', () => {
+		const cars = [
+			'2020 Toyota Camry (Daily Driver)',
+			'2019 Honda Civic (Weekend Car)',
+			'2021 Tesla Model 3',
+			'2021 Toyota Prius',
+			'2021 Ford F-150'
+		];
+		const format = (v: unknown) => fitBandTickLabel(String(v), 300, cars.length);
+		expect(fittedBandTicks(cars, format)(band(cars, 300))).toEqual(cars);
 	});
 });
 

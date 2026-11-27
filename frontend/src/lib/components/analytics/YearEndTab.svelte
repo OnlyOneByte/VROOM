@@ -278,6 +278,7 @@
 						referenceLines={monthAverage != null
 							? [{ value: monthAverage, label: 'Monthly average' }]
 							: []}
+						fitTicks
 						xAxisProps={{ ticks: monthTicks, format: (v: unknown) => String(v) }}
 						yAxisFormat={v => formatCurrency(v, undefined, 0)}
 						tooltipFormat={v => formatCurrency(Number(v))}
@@ -313,7 +314,7 @@
 						{#if biggestExpense}
 							<li class="flex items-center justify-between gap-3 py-3">
 								<div>
-									<p class="font-medium">Biggest single expense (excluding fill-ups)</p>
+									<p class="font-medium">Biggest single expense (excluding fill-ups and charges)</p>
 									<p class="text-sm text-muted-foreground">
 										{biggestExpense.description} · {formatCurrency(biggestExpense.amount)} · {formatDateWith(
 											biggestExpense.date,

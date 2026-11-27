@@ -131,7 +131,7 @@ describe('YearEndTab', () => {
 		expect(list.textContent).toMatch(/Cheapest car to run\s*Sparky · \$0\.09\/mi/);
 		expect(list.textContent).toMatch(/Most fill-ups and charges\s*Daily Driver · 36/);
 		expect(list.textContent).toMatch(
-			/Biggest single expense \(excluding fill-ups\)\s*Insurance · \$1,200\.00 · Feb 10/
+			/Biggest single expense \(excluding fill-ups and charges\)\s*Insurance · \$1,200\.00 · Feb 10/
 		);
 		expect(api.queryItems).toHaveBeenCalledWith({
 			start: secs(new Date(2026, 0, 1)),

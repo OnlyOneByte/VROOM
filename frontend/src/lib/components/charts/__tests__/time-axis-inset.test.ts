@@ -18,12 +18,13 @@ describe('time-series charts keep the first x label off the y labels', () => {
 });
 
 describe('x labels at the plot edges stay inside the chart', () => {
-	test.each(['AppLineChart.svelte', 'AppAreaChart.svelte', 'AppBarChart.svelte'])(
-		'%s draws its x tick labels with EdgeTickLabel',
-		file => {
-			const src = read(file);
-			expect(src).toMatch(/<EdgeTickLabel \{props\}( clearGutter)? \/>/);
-			expect(src).toContain('tickLabel: edgeTickLabel');
-		}
-	);
+	test.each([
+		['AppLineChart.svelte', '<EdgeTickLabel {props} />'],
+		['AppAreaChart.svelte', '<EdgeTickLabel {props} />'],
+		['AppBarChart.svelte', '<EdgeTickLabel {props} clearGutter />']
+	])('%s draws its x tick labels with EdgeTickLabel', (file, tag) => {
+		const src = read(file);
+		expect(src).toContain(tag);
+		expect(src).toContain('tickLabel: edgeTickLabel');
+	});
 });

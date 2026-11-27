@@ -149,6 +149,35 @@ function labelsFit(ticks: Date[], scale: AnyScale, format: (_v: unknown) => stri
 	});
 }
 
+export const BAR_LABEL_GUTTER = 4;
+
+export function fittedBandTicks(
+	candidates: readonly unknown[],
+	format: (_v: unknown) => string,
+	paddingRight = 0
+) {
+	return (scale: AnyScale): unknown[] => {
+		const half = (scale.bandwidth?.() ?? 0) / 2;
+		const width = Math.max(0, ...((scale.range?.() as number[] | undefined) ?? [0]));
+		const edges = { left: BAR_LABEL_GUTTER, right: paddingRight };
+		const centre = (tick: unknown) => {
+			const at = Number(scale(tick)) + half;
+			return at + edgeLabelShift(at, format(tick), width, edges);
+		};
+		for (let stride = 1; stride < candidates.length; stride++) {
+			const ticks = candidates.filter((_tick, i) => i % stride === 0);
+			const fits = ticks.every((tick, i) => {
+				if (i === 0) return true;
+				const gap = centre(tick) - centre(ticks[i - 1]);
+				const need = (tickLabelWidth(format(tick)) + tickLabelWidth(format(ticks[i - 1]))) / 2;
+				return gap >= need + TICK_LABEL_GAP;
+			});
+			if (fits) return ticks;
+		}
+		return candidates.slice(0, 1);
+	};
+}
+
 export function fittedTimeTicks(maxTicks: number, format: (_v: unknown) => string) {
 	return (scale: AnyScale): Date[] => {
 		const all: Date[] = (scale.ticks?.(maxTicks) ?? []).filter(
