@@ -61,18 +61,20 @@ export function chosenProviders(
 
 type ConfigPatch = Record<string, Record<string, string | number | boolean | null>>;
 
-async function patchForCurrentProviders(userId: string, patch: ConfigPatch): Promise<ConfigPatch> {
-  const [prefs, live] = await Promise.all([
-    repos().preferences.getOrCreate(userId),
-    loadProviderTypes(userId),
-  ]);
-  const saved = (prefs.backupConfig as BackupConfig | null)?.providers ?? {};
-  const result: ConfigPatch = {};
-  for (const [id, entry] of Object.entries(patch)) {
-    if (!live.has(id)) continue;
-    result[id] = saved[id] ? entry : { ...NEW_PROVIDER_BACKUP_SETTINGS, enabled: false, ...entry };
-  }
-  return result;
+async function savePatchForCurrentProviders(userId: string, patch: ConfigPatch): Promise<void> {
+  const live = await loadProviderTypes(userId);
+  const providers = Object.fromEntries(Object.entries(patch).filter(([id]) => live.has(id)));
+  if (Object.keys(providers).length === 0) return;
+  const defaults = { ...NEW_PROVIDER_BACKUP_SETTINGS, enabled: false };
+  await repos().preferences.mergeJsonField(
+    userId,
+    'backupConfig',
+    { providers },
+    {
+      parent: 'providers',
+      entries: Object.fromEntries(Object.keys(providers).map((id) => [id, defaults])),
+    }
+  );
 }
 
 export function needsZipGeneration(
@@ -335,9 +337,7 @@ export class BackupOrchestrator {
       }
 
       if (Object.keys(configPatch).length > 0) {
-        await repos().preferences.mergeJsonField(userId, 'backupConfig', {
-          providers: await patchForCurrentProviders(userId, configPatch),
-        });
+        await savePatchForCurrentProviders(userId, configPatch);
       }
       const coveredEveryEnabled =
         !providerIds ||

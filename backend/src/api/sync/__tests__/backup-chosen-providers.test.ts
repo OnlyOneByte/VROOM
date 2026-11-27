@@ -328,6 +328,41 @@ describe('A one-off backup does not undo changes made while it ran', () => {
     });
   });
 
+  test('settings saved in the moment before the backup writes its result stay as saved', async () => {
+    await seedProvider('new-h', FAKE_TYPE, null);
+    await registerDuring(() => undefined);
+    const { repos } = await import('../../../app-context');
+    const preferences = repos().preferences;
+    const write = preferences.mergeJsonField.bind(preferences);
+    preferences.mergeJsonField = (...args) => {
+      ctx.sqlite.run('UPDATE user_preferences SET backup_config = ? WHERE user_id = ?', [
+        JSON.stringify({
+          providers: { 'new-h': { enabled: true, folderPath: 'Mine', retentionCount: 3 } },
+        }),
+        ctx.user.id,
+      ]);
+      return write(...args);
+    };
+
+    try {
+      const res = await ctx.authed('POST', '/api/v1/sync', {
+        syncTypes: ['backup'],
+        force: true,
+        providerIds: ['new-h'],
+      });
+      expect(res.status).toBe(200);
+    } finally {
+      preferences.mergeJsonField = write;
+    }
+
+    expect(savedConfig().providers['new-h']).toMatchObject({
+      enabled: true,
+      folderPath: 'Mine',
+      retentionCount: 3,
+      lastBackupAt: expect.any(String),
+    });
+  });
+
   test('a provider removed during its backup gets no settings entry', async () => {
     await seedProvider('new-g', FAKE_TYPE, null);
     await registerDuring(() => {

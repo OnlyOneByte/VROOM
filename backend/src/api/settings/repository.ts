@@ -1,6 +1,6 @@
 import { eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
-import { jsonMergePatch } from '../../db/dialect';
+import { jsonAddMissingEntries, jsonMergePatch } from '../../db/dialect';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
 import {
   expenses,
@@ -126,15 +126,19 @@ export class PreferencesRepository {
   async mergeJsonField(
     userId: string,
     column: keyof typeof JSON_FIELD_COLUMNS,
-    patch: Record<string, unknown>
+    patch: Record<string, unknown>,
+    addMissing?: { parent: string; entries: Record<string, Record<string, unknown>> }
   ): Promise<UserPreferences | null> {
     // Column names come from a closed map; never interpolate user input into SQL.
-    const sqlColumn = JSON_FIELD_COLUMNS[column];
+    const sqlColumn = sql.raw(JSON_FIELD_COLUMNS[column]);
+    const base = addMissing
+      ? jsonAddMissingEntries(sqlColumn, addMissing.parent, addMissing.entries)
+      : sqlColumn;
     try {
       const result = await this.db
         .update(userPreferences)
         .set({
-          [column]: jsonMergePatch(sql.raw(sqlColumn), patch),
+          [column]: jsonMergePatch(base, patch),
           updatedAt: new Date(),
         })
         .where(eq(userPreferences.userId, userId))

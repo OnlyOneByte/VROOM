@@ -71,3 +71,71 @@ describe('mergeJsonField — atomic deep-merge', () => {
     void rmwA;
   });
 });
+
+describe('mergeJsonField — defaults only for missing entries', () => {
+  const defaults = { enabled: false, folderPath: 'Backups', retentionCount: 10 };
+  const addMissing = (ids: string[]) => ({
+    parent: 'providers',
+    entries: Object.fromEntries(ids.map((id) => [id, defaults])),
+  });
+
+  test('a missing entry gets the defaults under the patch; a saved one keeps its own values', async () => {
+    await repo.mergeJsonField(USER, 'backupConfig', {
+      providers: { saved: { enabled: true, folderPath: 'Mine', retentionCount: 3 } },
+    });
+
+    await repo.mergeJsonField(
+      USER,
+      'backupConfig',
+      { providers: { saved: { lastBackupAt: 't1' }, fresh: { lastBackupAt: 't1' } } },
+      addMissing(['saved', 'fresh'])
+    );
+
+    const cfg = backupConfig() as { providers: Record<string, unknown> };
+    expect(cfg.providers.saved).toEqual({
+      enabled: true,
+      folderPath: 'Mine',
+      retentionCount: 3,
+      lastBackupAt: 't1',
+    });
+    expect(cfg.providers.fresh).toEqual({ ...defaults, lastBackupAt: 't1' });
+  });
+
+  test('works when nothing has been saved yet, and with ids that need quoting', async () => {
+    const odd = 'a."b\'c';
+    await repo.mergeJsonField(
+      USER,
+      'backupConfig',
+      { providers: { [odd]: { lastBackupAt: 't1' } } },
+      addMissing([odd])
+    );
+
+    const cfg = backupConfig() as { providers: Record<string, unknown> };
+    expect(cfg.providers).toEqual({ [odd]: { ...defaults, lastBackupAt: 't1' } });
+  });
+
+  test('a settings save landing just before or just after the backup write is kept', async () => {
+    const mine = { enabled: true, folderPath: 'Mine', retentionCount: 3 };
+    const backup = () =>
+      repo.mergeJsonField(
+        USER,
+        'backupConfig',
+        { providers: { p: { lastBackupAt: 't1' } } },
+        addMissing(['p'])
+      );
+    const save = () => repo.mergeJsonField(USER, 'backupConfig', { providers: { p: mine } });
+
+    await Promise.all([save(), backup()]);
+    expect((backupConfig() as { providers: Record<string, unknown> }).providers.p).toEqual({
+      ...mine,
+      lastBackupAt: 't1',
+    });
+
+    await repo.mergeJsonField(USER, 'backupConfig', { providers: { p: null } });
+    await Promise.all([backup(), save()]);
+    expect((backupConfig() as { providers: Record<string, unknown> }).providers.p).toEqual({
+      ...mine,
+      lastBackupAt: 't1',
+    });
+  });
+});

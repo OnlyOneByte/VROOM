@@ -66,6 +66,21 @@ export function jsonMergePatch(object: SQLWrapper, patch: Record<string, unknown
   return sql`json_patch(coalesce(${object}, '{}'), ${JSON.stringify(patch)})`;
 }
 
+export function jsonAddMissingEntries(
+  object: SQLWrapper,
+  parent: string,
+  entries: Record<string, Record<string, unknown>>
+): SQL {
+  if (!/^[A-Za-z]\w*$/.test(parent)) {
+    throw new TypeError(`jsonAddMissingEntries: bad key ${parent}`);
+  }
+  return Object.entries(entries).reduce(
+    (merged, [key, value]) =>
+      sql`json_patch(${merged}, json_object(${parent}, json_object(${key}, json(CASE WHEN EXISTS (SELECT 1 FROM json_each(${object}, ${`$.${parent}`}) WHERE key = ${key}) THEN '{}' ELSE ${JSON.stringify(value)} END))))`,
+    sql`coalesce(${object}, '{}')`
+  );
+}
+
 export function countNum(expression: SQLWrapper = sql`*`): SQL<number> {
   return sql<number>`count(${expression})`.mapWith(Number);
 }
