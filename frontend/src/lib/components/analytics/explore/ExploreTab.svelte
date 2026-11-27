@@ -741,6 +741,7 @@
 									referenceLines={panels.fleetMean != null
 										? [{ value: panels.fleetMean, label: 'Fleet average' }]
 										: []}
+									fitTicks
 									xAxisProps={{ ticks: bandTicks }}
 									yAxisFormat={format.axis}
 									tooltipFormat={format.full}
@@ -809,6 +810,7 @@
 					onToggleSeries={toggleSeries}
 					config={buildChartConfig(allSeries)}
 					seriesLayout={form === 'stacked' ? 'stack' : form === 'grouped' ? 'group' : undefined}
+					fitTicks
 					xAxisProps={{ ticks: bandTicks }}
 					yAxisFormat={format.axis}
 					tooltipFormat={format.full}

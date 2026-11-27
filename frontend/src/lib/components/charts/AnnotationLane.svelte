@@ -26,6 +26,26 @@
 		return (context?.padding.left ?? 0) + x + (scale.bandwidth?.() ?? 0) / 2;
 	}
 
+	const MARKER_SPACING = 24;
+
+	let groups = $derived.by(() => {
+		const placed = markers
+			.map((marker, index) => ({ index, x: left(marker.at) }))
+			.filter((p): p is { index: number; x: number } => p.x !== null)
+			.sort((a, b) => a.x - b.x);
+		const out: Array<{ start: number; x: number; members: number[] }> = [];
+		for (const p of placed) {
+			const last = out.at(-1);
+			if (last && p.x - last.start < MARKER_SPACING) {
+				last.members.push(p.index);
+				last.x = (last.start + p.x) / 2;
+			} else {
+				out.push({ start: p.x, x: p.x, members: [p.index] });
+			}
+		}
+		return out;
+	});
+
 	function describe(index: number): string {
 		const marker = markers[index];
 		if (!marker) return '';
@@ -82,19 +102,31 @@
 			></span>
 		{/if}
 	{/each}
-	{#each markers as marker, i (i)}
-		{@const x = left(marker.at)}
-		{#if x !== null}
+	{#each groups as group (group.members[0])}
+		{@const isActive = active !== null && group.members.includes(active)}
+		{#if group.members.length === 1}
 			<span
-				class="border-foreground bg-background absolute top-0.5 size-3 -translate-x-1/2 rounded-full border-2 {active ===
-				i
+				class="border-foreground bg-background absolute top-0.5 size-3 -translate-x-1/2 rounded-full border-2 {isActive
 					? 'ring-ring/60 ring-2'
 					: ''}"
-				style="left: {x}px"
-				onmouseenter={() => (active = i)}
+				style="left: {group.x}px"
+				onmouseenter={() => (active = group.members[0] ?? null)}
 				aria-hidden="true"
 				data-annotation-marker
 			></span>
+		{:else}
+			<span
+				class="border-foreground bg-background absolute -top-0.5 h-5 min-w-5 -translate-x-1/2 rounded-full border-2 px-1 text-center text-xs leading-4 font-semibold tabular-nums {isActive
+					? 'ring-ring/60 ring-2'
+					: ''}"
+				style="left: {group.x}px"
+				onmouseenter={() => (active = group.members[0] ?? null)}
+				aria-hidden="true"
+				data-annotation-marker
+				data-annotation-group={group.members.length}
+			>
+				{group.members.length}
+			</span>
 		{/if}
 	{/each}
 	{#if shown}

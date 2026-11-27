@@ -107,6 +107,40 @@ describe('AnnotationLane', () => {
 		expect(Number.parseFloat(tip?.style.left ?? 'NaN')).toBeGreaterThanOrEqual(0);
 	});
 
+	test('markers closer than 24px share one marker that shows their count', async () => {
+		const months = [0, 1, 2, 3].map(m => new Date(Date.UTC(2026, m, 1)));
+		const narrow = {
+			xScale: (at: unknown) => months.findIndex(m => m === at) * 15,
+			padding: { top: 0, right: 0, bottom: 0, left: 10 }
+		} as unknown as ChartState<Record<string, unknown>>;
+		const annotations: ChartAnnotations = {
+			...ANNOTATIONS,
+			density: [],
+			formatAt: () => 'Month',
+			markers: months.map((at, i) => ({ at, label: `Service ${i + 1}` }))
+		};
+		const { container } = render(AnnotationLane, { props: { annotations, context: narrow } });
+		const shown = [...container.querySelectorAll<HTMLElement>('[data-annotation-marker]')];
+		expect(shown.map(m => [m.style.left, m.textContent?.trim()])).toEqual([
+			['17.5px', '2'],
+			['47.5px', '2']
+		]);
+
+		const lane = screen.getByRole('group', { name: /^Services: 4 markers\./ });
+		await fireEvent.keyDown(lane, { key: 'End' });
+		expect(screen.getByText('Month: Service 4. 4 of 4.')).toBeInTheDocument();
+		expect(shown[1]?.className).toContain('ring-2');
+		expect(shown[0]?.className).not.toContain('ring-2');
+	});
+
+	test('markers far enough apart each keep their own marker', () => {
+		const { container } = render(AnnotationLane, {
+			props: { annotations: ANNOTATIONS, context: CONTEXT }
+		});
+		const shown = container.querySelectorAll('[data-annotation-group]');
+		expect(shown).toHaveLength(0);
+	});
+
 	test('a lane with no markers is not a tab stop', () => {
 		render(AnnotationLane, {
 			props: { annotations: { ...ANNOTATIONS, markers: [] }, context: CONTEXT }
