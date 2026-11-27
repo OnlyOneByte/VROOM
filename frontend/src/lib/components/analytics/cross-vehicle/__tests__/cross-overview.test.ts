@@ -33,6 +33,15 @@ const spend = byCategory({
 });
 
 describe('cross-vehicle overview figures', () => {
+	test('the all-in bars leave out cars whose share hides their financial figures', () => {
+		const shown = carValues(
+			perCar({ daily: 0.58, shared: 0.2, weekend: 0.09 }),
+			new Set(['shared'])
+		);
+		expect(shown.map(c => c.vehicleId)).toEqual(['daily', 'weekend']);
+		expect(shown[0]?.share).toBe(1);
+	});
+
 	test('the requests are a fixed set, whatever the number of cars', () => {
 		const many = Array.from({ length: 12 }, (_, i) => `car-${i}`);
 		const requests = overviewRequests({ startDate: 1, endDate: 2 }, many);

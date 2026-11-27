@@ -133,7 +133,7 @@
 	);
 
 	let running = $derived(carValues(runningCost));
-	let allIn = $derived(carValues(allInCost));
+	let allIn = $derived(carValues(allInCost, hiddenFinancials));
 	let matrix = $derived(categoryMatrix(byCategory, hiddenFinancials));
 	let hero = $derived(crossHero(running, allIn, byCategory, hiddenFinancials));
 
