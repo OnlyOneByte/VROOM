@@ -821,6 +821,10 @@ export const communityNoiseKeys = sqliteTable('community_noise_keys', {
   noiseKey: text('noise_key').notNull(),
 });
 
+export const moneyUnitMigrations = sqliteTable('money_unit_migrations', {
+  name: text('name').primaryKey(),
+});
+
 export const serverSettings = sqliteTable('server_settings', {
   id: integer('id').primaryKey(),
   signupMode: text('signup_mode').notNull().default('invite'),
