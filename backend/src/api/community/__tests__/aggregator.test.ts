@@ -5,6 +5,7 @@ import {
   ageBand,
   aggregate,
   bandFor,
+  COMMUNITY_SCHEMA_VERSION,
   type CommunityVehicle,
   EPSILON_COUNT,
   EPSILON_SUM,
@@ -15,6 +16,8 @@ import {
   vehicleSamples,
 } from '../aggregator';
 import { fillUps, NO_NOISE, NOW, owners, vehicle } from './community-fixtures';
+
+const PUBLISHED_UNDER_VERSION_1 = { n: 35, mean: 12.3 };
 
 const DAY = 86_400_000;
 const term = (startDays: number, endDays: number, amount: number) => ({
@@ -175,6 +178,16 @@ describe('community stats aggregation privacy', () => {
     expect(
       aggregate(group(), { ...keyed, now: new Date(NOW.getTime() + DAY) }).rows.map((r) => r.mean)
     ).toEqual(first.map((r) => r.mean));
+  });
+
+  test('a schema version bump keeps the noise already published for unchanged data', () => {
+    const keyed = { now: NOW, minGroup: 30, noiseKey: 'test-key' };
+    const row = aggregate(
+      owners(40).map((id) => vehicle(id)),
+      keyed
+    ).rows.find((r) => r.metric === 'efficiency');
+    expect(row?.schemaVersion).toBe(COMMUNITY_SCHEMA_VERSION);
+    expect({ n: row?.nPublished, mean: row?.mean }).toEqual(PUBLISHED_UNDER_VERSION_1);
   });
 
   test('a change to the data, or a different key, draws fresh noise', () => {

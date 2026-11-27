@@ -905,6 +905,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
   const query = c.req.valid('query');
 
   const scope = await resolveExpenseReadScope(query.vehicleId, user.id);
+  const scale = await repos().preferences.moneyScale(scope.userId);
   const { data, totalCount } = await repos().expenses.findPaginated({
     ...scope,
     vehicleId: query.vehicleId,
@@ -915,6 +916,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
     ...plainDayFilters(c.req.query('startDate'), c.req.query('endDate')),
     tags: query.tags,
     search: query.search,
+    moneyScale: scale,
     sortBy: query.sortBy,
     sortDir: query.sortDir,
     limit: query.limit,
@@ -923,7 +925,6 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
 
   const { limit, offset } = clampPagination(query);
 
-  const scale = await repos().preferences.moneyScale(scope.userId);
   const rows = data.map((expense) =>
     query.vehicleId
       ? hideDriverFields(c, expense.vehicleId, expenseToApi(expense, scale))
@@ -941,6 +942,7 @@ routes.get(
     const query = c.req.valid('query');
 
     const scope = await resolveExpenseReadScope(query.vehicleId, user.id);
+    const scale = await repos().preferences.moneyScale(scope.userId);
     const months = await repos().expenses.getMonthlyTotals({
       ...scope,
       vehicleId: query.vehicleId,
@@ -951,9 +953,9 @@ routes.get(
       ...plainDayFilters(c.req.query('startDate'), c.req.query('endDate')),
       tags: query.tags,
       search: query.search,
+      moneyScale: scale,
     });
 
-    const scale = await repos().preferences.moneyScale(scope.userId);
     return c.json({
       success: true,
       data: months.map((m) => ({ ...m, amount: m.amount / scale })),
