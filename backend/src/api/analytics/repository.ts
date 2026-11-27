@@ -29,6 +29,7 @@ import { DatabaseError, ValidationError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import {
   buildAmortizationSchedule,
+  buildChargingByChargerType,
   buildCostPerDistanceChart,
   buildExpenseByCategory,
   buildFillupCostByVehicle,
@@ -44,6 +45,7 @@ import {
   buildVehicleRadar,
   type Calendar,
   type CategoryAmounts,
+  type ChargerTypeTotals,
   calendarParts,
   computeAverageCosts,
   computeEfficiencyPoint,
@@ -289,6 +291,7 @@ export interface FuelStatsData {
     };
     averageCost: { perSession: number | null; perEnergyUnit: number | null };
     priceHistory: Array<{ date: string; month: string; fuelType: string; pricePerVolume: number }>;
+    byChargerType: ChargerTypeTotals[];
   };
   costPerDistance: Array<{
     month: string;
@@ -867,6 +870,7 @@ export class AnalyticsRepository {
         mileage: expenses.mileage,
         volume: expenses.volume,
         fuelType: expenses.fuelType,
+        chargerType: expenses.chargerType,
         missedFillup: expenses.missedFillup,
         expenseAmount: expenses.expenseAmount,
         vehicleId: expenses.vehicleId,
@@ -1742,6 +1746,7 @@ export class AnalyticsRepository {
         (value) => value,
         convert.calendar
       ),
+      byChargerType: buildChargingByChargerType(sessions),
     };
   }
 

@@ -101,6 +101,66 @@ describe('charger type on charging expenses', () => {
     expect(body.data.rows[1]?.message).toMatch(/Charger type must be one of/);
   });
 
+  test('fuel stats split charging by charger type, with untyped charges as unspecified', async () => {
+    const day = (n: number) => `2024-06-${String(n).padStart(2, '0')}T00:00:00.000Z`;
+    const add = (n: number, kwh: number, amount: number, chargerType: string | null) =>
+      create({
+        ...charge(chargerType),
+        date: day(n),
+        mileage: 1000 + n * 10,
+        volume: kwh,
+        expenseAmount: amount,
+      });
+    await add(1, 30, 6, 'home');
+    await add(2, 30, 6, 'home');
+    await add(3, 20, 8, 'dc_fast');
+    await add(4, 10, 2, null);
+    await create({ ...charge(null, 'Regular'), date: day(5), mileage: 1050, volume: 10 });
+
+    const start = Math.floor(Date.UTC(2024, 0, 1) / 1000);
+    const end = Math.floor(Date.UTC(2025, 0, 1) / 1000);
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/fuel-stats?startDate=${start}&endDate=${end}&timeZone=UTC`
+    );
+    expect(res.status).toBe(200);
+    const body =
+      await json<
+        DataEnvelope<{
+          charging: {
+            byChargerType: {
+              chargerType: string;
+              sessions: number;
+              energy: number;
+              energyShare: number;
+              pricePerEnergyUnit: number | null;
+            }[];
+          };
+        }>
+      >(res);
+    const rows = body.data.charging.byChargerType.map((r) => ({
+      ...r,
+      energyShare: Math.round(r.energyShare * 1000) / 1000,
+    }));
+    expect(rows).toEqual([
+      { chargerType: 'home', sessions: 2, energy: 60, energyShare: 0.667, pricePerEnergyUnit: 0.2 },
+      {
+        chargerType: 'dc_fast',
+        sessions: 1,
+        energy: 20,
+        energyShare: 0.222,
+        pricePerEnergyUnit: 0.4,
+      },
+      {
+        chargerType: 'unspecified',
+        sessions: 1,
+        energy: 10,
+        energyShare: 0.111,
+        pricePerEnergyUnit: 0.2,
+      },
+    ]);
+  });
+
   test('an update can set and clear it, and switching to gas clears it', async () => {
     const row = await create(charge(null));
     const set = await ctx.authed('PUT', `/api/v1/expenses/${row.id}`, { chargerType: 'dc_fast' });
