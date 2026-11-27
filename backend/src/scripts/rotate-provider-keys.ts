@@ -77,9 +77,8 @@ export async function rotateProviderKeys(
 }
 
 if (import.meta.main) {
-  const { getDb } = await import('../db/connection');
-  const { openAsyncDatabase } = await import('../db/async-sqlite');
-  const report = await rotateProviderKeys(openAsyncDatabase(getDb().$client).db);
+  const { appContext } = await import('../app-context');
+  const report = await rotateProviderKeys(appContext().asyncDb);
   console.log(
     `Provider secrets: ${report.rotated} re-encrypted, ${report.unchanged} already on the current key, ${report.empty} with no secret, ${report.failed.length} unreadable.`
   );

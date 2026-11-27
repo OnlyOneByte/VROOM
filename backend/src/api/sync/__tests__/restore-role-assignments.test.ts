@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
 import { appContext } from '../../../app-context';
-import { getDb } from '../../../db/connection';
 import {
   assignServerRole,
   builtInRoleId,
   grantShareRole,
-  syncResolverFor,
+  resolverFor,
 } from '../../../permissions/grants';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -166,12 +165,16 @@ describe('restore re-creates role assignments from restored accepted shares only
     ).toEqual([]);
     expect(ctx.sqlite.query('SELECT id FROM permission_overrides').all()).toEqual([]);
     expect(vehicleRoles('stranger-1')).toEqual([]);
-    const db = getDb();
     expect(
-      syncResolverFor(db, ctx.user.id).can('server.roles.manage', { kind: 'server' }).allow
+      (await resolverFor(ctx.user.id, [{ kind: 'server' }])).can('server.roles.manage', {
+        kind: 'server',
+      }).allow
     ).toBe(false);
     expect(
-      syncResolverFor(db, 'stranger-1').can('vehicle.read', { kind: 'vehicle', vehicleId })
+      (await resolverFor('stranger-1', [{ kind: 'vehicle', vehicleId }])).can('vehicle.read', {
+        kind: 'vehicle',
+        vehicleId,
+      })
     ).toEqual({ allow: false, reason: 'not_found' });
   });
 });

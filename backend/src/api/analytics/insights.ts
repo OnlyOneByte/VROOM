@@ -1,6 +1,5 @@
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
-import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { rawAll, rawJsonValue } from '../../db/dialect';
 import { userPreferences, vehicles } from '../../db/schema';
 import { ELECTRIC_FUEL_TYPES } from '../../db/types';
@@ -217,10 +216,10 @@ export class AnalyticsInsightsRepository {
   private db: AsyncAppDatabase;
 
   constructor(
-    syncDb: AppDatabase,
+    db: AsyncAppDatabase,
     private queries: AnalyticsQueryRepository
   ) {
-    this.db = openAsyncDatabase(syncDb.$client).db;
+    this.db = db;
   }
 
   async insights(userId: string, query: InsightsQuery): Promise<Insight[]> {

@@ -6,7 +6,6 @@ import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { ensureServerAdmin } from '../api/signup/store';
 import { CONFIG } from '../config';
-import { handleDatabaseError, isAppError, isSyncError } from '../errors';
 import { syncBuiltInRoles } from '../permissions/grants';
 import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
@@ -41,24 +40,6 @@ let opened: AppDatabase | null = null;
 export function getDb(): AppDatabase {
   opened ??= openDatabase(CONFIG.database.url);
   return opened;
-}
-
-type AppTransaction = Parameters<AppDatabase['transaction']>[0] extends (tx: infer U) => unknown
-  ? U
-  : never;
-
-// bun:sqlite transactions must use a synchronous callback: an awaited statement autocommits on its own.
-export async function transaction<T>(
-  callback: (tx: AppTransaction) => T | Promise<T>,
-  database: AppDatabase = getDb()
-): Promise<T> {
-  try {
-    return (await database.transaction(callback as Parameters<AppDatabase['transaction']>[0])) as T;
-  } catch (error) {
-    if (isAppError(error) || isSyncError(error)) throw error;
-    logger.error('Transaction failed', { error });
-    throw handleDatabaseError(error);
-  }
 }
 
 export function foldUserEmailCase(database: AppDatabase): void {

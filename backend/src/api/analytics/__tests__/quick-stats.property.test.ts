@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
   createTestDb,
@@ -22,7 +23,7 @@ let repo: AnalyticsRepository;
 
 beforeEach(() => {
   testDb = createTestDb();
-  repo = new AnalyticsRepository(testDb.drizzle);
+  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 });
 
 afterEach(() => {
@@ -44,7 +45,7 @@ describe('Expense sum computation', () => {
         async (targetYear, vehiclesArr) => {
           testDb.sqlite.close();
           testDb = createTestDb();
-          repo = new AnalyticsRepository(testDb.drizzle);
+          repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
           const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
           seedUser(testDb.sqlite, user);
@@ -102,7 +103,7 @@ describe('Vehicle count computation', () => {
       fc.asyncProperty(fc.integer({ min: 0, max: 5 }), async (vehicleCount) => {
         testDb.sqlite.close();
         testDb = createTestDb();
-        repo = new AnalyticsRepository(testDb.drizzle);
+        repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
         const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
         seedUser(testDb.sqlite, user);
@@ -170,7 +171,7 @@ describe('Fleet health score is bounded weighted average', () => {
         async (vehicleCount, withInsurance) => {
           testDb.sqlite.close();
           testDb = createTestDb();
-          repo = new AnalyticsRepository(testDb.drizzle);
+          repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
           const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
           seedUser(testDb.sqlite, user);
@@ -191,7 +192,7 @@ describe('Fleet health score is bounded weighted average', () => {
   test('fleet health score is 0 when user has no vehicles', async () => {
     testDb.sqlite.close();
     testDb = createTestDb();
-    repo = new AnalyticsRepository(testDb.drizzle);
+    repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
     const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
     seedUser(testDb.sqlite, user);
@@ -203,7 +204,7 @@ describe('Fleet health score is bounded weighted average', () => {
   test('a vehicle with NO data scores 38 (default 50/50 + 0 insurance) and is INCLUDED in the fleet mean', async () => {
     testDb.sqlite.close();
     testDb = createTestDb();
-    repo = new AnalyticsRepository(testDb.drizzle);
+    repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
     const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
     seedUser(testDb.sqlite, user);
@@ -234,7 +235,7 @@ describe('YTD spending counts only the year the range ends in', () => {
   test('a trailing 12-month window across Jan 1 sums only the new year', async () => {
     testDb.sqlite.close();
     testDb = createTestDb();
-    repo = new AnalyticsRepository(testDb.drizzle);
+    repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
     seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
     seedVehicle(testDb.sqlite, {
       id: 'veh-1',
@@ -271,7 +272,7 @@ describe('YTD spending counts only the year the range ends in', () => {
   test("the client's local Jan 1 (ytdStart) decides the year at either edge of UTC", async () => {
     testDb.sqlite.close();
     testDb = createTestDb();
-    repo = new AnalyticsRepository(testDb.drizzle);
+    repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
     seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
     seedVehicle(testDb.sqlite, {
       id: 'veh-1',
@@ -347,7 +348,7 @@ describe('fleet health counts insurance only while a covering term is current', 
   test('a current term adds the 25-point insurance share', async () => {
     testDb.sqlite.close();
     testDb = createTestDb();
-    repo = new AnalyticsRepository(testDb.drizzle);
+    repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
     seedCoveredVehicle(Date.now() - 30 * DAY_MS, Date.now() + 150 * DAY_MS);
 
     const result = await repo.getQuickStats('user-1', yearToRange(2024));
@@ -357,7 +358,7 @@ describe('fleet health counts insurance only while a covering term is current', 
   test('an expired term on a policy still flagged active adds nothing', async () => {
     testDb.sqlite.close();
     testDb = createTestDb();
-    repo = new AnalyticsRepository(testDb.drizzle);
+    repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
     seedCoveredVehicle(Date.UTC(2024, 0, 1), Date.UTC(2024, 5, 30));
 
     const result = await repo.getQuickStats('user-1', yearToRange(2024));

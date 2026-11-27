@@ -137,25 +137,23 @@ Two alternatives were rejected:
 On Postgres (#1635) the same `transaction(async (tx) => …)` signature maps onto the driver's
 own pooled transaction, so call sites won't change again.
 
-**Moving the app across (#1378).** `appContext().asyncDb` is the async session over the same
-connection as `appContext().db`, and repositories move to it area by area. The settings,
-auth-provider, photo-ref, insurance-claim, financing, push, vehicle, trip, share, expense,
-odometer and reminder repositories are on it so far, and so are analytics, community stats, insurance policies,
-photos, drivers, the calendar feed, the settings and providers routes, provider resolution,
-the storage provider registry and Lucia's session adapter. Since part C1, so are the
-grants, roles, sign-up, share and driver transactions, the auth sign-up and unlink
-transactions, and the boot-time role sync and first-admin check. Since C2, so are the expense,
-split-expense, trip, odometer, reminder-trigger and financing transactions.
-`BaseRepository`'s shared methods run on it for every subclass.
+**One database handle (#1378).** All app code queries through the async session,
+`appContext().asyncDb`, directly or through a repository, and every transaction runs on it.
+Only `src/db/` holds the synchronous `bun:sqlite` handle: `getDb()` opens the connection,
+migrations and the boot-time email fold run on it before the async session is used, and
+connection upkeep runs through `upkeep(kind)`. `src/__tests__/sync-db-boundary.test.ts` fails
+when a production file outside `src/db/` imports the sync driver or a `bun:sqlite` value, names
+`AppDatabase`, calls `getDb()` or reads `$client` (the context factory excepted), or takes a
+`db` off the app context. Tests may still open their own sync handle for fixtures.
 
-Every repository, every transaction, the key-rotation script and sample and demo seeding run
-on the async session. Key rotation reads each batch and decrypts it before its write
-transaction opens, then writes with a compare-and-set on the old ciphertext; a demo or sample
-garage is seeded in one transaction, so a failed seed leaves none of it. The analytics
-repositories already query through the async session; only their constructors still take the
-sync handle, until C5. Inside a transaction callback, use the transaction handle `tx`; outside it, use the
-async session. Insurance writes check vehicle ownership inside the transaction that writes,
-and a currency change rescales the owner's money and saves the new currency in one transaction.
+Inside a transaction callback, use the transaction handle `tx`; outside it, use the async
+session. Key rotation reads each batch and decrypts it before its write transaction opens, then
+writes with a compare-and-set on the old ciphertext. A demo or sample garage is seeded in one
+transaction, so a failed seed leaves none of it. Insurance writes check vehicle ownership inside
+the transaction that writes, and a currency change rescales the owner's money and saves the new
+currency in one transaction. A money write re-checks the owner's money scale inside the
+transaction that saves it (`preferences.writeAtScale`), and refuses with a 409 if a currency
+change committed after the request converted its amounts.
 
 A read that gates a write runs inside the async transaction that does the write. An async
 transaction opens with `BEGIN IMMEDIATE` and the session queues every other writer behind it,
@@ -208,11 +206,6 @@ async too, and the provider create and photo backfill transactions run on the as
 Restore runs its wipe and inserts in one async transaction (see
 `docs/conventions/BackupRestore.md`).
 
-What part C still has to move (C5): the sync `AppDatabase` and `syncDb` themselves, the
-analytics constructors' sync parameter, `syncResolverFor` and the tests that still use the sync
-handle.
-Connection upkeep in `src/db/connection.ts` stays sync by design.
-
 **Permissions load, then check.** A request's resolver reads its grants on the async session
 before anything is decided. `authorize()` calls `loadResolver(c, resources)` for the resources
 it checks, and `requestResolver(c)` then hands out that same resolver, whose `can()` and
@@ -226,17 +219,15 @@ request to every route in the permission route map as the owner, an editor, a vi
 stranger, and fails on any `ScopeNotLoadedError`. Its requests carry a placeholder id and a
 minimal body, so they reach `authorize()` and the code before validation; checks deeper in a
 handler are covered by that route's own tests, which fail on the same 500. The 500 response
-carries a generic message, and the unloaded scope goes only to the server log. No production
-code uses the synchronous resolver, `syncResolverFor`, any more; tests still use it until C5
-removes it.
+carries a generic message, and the unloaded scope goes only to the server log.
 
-One ordering rule holds the migration together: sync queries must be gone before the first
-async transaction ships, because a sync query issued while an async transaction is open runs
-inside it. The async module enforces this. It wraps the connection's `prepare`, `query`, `run`, `exec` and `transaction`, and any call that doesn't
+A sync query issued while an async transaction is open would run inside it, so the async module
+refuses one. It wraps the connection's `prepare`, `query`, `run`, `exec` and `transaction`, and any call that doesn't
 come from the async session while an async transaction is open throws
 `SyncQueryInAsyncTransactionError`. The guard can't see a statement prepared before the
 transaction opened and run during it, so sync code must not hold prepared statements
-(`sqlite.prepare`, Drizzle's `.prepare()`). Nothing in the app does today.
+(`sqlite.prepare`, Drizzle's `.prepare()`). Outside `src/db/` nothing can, since no app code
+holds the sync handle.
 
 Connection upkeep in `src/db/connection.ts` stays sync by design. The health check's
 `SELECT 1` and the two WAL checkpoints run through `upkeep(kind)`, a fixed list of three

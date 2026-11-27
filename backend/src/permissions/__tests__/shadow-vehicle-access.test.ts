@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { getDb } from '../../db/connection';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../test-helpers/http-client';
 import { createInvitee } from '../../test-helpers/invitee';
 import { seedVehicle } from '../../test-helpers/seed';
@@ -9,7 +8,7 @@ import {
   resolveVehicleAccess,
   type VehicleAccessMode,
 } from '../../utils/vehicle-access';
-import { syncResolverFor } from '../grants';
+import { resolverFor } from '../grants';
 import { PERMISSION_REGISTRY } from '../registry';
 
 const TODAY_MODE: Record<string, VehicleAccessMode> = {
@@ -126,7 +125,7 @@ describe('shadow mode: the resolver agrees with utils/vehicle-access.ts for the 
     const differences: { role: string; permission: string; today: boolean }[] = [];
     for (const [role, userId] of Object.entries(people)) {
       const access = await resolveVehicleAccess(vehicleId, userId);
-      const resolver = syncResolverFor(getDb(), userId);
+      const resolver = await resolverFor(userId, [{ kind: 'vehicle', vehicleId }]);
       for (const permission of VEHICLE_PERMISSIONS) {
         const today = allowsMode(access, TODAY_MODE[permission] ?? 'owner');
         if (resolver.can(permission, { kind: 'vehicle', vehicleId }).allow !== today) {
@@ -144,7 +143,8 @@ describe('shadow mode: the resolver agrees with utils/vehicle-access.ts for the 
   });
 
   test('a stranger is not found by either', async () => {
-    const decision = syncResolverFor(getDb(), people.stranger ?? '').can('vehicle.read', {
+    const stranger = await resolverFor(people.stranger ?? '', [{ kind: 'vehicle', vehicleId }]);
+    const decision = stranger.can('vehicle.read', {
       kind: 'vehicle',
       vehicleId,
     });
