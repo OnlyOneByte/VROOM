@@ -123,6 +123,20 @@ function tickLabelWidth(label: string): number {
 	return width;
 }
 
+export function edgeTextAnchor(
+	x: unknown,
+	label: unknown,
+	plotWidth: number,
+	padding: { left: number; right: number }
+): 'start' | 'middle' | 'end' {
+	const at = Number(x);
+	if (!Number.isFinite(at) || plotWidth <= 0) return 'middle';
+	const half = tickLabelWidth(String(label ?? '')) / 2;
+	if (at + half > plotWidth + padding.right) return 'end';
+	if (at - half < -padding.left) return 'start';
+	return 'middle';
+}
+
 function labelsFit(ticks: Date[], scale: AnyScale, format: (_v: unknown) => string): boolean {
 	const widths = ticks.map(tick => tickLabelWidth(format(tick)));
 	return ticks.every((tick, i) => {

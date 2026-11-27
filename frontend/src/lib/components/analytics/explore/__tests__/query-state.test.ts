@@ -29,7 +29,8 @@ import {
 	numbersCsv,
 	numbersTable,
 	percentChange,
-	seriesFor
+	seriesFor,
+	weeksNeedYear
 } from '../explore-data';
 
 const params = (query: string) => new URLSearchParams(query);
@@ -132,6 +133,19 @@ describe('Explore chart data', () => {
 		expect(bucketLabel('2025-Q3', 'quarter')).toBe('Q3 2025');
 		expect(bucketLabel('2025', 'year')).toBe('2025');
 		expect(bucketLabel('total', 'none')).toBe('Whole range');
+	});
+
+	test('week labels carry the year once the range is longer than a year, so none repeat', () => {
+		expect(bucketLabel('2025-01-01', 'week')).toBe('Jan 1');
+		expect(bucketLabel('2025-01-01', 'week', true)).toBe('Jan 1 ’25');
+		expect(bucketLabel('2025-03', 'month', true)).toBe('Mar ’25');
+		expect(weeksNeedYear('week', 52)).toBe(false);
+		expect(weeksNeedYear('week', 53)).toBe(true);
+		expect(weeksNeedYear('month', 104)).toBe(false);
+
+		const ticks = ['2025-01-01', '2025-07-01', '2026-01-01', '2026-07-01'];
+		const labels = ticks.map(t => bucketLabel(t, 'week', weeksNeedYear('week', 104)));
+		expect(new Set(labels).size).toBe(ticks.length);
 	});
 
 	const response = {

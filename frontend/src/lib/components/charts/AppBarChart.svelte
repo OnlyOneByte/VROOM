@@ -15,7 +15,8 @@
 		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
-	import type { ChartState } from 'layerchart';
+	import type { ChartState, TextProps } from 'layerchart';
+	import EdgeTickLabel from './EdgeTickLabel.svelte';
 	import { buildChartA11y, type ChartSelectHandler } from './chart-a11y.ts';
 	import type { ChartAnnotations } from './types.ts';
 	import { columnWidth } from './bar-columns.ts';
@@ -209,6 +210,10 @@
 	);
 </script>
 
+{#snippet edgeTickLabel({ props }: { props: TextProps })}
+	<EdgeTickLabel {props} />
+{/snippet}
+
 <ChartCard
 	{title}
 	{level}
@@ -255,7 +260,9 @@
 							...barSize
 						},
 						...barProps,
-						xAxis: resolvedXAxisProps,
+						xAxis: vertical
+							? { ...resolvedXAxisProps, tickLabel: edgeTickLabel }
+							: resolvedXAxisProps,
 						yAxis: {
 							format: yAxisFormat,
 							...(orientation === 'vertical' && { ticks: yTicks })

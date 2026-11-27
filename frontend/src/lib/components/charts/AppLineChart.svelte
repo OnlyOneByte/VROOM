@@ -20,7 +20,8 @@
 		isolatedValueRows
 	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
-	import type { ChartState } from 'layerchart';
+	import type { ChartState, TextProps } from 'layerchart';
+	import EdgeTickLabel from './EdgeTickLabel.svelte';
 	import { buildChartA11y, type ChartSelectHandler } from './chart-a11y.ts';
 	import type { ChartAnnotations } from './types.ts';
 	import { guideTicks } from './guides.ts';
@@ -154,6 +155,10 @@
 	let isolatedValues = $derived(series.flatMap(s => isolatedValueRows(s.data ?? data, [s.key])));
 </script>
 
+{#snippet edgeTickLabel({ props }: { props: TextProps })}
+	<EdgeTickLabel {props} />
+{/snippet}
+
 {#snippet bandMarks()}
 	{#if band}
 		{@const { from, to } = band}
@@ -215,7 +220,11 @@
 					props={{
 						...trendProps,
 						...lineProps,
-						xAxis: { ...resolvedXAxisProps, ticks: insetTimeTicks(resolvedXAxisProps['ticks']) },
+						xAxis: {
+							...resolvedXAxisProps,
+							ticks: insetTimeTicks(resolvedXAxisProps['ticks']),
+							tickLabel: edgeTickLabel
+						},
 						yAxis: { format: yAxisFormat, ticks: yTicks },
 						grid: { yTicks }
 					}}

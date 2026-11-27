@@ -36,13 +36,21 @@ export function bucketDate(key: string): Date {
 	return new Date(y, m - 1, d);
 }
 
-export function bucketLabel(key: string, per: AnalyticsQueryInterval): string {
+export function bucketLabel(key: string, per: AnalyticsQueryInterval, withYear = false): string {
 	if (per === 'none') return 'Whole range';
 	if (per === 'year') return key;
 	if (per === 'quarter') return key.replace(/^(\d{4})-Q(\d)$/, 'Q$2 $1');
 	const date = bucketDate(key);
-	if (per === 'week') return formatDateWith(date, { month: 'short', day: 'numeric' });
-	return `${formatDateWith(date, { month: 'short' })} ’${String(date.getFullYear()).slice(2)}`;
+	const year = `’${String(date.getFullYear()).slice(2)}`;
+	if (per === 'week') {
+		const day = formatDateWith(date, { month: 'short', day: 'numeric' });
+		return withYear ? `${day} ${year}` : day;
+	}
+	return `${formatDateWith(date, { month: 'short' })} ${year}`;
+}
+
+export function weeksNeedYear(per: AnalyticsQueryInterval, bucketCount: number): boolean {
+	return per === 'week' && bucketCount > 52;
 }
 
 export function seriesFor(

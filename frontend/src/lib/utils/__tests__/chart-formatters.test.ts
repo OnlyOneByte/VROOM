@@ -20,9 +20,32 @@ import {
 	getXTickCount,
 	monthlyXAxisProps,
 	parseMonthToDate,
-	TIME_X_PADDING
+	TIME_X_PADDING,
+	edgeTextAnchor
 } from '#lib/utils/chart-formatters.ts';
 import { formatNumber } from '#lib/utils/formatters.ts';
+
+describe('edgeTextAnchor (x labels at the plot edges stay inside the chart)', () => {
+	const padding = { left: 48, right: 4 };
+
+	test('a label centred on the right edge is end-aligned, so it is not cut off', () => {
+		expect(edgeTextAnchor(241, 'Nov ’26', 241, padding)).toBe('end');
+	});
+
+	test('a label that sticks out past the left edge is start-aligned', () => {
+		expect(edgeTextAnchor(-46, 'Jan 1 ’25', 241, padding)).toBe('start');
+	});
+
+	test('labels with room on both sides stay centred', () => {
+		expect(edgeTextAnchor(120, 'Nov ’26', 241, padding)).toBe('middle');
+		expect(edgeTextAnchor(0, 'Aug ’26', 241, padding)).toBe('middle');
+	});
+
+	test('before the chart has a size, labels stay centred', () => {
+		expect(edgeTextAnchor(10, 'Nov ’26', 0, padding)).toBe('middle');
+		expect(edgeTextAnchor(undefined, 'Nov ’26', 241, padding)).toBe('middle');
+	});
+});
 
 describe('chart money axis formatters', () => {
 	test('formatCurrencyAxis renders compact currency with no decimals', () => {
