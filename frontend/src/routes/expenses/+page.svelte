@@ -55,7 +55,7 @@
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { forgetRecentlySynced, recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
-	import { editedRows, movedBackRows, stillInView } from '#lib/utils/pending-edits.svelte.ts';
+	import { movedBackRows, stillInView, summaryEdits } from '#lib/utils/pending-edits.svelte.ts';
 	import FilterPills from '#lib/components/expenses/FilterPills.svelte';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
@@ -156,13 +156,31 @@
 				)
 			: []
 	);
-	let movedBackCounted = $derived(movedBackRows(listedExpenseIds, backInView, summaryRequestedAt));
-	let edited = $derived.by(() => {
-		const rows = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
-		return { before: rows.before, after: [...rows.after.filter(inView), ...movedBackCounted] };
-	});
+	const editsFor = (
+		requestedAt: number | undefined,
+		counted: typeof backInView,
+		unknown: typeof backInView = () => false
+	) => {
+		const edits = summaryEdits(requestedAt, expenses);
+		const kept = edits.before.flatMap((was, i) => {
+			const now = edits.after[i];
+			return now && !unknown(was) ? [{ was, now }] : [];
+		});
+		return {
+			before: kept.map(({ was }) => was).filter(counted),
+			after: kept.map(({ now }) => now).filter(counted)
+		};
+	};
+	const searchUnknown = (row: Expense) =>
+		!!searchTerm.trim() &&
+		backInView(row) &&
+		!listedExpenseIds.has(row.id) &&
+		!matchesFilters(row, { search: searchTerm });
+	const onSummaryCar = (row: Expense) =>
+		!isDeleteHidden(row) && (!selectedVehicleId || row.vehicleId === selectedVehicleId);
 	let shownSummary = $derived.by(() => {
 		const now = Date.now();
+		const edited = editsFor(summaryRequestedAt, onSummaryCar);
 		const withQueued = withPendingInSummary(summary, pending.saving, now);
 		const withoutRemoved = withPendingInSummary(
 			withQueued,
@@ -332,9 +350,11 @@
 	const nextSummaryRequest = latest();
 	const nextMonthTotalsRequest = latest();
 	let monthTotals = $state<ReadonlyMap<string, number>>(new Map());
+	let monthTotalsRequestedAt = $state<number | undefined>();
 
 	async function loadMonthTotals(keepShown = false) {
 		const isCurrent = nextMonthTotalsRequest();
+		const requestedAt = Date.now();
 		if (!keepShown) monthTotals = new Map();
 		const {
 			limit: _limit,
@@ -345,7 +365,10 @@
 		} = buildListParams(0);
 		try {
 			const months = await expenseApi.getMonthlyTotals(filters);
-			if (isCurrent()) monthTotals = new Map(months.map(m => [m.month, m.amount]));
+			if (isCurrent()) {
+				monthTotals = new Map(months.map(m => [m.month, m.amount]));
+				monthTotalsRequestedAt = requestedAt;
+			}
 		} catch (error) {
 			if (!isCurrent()) return;
 			monthTotals = new Map();
@@ -589,6 +612,7 @@
 
 	let vehicleById = $derived(new Map(vehicles.map(v => [v.id, v])));
 	let shownMonthTotals = $derived.by(() => {
+		const edited = editsFor(monthTotalsRequestedAt, backInView, searchUnknown);
 		const withQueued = withPendingByMonth(
 			monthTotals,
 			pending.saving.filter(row => matchesFilters(row, pendingFilters))
