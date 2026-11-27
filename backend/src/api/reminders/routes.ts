@@ -26,7 +26,8 @@ import { readJsonBody } from '../../utils/request-body';
 import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import {
-  FINANCIAL_READS,
+  financialAccessOf,
+  isFinancialCategory,
   isFinancialExpense,
   requireVehicleAccess,
   requireVehiclesAccess,
@@ -133,6 +134,29 @@ const fromReminderReadable: ResourceOf = async (c) => {
   const readable = all.filter((r) => resolver.can('vehicle.reminder.read', r).allow);
   return readable.length > 0 ? readable : all.slice(0, 1);
 };
+
+type ReminderScope = {
+  reminder: { userId: string; expenseCategory?: string | null };
+  vehicleIds: readonly string[];
+};
+
+async function mayTouchFinancialReminder(
+  c: Context,
+  existing: ReminderScope,
+  mode: 'read' | 'write'
+): Promise<boolean> {
+  if (!isFinancialCategory(existing.reminder.expenseCategory)) return true;
+  if (existing.reminder.userId === c.get('user').id) return true;
+  const resolver = await loadResolver(c, vehicleResources(existing.vehicleIds));
+  return (
+    existing.vehicleIds.length > 0 &&
+    existing.vehicleIds.every((vehicleId) => financialAccessOf(resolver, vehicleId)[mode])
+  );
+}
+
+async function assertMayWriteReminder(c: Context, existing: ReminderScope): Promise<void> {
+  if (!(await mayTouchFinancialReminder(c, existing, 'write'))) throw new NotFoundError('Reminder');
+}
 
 async function visibleVehicleIds(c: Context, vehicleIds: readonly string[]): Promise<string[]> {
   const resolver = await loadResolver(c, vehicleResources(vehicleIds));
@@ -309,6 +333,7 @@ routes.post(
     if (!existing) throw new NotFoundError('Reminder');
     const { reminder, vehicleIds } = existing;
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
+    await assertMayWriteReminder(c, existing);
 
     const fields: { lastServiceOdometer?: number; nextDueOdometer?: number; nextDueDate?: Date } =
       {};
@@ -379,6 +404,10 @@ routes.post(
 
     const { vehicleIds, timeZone: _createTimeZone, ...reminderData } = data;
     const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
+    await assertMayWriteReminder(c, {
+      reminder: { userId: ownerId, expenseCategory: reminderData.expenseCategory },
+      vehicleIds,
+    });
     const mileage = await resolveMileageFields(reminderData, vehicleIds, ownerId);
     const scale = await repos().preferences.moneyScale(ownerId);
     const result = await repos().preferences.writeAtScale(ownerId, scale, () =>
@@ -429,8 +458,9 @@ routes.get('/', authorize(fromQueryVehicle), async (c) => {
           reminders.map(async (row) => ({
             ...row,
             vehicleIds: await visibleVehicleIds(c, row.vehicleIds),
+            seen: await mayTouchFinancialReminder(c, row, 'read'),
           }))
-        );
+        ).then((rows) => rows.filter((row) => row.seen).map(({ seen: _seen, ...row }) => row));
   const scale = await repos().preferences.moneyScale(listUserId);
   return c.json({ success: true, data: visible.map((r) => reminderWithVehiclesToApi(r, scale)) });
 });
@@ -455,8 +485,7 @@ routes.get(
     const readable = materialized.filter((expense) => {
       const vehicle = vehicleResource(expense.vehicleId);
       if (!resolver.can('vehicle.expense.read', vehicle).allow) return false;
-      const seesFinancial = FINANCIAL_READS.every((p) => resolver.can(p, vehicle).allow);
-      return seesFinancial || !isFinancialExpense(expense);
+      return financialAccessOf(resolver, expense.vehicleId).read || !isFinancialExpense(expense);
     });
     const scale = await repos().preferences.moneyScale(existing.reminder.userId);
     return c.json({
@@ -480,6 +509,7 @@ routes.put(
     const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
+    await assertMayWriteReminder(c, existing);
     const scale = await repos().preferences.moneyScale(ownerId);
     const partialUpdate = reminderFromApi(
       keepStoredDatesOnSameDay(c.req.valid('json'), existing.reminder),
@@ -507,6 +537,7 @@ routes.put(
       ...partialUpdate,
       vehicleIds: partialUpdate.vehicleIds ?? existing.vehicleIds,
     };
+    await assertMayWriteReminder(c, { reminder: merged, vehicleIds: merged.vehicleIds });
 
     assertMergedReminderValid(merged, partialUpdate);
 
@@ -556,6 +587,7 @@ routes.delete(
     const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
+    await assertMayWriteReminder(c, existing);
 
     // clearSource must run before the delete: a dangling sourceId fails backup validation on restore.
     await repos().expenses.clearSource('reminder', id, ownerId);
