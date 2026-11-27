@@ -28,28 +28,60 @@
 
 	const MARKER_SPACING = 24;
 	const GROUP_HALF_WIDTH = 12;
+	const PILL_GAP = 2;
+
+	type Group = { start: number; end: number; x: number; members: number[]; services: number };
+
+	function pillWidth(g: Group): number {
+		return g.members.length === 1 ? 12 : Math.max(16, 7 * String(g.services).length + 8);
+	}
 
 	let groups = $derived.by(() => {
 		const placed = markers
 			.map((marker, index) => ({ index, x: left(marker.at) }))
 			.filter((p): p is { index: number; x: number } => p.x !== null)
 			.sort((a, b) => a.x - b.x);
-		const out: Array<{ start: number; x: number; members: number[]; services: number }> = [];
+		const runs: Group[] = [];
 		for (const p of placed) {
 			const services = markers[p.index]?.rows?.length ?? 1;
-			const last = out.at(-1);
+			const last = runs.at(-1);
 			if (last && p.x - last.x < MARKER_SPACING) {
 				last.members.push(p.index);
 				last.services += services;
+				last.end = p.x;
 				last.x = (last.start + p.x) / 2;
 			} else {
-				out.push({ start: p.x, x: p.x, members: [p.index], services });
+				runs.push({ start: p.x, end: p.x, x: p.x, members: [p.index], services });
 			}
 		}
-		const edge = laneWidth > 0 ? laneWidth - GROUP_HALF_WIDTH : Infinity;
-		return out.map(g =>
-			g.members.length > 1 ? { ...g, x: Math.min(Math.max(g.x, GROUP_HALF_WIDTH), edge) } : g
-		);
+		const place = (g: Group): Group => {
+			const mid = (g.start + g.end) / 2;
+			if (g.members.length === 1) return { ...g, x: mid };
+			const half = Math.max(GROUP_HALF_WIDTH, pillWidth(g) / 2 + 2);
+			const edge = laneWidth > 0 ? laneWidth - half : Infinity;
+			return { ...g, x: Math.min(Math.max(mid, half), edge) };
+		};
+		const out: Group[] = [];
+		for (const run of runs) {
+			let g = place(run);
+			let prev = out.at(-1);
+			while (
+				prev &&
+				g.x - prev.x < Math.max(MARKER_SPACING, (pillWidth(prev) + pillWidth(g)) / 2 + PILL_GAP)
+			) {
+				out.pop();
+				g = place({
+					start: prev.start,
+					end: g.end,
+					x: 0,
+					members: [...prev.members, ...g.members],
+					services: prev.services + g.services
+				});
+				prev = out.at(-1);
+			}
+			out.push(g);
+		}
+		return out;
 	});
 	let activeGroup = $derived(
 		active === null ? undefined : groups.find(g => g.members.includes(active as number))
@@ -153,6 +185,7 @@
 					<div class={index === active ? 'font-medium' : ''}>
 						<span class="text-muted-foreground">{annotations.formatAt(marker.at)}:</span>
 						{marker.label}
+						{#if marker.detail}<div class="truncate font-normal">{marker.detail}</div>{/if}
 					</div>
 				{/if}
 			{/each}
