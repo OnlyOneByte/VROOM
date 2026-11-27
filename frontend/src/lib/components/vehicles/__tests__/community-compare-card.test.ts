@@ -22,6 +22,14 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 vi.mock('#lib/stores/app.svelte.ts', () => ({
 	appStore: { showError: (message: string) => showError(message) }
 }));
+const authState = { demo: false };
+vi.mock('#lib/stores/auth.svelte.ts', () => ({
+	authStore: {
+		get user() {
+			return { id: 'u1', demo: authState.demo };
+		}
+	}
+}));
 vi.mock('#lib/stores/settings.svelte.ts', () => ({
 	settingsStore: {
 		get settings() {
@@ -91,6 +99,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	localStorage.clear();
 	settingsState.mode = 'local';
+	authState.demo = false;
 });
 
 afterEach(() => {
@@ -150,6 +159,16 @@ describe('CommunityCompareCard', () => {
 			'/settings#community-comparisons'
 		);
 		expect(screen.queryByText(/owners ·|about \d+ owners/)).toBeNull();
+	});
+
+	test('a demo visitor sees what the card does but gets no opt-in link they cannot use', async () => {
+		authState.demo = true;
+		compare.mockResolvedValue(all('opt_in_required'));
+		await mount();
+		expect(
+			screen.getByText('See how your Civic EX compares with other owners on this server.')
+		).toBeInTheDocument();
+		expect(screen.queryByRole('link', { name: 'Turn on community stats' })).toBeNull();
 	});
 
 	test('a user whose opt-in is not in a refresh yet is told to wait, with no numbers', async () => {
