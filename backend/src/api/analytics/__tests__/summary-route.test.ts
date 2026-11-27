@@ -48,6 +48,8 @@ const MOCK_SUMMARY: AnalyticsSummaryData = {
     distance: { totalDistance: 8500, avgPerDay: 23.3, avgPerMonth: 708.3 },
     monthlyConsumption: [],
     gasPriceHistory: [],
+    fillupsByVehicle: [],
+    chargingByVehicle: [],
     fillupCostByVehicle: [],
     odometerProgression: [],
     costPerDistance: [],
