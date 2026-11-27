@@ -357,6 +357,13 @@ export interface AnalyticsQueryResponse extends AnalyticsQueryPeriod {
 	}>;
 	annotationsTruncated?: boolean;
 	trips?: { count: number[]; distance: number[] };
+	coverage?: AnalyticsQueryCoverage;
+}
+
+export interface AnalyticsQueryCoverage {
+	vehicleIds: string[];
+	otherCurrency: Array<{ vehicleId: string; currency: string }>;
+	unavailable: number;
 }
 
 export interface AnalyticsBucketItemsParams {
@@ -385,6 +392,7 @@ export interface AnalyticsBucketItems {
 	}>;
 	others: { total: number; count: number } | null;
 	categories: string[];
+	coverage?: AnalyticsQueryCoverage;
 }
 
 export interface AnalyticsInsight {

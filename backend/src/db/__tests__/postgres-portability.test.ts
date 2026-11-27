@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
 import { appendFileSync } from 'node:fs';
-import { PGlite } from '@electric-sql/pglite';
+import type { PGlite } from '@electric-sql/pglite';
 import { getTableColumns, getTableName, is, type SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { SQLiteTable } from 'drizzle-orm/sqlite-core';
@@ -19,6 +19,7 @@ import { openAsyncDatabase } from '../async-sqlite';
 import { getDb } from '../connection';
 import * as schema from '../schema';
 import { seedGarage } from '../seed';
+import { startPglite } from './start-pglite';
 
 const db = getDb();
 
@@ -201,15 +202,22 @@ async function captureWorkload(userId: string): Promise<Captured[]> {
   return out;
 }
 
+function writeSummary(text: string): void {
+  console.log(text);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${text}\n`);
+}
+
 describe.skipIf(!ENABLED)('raw SQL runs the same on Postgres', () => {
   test('every captured query returns the same rows, or is a listed expected failure', async () => {
+    const pg = await startPglite(undefined, (attempt, error) =>
+      writeSummary(`- PGlite startup attempt ${attempt} crashed and was retried (#1931): ${error}`)
+    );
     const ctx = await createTestApp();
     await seedGarage(ctx.user.id);
     const captured = await captureWorkload(ctx.user.id);
     expect(captured.length).toBeGreaterThan(30);
     expect(captured.some((c) => c.rows.length > 0)).toBe(true);
 
-    const pg = new PGlite();
     await mirrorIntoPostgres(pg);
     const dialect = new PgDialect();
     const failures = new Map<string, string>();
@@ -238,9 +246,7 @@ describe.skipIf(!ENABLED)('raw SQL runs the same on Postgres', () => {
       '',
       ...[...failures].map(([label, why]) => `- \`${label}\`: ${why}`),
     ].join('\n');
-    console.log(summary);
-    if (process.env.GITHUB_STEP_SUMMARY)
-      appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+    writeSummary(summary);
 
     const unexpected = [...failures]
       .filter(([label, why]) => {

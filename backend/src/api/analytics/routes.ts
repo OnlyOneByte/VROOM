@@ -221,14 +221,37 @@ const bucketItemsSchema = z
 
 const fromVehicleQuery: ResourceOf = (c) => vehicleOrOwnAccount(c.req.query('vehicleId'), c);
 
-async function queryScope(userId: string, vehicleIds?: string[]): Promise<ReadableVehicle[]> {
-  if (vehicleIds && vehicleIds.length === 0) return [];
+interface QueryCoverage {
+  vehicleIds: string[];
+  otherCurrency: Array<{ vehicleId: string; currency: string }>;
+  unavailable: number;
+}
+
+async function queryScope(
+  userId: string,
+  vehicleIds?: string[]
+): Promise<{ scope: ReadableVehicle[]; coverage: QueryCoverage }> {
+  if (vehicleIds && vehicleIds.length === 0) {
+    return { scope: [], coverage: { vehicleIds: [], otherCurrency: [], unavailable: 0 } };
+  }
   const readable = await readableVehicles(userId, vehicleIds);
   const currencyOf = await repos().preferences.currencies([
     userId,
     ...readable.map((v) => v.ownerId),
   ]);
-  return readable.filter((v) => currencyOf(v.ownerId) === currencyOf(userId));
+  const scope = readable.filter((v) => currencyOf(v.ownerId) === currencyOf(userId));
+  const otherCurrency = readable
+    .filter((v) => currencyOf(v.ownerId) !== currencyOf(userId))
+    .map((v) => ({ vehicleId: v.vehicleId, currency: currencyOf(v.ownerId) }));
+  const asked = new Set(vehicleIds ?? []);
+  return {
+    scope,
+    coverage: {
+      vehicleIds: scope.map((v) => v.vehicleId),
+      otherCurrency,
+      unavailable: asked.size === 0 ? 0 : asked.size - readable.length,
+    },
+  };
 }
 
 routes.use('*', requireAuth);
@@ -240,11 +263,14 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const query = c.req.valid('query');
-    const scope = await queryScope(user.id, query.vehicleIds);
+    const { scope, coverage } = await queryScope(user.id, query.vehicleIds);
     const data = await repos().analyticsQuery.items(user.id, query, scope);
     return c.json({
       success: true,
-      data: bucketItemsToApi(data, await repos().preferences.moneyScale(user.id)),
+      data: {
+        ...bucketItemsToApi(data, await repos().preferences.moneyScale(user.id)),
+        coverage,
+      },
     });
   }
 );
@@ -273,11 +299,14 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const query = c.req.valid('query');
-    const scope = await queryScope(user.id, query.vehicleIds);
+    const { scope, coverage } = await queryScope(user.id, query.vehicleIds);
     const data = await repos().analyticsQuery.query(user.id, query, scope);
     return c.json({
       success: true,
-      data: analyticsQueryToApi(data, await repos().preferences.moneyScale(user.id)),
+      data: {
+        ...analyticsQueryToApi(data, await repos().preferences.moneyScale(user.id)),
+        coverage,
+      },
     });
   }
 );
@@ -289,17 +318,21 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { startDate, endDate, ytdStart, timeZone, vehicleIds } = c.req.valid('query');
+    const { scope, coverage } = await queryScope(user.id, vehicleIds);
     const data = await repos().analytics.getSummary(
       user.id,
       { start: startDate, end: endDate },
       ytdStart,
       timeZone,
       vehicleIds,
-      await queryScope(user.id, vehicleIds)
+      scope
     );
     return c.json({
       success: true,
-      data: analyticsSummaryToApi(data, await repos().preferences.moneyScale(user.id)),
+      data: {
+        ...analyticsSummaryToApi(data, await repos().preferences.moneyScale(user.id)),
+        coverage,
+      },
     });
   }
 );
@@ -356,16 +389,20 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { startDate, endDate, timeZone, vehicleIds } = c.req.valid('query');
+    const { scope, coverage } = await queryScope(user.id, vehicleIds);
     const data = await repos().analytics.getCrossVehicle(
       user.id,
       { start: startDate, end: endDate },
       timeZone,
       vehicleIds,
-      await queryScope(user.id, vehicleIds)
+      scope
     );
     return c.json({
       success: true,
-      data: crossVehicleToApi(data, await repos().preferences.moneyScale(user.id)),
+      data: {
+        ...crossVehicleToApi(data, await repos().preferences.moneyScale(user.id)),
+        coverage,
+      },
     });
   }
 );
@@ -377,15 +414,14 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { timeZone, vehicleIds } = c.req.valid('query');
-    const data = await repos().analytics.getFinancing(
-      user.id,
-      timeZone,
-      vehicleIds,
-      await queryScope(user.id, vehicleIds)
-    );
+    const { scope, coverage } = await queryScope(user.id, vehicleIds);
+    const data = await repos().analytics.getFinancing(user.id, timeZone, vehicleIds, scope);
     return c.json({
       success: true,
-      data: financingToApi(data, await repos().preferences.moneyScale(user.id)),
+      data: {
+        ...financingToApi(data, await repos().preferences.moneyScale(user.id)),
+        coverage,
+      },
     });
   }
 );
@@ -397,15 +433,14 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { timeZone, vehicleIds } = c.req.valid('query');
-    const data = await repos().analytics.getInsurance(
-      user.id,
-      timeZone,
-      vehicleIds,
-      await queryScope(user.id, vehicleIds)
-    );
+    const { scope, coverage } = await queryScope(user.id, vehicleIds);
+    const data = await repos().analytics.getInsurance(user.id, timeZone, vehicleIds, scope);
     return c.json({
       success: true,
-      data: insuranceToApi(data, await repos().preferences.moneyScale(user.id)),
+      data: {
+        ...insuranceToApi(data, await repos().preferences.moneyScale(user.id)),
+        coverage,
+      },
     });
   }
 );

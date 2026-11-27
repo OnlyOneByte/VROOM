@@ -103,6 +103,19 @@ describe('summary and Cross-vehicle cover cars shared with you, as each share al
       [ctx.user.id]
     );
     expect(costs(await cross(viewer.request))).toEqual({});
+
+    for (const path of [
+      `/api/v1/analytics/summary?${RANGE}`,
+      `/api/v1/analytics/cross-vehicle?${RANGE}`,
+      '/api/v1/analytics/financing',
+      '/api/v1/analytics/insurance',
+    ]) {
+      const res = await viewer.request('GET', path);
+      const body = await json<DataEnvelope<{ coverage: { otherCurrency: unknown[] } }>>(res);
+      expect(body.data.coverage.otherCurrency, path).toEqual([
+        { vehicleId: SHARED, currency: 'EUR' },
+      ]);
+    }
   });
 
   test("the summary's spending leaves out what the share hides", async () => {

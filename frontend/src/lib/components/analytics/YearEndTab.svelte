@@ -15,8 +15,7 @@
 		getCategoryLabel
 	} from '#lib/utils/chart-colors.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
-	import { vehicleApi } from '#lib/services/vehicle-api.ts';
-	import type { AnalyticsBucketItems, AnalyticsQueryResponse, Vehicle } from '#lib/types/index.ts';
+	import type { AnalyticsBucketItems, AnalyticsQueryResponse } from '#lib/types/index.ts';
 	import {
 		formatCurrency,
 		formatDateWith,
@@ -34,7 +33,7 @@
 		biggestMonth,
 		cheapestToRun,
 		mostFills,
-		carsWithSpending,
+		coveredCars,
 		percentChange,
 		yearCounts,
 		yearRange,
@@ -47,7 +46,6 @@
 
 	let selectedYear = $state(currentYear);
 	let largest = $state<AnalyticsBucketItems | null>(null);
-	let vehicles = $state<Vehicle[]>([]);
 	let results = $state<Record<YearQuery, AnalyticsQueryResponse> | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
@@ -59,14 +57,12 @@
 		const { start, end } = yearRange(year);
 		try {
 			isLoading = true;
-			const [items, cars, ...responses] = await Promise.all([
+			const [items, ...responses] = await Promise.all([
 				analyticsApi.queryItems({ start, end, include: 'all', metric: 'cost' }),
-				vehicleApi.getVehicles({ includeShared: true }),
 				...YEAR_QUERIES.map(key => analyticsApi.query(queries[key]))
 			]);
 			if (current !== request) return;
 			largest = items;
-			vehicles = cars;
 			results = Object.fromEntries(
 				YEAR_QUERIES.map((key, i) => [key, responses[i] as AnalyticsQueryResponse])
 			) as Record<YearQuery, AnalyticsQueryResponse>;
@@ -101,12 +97,8 @@
 
 	let monthly = $derived(results?.monthly ?? null);
 	let currency = $derived(monthly?.unit ?? null);
-	let otherCurrency = $derived(
-		vehicles.filter(
-			v => v.sharedAccess && currency && v.ownerCurrency && v.ownerCurrency !== currency
-		)
-	);
-	let carCount = $derived(carsWithSpending(results?.cars ?? null));
+	let covered = $derived(coveredCars(monthly));
+	let carCount = $derived(covered.count);
 	const listOf = (items: string[]) =>
 		new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(items);
 	let total = $derived(monthly?.totals.value ?? 0);
@@ -160,7 +152,7 @@
 	]);
 	let effTrendConfig = $derived(buildChartConfig(effTrendSeries));
 
-	let carsText = $derived(`${carCount} ${carCount === 1 ? 'vehicle' : 'vehicles'} with spending`);
+	let carsText = $derived(`${carCount} ${carCount === 1 ? 'vehicle' : 'vehicles'}`);
 	let detailTiles = $derived.by(() => {
 		const avgEff = results?.efficiency.totals.value ?? null;
 		const perDistance = monthly?.totals.perDistance ?? null;
@@ -286,6 +278,7 @@
 						referenceLines={monthAverage != null
 							? [{ value: monthAverage, label: 'Monthly average' }]
 							: []}
+						fitTicks
 						xAxisProps={{ ticks: monthTicks, format: (v: unknown) => String(v) }}
 						yAxisFormat={v => formatCurrency(v, undefined, 0)}
 						tooltipFormat={v => formatCurrency(Number(v))}
@@ -321,7 +314,7 @@
 						{#if biggestExpense}
 							<li class="flex items-center justify-between gap-3 py-3">
 								<div>
-									<p class="font-medium">Biggest single expense (excluding fill-ups)</p>
+									<p class="font-medium">Biggest single expense (excluding fill-ups and charges)</p>
 									<p class="text-sm text-muted-foreground">
 										{biggestExpense.description} · {formatCurrency(biggestExpense.amount)} · {formatDateWith(
 											biggestExpense.date,
@@ -347,7 +340,7 @@
 					<AppLineChart
 						level={3}
 						title="{efficiencyLabel} by month"
-						description="Fuel economy across the vehicles with spending, {selectedYear}"
+						description="Fuel economy across these vehicles, {selectedYear}"
 						data={effTrendData}
 						x="date"
 						y="efficiency"
@@ -363,11 +356,10 @@
 </div>
 
 {#snippet sharedNote()}
-	{#if otherCurrency.length > 0}
+	{#if covered.otherCurrencies.length > 0}
 		<p class="text-sm text-muted-foreground">
-			Not included: cars shared with you in {listOf([
-				...new Set(otherCurrency.map(v => v.ownerCurrency ?? ''))
-			])}. These figures are in {currency}.
+			Not included: cars shared with you in {listOf(covered.otherCurrencies)}. These figures are in
+			{currency}.
 		</p>
 	{/if}
 {/snippet}

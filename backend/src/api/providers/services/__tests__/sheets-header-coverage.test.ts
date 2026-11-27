@@ -41,7 +41,7 @@ describe('Google Sheets header coverage (column drift guard)', () => {
       drift,
       `Sheets header array(s) are MISSING schema column(s) — those columns are silently ` +
         `dropped on a Google Sheets backup and restored as null. Add them to SHEET_HEADERS ` +
-        `in google-sheets-service.ts (keep order in sync with db/schema.ts):\n${drift.join('\n')}`
+        `in google-sheets-service.ts (keep order in sync with db/sqlite/schema.ts):\n${drift.join('\n')}`
     ).toEqual([]);
   });
 

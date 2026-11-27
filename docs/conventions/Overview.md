@@ -111,7 +111,7 @@ Routes live in `frontend/src/routes/` under SvelteKit file-based routing; `#lib/
 - Every domain under `api/` has a `routes.ts` with its Hono route definitions. Most also have a `repository.ts` (or a domain-named one such as `insurance/claims-repository.ts`) holding the data access — follow the split the domain you're touching already uses.
 - Every route maps to a permission, or is marked public with a reason. Declare a feature's permissions in a `capabilities.ts` next to its `routes.ts`; see `Permissions.md`.
 - Use Biome for linting and formatting (not ESLint/Prettier). `bun run all:fix` chains `lint:fix`, `format:fix`, and `check:fix`.
-- Schema changes go through generated migrations in `backend/drizzle/`: edit `db/schema.ts`, then `bun run db:generate`. Migrations apply automatically at startup via `runMigrations()`. Never use `db:push` for a schema change — see `DatabaseMigrations.md`.
+- Schema changes go through generated migrations in `backend/drizzle/` and `backend/drizzle-pg/`: edit `db/sqlite/schema.ts`, then `bun run db:generate` and `bun run db:generate:pg`. Migrations apply automatically at startup via `runMigrations()`. Never use `db:push` for a schema change — see `DatabaseMigrations.md`.
 
 ## Money (integer minor units)
 

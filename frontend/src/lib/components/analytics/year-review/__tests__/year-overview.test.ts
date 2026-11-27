@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { AnalyticsQueryResponse } from '#lib/types/index.ts';
 import {
 	biggestMonth,
-	carsWithSpending,
+	coveredCars,
 	cheapestToRun,
 	mostFills,
 	percentChange,
@@ -60,21 +60,25 @@ describe('yearRequests', () => {
 	});
 });
 
-describe('cars with spending', () => {
-	test('the cars request groups the whole year by vehicle, all costs', () => {
-		expect(yearRequests(2026, NOW).cars).toEqual({
-			metric: 'cost',
-			interval: 'none',
-			groupBy: 'vehicle',
-			include: 'all',
-			start: secs(new Date(2026, 0, 1)),
-			end: secs(new Date(2026, 10, 28))
-		});
+describe('covered cars', () => {
+	test('the year sends no separate per-car query', () => {
+		expect(Object.keys(yearRequests(2026, NOW))).not.toContain('cars');
 	});
 
-	test('counts only cars whose year total is above zero', () => {
-		expect(carsWithSpending(series({ Civic: 120, RAV4: 0, F150: null, Golf: -5 }))).toBe(1);
-		expect(carsWithSpending(null)).toBe(0);
+	test('counts every car the query covered and names each left-out currency once', () => {
+		const response = {
+			coverage: {
+				vehicleIds: ['civic', 'rav4'],
+				otherCurrency: [
+					{ vehicleId: 'golf', currency: 'EUR' },
+					{ vehicleId: 'polo', currency: 'EUR' },
+					{ vehicleId: 'mini', currency: 'GBP' }
+				],
+				unavailable: 0
+			}
+		} as unknown as AnalyticsQueryResponse;
+		expect(coveredCars(response)).toEqual({ count: 2, otherCurrencies: ['EUR', 'GBP'] });
+		expect(coveredCars(null)).toEqual({ count: 0, otherCurrencies: [] });
 	});
 });
 

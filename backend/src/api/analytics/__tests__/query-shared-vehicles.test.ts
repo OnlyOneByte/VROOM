@@ -256,3 +256,103 @@ describe('analytics query follows the per-car permissions of a share', () => {
     expect(data.range.start).toBe(JUNE);
   });
 });
+
+interface Coverage {
+  vehicleIds: string[];
+  otherCurrency: Array<{ vehicleId: string; currency: string }>;
+  unavailable: number;
+}
+
+describe('the query and its items report the cars they covered', () => {
+  const OWN = 'qs-viewer-car';
+
+  async function coverage(
+    request: RequestFn,
+    params = '',
+    neverNamed: string[] = [PRIVATE]
+  ): Promise<Coverage[]> {
+    const bodies: Coverage[] = [];
+    for (const path of ['query?metric=cost&', 'query/items?']) {
+      const res = await request('GET', `/api/v1/analytics/${path}${RANGE}&${params}`);
+      expect(res.status).toBe(200);
+      const text = await res.text();
+      for (const id of neverNamed) expect(text, `${path} names ${id}`).not.toContain(id);
+      bodies.push((JSON.parse(text) as DataEnvelope<{ coverage: Coverage }>).data.coverage);
+    }
+    return bodies;
+  }
+
+  const sorted = (c: Coverage) => ({ ...c, vehicleIds: [...c.vehicleIds].sort() });
+
+  function ownerCurrency(currency: string): void {
+    ctx.sqlite.run(
+      'INSERT INTO user_preferences (user_id, currency_unit) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET currency_unit = excluded.currency_unit',
+      [ctx.user.id, currency]
+    );
+  }
+
+  beforeEach(() => {
+    seedCar(ctx, OWN, viewer.id);
+  });
+
+  test('an owned car and a shared car are both listed, with nothing left out', async () => {
+    for (const body of await coverage(viewer.request)) {
+      expect(sorted(body)).toEqual({
+        vehicleIds: [OWN, SHARED].sort(),
+        otherCurrency: [],
+        unavailable: 0,
+      });
+    }
+  });
+
+  test('a shared car in another currency is named as left out for its currency', async () => {
+    ownerCurrency('EUR');
+    for (const body of await coverage(viewer.request)) {
+      expect(body).toEqual({
+        vehicleIds: [OWN],
+        otherCurrency: [{ vehicleId: SHARED, currency: 'EUR' }],
+        unavailable: 0,
+      });
+    }
+  });
+
+  test('a shared car without expense access is never named, whatever the currency', async () => {
+    overrideOn(ctx, SHARED, viewer, 'vehicle.expense.read', 'deny');
+    for (const currency of ['USD', 'EUR']) {
+      ownerCurrency(currency);
+      for (const body of await coverage(viewer.request, '', [PRIVATE, SHARED])) {
+        expect(body, currency).toEqual({ vehicleIds: [OWN], otherCurrency: [], unavailable: 0 });
+      }
+      const asked = await coverage(viewer.request, `vehicleIds=${SHARED},${OWN}`, [
+        PRIVATE,
+        SHARED,
+      ]);
+      for (const body of asked) {
+        expect(body, currency).toEqual({ vehicleIds: [OWN], otherCurrency: [], unavailable: 1 });
+      }
+    }
+  });
+
+  test('a car the viewer cannot read is only counted, never named, when asked for by id', async () => {
+    for (const body of await coverage(viewer.request, `vehicleIds=${SHARED},${PRIVATE}`)) {
+      expect(body).toEqual({ vehicleIds: [SHARED], otherCurrency: [], unavailable: 1 });
+    }
+    const strangers = await coverage(stranger.request, `vehicleIds=${SHARED},${PRIVATE}`, [
+      PRIVATE,
+      SHARED,
+    ]);
+    for (const body of strangers) {
+      expect(body).toEqual({ vehicleIds: [], otherCurrency: [], unavailable: 2 });
+    }
+  });
+
+  test('the owner sees both of their cars covered', async () => {
+    for (const body of await coverage(ctx.authed, '', [])) {
+      expect(sorted(body)).toEqual({
+        vehicleIds: [PRIVATE, SHARED].sort(),
+        otherCurrency: [],
+        unavailable: 0,
+      });
+    }
+  });
+});
