@@ -8,6 +8,10 @@ export interface SweepCall {
 }
 
 const DATE = '2024-06-01T00:00:00.000Z';
+const FROM = 1_704_067_200;
+const TO = 1_735_689_600;
+const span = `start=${FROM}&end=${TO}`;
+const range = `startDate=${FROM}&endDate=${TO}`;
 
 export async function sendSweepCall(
   app: Hono,
@@ -174,6 +178,35 @@ export function writeRouteCalls(vehicleId: string, memberId: string): Record<str
         endpoint: 'https://fcm.googleapis.com/fcm/send/sweep',
         keys: { p256dh: 'p256dh', auth: 'auth' },
       },
+    },
+    'GET /api/v1/auth/providers/connect/google': {
+      path: '/api/v1/auth/providers/connect/google?returnTo=/settings&nonce=sweep-nonce',
+    },
+    'GET /api/v1/photos': { path: `/api/v1/photos?entityType=vehicle&entityId=${vehicleId}` },
+    'GET /api/v1/analytics/query': {
+      path: `/api/v1/analytics/query?metric=cost&${span}&vehicleIds=${vehicleId}`,
+    },
+    'GET /api/v1/analytics/query/items': {
+      path: `/api/v1/analytics/query/items?${span}&vehicleIds=${vehicleId}`,
+    },
+    'GET /api/v1/analytics/insights': {
+      path: `/api/v1/analytics/insights?${span}&vehicleIds=${vehicleId}`,
+    },
+    'GET /api/v1/analytics/summary': {
+      path: `/api/v1/analytics/summary?${range}&vehicleIds=${vehicleId}`,
+    },
+    'GET /api/v1/analytics/quick-stats': { path: `/api/v1/analytics/quick-stats?${range}` },
+    'GET /api/v1/analytics/fuel-stats': { path: `/api/v1/analytics/fuel-stats?${range}` },
+    'GET /api/v1/analytics/cross-vehicle': {
+      path: `/api/v1/analytics/cross-vehicle?${range}&vehicleIds=${vehicleId}`,
+    },
+    'GET /api/v1/analytics/fuel-advanced': { path: `/api/v1/analytics/fuel-advanced?${range}` },
+    'GET /api/v1/analytics/vehicle-expenses': {
+      path: `/api/v1/analytics/vehicle-expenses?${range}`,
+    },
+    'GET /api/v1/roles': { path: '/api/v1/roles?scope=vehicle' },
+    'GET /api/v1/overrides': {
+      path: `/api/v1/overrides?userId=${memberId}&scope=vehicle&scopeId=${vehicleId}`,
     },
     'POST /api/v1/calendar/feed': { body: {} },
     'PUT /api/v1/calendar/feed': { body: { options: {} } },

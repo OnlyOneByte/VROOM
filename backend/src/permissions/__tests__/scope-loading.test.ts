@@ -104,7 +104,11 @@ const HANDLER_PRECONDITIONS: Record<string, string> = {
   'POST /api/v1/assistant/chat': 'No assistant (LLM) provider is configured',
   'POST /api/v1/sync/restore/from-provider': 'Provider not found or inactive',
   'POST /api/v1/sync/restore/from-backup': 'not a readable VROOM backup ZIP',
+  'GET /api/v1/photos/receipt-drafts': 'Connect Google Photos in Settings',
 };
+
+const preconditionKeys = (wanted: (key: string) => boolean) =>
+  Object.keys(HANDLER_PRECONDITIONS).filter(wanted).sort();
 
 const quietPush = { send: async () => ({ kind: 'ok' as const }) };
 
@@ -178,7 +182,9 @@ describe('the sweep sends each route with a body one it accepts', () => {
       else if (outcome) refused.push(`${key} -> ${outcome}`);
     }
     expect(refused).toEqual([]);
-    expect([...preconditionsHit].sort()).toEqual(Object.keys(HANDLER_PRECONDITIONS).sort());
+    expect([...preconditionsHit].sort()).toEqual(
+      preconditionKeys((key) => !key.startsWith('GET '))
+    );
   }, 120_000);
 
   test('in sweep order, the owner finds the record behind every path id', async () => {
@@ -189,6 +195,23 @@ describe('the sweep sends each route with a body one it accepts', () => {
       if (res.status === 404) missing.push(`${key} -> ${(await res.text()).slice(0, 120)}`);
     }
     expect(missing).toEqual([]);
+  }, 120_000);
+
+  test('the owner gets past input validation on every read', async () => {
+    const refused: string[] = [];
+    const preconditionsHit = new Set<string>();
+    for (const [key, method, path, call] of sweepRequests(members.editor.id)) {
+      if (method !== 'GET') continue;
+      const { cookie } = await requestAs(ctx, ctx.user.id);
+      const outcome = await inputOutcome(
+        key,
+        await sendSweepCall(ctx.app, cookie, method, path, call ?? {})
+      );
+      if (outcome === 'precondition') preconditionsHit.add(key);
+      else if (outcome) refused.push(`${key} -> ${outcome}`);
+    }
+    expect(refused).toEqual([]);
+    expect([...preconditionsHit].sort()).toEqual(preconditionKeys((key) => key.startsWith('GET ')));
   }, 120_000);
 });
 
