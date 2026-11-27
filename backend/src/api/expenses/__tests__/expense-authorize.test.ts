@@ -19,7 +19,7 @@ let viewer: Invitee;
 let stranger: Invitee;
 let disabled: Invitee;
 
-function insertExpense(
+async function insertExpense(
   id: string,
   owner: string,
   vehicle: string,
@@ -27,15 +27,15 @@ function insertExpense(
     createdBy = null,
     sourceType = null,
   }: { createdBy?: string | null; sourceType?: string | null } = {}
-): void {
-  ctx.sqlite.run(
+): Promise<void> {
+  await ctx.sql.run(
     "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, created_by, source_type, source_id) VALUES (?, ?, ?, 'maintenance', 1717200000, 2500, ?, ?, ?)",
     [id, vehicle, owner, createdBy, sourceType, sourceType ? 'loan-1' : null]
   );
 }
 
 async function seedMember(member: Invitee, level: 'viewer' | 'editor'): Promise<void> {
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, ?, 'accepted', ?)",
     [`share-${member.id}`, vehicleId, ctx.user.id, member.id, level, member.email]
   );
@@ -47,8 +47,12 @@ async function seedMember(member: Invitee, level: 'viewer' | 'editor'): Promise<
   });
 }
 
-function override(member: Invitee, permission: string, effect: 'allow' | 'deny'): void {
-  ctx.sqlite.run(
+async function override(
+  member: Invitee,
+  permission: string,
+  effect: 'allow' | 'deny'
+): Promise<void> {
+  await ctx.sql.run(
     "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect) VALUES (?, ?, 'vehicle', ?, ?, ?)",
     [`po-${member.id}-${permission}`, member.id, vehicleId, permission, effect]
   );
@@ -67,7 +71,7 @@ async function listIds(request: RequestFn, query = `?vehicleId=${vehicleId}`) {
 beforeEach(async () => {
   ctx = await createTestApp();
   vehicleId = `exp-car-${crypto.randomUUID()}`;
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Toyota', 'Camry', 2022)",
     [vehicleId, ctx.user.id]
   );
@@ -84,14 +88,14 @@ beforeEach(async () => {
   ] as const) {
     await seedMember(member, level);
   }
-  ctx.sqlite.run(
+  await ctx.sql.run(
     'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
     ['ra-co', coOwner.id, builtInRoleId('co_owner'), vehicleId, ctx.user.id]
   );
-  ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [disabled.id]);
-  insertExpense('owners-row', ctx.user.id, vehicleId);
-  insertExpense('editors-row', ctx.user.id, vehicleId, { createdBy: editor.id });
-  insertExpense('loan-row', ctx.user.id, vehicleId, { sourceType: 'financing' });
+  await ctx.sql.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [disabled.id]);
+  await insertExpense('owners-row', ctx.user.id, vehicleId);
+  await insertExpense('editors-row', ctx.user.id, vehicleId, { createdBy: editor.id });
+  await insertExpense('loan-row', ctx.user.id, vehicleId, { sourceType: 'financing' });
 }, SETUP_TIMEOUT_MS);
 
 afterEach(() => ctx.close());
@@ -111,9 +115,9 @@ describe('expenses resolve through can() for every role', () => {
   });
 
   test('an allow override shows an editor the financials; a deny override hides the car', async () => {
-    override(editor, 'vehicle.financing.read', 'allow');
-    override(editor, 'vehicle.insurance.read', 'allow');
-    override(viewer, 'vehicle.expense.read', 'deny');
+    await override(editor, 'vehicle.financing.read', 'allow');
+    await override(editor, 'vehicle.insurance.read', 'allow');
+    await override(viewer, 'vehicle.expense.read', 'deny');
     expect((await listIds(editor.request)).ids).toContain('loan-row');
     expect((await listIds(viewer.request)).status).toBe(403);
     expect((await viewer.request('GET', '/api/v1/expenses/owners-row')).status).toBe(403);
@@ -150,18 +154,19 @@ describe('split updates cannot delete legs the caller may not delete', () => {
     splitConfig: { method: 'even', vehicleIds },
     totalAmount: 90,
   });
-  const legs = (groupId: string) =>
-    ctx.sqlite
-      .query('SELECT vehicle_id, created_by FROM expenses WHERE group_id = ? ORDER BY vehicle_id')
-      .all(groupId) as { vehicle_id: string; created_by: string | null }[];
+  const legs = async (groupId: string) =>
+    (await ctx.sql.all(
+      'SELECT vehicle_id, created_by FROM expenses WHERE group_id = ? ORDER BY vehicle_id',
+      [groupId]
+    )) as { vehicle_id: string; created_by: string | null }[];
 
   beforeEach(async () => {
     for (const car of cars) {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Mazda', 'CX-5', 2021)",
         [car, ctx.user.id]
       );
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status) VALUES (?, ?, ?, ?, 'editor', 'accepted')",
         [`share-${car}`, car, ctx.user.id, editor.id]
       );
@@ -191,10 +196,14 @@ describe('split updates cannot delete legs the caller may not delete', () => {
 
     expect((await put(['split-a'])).status).toBe(403);
     expect((await put(['split-a', 'split-b', 'split-c'])).status).toBe(200);
-    expect(legs(groupId).map((leg) => leg.created_by)).toEqual([null, null, null]);
+    expect((await legs(groupId)).map((leg) => leg.created_by)).toEqual([null, null, null]);
     expect((await put(['split-c'])).status).toBe(403);
     expect((await editor.request('DELETE', `/api/v1/expenses/split/${groupId}`)).status).toBe(403);
-    expect(legs(groupId).map((leg) => leg.vehicle_id)).toEqual(['split-a', 'split-b', 'split-c']);
+    expect((await legs(groupId)).map((leg) => leg.vehicle_id)).toEqual([
+      'split-a',
+      'split-b',
+      'split-c',
+    ]);
   });
 
   test('an editor shrinks and deletes their own split, but not one with legs by someone else', async () => {
@@ -202,7 +211,7 @@ describe('split updates cannot delete legs the caller may not delete', () => {
     const path = `/api/v1/expenses/split/${mine}`;
     expect((await editor.request('PUT', path, splitBody(['split-a']))).status).toBe(200);
     const mixed = await createSplit(editor.request, ['split-b', 'split-c']);
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "UPDATE expenses SET created_by = NULL WHERE group_id = ? AND vehicle_id = 'split-c'",
       [mixed]
     );
@@ -214,11 +223,11 @@ describe('split updates cannot delete legs the caller may not delete', () => {
 describe('expenses never cross accounts', () => {
   test("another person's own expenses stay out of lists, exports and lookups", async () => {
     const theirCar = `exp-their-car-${crypto.randomUUID()}`;
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Honda', 'Civic', 2020)",
       [theirCar, stranger.id]
     );
-    insertExpense('their-row', stranger.id, theirCar);
+    await insertExpense('their-row', stranger.id, theirCar);
     const mine = await listIds(ctx.authed, '');
     expect(mine.status).toBe(200);
     expect(mine.ids).not.toContain('their-row');

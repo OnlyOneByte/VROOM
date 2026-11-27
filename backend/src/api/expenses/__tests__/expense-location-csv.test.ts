@@ -50,9 +50,9 @@ describe('expense location CSV export and import round-trip', () => {
     const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv, dryRun: false });
     expect(res.status, await res.clone().text()).toBe(200);
 
-    const rows = ctx.sqlite
-      .query("SELECT location FROM expenses WHERE location = 'Downtown garage'")
-      .all() as ExpenseDb[];
+    const rows = (await ctx.sql.all(
+      "SELECT location FROM expenses WHERE location = 'Downtown garage'"
+    )) as ExpenseDb[];
     expect(rows.length).toBe(1);
     expect(rows[0]?.location).toBe('Downtown garage');
   });
@@ -69,18 +69,18 @@ describe('expense location CSV export and import round-trip', () => {
     const first = await ctx.authed('POST', '/api/v1/expenses/import', { csv, dryRun: false });
     expect(first.status).toBe(200);
     const countAfterFirst = (
-      ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number }
+      (await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number }
     ).n;
 
     const second = await ctx.authed('POST', '/api/v1/expenses/import', { csv, dryRun: false });
     expect(second.status).toBe(200);
     const countAfterSecond = (
-      ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number }
+      (await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number }
     ).n;
     expect(countAfterSecond).toBe(countAfterFirst);
-    const rows = ctx.sqlite
-      .query("SELECT location FROM expenses WHERE location = 'Trailhead lot'")
-      .all() as ExpenseDb[];
+    const rows = (await ctx.sql.all(
+      "SELECT location FROM expenses WHERE location = 'Trailhead lot'"
+    )) as ExpenseDb[];
     expect(rows.length).toBe(1);
   });
 });

@@ -21,10 +21,11 @@ interface ExpenseRow {
   description: string | null;
 }
 
-function rowOf(id: string): ExpenseRow | null {
-  return ctx.sqlite
-    .query('SELECT expense_amount, group_total, description FROM expenses WHERE id = ?')
-    .get(id) as ExpenseRow | null;
+async function rowOf(id: string): Promise<ExpenseRow | null> {
+  return (await ctx.sql.get(
+    'SELECT expense_amount, group_total, description FROM expenses WHERE id = ?',
+    [id]
+  )) as ExpenseRow | null;
 }
 
 async function createSplit(): Promise<{ legIds: string[]; vehicleIds: string[] }> {
@@ -55,9 +56,11 @@ async function createSourcedExpense(sourceType: string): Promise<string> {
   });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBe(201);
-  ctx.sqlite
-    .query('UPDATE expenses SET source_type = ?, source_id = ? WHERE id = ?')
-    .run(sourceType, 'source-1', body.data.id);
+  await ctx.sql.run('UPDATE expenses SET source_type = ?, source_id = ? WHERE id = ?', [
+    sourceType,
+    'source-1',
+    body.data.id,
+  ]);
   return body.data.id;
 }
 
@@ -69,7 +72,7 @@ describe('PUT /expenses/:id on a split leg', () => {
     const res = await ctx.authed('PUT', `/api/v1/expenses/${legId}`, { expenseAmount: 25 });
 
     expect(res.status).toBe(400);
-    expect(rowOf(legId)).toMatchObject({ expense_amount: 1500, group_total: 3000 });
+    expect(await rowOf(legId)).toMatchObject({ expense_amount: 1500, group_total: 3000 });
   });
 
   test('rejects moving the leg to another vehicle', async () => {
@@ -92,7 +95,7 @@ describe('PUT /expenses/:id on a split leg', () => {
     });
 
     expect(res.status, await res.text()).toBe(200);
-    expect(rowOf(legId)?.description).toBe('Front brakes');
+    expect((await rowOf(legId))?.description).toBe('Front brakes');
   });
 });
 
@@ -103,7 +106,7 @@ describe('DELETE /expenses/:id on a split leg', () => {
     const res = await ctx.authed('DELETE', `/api/v1/expenses/${legIds[0]}`);
 
     expect(res.status).toBe(400);
-    for (const id of legIds) expect(rowOf(id)).not.toBeNull();
+    for (const id of legIds) expect(await rowOf(id)).not.toBeNull();
   });
 });
 
@@ -118,7 +121,7 @@ describe('PUT /expenses/:id on a sourced expense', () => {
 
     expect(amount.status).toBe(400);
     expect(date.status).toBe(400);
-    expect(rowOf(id)?.expense_amount).toBe(12000);
+    expect((await rowOf(id))?.expense_amount).toBe(12000);
   });
 
   test('accepts description and tag edits on an insurance term expense', async () => {
@@ -130,7 +133,7 @@ describe('PUT /expenses/:id on a sourced expense', () => {
     });
 
     expect(res.status, await res.text()).toBe(200);
-    expect(rowOf(id)?.description).toBe('Six-month premium');
+    expect((await rowOf(id))?.description).toBe('Six-month premium');
   });
 
   test('leaves reminder expenses editable, since reminders never regenerate them', async () => {
@@ -139,6 +142,6 @@ describe('PUT /expenses/:id on a sourced expense', () => {
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { expenseAmount: 99 });
 
     expect(res.status, await res.text()).toBe(200);
-    expect(rowOf(id)?.expense_amount).toBe(9900);
+    expect((await rowOf(id))?.expense_amount).toBe(9900);
   });
 });

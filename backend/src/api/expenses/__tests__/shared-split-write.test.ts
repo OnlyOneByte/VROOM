@@ -39,10 +39,12 @@ async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   return vehicleId;
 }
 
-function storedSiblings(groupId: string): Array<{ user_id: string; created_by: string | null }> {
-  return ctx.sqlite
-    .query('SELECT user_id, created_by FROM expenses WHERE group_id = ?')
-    .all(groupId) as Array<{ user_id: string; created_by: string | null }>;
+async function storedSiblings(
+  groupId: string
+): Promise<Array<{ user_id: string; created_by: string | null }>> {
+  return (await ctx.sql.all('SELECT user_id, created_by FROM expenses WHERE group_id = ?', [
+    groupId,
+  ])) as Array<{ user_id: string; created_by: string | null }>;
 }
 
 describe('shared split writes stamp the owner and createdBy', () => {
@@ -59,7 +61,7 @@ describe('shared split writes stamp the owner and createdBy', () => {
     const body = await json<DataEnvelope<SplitData>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const rows = storedSiblings(body.data.groupId);
+    const rows = await storedSiblings(body.data.groupId);
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
       expect(row.user_id).toBe(ctx.user.id);
@@ -86,7 +88,7 @@ describe('shared split writes stamp the owner and createdBy', () => {
     });
     const body = await json<DataEnvelope<SplitData>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
-    const rows = storedSiblings(body.data.groupId);
+    const rows = await storedSiblings(body.data.groupId);
     expect(rows.length).toBe(2);
     for (const row of rows) {
       expect(row.user_id).toBe(ctx.user.id);
@@ -104,7 +106,7 @@ describe('shared split writes stamp the owner and createdBy', () => {
     });
     const body = await json<DataEnvelope<SplitData>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
-    for (const row of storedSiblings(body.data.groupId)) {
+    for (const row of await storedSiblings(body.data.groupId)) {
       expect(row.user_id).toBe(ctx.user.id);
       expect(row.created_by).toBeNull();
     }
@@ -127,9 +129,10 @@ describe('shared split writes stamp the owner and createdBy', () => {
       date: '2024-06-04T00:00:00.000Z',
     });
     expect(res.status, 'cross-owner split rejected').toBe(400);
-    const leaked = ctx.sqlite
-      .query('SELECT id FROM expenses WHERE vehicle_id IN (?, ?)')
-      .all(sharedFromA, bOwn) as Array<{ id: string }>;
+    const leaked = (await ctx.sql.all('SELECT id FROM expenses WHERE vehicle_id IN (?, ?)', [
+      sharedFromA,
+      bOwn,
+    ])) as Array<{ id: string }>;
     expect(leaked.length).toBe(0);
   });
 
@@ -159,7 +162,7 @@ describe('shared split writes stamp the owner and createdBy', () => {
       totalAmount: 90,
     });
     expect(put.status, 'editor can update a shared split').toBe(200);
-    for (const row of storedSiblings(gid)) {
+    for (const row of await storedSiblings(gid)) {
       expect(row.user_id).toBe(ctx.user.id);
       expect(row.created_by, 'the owner created this leg, so the edit keeps it unattributed').toBe(
         null
@@ -178,7 +181,7 @@ describe('shared split writes stamp the owner and createdBy', () => {
     const mineId = (await json<DataEnvelope<SplitData>>(mine)).data.groupId;
     const del = await asB('DELETE', `/api/v1/expenses/split/${mineId}`);
     expect(del.status, 'editor can delete a split they added').toBe(200);
-    expect(ctx.sqlite.query('SELECT id FROM expenses WHERE group_id = ?').get(mineId)).toBeNull();
+    expect(await ctx.sql.get('SELECT id FROM expenses WHERE group_id = ?', [mineId])).toBeNull();
   });
 
   test('an EDITOR cannot PUT a shared split onto their own vehicle (owner of the group must not change)', async () => {
@@ -204,9 +207,9 @@ describe('shared split writes stamp the owner and createdBy', () => {
       totalAmount: 30,
     });
     expect(put.status, 'moving the split to another owner is rejected').toBe(400);
-    const rows = ctx.sqlite
-      .query('SELECT vehicle_id, user_id FROM expenses WHERE group_id = ?')
-      .all(gid) as Array<{ vehicle_id: string; user_id: string }>;
+    const rows = (await ctx.sql.all('SELECT vehicle_id, user_id FROM expenses WHERE group_id = ?', [
+      gid,
+    ])) as Array<{ vehicle_id: string; user_id: string }>;
     expect(rows).toEqual([{ vehicle_id: vehicleId, user_id: ctx.user.id }]);
   });
 

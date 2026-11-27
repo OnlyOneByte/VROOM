@@ -173,10 +173,10 @@ describe('PUT /api/v1/expenses/:id — vehicle reassignment ownership', () => {
       '2026-03-01T12:00:00.000Z'
     );
 
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-61', 'f61@test.com', 'Foreign')`
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-foreign-61', 'u-foreign-61', 'Mazda', '3', 2020)`
     );
 

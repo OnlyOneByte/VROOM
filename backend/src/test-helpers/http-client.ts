@@ -1,5 +1,6 @@
 import { afterEach, beforeEach } from 'bun:test';
 import type { Hono } from 'hono';
+import { pgliteTestSql, sqliteTestSql, type TestSql } from './test-sql';
 
 export const SETUP_TIMEOUT_MS = 30_000;
 
@@ -31,6 +32,7 @@ export interface TestApp {
   app: Hono;
   user: TestUser;
   sqlite: import('bun:sqlite').Database;
+  sql: TestSql;
   cookie: string;
   authed: (method: string, path: string, body?: unknown) => Promise<Response>;
   anon: (method: string, path: string, body?: unknown) => Promise<Response>;
@@ -81,14 +83,13 @@ async function migratedPostgres(): Promise<import('@electric-sql/pglite').PGlite
   return client;
 }
 
-async function openPostgresTestDatabase(): Promise<void> {
+async function openPostgresTestDatabase(): Promise<import('@electric-sql/pglite').PGlite> {
   if (!postgres) {
     postgres = migratedPostgres().catch((error) => {
       postgres = undefined;
       throw error;
     });
-    await postgres;
-    return;
+    return postgres;
   }
   const client = await postgres;
   const tables = await client.query<{ name: string }>(
@@ -96,10 +97,11 @@ async function openPostgresTestDatabase(): Promise<void> {
   );
   const list = tables.rows.map((row) => `"${row.name}"`).join(', ');
   await client.exec(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
+  return client;
 }
 
 async function createPostgresTestApp(seedUser: Partial<TestUser>): Promise<TestApp> {
-  await openPostgresTestDatabase();
+  const client = await openPostgresTestDatabase();
   const schema = await import('../db/schema');
   const { appContext } = await import('../app-context');
   const { app } = await import('../app');
@@ -124,6 +126,7 @@ async function createPostgresTestApp(seedUser: Partial<TestUser>): Promise<TestA
     app,
     user: { id, email, displayName },
     sqlite: NO_RAW_SQLITE,
+    sql: pgliteTestSql(client),
     cookie,
     authed: (method, path, body) => sendRequest(app, method, path, body, cookie),
     anon: (method, path, body) => sendRequest(app, method, path, body),
@@ -168,6 +171,7 @@ export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<T
     app,
     user: { id, email, displayName },
     sqlite,
+    sql: sqliteTestSql(sqlite),
     cookie,
     authed: (method, path, body) => sendRequest(app, method, path, body, cookie),
     anon: (method, path, body) => sendRequest(app, method, path, body),

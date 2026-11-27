@@ -20,8 +20,8 @@ interface ExpenseDb {
   description: string | null;
 }
 
-function descriptionOf(id: string): string | null {
-  return (ctx.sqlite.query('SELECT description FROM expenses WHERE id = ?').get(id) as ExpenseDb)
+async function descriptionOf(id: string): Promise<string | null> {
+  return ((await ctx.sql.get('SELECT description FROM expenses WHERE id = ?', [id])) as ExpenseDb)
     .description;
 }
 
@@ -42,12 +42,12 @@ describe('expense description clear-on-edit', () => {
   test('PUT description:null clears a previously-saved description', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const id = await createWithDescription(vehicleId, 'Parking garage downtown');
-    expect(descriptionOf(id)).toBe('Parking garage downtown');
+    expect(await descriptionOf(id)).toBe('Parking garage downtown');
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { description: null });
     expect(res.status, await res.text()).toBe(200);
 
-    expect(descriptionOf(id), 'description should be NULL, not the stale value').toBeNull();
+    expect(await descriptionOf(id), 'description should be NULL, not the stale value').toBeNull();
   });
 
   test('PUT without description leaves the stored value untouched', async () => {
@@ -57,12 +57,12 @@ describe('expense description clear-on-edit', () => {
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { expenseAmount: 99 });
     expect(res.status, await res.text()).toBe(200);
 
-    expect(descriptionOf(id)).toBe('Keep me');
+    expect(await descriptionOf(id)).toBe('Keep me');
   });
 
   test('create still persists a provided description', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const id = await createWithDescription(vehicleId, 'Oil change');
-    expect(descriptionOf(id)).toBe('Oil change');
+    expect(await descriptionOf(id)).toBe('Oil change');
   });
 });

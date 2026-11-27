@@ -15,8 +15,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function rowOf(id: string): { date: number; category: string } {
-  return ctx.sqlite.query('SELECT date, category FROM expenses WHERE id = ?').get(id) as {
+async function rowOf(id: string): Promise<{ date: number; category: string }> {
+  return (await ctx.sql.get('SELECT date, category FROM expenses WHERE id = ?', [id])) as {
     date: number;
     category: string;
   };
@@ -41,14 +41,14 @@ async function createSplitLegs(): Promise<string[]> {
 describe('PUT /expenses/:id on a split leg', () => {
   test('rejects a date change that would move one leg away from its siblings', async () => {
     const [legId = ''] = await createSplitLegs();
-    const before = rowOf(legId);
+    const before = await rowOf(legId);
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${legId}`, {
       date: '2024-03-01T00:00:00.000Z',
     });
 
     expect(res.status).toBe(400);
-    expect(rowOf(legId)).toEqual(before);
+    expect(await rowOf(legId)).toEqual(before);
   });
 
   test('rejects a category change on one leg', async () => {
@@ -57,7 +57,7 @@ describe('PUT /expenses/:id on a split leg', () => {
     const res = await ctx.authed('PUT', `/api/v1/expenses/${legId}`, { category: 'financial' });
 
     expect(res.status).toBe(400);
-    expect(rowOf(legId).category).toBe('maintenance');
+    expect((await rowOf(legId)).category).toBe('maintenance');
   });
 
   test('accepts the unchanged date and category alongside a description edit', async () => {
@@ -84,9 +84,10 @@ describe('PUT /expenses/:id on an insurance term expense', () => {
     });
     const body = await json<DataEnvelope<{ id: string }>>(created);
     expect(created.status, JSON.stringify(body)).toBe(201);
-    ctx.sqlite
-      .query("UPDATE expenses SET source_type = 'insurance_term', source_id = 't1' WHERE id = ?")
-      .run(body.data.id);
+    await ctx.sql.run(
+      "UPDATE expenses SET source_type = 'insurance_term', source_id = 't1' WHERE id = ?",
+      [body.data.id]
+    );
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, {
       date: '2024-06-01T08:30:15.123Z',

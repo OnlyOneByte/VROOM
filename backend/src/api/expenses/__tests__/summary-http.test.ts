@@ -99,10 +99,10 @@ describe('GET /expenses/summary — vehicleId scoping', () => {
   });
 
   test('a summary scoped to an UNOWNED vehicle is 404 (ownership-checked)', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u2sum', 'sum@x.com', 'Other')`
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v2sum', 'u2sum', 'Honda', 'Civic', 2020)`
     );
     const res = await ctx.authed('GET', '/api/v1/expenses/summary?period=all&vehicleId=v2sum');

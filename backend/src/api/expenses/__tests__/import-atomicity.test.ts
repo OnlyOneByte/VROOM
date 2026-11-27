@@ -11,8 +11,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function expenseCount(): number {
-  const r = ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number };
+async function expenseCount(): Promise<number> {
+  const r = (await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number };
   return r.n;
 }
 
@@ -39,7 +39,7 @@ describe('importExpenses atomicity', () => {
       },
     ] as ImportRows;
 
-    expect(expenseCount()).toBe(0);
+    expect(await expenseCount()).toBe(0);
 
     let threw = false;
     try {
@@ -49,7 +49,7 @@ describe('importExpenses atomicity', () => {
     }
 
     expect(threw, 'the FK violation should surface as a throw').toBe(true);
-    expect(expenseCount(), 'the whole batch rolled back — no half-imported file').toBe(0);
+    expect(await expenseCount(), 'the whole batch rolled back — no half-imported file').toBe(0);
   });
 
   test('a clientId repeated WITHIN one file is counted as a duplicate, not inserted twice', async () => {
@@ -75,10 +75,10 @@ describe('importExpenses atomicity', () => {
 
     const first = await repos().expenses.importExpenses(rows, ctx.user.id);
     expect(first).toEqual({ imported: 1, duplicates: 1 });
-    expect(expenseCount()).toBe(1);
+    expect(await expenseCount()).toBe(1);
 
     const second = await repos().expenses.importExpenses(rows, ctx.user.id);
     expect(second).toEqual({ imported: 0, duplicates: 2 });
-    expect(expenseCount()).toBe(1);
+    expect(await expenseCount()).toBe(1);
   });
 });

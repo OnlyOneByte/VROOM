@@ -23,10 +23,11 @@ interface FuelCols {
   missed_fillup: number;
 }
 
-function expenseRow(id: string): FuelCols {
-  return ctx.sqlite
-    .query('SELECT category, volume, fuel_type, mileage, missed_fillup FROM expenses WHERE id = ?')
-    .get(id) as FuelCols;
+async function expenseRow(id: string): Promise<FuelCols> {
+  return (await ctx.sql.get(
+    'SELECT category, volume, fuel_type, mileage, missed_fillup FROM expenses WHERE id = ?',
+    [id]
+  )) as FuelCols;
 }
 
 describe('non-fuel expense writes clear the fuel-only fields and keep the mileage', () => {
@@ -45,7 +46,7 @@ describe('non-fuel expense writes clear the fuel-only fields and keep the mileag
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const row = expenseRow(body.data.id);
+    const row = await expenseRow(body.data.id);
     expect(row.category).toBe('misc');
     expect(row.volume).toBeNull();
     expect(row.fuel_type).toBeNull();
@@ -67,12 +68,12 @@ describe('non-fuel expense writes clear the fuel-only fields and keep the mileag
     const cbody = await json<DataEnvelope<{ id: string }>>(created);
     expect(created.status, JSON.stringify(cbody)).toBe(201);
     const id = cbody.data.id;
-    expect(expenseRow(id).volume).toBe(10);
+    expect((await expenseRow(id)).volume).toBe(10);
 
     const put = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { category: 'maintenance' });
     expect(put.status).toBe(200);
 
-    const row = expenseRow(id);
+    const row = await expenseRow(id);
     expect(row.category).toBe('maintenance');
     expect(row.volume).toBeNull();
     expect(row.fuel_type).toBeNull();
@@ -91,7 +92,7 @@ describe('non-fuel expense writes clear the fuel-only fields and keep the mileag
     const cbody = await json<DataEnvelope<{ id: string }>>(created);
     expect(created.status, JSON.stringify(cbody)).toBe(201);
     const id = cbody.data.id;
-    expect(expenseRow(id).mileage).toBeNull();
+    expect((await expenseRow(id)).mileage).toBeNull();
 
     const put = await ctx.authed('PUT', `/api/v1/expenses/${id}`, {
       expenseAmount: 85,
@@ -101,7 +102,7 @@ describe('non-fuel expense writes clear the fuel-only fields and keep the mileag
     });
     expect(put.status).toBe(200);
 
-    const row = expenseRow(id);
+    const row = await expenseRow(id);
     expect(row.category).toBe('maintenance');
     expect(row.mileage).toBe(99_999);
     expect(row.volume).toBeNull();
@@ -122,7 +123,7 @@ describe('non-fuel expense writes clear the fuel-only fields and keep the mileag
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const row = expenseRow(body.data.id);
+    const row = await expenseRow(body.data.id);
     expect(row.volume).toBe(11);
     expect(row.fuel_type).toBe('Diesel');
     expect(row.mileage).toBe(31_000);

@@ -21,14 +21,14 @@ afterEach(() => ctx.close());
 
 const ABSENT_ID = 'no-such-expense-id';
 
-function seedForeignExpense(): string {
-  ctx.sqlite.run(
+async function seedForeignExpense(): Promise<string> {
+  await ctx.sql.run(
     `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-status', 'fstatus@test.com', 'Foreign')`
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-foreign-status', 'u-foreign-status', 'Mazda', '3', 2020)`
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO expenses (id, vehicle_id, category, date, expense_amount, user_id)
      VALUES ('exp-foreign-status', 'veh-foreign-status', 'misc', 1700000000000, 4200, 'u-foreign-status')`
   );
@@ -72,7 +72,7 @@ describe('expenses/:id — absent row answers 404, not 400', () => {
 
 describe('expenses/:id — status cannot discriminate existence', () => {
   test('an existing FOREIGN id answers the same 404 as an absent one on every verb', async () => {
-    const foreignId = seedForeignExpense();
+    const foreignId = await seedForeignExpense();
 
     for (const method of ['GET', 'PUT', 'DELETE'] as const) {
       const body = method === 'PUT' ? { description: 'edited' } : undefined;
@@ -83,9 +83,9 @@ describe('expenses/:id — status cannot discriminate existence', () => {
       expect(foreign.status, `${method} foreign`).toBe(404);
     }
 
-    const remaining = ctx.sqlite
-      .query('SELECT COUNT(*) as n FROM expenses WHERE id = ?')
-      .get(foreignId) as { n: number };
+    const remaining = (await ctx.sql.get('SELECT COUNT(*) as n FROM expenses WHERE id = ?', [
+      foreignId,
+    ])) as { n: number };
     expect(remaining.n, 'the foreign expense survived the denied DELETE').toBe(1);
   });
 });

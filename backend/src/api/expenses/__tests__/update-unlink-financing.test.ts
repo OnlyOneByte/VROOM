@@ -20,10 +20,10 @@ interface SourceRow {
   source_id: string | null;
 }
 
-function sourceOf(id: string): SourceRow {
-  return ctx.sqlite
-    .query('SELECT source_type, source_id FROM expenses WHERE id = ?')
-    .get(id) as SourceRow;
+async function sourceOf(id: string): Promise<SourceRow> {
+  return (await ctx.sql.get('SELECT source_type, source_id FROM expenses WHERE id = ?', [
+    id,
+  ])) as SourceRow;
 }
 
 async function createLinkedPayment(): Promise<{ id: string; financingId: string }> {
@@ -61,14 +61,14 @@ describe('PUT can remove a financing link', () => {
       sourceId: null,
     });
     expect(res.status, await res.text()).toBe(200);
-    expect(sourceOf(id)).toEqual({ source_type: null, source_id: null });
+    expect(await sourceOf(id)).toEqual({ source_type: null, source_id: null });
   });
 
   test('omitting both keeps the link', async () => {
     const { id, financingId } = await createLinkedPayment();
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { expenseAmount: 410 });
     expect(res.status, await res.text()).toBe(200);
-    expect(sourceOf(id)).toEqual({ source_type: 'financing', source_id: financingId });
+    expect(await sourceOf(id)).toEqual({ source_type: 'financing', source_id: financingId });
   });
 
   test.each([[{ sourceType: null }], [{ sourceId: null }], [{ sourceType: null, sourceId: 'x' }]])(
@@ -77,7 +77,7 @@ describe('PUT can remove a financing link', () => {
       const { id, financingId } = await createLinkedPayment();
       const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, half);
       expect(res.status).toBe(400);
-      expect(sourceOf(id)).toEqual({ source_type: 'financing', source_id: financingId });
+      expect(await sourceOf(id)).toEqual({ source_type: 'financing', source_id: financingId });
     }
   );
 
@@ -90,14 +90,15 @@ describe('PUT can remove a financing link', () => {
       date: '2024-02-01T00:00:00.000Z',
     });
     const body = await json<DataEnvelope<{ id: string }>>(res);
-    ctx.sqlite
-      .query("UPDATE expenses SET source_type = 'reminder', source_id = 'r1' WHERE id = ?")
-      .run(body.data.id);
+    await ctx.sql.run(
+      "UPDATE expenses SET source_type = 'reminder', source_id = 'r1' WHERE id = ?",
+      [body.data.id]
+    );
     const put = await ctx.authed('PUT', `/api/v1/expenses/${body.data.id}`, {
       sourceType: null,
       sourceId: null,
     });
     expect(put.status).toBe(400);
-    expect(sourceOf(body.data.id)).toEqual({ source_type: 'reminder', source_id: 'r1' });
+    expect(await sourceOf(body.data.id)).toEqual({ source_type: 'reminder', source_id: 'r1' });
   });
 });

@@ -80,10 +80,10 @@ describe('charger type on charging expenses', () => {
     expect(csv.split('\n')[0]).toContain('"chargerType"');
     expect(csv).toContain('"home"');
 
-    ctx.sqlite.run('DELETE FROM expenses');
+    await ctx.sql.run('DELETE FROM expenses');
     const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
     expect(res.status).toBe(200);
-    const row = ctx.sqlite.query('SELECT charger_type FROM expenses').get();
+    const row = await ctx.sql.get('SELECT charger_type FROM expenses');
     expect(row).toEqual({ charger_type: 'home' });
   });
 
@@ -198,7 +198,7 @@ describe('charger type on charging expenses', () => {
     const set = await ctx.authed('PUT', `/api/v1/expenses/${gas.id}`, { chargerType: 'home' });
     expect(set.status).toBe(200);
     expect((await json<DataEnvelope<Row>>(set)).data.chargerType).toBeNull();
-    expect(ctx.sqlite.query('SELECT charger_type FROM expenses WHERE id = ?').get(gas.id)).toEqual({
+    expect(await ctx.sql.get('SELECT charger_type FROM expenses WHERE id = ?', [gas.id])).toEqual({
       charger_type: null,
     });
   });

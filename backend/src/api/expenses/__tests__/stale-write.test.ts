@@ -43,8 +43,8 @@ async function createExpense(): Promise<Row> {
 
 const put = (id: string, body: object) => ctx.authed('PUT', `/api/v1/expenses/${id}`, body);
 
-function stored(id: string): unknown {
-  return ctx.sqlite.query('SELECT * FROM expenses WHERE id = ?').get(id);
+async function stored(id: string): Promise<unknown> {
+  return await ctx.sql.get('SELECT * FROM expenses WHERE id = ?', [id]);
 }
 
 describe('PUT /expenses/:id with expectedUpdatedAt', () => {
@@ -53,14 +53,14 @@ describe('PUT /expenses/:id with expectedUpdatedAt', () => {
     const fresh = await put(row.id, { description: 'Second', expectedUpdatedAt: row.updatedAt });
     expect(fresh.status).toBe(200);
     const current = (await json<DataEnvelope<Row>>(fresh)).data;
-    const before = stored(row.id);
+    const before = await stored(row.id);
 
     const stale = await put(row.id, { description: 'Late', expectedUpdatedAt: row.updatedAt });
     expect(stale.status).toBe(409);
     const body = await json<ErrorBody>(stale);
     expect(body.error.code).toBe('EXPENSE_CHANGED');
     expect(body.error.details?.updatedAt).toBe(current.updatedAt);
-    expect(stored(row.id)).toEqual(before);
+    expect(await stored(row.id)).toEqual(before);
   });
 
   test('a matching value saves', async () => {
@@ -92,23 +92,24 @@ describe('PUT /expenses/:id with expectedUpdatedAt', () => {
       expectedUpdatedAt: afterFirst.updatedAt,
     });
     expect(late.status).toBe(409);
-    expect(ctx.sqlite.query('SELECT description FROM expenses WHERE id = ?').get(row.id)).toEqual({
+    expect(await ctx.sql.get('SELECT description FROM expenses WHERE id = ?', [row.id])).toEqual({
       description: 'B',
     });
   });
 
   test('clearing a financing link moves the version, so an edit read before it is refused', async () => {
     const row = await createExpense();
-    ctx.sqlite
-      .query("UPDATE expenses SET source_type = 'financing', source_id = 'loan-1' WHERE id = ?")
-      .run(row.id);
+    await ctx.sql.run(
+      "UPDATE expenses SET source_type = 'financing', source_id = 'loan-1' WHERE id = ?",
+      [row.id]
+    );
 
     expect(await repos().expenses.clearSource('financing', 'loan-1', ctx.user.id)).toBe(1);
 
     const stale = await put(row.id, { description: 'Late', expectedUpdatedAt: row.updatedAt });
     expect(stale.status).toBe(409);
     expect((await json<ErrorBody>(stale)).error.code).toBe('EXPENSE_CHANGED');
-    expect(ctx.sqlite.query('SELECT description FROM expenses WHERE id = ?').get(row.id)).toEqual({
+    expect(await ctx.sql.get('SELECT description FROM expenses WHERE id = ?', [row.id])).toEqual({
       description: 'Oil change',
     });
   });
@@ -160,20 +161,20 @@ describe('PUT /expenses/split/:id with expectedUpdatedAt', () => {
     };
   }
 
-  const latestLegTime = (groupId: string): string => {
-    const row = ctx.sqlite
-      .query('SELECT MAX(updated_at) AS t FROM expenses WHERE group_id = ?')
-      .get(groupId) as { t: number };
+  const latestLegTime = async (groupId: string): Promise<string> => {
+    const row = (await ctx.sql.get('SELECT MAX(updated_at) AS t FROM expenses WHERE group_id = ?', [
+      groupId,
+    ])) as { t: number };
     return new Date(row.t * 1000).toISOString();
   };
 
   const splitPut = (groupId: string, body: object) =>
     ctx.authed('PUT', `/api/v1/expenses/split/${groupId}`, body);
 
-  const legAmounts = (groupId: string) =>
-    ctx.sqlite
-      .query('SELECT expense_amount FROM expenses WHERE group_id = ? ORDER BY id')
-      .all(groupId);
+  const legAmounts = async (groupId: string) =>
+    await ctx.sql.all('SELECT expense_amount FROM expenses WHERE group_id = ? ORDER BY id', [
+      groupId,
+    ]);
 
   test('a matching value saves and a stale one is refused with nothing written', async () => {
     const { groupId, updatedAt } = await createSplit();
@@ -184,7 +185,7 @@ describe('PUT /expenses/split/:id with expectedUpdatedAt', () => {
       expectedUpdatedAt: updatedAt,
     });
     expect(ok.status).toBe(200);
-    const before = legAmounts(groupId);
+    const before = await legAmounts(groupId);
 
     const stale = await splitPut(groupId, {
       splitConfig,
@@ -193,7 +194,7 @@ describe('PUT /expenses/split/:id with expectedUpdatedAt', () => {
     });
     expect(stale.status).toBe(409);
     expect((await json<ErrorBody>(stale)).error.code).toBe('EXPENSE_CHANGED');
-    expect(legAmounts(groupId)).toEqual(before);
+    expect(await legAmounts(groupId)).toEqual(before);
   });
 
   test('no value saves as before', async () => {
@@ -209,9 +210,9 @@ describe('PUT /expenses/split/:id with expectedUpdatedAt', () => {
     const { groupId, legIds, other } = await createSplit();
     const [legA = '', legB = ''] = legIds;
     expect((await put(legA, { description: 'A' })).status).toBe(200);
-    const afterA = latestLegTime(groupId);
+    const afterA = await latestLegTime(groupId);
     expect((await put(legB, { description: 'B' })).status).toBe(200);
-    expect(latestLegTime(groupId) > afterA).toBe(true);
+    expect((await latestLegTime(groupId)) > afterA).toBe(true);
 
     const stale = await splitPut(groupId, {
       splitConfig: { method: 'even', vehicleIds: [vehicleId, other] },
@@ -241,6 +242,6 @@ describe('PUT /expenses/split/:id with expectedUpdatedAt', () => {
       expectedUpdatedAt: updatedAt,
     });
     expect(stale.status).toBe(409);
-    expect(legAmounts(groupId)).toHaveLength(3);
+    expect(await legAmounts(groupId)).toHaveLength(3);
   });
 });

@@ -15,8 +15,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function tagsOf(id: string): string[] | null {
-  const row = ctx.sqlite.query('SELECT tags FROM expenses WHERE id = ?').get(id) as {
+async function tagsOf(id: string): Promise<string[] | null> {
+  const row = (await ctx.sql.get('SELECT tags FROM expenses WHERE id = ?', [id])) as {
     tags: string | null;
   };
   return row.tags == null ? null : (JSON.parse(row.tags) as string[]);
@@ -39,12 +39,12 @@ describe('expense update preserves tags', () => {
   test('editing only the amount must NOT wipe the tags', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
     const id = await createTaggedExpense(vehicleId, ['business', 'reimbursable']);
-    expect(tagsOf(id)).toEqual(['business', 'reimbursable']);
+    expect(await tagsOf(id)).toEqual(['business', 'reimbursable']);
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { expenseAmount: 99 });
     expect(res.status, await res.text()).toBe(200);
 
-    expect(tagsOf(id), 'tags must survive an unrelated-field edit').toEqual([
+    expect(await tagsOf(id), 'tags must survive an unrelated-field edit').toEqual([
       'business',
       'reimbursable',
     ]);
@@ -57,7 +57,7 @@ describe('expense update preserves tags', () => {
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { tags: ['new', 'fresh'] });
     expect(res.status, await res.text()).toBe(200);
 
-    expect(tagsOf(id)).toEqual(['new', 'fresh']);
+    expect(await tagsOf(id)).toEqual(['new', 'fresh']);
   });
 });
 
@@ -93,12 +93,12 @@ describe('a tag containing a separator is rejected', () => {
     const id = await createTaggedExpense(vehicleId, ['clean']);
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { tags: ['a;b'] });
     expect(res.status).toBe(400);
-    expect(tagsOf(id)).toEqual(['clean']);
+    expect(await tagsOf(id)).toEqual(['clean']);
   });
 
   test('a normal separator-free tag still creates fine (control)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
     const id = await createTaggedExpense(vehicleId, ['road-trip', 'business']);
-    expect(tagsOf(id)).toEqual(['road-trip', 'business']);
+    expect(await tagsOf(id)).toEqual(['road-trip', 'business']);
   });
 });

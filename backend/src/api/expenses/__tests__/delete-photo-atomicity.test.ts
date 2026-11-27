@@ -17,27 +17,27 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function blockExpenseDeletes(): void {
-  ctx.sqlite.run(
+async function blockExpenseDeletes(): Promise<void> {
+  await ctx.sql.run(
     `CREATE TRIGGER test_block_expense_delete BEFORE DELETE ON expenses
      BEGIN SELECT RAISE(ABORT, 'expense delete blocked by test'); END`
   );
 }
-function unblockExpenseDeletes(): void {
-  ctx.sqlite.run('DROP TRIGGER IF EXISTS test_block_expense_delete');
+async function unblockExpenseDeletes(): Promise<void> {
+  await ctx.sql.run('DROP TRIGGER IF EXISTS test_block_expense_delete');
 }
 
-function photoCount(): number {
-  const r = ctx.sqlite.query('SELECT COUNT(*) as n FROM photos').get() as { n: number };
+async function photoCount(): Promise<number> {
+  const r = (await ctx.sql.get('SELECT COUNT(*) as n FROM photos')) as { n: number };
   return r.n;
 }
-function expenseCount(): number {
-  const r = ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number };
+async function expenseCount(): Promise<number> {
+  const r = (await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number };
   return r.n;
 }
 
-function attachPhoto(expenseId: string, id: string): void {
-  ctx.sqlite.run(
+async function attachPhoto(expenseId: string, id: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO photos (id, entity_type, entity_id, user_id, file_name, mime_type, file_size)
      VALUES (?, 'expense', ?, ?, 'receipt.jpg', 'image/jpeg', 1234)`,
     [id, expenseId, ctx.user.id]
@@ -57,23 +57,23 @@ describe('expense deletes that also drop photos are atomic', () => {
       sourceType: 'insurance_term',
       sourceId: 'term-1',
     } as Parameters<AppContext['repos']['expenses']['create']>[0]);
-    attachPhoto(created.id, 'photo-source-1');
+    await attachPhoto(created.id, 'photo-source-1');
 
-    expect(photoCount()).toBe(1);
+    expect(await photoCount()).toBe(1);
 
-    blockExpenseDeletes();
+    await blockExpenseDeletes();
     let threw = false;
     try {
       await repos().expenses.deleteBySource('insurance_term', 'term-1', ctx.user.id);
     } catch {
       threw = true;
     } finally {
-      unblockExpenseDeletes();
+      await unblockExpenseDeletes();
     }
 
     expect(threw, 'the blocked expense delete should surface as a throw').toBe(true);
-    expect(expenseCount(), 'the expense survived the failed delete').toBe(1);
-    expect(photoCount(), 'its photo row rolled back with it').toBe(1);
+    expect(await expenseCount(), 'the expense survived the failed delete').toBe(1);
+    expect(await photoCount(), 'its photo row rolled back with it').toBe(1);
   });
 
   test('deleteSplitExpense: a failing sibling delete leaves the photo rows intact', async () => {
@@ -90,23 +90,23 @@ describe('expense deletes that also drop photos are atomic', () => {
       await json<DataEnvelope<{ groupId: string; siblings: Array<{ id: string }> }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
     const { groupId } = body.data;
-    attachPhoto(body.data.siblings[0].id, 'photo-split-1');
+    await attachPhoto(body.data.siblings[0].id, 'photo-split-1');
 
-    expect(expenseCount()).toBe(2);
-    expect(photoCount()).toBe(1);
+    expect(await expenseCount()).toBe(2);
+    expect(await photoCount()).toBe(1);
 
-    blockExpenseDeletes();
+    await blockExpenseDeletes();
     let threw = false;
     try {
       await repos().expenses.deleteSplitExpense(groupId, ctx.user.id);
     } catch {
       threw = true;
     } finally {
-      unblockExpenseDeletes();
+      await unblockExpenseDeletes();
     }
 
     expect(threw, 'the blocked sibling delete should surface as a throw').toBe(true);
-    expect(expenseCount(), 'both siblings survived the failed delete').toBe(2);
-    expect(photoCount(), 'the attached photo row rolled back with them').toBe(1);
+    expect(await expenseCount(), 'both siblings survived the failed delete').toBe(2);
+    expect(await photoCount(), 'the attached photo row rolled back with them').toBe(1);
   });
 });
