@@ -19,8 +19,13 @@ import { OPERATION_TIMEOUTS, withDeadline, withTimeout } from '../../utils/timeo
 import { zValidator } from '../../utils/validation';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
-import { backupOrchestrator } from './backup-orchestrator';
-import { hasSheetsSync, hasZipBackup, isSyncEnabled } from './backup-strategy';
+import { backupOrchestrator, loadProviderTypes } from './backup-orchestrator';
+import {
+  hasSheetsSync,
+  hasZipBackup,
+  isPhotoOnlyProviderType,
+  isSyncEnabled,
+} from './backup-strategy';
 import './init';
 import { type RestoreResponse, restoreService } from './restore';
 
@@ -71,6 +76,30 @@ function validateSyncTypes(syncTypes: unknown): string[] {
   return syncTypes as string[];
 }
 
+const providerIdsSchema = z
+  .array(z.string().min(1).max(64))
+  .min(1, 'Choose at least one provider')
+  .max(20)
+  .refine((ids) => new Set(ids).size === ids.length, 'Provider ids must be unique')
+  .optional();
+
+async function validateProviderIds(userId: string, raw: unknown): Promise<string[] | undefined> {
+  const parsed = providerIdsSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid providerIds');
+  }
+  if (!parsed.data) return undefined;
+  const types = await loadProviderTypes(userId);
+  for (const id of parsed.data) {
+    const type = types.get(id);
+    if (type === undefined) throw new ValidationError('Unknown storage provider');
+    if (isPhotoOnlyProviderType(type)) {
+      throw new ValidationError('That storage provider only keeps photos');
+    }
+  }
+  return parsed.data;
+}
+
 routes.post(
   '/',
   syncRateLimiter,
@@ -81,11 +110,16 @@ routes.post(
     const userId = user.id;
 
     // null parses as valid JSON, so the parsed body can be null and must be optional-chained.
-    const body = await readJsonBody<{ syncTypes?: unknown; force?: unknown } | null>(c);
+    const body = await readJsonBody<{
+      syncTypes?: unknown;
+      force?: unknown;
+      providerIds?: unknown;
+    } | null>(c);
     validateSyncTypes(body?.syncTypes);
     const force = body?.force === true;
+    const providerIds = await validateProviderIds(userId, body?.providerIds);
 
-    const result = await backupOrchestrator.execute(userId, user.displayName, force);
+    const result = await backupOrchestrator.execute(userId, user.displayName, force, providerIds);
 
     if (result.status === 'in_progress') {
       return c.json(

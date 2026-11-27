@@ -40,6 +40,24 @@ export function filterEnabledProviders(
   );
 }
 
+export const NEW_PROVIDER_BACKUP_SETTINGS = {
+  folderPath: 'Backups',
+  retentionCount: 10,
+} as const;
+
+export function chosenProviders(
+  config: BackupConfig,
+  providerIds: readonly string[]
+): [string, ProviderBackupSettings][] {
+  return providerIds.map((id) => {
+    const saved = config.providers[id];
+    return [id, { ...NEW_PROVIDER_BACKUP_SETTINGS, ...saved, enabled: true }] as [
+      string,
+      ProviderBackupSettings,
+    ];
+  });
+}
+
 export function needsZipGeneration(
   enabledProviders: [string, ProviderBackupSettings][],
   providerTypes: ProviderTypes
@@ -107,7 +125,8 @@ export class BackupOrchestrator {
   async execute(
     userId: string,
     displayName: string,
-    force = false
+    force = false,
+    providerIds?: readonly string[]
   ): Promise<BackupOrchestratorResult> {
     const timestamp = new Date().toISOString();
 
@@ -146,10 +165,10 @@ export class BackupOrchestrator {
       const providerRowMap = new Map(providerRows.map((r) => [r.id, r]));
       const providerTypes = new Map(providerRows.map((r) => [r.id, r.providerType]));
 
-      const enabledProviders = filterEnabledProviders(
-        force ? config : withPausedSheetsOff(config),
-        providerTypes
-      );
+      const runConfig = force ? config : withPausedSheetsOff(config);
+      const enabledProviders = providerIds
+        ? chosenProviders(runConfig, providerIds)
+        : filterEnabledProviders(runConfig, providerTypes);
 
       if (enabledProviders.length === 0) {
         return { timestamp, outcome: 'noop', failedProviders: [], results: {} };
