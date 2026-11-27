@@ -113,6 +113,16 @@ describe('PUT /expenses/:id with expectedUpdatedAt', () => {
     });
   });
 
+  test('a currency change that rescales amounts moves the version, so an edit read before it is refused', async () => {
+    const row = await createExpense();
+    const changed = await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'JPY' });
+    expect(changed.status).toBe(200);
+
+    const stale = await put(row.id, { description: 'Late', expectedUpdatedAt: row.updatedAt });
+    expect(stale.status).toBe(409);
+    expect((await json<ErrorBody>(stale)).error.code).toBe('EXPENSE_CHANGED');
+  });
+
   test('a value that is not a date-time is a 400', async () => {
     const row = await createExpense();
     expect((await put(row.id, { description: 'x', expectedUpdatedAt: 'yesterday' })).status).toBe(

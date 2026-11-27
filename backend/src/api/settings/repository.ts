@@ -16,6 +16,7 @@ import {
 import { ConflictError, DatabaseError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES } from '../../types';
 import { minorUnitScale } from '../../utils/money';
+import { nextUpdatedAt } from '../expenses/updated-at';
 import { type BackupTables, MONEY_CENTS_FIELDS, rescaleMoneyTables } from '../sync/backup';
 
 export const DEFAULT_CURRENCY = 'USD';
@@ -196,7 +197,11 @@ async function rescaleOwnedMoney(
       (name) => MONEY_CENTS_FIELDS.has(name) || name === 'expenseSplitConfig'
     );
     for (const row of rescaled[key] ?? []) {
-      const set = Object.fromEntries(columns.map((name) => [name, row[name]]));
+      const stamp = row.updatedAt instanceof Date ? row.updatedAt : null;
+      const set = {
+        ...Object.fromEntries(columns.map((name) => [name, row[name]])),
+        ...(table === expenses && { updatedAt: nextUpdatedAt([stamp]) }),
+      };
       await tx
         .update(table)
         .set(set)

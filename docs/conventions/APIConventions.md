@@ -136,14 +136,16 @@ need; don't reshape a repository to qualify.
   code `EXPENSE_CHANGED` and `details.updatedAt` (the current value). If it is not set, the update
   behaves as before, so imports and older clients are unaffected.
 - Every write to an expense row moves `updated_at` forward, including writes that are not edits:
-  clearing a financing or other source link, deactivating a loan, the driver payer backfill and a
-  split group's total recompute. Without that, an edit read before such a write would overwrite it
-  unchecked.
+  clearing a financing or other source link, deactivating a loan, the driver payer backfill, a
+  split group's total recompute and the amount rescale on a currency change. Without that, an edit
+  read before such a write would overwrite it unchecked. (A driver is archived, not deleted, so the
+  `paid_by_driver_id` foreign key only clears when its vehicle, and so the expense, goes too.)
 - `updated_at` is stored in whole seconds, so each write sets it to at least one second past the
   latest value among the rows it touches (`nextUpdatedAt` and `nextUpdatedAtFor` in
   `api/expenses/updated-at.ts`). Two writes inside one second therefore never share a value.
-  `expense-writes-stamp.test.ts` fails on a production `update(expenses)` that does not set
-  `updatedAt`.
+  `expense-writes-stamp.test.ts` fails on a production `.update(expenses).set({ … })` that does
+  not set `updatedAt`. It reads that literal form only; a write through a table variable, such as
+  the currency rescale, has its own test in `stale-write.test.ts`.
 
 ### Ownership & Authorization
 - Every route checks access *before* the repository call. Don't delegate it downstream.
