@@ -162,6 +162,10 @@ async function routeData<T>(path: string): Promise<T> {
   const res = await ctx.authed('GET', path);
   const body = await json<DataEnvelope<T>>(res);
   expect(res.status, `GET ${path}: ${JSON.stringify(body)}`).toBe(200);
+  if (body.data && typeof body.data === 'object' && 'coverage' in body.data) {
+    const { coverage: _coverage, ...money } = body.data as Record<string, unknown>;
+    return money as T;
+  }
   return body.data;
 }
 
