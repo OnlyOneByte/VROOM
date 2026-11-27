@@ -1,12 +1,12 @@
 import { getTableColumns, is, SQL } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   customType,
   doublePrecision,
   foreignKey,
   index,
-  integer,
   jsonb,
   type PgColumnBuilderBase,
   type PgTableExtraConfigValue,
@@ -78,7 +78,7 @@ function baseColumn(column: SQLiteColumn): Chain {
     case 'SQLiteBoolean':
       return boolean(name) as unknown as Chain;
     case 'SQLiteInteger':
-      return integer(name) as unknown as Chain;
+      return bigint(name, { mode: 'number' }) as unknown as Chain;
     case 'SQLiteReal':
       return doublePrecision(name) as unknown as Chain;
     case 'SQLiteTextJson':
