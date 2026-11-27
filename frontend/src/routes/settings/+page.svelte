@@ -25,7 +25,6 @@
 	import PWAInstallCard from '#lib/components/settings/cards/PwaInstallCard.svelte';
 	import PushNotificationsCard from '#lib/components/settings/cards/PushNotificationsCard.svelte';
 	import CalendarFeedCard from '#lib/components/settings/cards/CalendarFeedCard.svelte';
-	import ModelProvidersCard from '#lib/components/settings/cards/ModelProvidersCard.svelte';
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { signupApi } from '#lib/services/signup-api.ts';
@@ -69,6 +68,8 @@
 		return storageProviders.map(p => p.displayName).join(' · ');
 	});
 
+	const AI_ANCHORS = new Set(['#settings-ai', '#receipt-scanning', '#assistant-providers']);
+
 	const migrateCard = import('#lib/components/settings/cards/MigrateFromTrackerCard.svelte');
 	migrateCard.catch(() => undefined);
 
@@ -77,6 +78,12 @@
 	onMount(() => {
 		if (location.hash === '#settings-connections') {
 			void goto(resolve(routes.settingsStorage), { replaceState: true });
+			return;
+		}
+		if (AI_ANCHORS.has(location.hash)) {
+			const anchor = location.hash === '#settings-ai' ? '' : location.hash;
+			// eslint-disable-next-line svelte/no-navigation-without-resolve -- the path is resolved; only the card's anchor is added
+			void goto(`${resolve(routes.settingsAi)}${anchor}`, { replaceState: true });
 			return;
 		}
 		settingsStore.load();
@@ -314,6 +321,25 @@
 						</CardContent>
 					</Card>
 
+					<Card variant="section" role="region" aria-labelledby="settings-ai">
+						<CardHeader>
+							<CardTitle level={2} id="settings-ai" class="text-base">AI helpers</CardTitle>
+							<CardAction>
+								<a
+									href={resolve(routes.settingsAi)}
+									class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
+									aria-label="Manage AI helpers"
+								>
+									Manage
+								</a>
+							</CardAction>
+						</CardHeader>
+						<CardContent class="pb-3" data-testid="settings-ai-summary">
+							<p class="font-medium">Receipt scanning and the assistant</p>
+							<p class="text-sm text-muted-foreground">Optional, with your own provider and key</p>
+						</CardContent>
+					</Card>
+
 					<Card variant="section" role="region" aria-labelledby="settings-data">
 						<CardHeader>
 							<CardTitle level={2} id="settings-data" class="text-base">Your data</CardTitle>
@@ -353,14 +379,6 @@
 					</Card>
 				</div>
 			</div>
-			<section class="space-y-4" aria-labelledby="settings-ai">
-				<div>
-					<h2 id="settings-ai" class="text-lg font-semibold">Connections</h2>
-					<p class="text-sm text-muted-foreground">AI services you connect with your own key.</p>
-				</div>
-				<ModelProvidersCard domain="vlm" />
-				<ModelProvidersCard domain="llm" />
-			</section>
 		</div>
 	{/if}
 </div>

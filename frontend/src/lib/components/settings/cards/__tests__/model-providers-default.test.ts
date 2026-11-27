@@ -75,7 +75,7 @@ describe('choosing which assistant provider is used', () => {
 		getProviders.mockResolvedValue([NEWER, OLDER]);
 		await mount();
 		expect(await rowWith('Work Claude')).toHaveTextContent('Used for the assistant');
-		expect(screen.getAllByRole('button', { name: 'Use for the Assistant' })).toHaveLength(1);
+		expect(screen.getAllByRole('button', { name: 'Use for the assistant' })).toHaveLength(1);
 	});
 
 	test('a saved choice is shown, and picking another one saves it', async () => {
@@ -84,7 +84,7 @@ describe('choosing which assistant provider is used', () => {
 		await mount();
 		expect(await rowWith('Home Claude')).toHaveTextContent('Used for the assistant');
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Use for the Assistant' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Use for the assistant' }));
 		await waitFor(() =>
 			expect(showSuccess).toHaveBeenCalledWith('The assistant now uses Work Claude.')
 		);
@@ -139,7 +139,7 @@ describe('the built-in text reader in receipt scanning', () => {
 		getProviders.mockResolvedValue([VISION]);
 		await mountVision();
 		expect(screen.getByTestId('vlm-provider-row')).toHaveTextContent('Used for receipt scanning');
-		await fireEvent.click(screen.getByRole('button', { name: 'Use for Receipt Scanning' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Use for receipt scanning' }));
 		await waitFor(() =>
 			expect(screen.getByTestId('vlm-builtin-row')).toHaveTextContent('Used for receipt scanning')
 		);
@@ -155,7 +155,7 @@ describe('the built-in text reader in receipt scanning', () => {
 		} as UserSettings);
 		await mountVision();
 		expect(screen.getByTestId('vlm-builtin-row')).toHaveTextContent('Used for receipt scanning');
-		expect(screen.getByTestId('vlm-provider-row')).toHaveTextContent('Use for Receipt Scanning');
+		expect(screen.getByTestId('vlm-provider-row')).toHaveTextContent('Use for receipt scanning');
 	});
 
 	test('the add dialog offers only AI providers, not the built-in reader', async () => {

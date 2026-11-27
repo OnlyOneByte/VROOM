@@ -159,7 +159,7 @@ describe('Settings page loading', () => {
 
 	test('has no Save Settings button: every preference saves on change', async () => {
 		await mount();
-		expect(screen.getByTestId('stub-model-llm')).toBeInTheDocument();
+		expect(screen.getByTestId('settings-ai-summary')).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Save/ })).toBeNull();
 	});
 
@@ -175,15 +175,15 @@ describe('Settings page loading', () => {
 				})
 		);
 		await mount();
-		expect(screen.queryByTestId('stub-model-llm')).toBeNull();
+		expect(screen.queryByTestId('stub-charge')).toBeNull();
 
 		finish();
 		await settle();
-		const card = screen.getByTestId('stub-model-llm');
+		const card = screen.getByTestId('stub-charge');
 
 		fakeSettingsState.isLoading = true;
 		await settle();
-		expect(screen.getByTestId('stub-model-llm')).toBe(card);
+		expect(screen.getByTestId('stub-charge')).toBe(card);
 	});
 
 	test('a load failure shows the error and retry reloads everything', async () => {
@@ -193,20 +193,20 @@ describe('Settings page loading', () => {
 		await mount();
 		expect(screen.getByText("Couldn't load settings")).toBeInTheDocument();
 		expect(screen.getByText(SERVER_FAILURE_MESSAGE)).toBeInTheDocument();
-		expect(screen.queryByTestId('stub-model-llm')).toBeNull();
+		expect(screen.queryByTestId('settings-ai-summary')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
 		expect(settingsStoreFake.load).toHaveBeenCalledTimes(2);
 		expect(getProviders).toHaveBeenCalledTimes(2);
 		expect(screen.queryByText("Couldn't load settings")).toBeNull();
-		expect(screen.getByTestId('stub-model-llm')).toBeInTheDocument();
+		expect(screen.getByTestId('settings-ai-summary')).toBeInTheDocument();
 	});
 
 	test('a storage-provider load failure still renders the page', async () => {
 		getProviders.mockRejectedValue(new Error('offline'));
 		await mount();
-		expect(screen.getByTestId('stub-model-llm')).toBeInTheDocument();
+		expect(screen.getByTestId('settings-ai-summary')).toBeInTheDocument();
 	});
 
 	test('the Account section shows the name and email and links to the profile', async () => {
@@ -278,19 +278,29 @@ describe('Settings page loading', () => {
 		expect(within(data).getByRole('button', { name: 'Export' })).toBeInTheDocument();
 	});
 
-	test('groups both AI provider cards under one Connections section, with no storage card', async () => {
+	test('AI helpers links to its page, and the provider cards no longer sit on Settings', async () => {
 		await mount();
-		const section = screen.getByRole('region', { name: 'Connections' });
-		expect(section.nextElementSibling).toBeNull();
-		const migrate = screen.getByTestId('stub-migrate');
-		expect(section).not.toContainElement(migrate);
-		expect(
-			migrate.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING
-		).toBeTruthy();
-		expect(section).toContainElement(screen.getByTestId('stub-model-vlm'));
-		expect(section).toContainElement(screen.getByTestId('stub-model-llm'));
+		const ai = within(screen.getByRole('region', { name: 'AI helpers' }));
+		expect(ai.getByRole('link', { name: 'Manage AI helpers' })).toHaveAttribute(
+			'href',
+			'/settings/ai'
+		);
+		expect(screen.queryByTestId('stub-model-vlm')).toBeNull();
+		expect(screen.queryByTestId('stub-model-llm')).toBeNull();
+		expect(screen.queryByRole('region', { name: 'Connections' })).toBeNull();
 		expect(screen.queryByRole('button', { name: 'stub backup now' })).toBeNull();
-		expect(screen.queryByRole('spinbutton', { name: 'stub inactivity' })).toBeNull();
+	});
+
+	test.each([
+		['#settings-ai', '/settings/ai'],
+		['#receipt-scanning', '/settings/ai#receipt-scanning'],
+		['#assistant-providers', '/settings/ai#assistant-providers']
+	])('an old link to %s goes to the AI helpers page', async (hash, target) => {
+		window.history.replaceState(null, '', `/settings${hash}`);
+		await mount();
+		expect(goto).toHaveBeenCalledWith(target, { replaceState: true });
+		expect(settingsStoreFake.load).not.toHaveBeenCalled();
+		window.history.replaceState(null, '', '/');
 	});
 
 	test.each([
