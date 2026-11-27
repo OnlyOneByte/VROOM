@@ -227,6 +227,11 @@ interface QueryCoverage {
   unavailable: number;
 }
 
+function withFinancials(scope: ReadableVehicle[], coverage: QueryCoverage): QueryCoverage {
+  const shown = new Set(scope.filter((v) => !v.hideFinancials).map((v) => v.vehicleId));
+  return { ...coverage, vehicleIds: coverage.vehicleIds.filter((id) => shown.has(id)) };
+}
+
 async function queryScope(
   userId: string,
   vehicleIds?: string[]
@@ -420,7 +425,7 @@ routes.get(
       success: true,
       data: {
         ...financingToApi(data, await repos().preferences.moneyScale(user.id)),
-        coverage,
+        coverage: withFinancials(scope, coverage),
       },
     });
   }
@@ -439,7 +444,7 @@ routes.get(
       success: true,
       data: {
         ...insuranceToApi(data, await repos().preferences.moneyScale(user.id)),
-        coverage,
+        coverage: withFinancials(scope, coverage),
       },
     });
   }

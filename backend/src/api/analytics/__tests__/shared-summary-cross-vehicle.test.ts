@@ -182,6 +182,11 @@ describe('financing and insurance cover shared cars only where the share shows t
 
   test('a viewer without financial access gets no financing or insurance for the shared car', async () => {
     expect((await financing(viewer.request)).vehicleDetails).toEqual([]);
+    for (const path of ['/api/v1/analytics/financing', '/api/v1/analytics/insurance']) {
+      const res = await viewer.request('GET', path);
+      const body = await json<DataEnvelope<{ coverage: { vehicleIds: string[] } }>>(res);
+      expect(body.data.coverage.vehicleIds, path).toEqual([]);
+    }
     const data = await insurance(viewer.request);
     expect(data.vehicleDetails).toEqual([]);
     expect(data.summary.totalAnnualPremiums).toBe(0);
