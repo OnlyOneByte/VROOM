@@ -6,7 +6,7 @@ import { appContext } from '../app-context';
 import { CONFIG } from '../config';
 import { users } from '../db/schema';
 import { ValidationError } from '../errors';
-import { resolverFor } from '../permissions/grants';
+import { syncResolverFor } from '../permissions/grants';
 
 type AddressClass = 'public' | 'private' | 'forbidden';
 
@@ -233,7 +233,7 @@ export function isNetworkAdmin(userId: string): boolean {
     .where(eq(users.id, userId))
     .get()?.email;
   if (email && CONFIG.adminEmails.includes(email.toLowerCase())) return true;
-  return resolverFor(db, userId).can(PRIVATE_NETWORK_PERMISSION, { kind: 'server' }).allow;
+  return syncResolverFor(db, userId).can(PRIVATE_NETWORK_PERMISSION, { kind: 'server' }).allow;
 }
 
 const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;

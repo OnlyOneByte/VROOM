@@ -1,20 +1,20 @@
 import type { Context } from 'hono';
 import { appContext, repos } from '../../app-context';
 import { ForbiddenError, ValidationError } from '../../errors';
-import { requestResolver } from '../../permissions/grants';
+import { loadResolver, requestResolver } from '../../permissions/grants';
 import { findDriver, ownDriverId } from './repository';
 
 type DriverField = 'driverId' | 'paidByDriverId';
 
 function mayRecordOthers(c: Context, vehicleId: string): boolean {
-  return requestResolver(c, appContext().db).can('vehicle.driver.record', {
+  return requestResolver(c).can('vehicle.driver.record', {
     kind: 'vehicle',
     vehicleId,
   }).allow;
 }
 
 export function maySeeDrivers(c: Context, vehicleId: string): boolean {
-  const resolver = requestResolver(c, appContext().db);
+  const resolver = requestResolver(c);
   const vehicle = { kind: 'vehicle' as const, vehicleId };
   return (
     resolver.can('vehicle.driver.record', vehicle).allow ||
@@ -23,7 +23,7 @@ export function maySeeDrivers(c: Context, vehicleId: string): boolean {
 }
 
 export function carShareAccess(c: Context, vehicleId: string, enabled: boolean) {
-  const resolver = requestResolver(c, appContext().db);
+  const resolver = requestResolver(c);
   const vehicle = { kind: 'vehicle' as const, vehicleId };
   return {
     enabled,
@@ -45,6 +45,7 @@ async function assertMayAttribute(
   requested: string | null,
   current: string | null | undefined
 ): Promise<void> {
+  await loadResolver(c, [{ kind: 'vehicle', vehicleId }]);
   if (mayRecordOthers(c, vehicleId)) return;
   const own = await ownDriverId(appContext().asyncDb, vehicleId, c.get('user').id);
   if (current && current !== own) {

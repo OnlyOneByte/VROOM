@@ -105,6 +105,12 @@ export class DatabaseError extends AppError {
   }
 }
 
+export class ScopeNotLoadedError extends AppError {
+  constructor(scope: string) {
+    super('A permission check ran before its scope was loaded', 500, false, { scope });
+  }
+}
+
 export enum SyncErrorCode {
   AUTH_INVALID = 'AUTH_INVALID',
   NETWORK_ERROR = 'NETWORK_ERROR',

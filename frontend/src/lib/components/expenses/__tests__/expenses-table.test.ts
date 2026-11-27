@@ -290,7 +290,7 @@ describe('ExpensesTable deleting', () => {
 		await confirmDeleteIn();
 
 		await waitFor(() => expect(desktopAmounts(container)).toEqual(['$300.00', '$15.00']));
-		expect(notificationMessages()).toEqual(['Expense deleted']);
+		expect(notificationMessages()).toEqual([expect.stringMatching(/^Deleted “.+”$/)]);
 		expect(deleteExpense).not.toHaveBeenCalled();
 		expect(onDelete).not.toHaveBeenCalled();
 		await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());

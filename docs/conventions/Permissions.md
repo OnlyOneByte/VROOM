@@ -163,7 +163,10 @@ the two OAuth returns (they check their stored state, the session and, again, th
 flow started with), `GET /overrides`, where anyone reads their own overrides, and the `/roles`
 routes, which pick `server.roles.manage` or the owner's library by the role's scope;
 `src/permissions/__tests__/route-guard.test.ts` lists them and fails when any other mapped route
-lacks `authorize()`.
+lacks `authorize()`. A route that checks inside loads what it checks first with
+`await loadResolver(c, resources)`, and so does any code that checks a vehicle other than the one
+`authorize()` loaded. `requestResolver(c).can()` on an unloaded scope throws and the request
+fails with a 500; it never allows.
 - Use `{ public: '<reason>' }` only for routes a signed-out visitor must reach: health, the
   sign-in flow. The reason says why.
 

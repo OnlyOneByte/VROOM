@@ -18,7 +18,7 @@ import type { ApiResponse } from '../../errors';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';
-import { requestResolver } from '../../permissions/grants';
+import { loadResolver, vehicleResources } from '../../permissions/grants';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
@@ -284,7 +284,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
     const grants = await repos().vehicleShares.findAcceptedAccessForUser(user.id);
     if (grants.length > 0) {
       const byVehicleId = new Map(grants.map((g) => [g.vehicleId, g]));
-      const resolver = requestResolver(c, appContext().db);
+      const resolver = await loadResolver(c, vehicleResources(byVehicleId.keys()));
       const sharedVehicles = (await repos().vehicles.findByIds([...byVehicleId.keys()])).filter(
         (v) => resolver.can('vehicle.read', { kind: 'vehicle', vehicleId: v.id }).allow
       );
@@ -318,6 +318,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
   });
 
   const scaleOf = await repos().preferences.moneyScales(ownerOf.values());
+  await loadResolver(c, vehicleResources(allVehicles.map((v) => v.id)));
   const apiVehicles = enrichedVehicles.map((v) => ({
     ...vehicleRowToApi(v, scaleOf(ownerOf.get(v.id) ?? '')),
     carShare: carShareAccess(c, v.id, v.carShareEnabled),

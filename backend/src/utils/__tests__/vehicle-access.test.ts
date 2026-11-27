@@ -1,9 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../db/__tests__/migration-helpers';
-import type { AppDatabase } from '../../db/connection';
-import * as schema from '../../db/schema';
+import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
 import { NotFoundError } from '../../errors';
 import {
   requireVehicleAccess,
@@ -13,7 +11,7 @@ import {
 } from '../vehicle-access';
 
 let sqlite: Database;
-let db: AppDatabase;
+let db: AsyncAppDatabase;
 
 const OWNER = 'u-owner';
 const INVITEE = 'u-invitee';
@@ -39,8 +37,7 @@ beforeEach(() => {
     'Civic',
     2021,
   ]);
-  // biome-ignore lint/suspicious/noExplicitAny: drizzle bun-sqlite generic vs the AppDatabase alias
-  db = drizzle(sqlite, { schema }) as any;
+  db = openAsyncDatabase(sqlite).db;
 });
 afterEach(() => sqlite.close());
 

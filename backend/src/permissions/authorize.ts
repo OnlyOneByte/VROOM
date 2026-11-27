@@ -1,7 +1,6 @@
 import type { Context, MiddlewareHandler } from 'hono';
-import { appContext } from '../app-context';
 import { ForbiddenError, NotFoundError } from '../errors';
-import { requestResolver } from './grants';
+import { loadResolver, requestResolver } from './grants';
 import type { Decision, Resource } from './resolve';
 import { isPublicRule, ROUTE_PERMISSIONS, type RouteRule } from './route-map';
 
@@ -18,7 +17,7 @@ function labelOf(resource: Resource): string {
 }
 
 export function requireCan(c: Context, permission: string, resource: Resource): void {
-  enforce(requestResolver(c, appContext().db).can(permission, resource), labelOf(resource));
+  enforce(requestResolver(c).can(permission, resource), labelOf(resource));
 }
 
 function requiredFor(rule: RouteRule, resource: Resource, entityType: string | undefined) {
@@ -52,6 +51,7 @@ export function authorize(resourceOf: ResourceOf): MiddlewareHandler {
     const found = await resourceOf(c);
     const resources = Array.isArray(found) ? found : [found];
     if (resources.length === 0) throw new ForbiddenError();
+    await loadResolver(c, resources);
     for (const resource of resources) checkRule(c, rule, resource);
     await next();
   };

@@ -15,6 +15,7 @@ import {
   requireCan,
   vehicleOrOwnAccount,
 } from '../../permissions/authorize';
+import { loadResolver, vehicleResources } from '../../permissions/grants';
 import type { Resource } from '../../permissions/resolve';
 import { neutralizeCsvRow } from '../../utils/csv-safety';
 import {
@@ -479,6 +480,7 @@ routes.put(
 
     const existing = await repos().expenses.getSplitExpense(id, groupInfo.ownerId);
     const kept = new Set(splitConfigVehicleIds(data.splitConfig));
+    await loadResolver(c, vehicleResources(existing.map((row) => row.vehicleId)));
     for (const leg of existing.filter((row) => !kept.has(row.vehicleId))) {
       requireCan(
         c,
@@ -1044,6 +1046,7 @@ routes.put(
     }
 
     if (updateData.vehicleId && updateData.vehicleId !== existingExpense.vehicleId) {
+      await loadResolver(c, [vehicleResource(updateData.vehicleId)]);
       requireCan(c, 'vehicle.expense.write', vehicleResource(updateData.vehicleId));
       const target = await requireVehicleAccess(updateData.vehicleId, user.id, 'read');
       if (target.ownerId !== existingExpense.userId) {

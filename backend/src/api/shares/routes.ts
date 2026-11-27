@@ -26,6 +26,7 @@ import {
   changeShareRole,
   endVehicleMembership,
   grantShareRole,
+  loadResolver,
   refuseUnheld,
   requestResolver,
   shareRoleId,
@@ -91,7 +92,7 @@ const fromShare: ResourceOf = async (c) => {
   const share = await repos().vehicleShares.findById(c.req.param('id') ?? '');
   if (!share) throw new NotFoundError('Share');
   const vehicle: Resource = { kind: 'vehicle', vehicleId: share.vehicleId };
-  const decision = requestResolver(c, appContext().db).can('vehicle.read', vehicle);
+  const decision = (await loadResolver(c, [vehicle])).can('vehicle.read', vehicle);
   if (!decision.allow && decision.reason === 'not_found') throw new NotFoundError('Share');
   return vehicle;
 };
@@ -106,7 +107,7 @@ function vehicleOwnerId(vehicleId: string): string | null {
 }
 
 function holdsOn(c: Context, vehicleId: string): (permission: string) => boolean {
-  const resolver = requestResolver(c, appContext().db);
+  const resolver = requestResolver(c);
   const vehicle: Resource = { kind: 'vehicle', vehicleId };
   return (permission) => resolver.can(permission, vehicle).allow;
 }
