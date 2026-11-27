@@ -97,6 +97,7 @@ export interface UserSettings {
 	userId: string;
 	unitPreferences: UnitPreferences;
 	currencyUnit: string;
+	businessMileageRate?: number;
 	themePreference?: string;
 	autoBackupEnabled: boolean;
 	backupFrequency: 'daily' | 'weekly' | 'monthly';

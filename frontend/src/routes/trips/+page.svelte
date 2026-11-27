@@ -1,7 +1,9 @@
 <script lang="ts">
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import { MapPin, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import { routes } from '#lib/routes.ts';
 	import { tripApi } from '#lib/services/trip-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import type { Trip, TripSummary, Vehicle } from '#lib/types/index.ts';
@@ -145,7 +147,16 @@
 				<HeroFigure
 					label="Business distance"
 					value="{formatNumberUpTo(s.businessDistance, 1)} {distLabel}"
-				/>
+				>
+					{#snippet meta()}
+						<a
+							href="{resolve(routes.settings)}#business-mileage-rate"
+							class="inline-flex min-h-10 items-center font-medium text-accent-ink underline-offset-4 hover:underline sm:min-h-0"
+						>
+							Set a mileage rate to see what it’s worth
+						</a>
+					{/snippet}
+				</HeroFigure>
 			{/if}
 			<dl class="grid grid-cols-3 gap-4">
 				<div>
