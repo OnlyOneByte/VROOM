@@ -99,8 +99,14 @@
 		formatDateWith(bucketDate(bucket), { month });
 
 	let monthly = $derived(results?.monthly ?? null);
-	let ownedCount = $derived(vehicles.filter(v => !v.sharedAccess).length);
-	let hasShared = $derived(vehicles.some(v => v.sharedAccess));
+	let currency = $derived(monthly?.unit ?? null);
+	let otherCurrency = $derived(
+		vehicles.filter(
+			v => v.sharedAccess && currency && v.ownerCurrency && v.ownerCurrency !== currency
+		)
+	);
+	let carCount = $derived(vehicles.length - otherCurrency.length);
+	const carName = (v: Vehicle) => v.nickname || `${v.year} ${v.make} ${v.model}`;
 	let total = $derived(monthly?.totals.value ?? 0);
 	let categories = $derived.by(() => {
 		const breakdown = (results?.categories.series ?? []).map(s => ({
@@ -152,7 +158,7 @@
 	]);
 	let effTrendConfig = $derived(buildChartConfig(effTrendSeries));
 
-	let carsText = $derived(`${ownedCount} ${ownedCount === 1 ? 'vehicle' : 'vehicles'}`);
+	let carsText = $derived(`${carCount} ${carCount === 1 ? 'vehicle' : 'vehicles'}`);
 	let detailTiles = $derived.by(() => {
 		const avgEff = results?.efficiency.totals.value ?? null;
 		const perDistance = monthly?.totals.perDistance ?? null;
@@ -355,9 +361,11 @@
 </div>
 
 {#snippet sharedNote()}
-	{#if hasShared}
+	{#if otherCurrency.length > 0}
 		<p class="text-sm text-muted-foreground">
-			These figures cover the {carsText} you own. Cars shared with you aren't included yet.
+			Not included: {otherCurrency.map(carName).join(', ')}, shared with you in {[
+				...new Set(otherCurrency.map(v => v.ownerCurrency))
+			].join(' and ')}. These figures are in {currency}.
 		</p>
 	{/if}
 {/snippet}
