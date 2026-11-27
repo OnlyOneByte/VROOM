@@ -49,7 +49,7 @@ export class PreferencesRepository {
     return minorUnitScale(prefs?.currencyUnit ?? DEFAULT_CURRENCY);
   }
 
-  async moneyScales(userIds: Iterable<string>): Promise<(userId: string) => number> {
+  async currencies(userIds: Iterable<string>): Promise<(userId: string) => string> {
     const ids = [...new Set(userIds)];
     const rows = ids.length
       ? await this.db
@@ -58,7 +58,12 @@ export class PreferencesRepository {
           .where(inArray(userPreferences.userId, ids))
       : [];
     const currencies = new Map(rows.map((row) => [row.userId, row.currency]));
-    return (userId) => minorUnitScale(currencies.get(userId) ?? DEFAULT_CURRENCY);
+    return (userId) => currencies.get(userId) ?? DEFAULT_CURRENCY;
+  }
+
+  async moneyScales(userIds: Iterable<string>): Promise<(userId: string) => number> {
+    const currencyOf = await this.currencies(userIds);
+    return (userId) => minorUnitScale(currencyOf(userId));
   }
 
   async getOrCreate(userId: string): Promise<UserPreferences> {

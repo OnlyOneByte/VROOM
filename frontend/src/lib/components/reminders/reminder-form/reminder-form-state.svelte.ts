@@ -17,6 +17,10 @@ export class ReminderFormState {
 	values = $state<ReminderDraft>(emptyReminderDraft([], new SvelteDate()));
 	errors = $state<Record<string, string>>({});
 	isSubmitting = $state(false);
+	vehicles = $state<Vehicle[]>([]);
+	currency = $derived(
+		this.vehicles.find(v => v.id === this.values.selectedVehicleIds[0])?.ownerCurrency
+	);
 
 	hasTimeAxis = $derived(hasTimeTrigger(this.values.triggerMode));
 	hasMileageAxis = $derived(hasMileageTrigger(this.values.triggerMode));
@@ -24,6 +28,7 @@ export class ReminderFormState {
 
 	load(reminder: ReminderWithVehicles | null, vehicles: Vehicle[]) {
 		this.errors = {};
+		this.vehicles = vehicles;
 		this.values = reminder
 			? draftFromReminder(reminder)
 			: emptyReminderDraft(vehicles, new SvelteDate());
@@ -47,7 +52,7 @@ export class ReminderFormState {
 	}
 
 	validate(): boolean {
-		this.errors = validateReminderDraft(this.values);
+		this.errors = validateReminderDraft(this.values, this.currency);
 		return Object.keys(this.errors).length === 0;
 	}
 

@@ -23,7 +23,13 @@ import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } 
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
-import { boundedDollarsToCents, toMajor, vehicleFromApi, vehicleRowToApi } from '../../utils/money';
+import {
+  boundedDollarsToCents,
+  minorUnitScale,
+  toMajor,
+  vehicleFromApi,
+  vehicleRowToApi,
+} from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { canonicalScale } from '../../utils/unit-conversions';
 import {
@@ -317,12 +323,16 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
     return v;
   });
 
-  const scaleOf = await repos().preferences.moneyScales(ownerOf.values());
+  const currencyOf = await repos().preferences.currencies(ownerOf.values());
   await loadResolver(c, vehicleResources(allVehicles.map((v) => v.id)));
-  const apiVehicles = enrichedVehicles.map((v) => ({
-    ...vehicleRowToApi(v, scaleOf(ownerOf.get(v.id) ?? '')),
-    carShare: carShareAccess(c, v.id, v.carShareEnabled),
-  }));
+  const apiVehicles = enrichedVehicles.map((v) => {
+    const ownerCurrency = currencyOf(ownerOf.get(v.id) ?? '');
+    return {
+      ...vehicleRowToApi(v, minorUnitScale(ownerCurrency)),
+      ownerCurrency,
+      carShare: carShareAccess(c, v.id, v.carShareEnabled),
+    };
+  });
   const response: ApiResponse<typeof apiVehicles> = {
     success: true,
     data: apiVehicles,
@@ -347,15 +357,17 @@ routes.post('/', zValidator('json', createVehicleSchema), authorize(ownAccount),
     unitPreferences = userSettings.unitPreferences;
   }
 
+  const ownerCurrency = (await repos().preferences.currencies([user.id]))(user.id);
+  const scale = minorUnitScale(ownerCurrency);
   const createdVehicle = await repos().vehicles.create({
-    ...vehicleFromApi(vehicleData, await repos().preferences.moneyScale(user.id)),
+    ...vehicleFromApi(vehicleData, scale),
     unitPreferences,
     userId: user.id,
   });
 
-  const response: ApiResponse<typeof createdVehicle> = {
+  const response: ApiResponse<typeof createdVehicle & { ownerCurrency: string }> = {
     success: true,
-    data: vehicleRowToApi(createdVehicle, await repos().preferences.moneyScale(user.id)),
+    data: { ...vehicleRowToApi(createdVehicle, scale), ownerCurrency },
     message: 'Vehicle created successfully',
   };
 
@@ -412,10 +424,14 @@ routes.get(
     }
     const carShare = carShareAccess(c, id, vehicle.carShareEnabled);
 
-    const response: ApiResponse<typeof responseData & { carShare: typeof carShare }> = {
+    const ownerCurrency = (await repos().preferences.currencies([vehicle.userId]))(vehicle.userId);
+    const response: ApiResponse<
+      typeof responseData & { carShare: typeof carShare; ownerCurrency: string }
+    > = {
       success: true,
       data: {
-        ...vehicleRowToApi(responseData, await repos().preferences.moneyScale(vehicle.userId)),
+        ...vehicleRowToApi(responseData, minorUnitScale(ownerCurrency)),
+        ownerCurrency,
         carShare,
       },
     };
@@ -461,21 +477,24 @@ routes.put(
     );
     await assertUnitChangeConfirmed(existingVehicle, mergedUnitPreferences, confirmUnitChange);
 
+    const ownerId = existingVehicle.userId;
+    const ownerCurrency = (await repos().preferences.currencies([ownerId]))(ownerId);
+    const scale = minorUnitScale(ownerCurrency);
     const updatedVehicle = await repos().vehicles.update(id, {
-      ...vehicleFromApi(
-        restUpdateData,
-        await repos().preferences.moneyScale(existingVehicle.userId)
-      ),
+      ...vehicleFromApi(restUpdateData, scale),
       ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
       ...(renamedWithoutCatalogModel(existingVehicle, updateData) && { catalogModelId: null }),
     });
 
     return c.json({
       success: true,
-      data: vehicleRowToApi(
-        seesFinancials(access) ? updatedVehicle : sharedVehicleView(updatedVehicle),
-        await repos().preferences.moneyScale(existingVehicle.userId)
-      ),
+      data: {
+        ...vehicleRowToApi(
+          seesFinancials(access) ? updatedVehicle : sharedVehicleView(updatedVehicle),
+          scale
+        ),
+        ownerCurrency,
+      },
       message: 'Vehicle updated successfully',
     });
   }

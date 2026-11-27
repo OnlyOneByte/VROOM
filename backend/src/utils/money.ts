@@ -38,8 +38,11 @@ const PARSED_SCALE = 100;
 export function parsedToMinor(cents: number, scale: number): number {
   const minor = (cents * scale) / PARSED_SCALE;
   if (!Number.isInteger(minor)) {
+    const digits = Math.log10(scale);
     throw new ValidationError(
-      `Amounts in this currency can have at most ${Math.log10(scale)} decimal places`
+      digits > 0
+        ? `Amounts in this currency can have at most ${digits} decimal places`
+        : 'Amounts in this currency must be whole numbers'
     );
   }
   return minor;

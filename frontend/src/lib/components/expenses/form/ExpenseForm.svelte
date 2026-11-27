@@ -580,6 +580,7 @@
 		amountError={form.touched['amount'] ? form.errors['amount'] : undefined}
 		quick={quickAdd}
 		onAmountBlur={handleAmountBlur}
+		currency={form.amountCurrency}
 	/>
 {/snippet}
 

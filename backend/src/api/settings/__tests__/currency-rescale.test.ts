@@ -211,5 +211,15 @@ describe('PUT /settings rescales stored money when the decimals change', () => {
     expect((await json<DataEnvelope<{ expenseAmount: number }>>(read)).data.expenseAmount).toBe(
       1234
     );
+
+    type Owned = { id: string; ownerCurrency: string };
+    const one = await viewer.request('GET', `/api/v1/vehicles/${vehicleId}`);
+    expect((await json<DataEnvelope<Owned>>(one)).data.ownerCurrency).toBe('JPY');
+    const list = await json<DataEnvelope<Owned[]>>(
+      await viewer.request('GET', '/api/v1/vehicles?include=shared')
+    );
+    expect(list.data.find((v) => v.id === vehicleId)?.ownerCurrency).toBe('JPY');
+    const own = await json<DataEnvelope<Owned[]>>(await ctx.authed('GET', '/api/v1/vehicles'));
+    expect(own.data.find((v) => v.id === vehicleId)?.ownerCurrency).toBe('JPY');
   });
 });

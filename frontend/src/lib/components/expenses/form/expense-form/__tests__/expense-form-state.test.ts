@@ -37,6 +37,20 @@ describe('ExpenseFormState — construction and derived flags', () => {
 		expect(insured.canDuplicate).toBe(false);
 	});
 
+	test("the amount uses the car's owner currency, and a split's cars' owner currency", () => {
+		const state = createState();
+		state.vehicles = [
+			makeVehicle('usd', { ownerCurrency: 'USD' }),
+			makeVehicle('yen1', { ownerCurrency: 'JPY' }),
+			makeVehicle('yen2', { ownerCurrency: 'JPY' })
+		];
+		state.vehicle = makeVehicle('usd', { ownerCurrency: 'USD' });
+		expect(state.amountCurrency).toBe('USD');
+		state.isSplit = true;
+		state.selectedVehicleIds = ['yen1', 'yen2'];
+		expect(state.amountCurrency).toBe('JPY');
+	});
+
 	test('parsedTotalAmount falls back to 0 for non-numeric input', () => {
 		const state = createState();
 		expect(state.parsedTotalAmount).toBe(0);

@@ -107,6 +107,11 @@ export class ExpenseFormState {
 		this.showFuelFields && this.lastFuelExpense?.mileage ? this.lastFuelExpense.mileage : null
 	);
 	asksForMileage = $derived(!this.isSplit || this.selectedVehicleIds.length < 2);
+	amountCurrency = $derived(
+		this.isSplit
+			? this.vehicles.find(v => v.id === this.selectedVehicleIds[0])?.ownerCurrency
+			: this.vehicle?.ownerCurrency
+	);
 	isFinancingPayment = $derived(
 		this.sourceType === 'financing' && !!this.sourceId && this.formData.category === 'financial'
 	);
@@ -130,6 +135,7 @@ export class ExpenseFormState {
 		return {
 			category: this.formData.category,
 			vehicle: this.vehicle,
+			currency: this.amountCurrency,
 			volumeUnit: this.effectiveVolumeUnit,
 			chargeUnit: this.effectiveChargeUnit,
 			allVehicleExpenses: this.allVehicleExpenses,

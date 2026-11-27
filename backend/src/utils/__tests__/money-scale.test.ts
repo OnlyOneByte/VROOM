@@ -14,7 +14,7 @@ describe('parsed amounts become the owner currency minor unit', () => {
 
   test('an amount finer than the currency allows is refused, not rounded', () => {
     expect(() => parsedToMinor(1234, 1)).toThrow(ValidationError);
-    expect(() => parsedToMinor(1234, 1)).toThrow('at most 0 decimal places');
+    expect(() => parsedToMinor(1234, 1)).toThrow('must be whole numbers');
   });
 
   test('absolute split allocations and the reminder amount convert together', () => {

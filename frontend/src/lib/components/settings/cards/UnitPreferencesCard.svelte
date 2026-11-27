@@ -2,7 +2,8 @@
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import Segmented from '#lib/components/common/Segmented.svelte';
 	import { CURRENCIES } from '#lib/constants/currencies.ts';
-	import { currencyLabel } from '#lib/utils/formatters.ts';
+	import { currencyLabel, minorUnitScale } from '#lib/utils/formatters.ts';
+	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
 
 	type Distance = 'miles' | 'kilometers';
@@ -41,6 +42,29 @@
 			? CURRENCIES
 			: [currencyUnit, ...CURRENCIES]
 	);
+
+	let pendingCurrency = $state<string | null>(null);
+	let confirmOpen = $state(false);
+	let shownCurrency = $state('');
+
+	$effect.pre(() => {
+		if (!confirmOpen) shownCurrency = currencyUnit;
+	});
+
+	function applyCurrency(code: string) {
+		currencyUnit = code;
+		onCurrencyChange?.();
+	}
+
+	function chooseCurrency(code: string) {
+		if (!code || code === currencyUnit) return;
+		if (minorUnitScale(code) < minorUnitScale(currencyUnit)) {
+			pendingCurrency = code;
+			confirmOpen = true;
+			return;
+		}
+		applyCurrency(code);
+	}
 </script>
 
 <Card variant="section">
@@ -49,7 +73,8 @@
 	</CardHeader>
 	<CardContent>
 		<p class="text-sm text-muted-foreground">
-			Defaults for new vehicles, and the units for totals across vehicles. Changes save right away.
+			Defaults for new vehicles, and the units for totals across vehicles. Changes save right away;
+			a currency without cents asks first.
 		</p>
 		<div class="divide-y">
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
@@ -88,15 +113,7 @@
 			</div>
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
 				<label for="currency" class="font-medium">Currency</label>
-				<Select.Root
-					type="single"
-					value={currencyUnit}
-					onValueChange={v => {
-						if (!v || v === currencyUnit) return;
-						currencyUnit = v;
-						onCurrencyChange?.();
-					}}
-				>
+				<Select.Root type="single" bind:value={shownCurrency} onValueChange={chooseCurrency}>
 					<Select.Trigger id="currency" class="w-full max-w-xs sm:w-auto">
 						{currencyLabel(currencyUnit)}
 					</Select.Trigger>
@@ -112,3 +129,13 @@
 		</div>
 	</CardContent>
 </Card>
+
+<ConfirmDialog
+	bind:open={confirmOpen}
+	title={pendingCurrency ? `Switch to ${currencyLabel(pendingCurrency)}?` : ''}
+	description="This currency has no cents, so every amount you've recorded is rounded to a whole number. Switching back later won't bring the cents back."
+	confirmLabel="Switch and round"
+	onConfirm={() => {
+		if (pendingCurrency) applyCurrency(pendingCurrency);
+	}}
+/>
