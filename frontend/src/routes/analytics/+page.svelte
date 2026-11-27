@@ -22,6 +22,7 @@
 		type AnalyticsFilters
 	} from '#lib/components/analytics/analytics-filters.ts';
 	import {
+		cancelPrefetch,
 		exploreRequest,
 		parseExplore,
 		prefetchExplore,
@@ -190,6 +191,7 @@
 				vehicleIds
 			});
 			if (request !== summaryRequest) return;
+			if (result.quickStats.vehicleCount === 0) cancelPrefetch();
 			summary = result;
 			error = null;
 		} catch (e) {
