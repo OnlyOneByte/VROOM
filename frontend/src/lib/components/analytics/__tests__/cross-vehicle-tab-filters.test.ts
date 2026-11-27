@@ -4,7 +4,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 const api = vi.hoisted(() => ({
 	getCrossVehicle: vi.fn(),
 	getFinancing: vi.fn(),
-	getInsurance: vi.fn()
+	getInsurance: vi.fn(),
+	query: vi.fn(() => Promise.resolve(null))
 }));
 
 vi.mock('#lib/components/charts/index.ts', () => ({

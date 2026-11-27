@@ -3,15 +3,28 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 
 const mocks = vi.hoisted(() => ({
 	query: vi.fn(),
-	summary: vi.fn()
+	summary: vi.fn(),
+	url: new URL('https://vroom.test/analytics')
 }));
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/state', () => ({ page: { url: new URL('https://vroom.test/analytics') } }));
+vi.mock('$app/state', () => ({
+	page: {
+		get url() {
+			return mocks.url;
+		}
+	}
+}));
 vi.mock('#lib/components/analytics/fuel/FuelStatsTab.svelte', () => ({ default: () => {} }));
 vi.mock('#lib/services/vehicle-api.ts', () => ({
-	vehicleApi: { getVehicles: () => Promise.resolve([]) }
+	vehicleApi: {
+		getVehicles: () =>
+			Promise.resolve([
+				{ id: 'civic', year: 2019, make: 'Honda', model: 'Civic' },
+				{ id: 'rav4', year: 2022, make: 'Toyota', model: 'RAV4' }
+			])
+	}
 }));
 vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: {
@@ -27,6 +40,7 @@ import Page from '../+page.svelte';
 let releaseSummary: (value: unknown) => void = () => {};
 
 beforeEach(() => {
+	mocks.url = new URL('https://vroom.test/analytics');
 	mocks.query.mockReset();
 	mocks.query.mockReturnValue(new Promise(() => {}));
 	mocks.summary.mockReset();
@@ -68,4 +82,26 @@ describe('the Explore query on page load', () => {
 		await screen.findByRole('heading', { name: 'Fuel & charging' });
 		expect(mocks.query).toHaveBeenCalledTimes(1);
 	}, 20_000);
+
+	test('with cars and a range in the URL, Explore still matches the prefetch and sends nothing more', async () => {
+		mocks.url = new URL('https://vroom.test/analytics?range=3m&cars=rav4,civic');
+		render(Page);
+		await waitFor(() => expect(mocks.query).toHaveBeenCalledTimes(1));
+		expect(mocks.query.mock.calls[0]?.[0]).toMatchObject({ vehicleIds: ['rav4', 'civic'] });
+
+		releaseSummary(SUMMARY);
+		await screen.findByLabelText('Loading the chart', undefined, { timeout: 10_000 });
+		expect(mocks.query).toHaveBeenCalledTimes(1);
+	}, 20_000);
+
+	test('with no vehicles, the prefetch is cancelled once the summary says so', async () => {
+		render(Page);
+		await waitFor(() => expect(mocks.query).toHaveBeenCalledTimes(1));
+		const signal = (mocks.query.mock.calls[0]?.[1] as { signal: AbortSignal }).signal;
+		expect(signal.aborted).toBe(false);
+
+		releaseSummary({ ...SUMMARY, quickStats: { ...SUMMARY.quickStats, vehicleCount: 0 } });
+		await waitFor(() => expect(signal.aborted).toBe(true));
+		expect(mocks.query).toHaveBeenCalledTimes(1);
+	});
 });
