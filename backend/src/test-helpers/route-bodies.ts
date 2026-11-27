@@ -36,7 +36,7 @@ function upload(field: string, name: string, type: string, extra: Record<string,
   };
 }
 
-export function writeRouteCalls(vehicleId: string, userId: string): Record<string, SweepCall> {
+export function writeRouteCalls(vehicleId: string, memberId: string): Record<string, SweepCall> {
   const even = { method: 'even', vehicleIds: [vehicleId] };
   const coverage = { vehicleIds: [vehicleId] };
   return {
@@ -138,10 +138,21 @@ export function writeRouteCalls(vehicleId: string, userId: string): Record<strin
     'POST /api/v1/roles': { body: { scope: 'vehicle', name: 'Sweep' } },
     'PATCH /api/v1/roles/:id': { body: { name: 'Sweep' } },
     'PUT /api/v1/roles/:id/permissions': { body: { permissions: [] } },
-    'POST /api/v1/role-assignments': { body: { userId: 'sweep-nobody', roleId: 'builtin_member' } },
+    'POST /api/v1/role-assignments': {
+      body: { userId: 'sweep-nobody', roleId: 'builtin_viewer', scopeId: vehicleId },
+    },
+    'DELETE /api/v1/role-assignments': {
+      path: `/api/v1/role-assignments?userId=sweep-nobody&roleId=builtin_viewer&scopeId=${vehicleId}`,
+    },
+    'DELETE /api/v1/overrides': {
+      path: `/api/v1/overrides?userId=${memberId}&scope=vehicle&scopeId=${vehicleId}&permission=vehicle.read`,
+    },
+    'DELETE /api/v1/push/subscribe': {
+      body: { endpoint: 'https://fcm.googleapis.com/fcm/send/sweep' },
+    },
     'PUT /api/v1/overrides': {
       body: {
-        userId,
+        userId: memberId,
         scope: 'vehicle',
         scopeId: vehicleId,
         permission: 'vehicle.read',

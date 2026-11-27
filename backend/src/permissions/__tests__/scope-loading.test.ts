@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { Hono } from 'hono';
+import { setPushSenderForTest } from '../../api/push/push-service';
 import { ScopeNotLoadedError } from '../../errors';
 import { errorHandler } from '../../middleware';
 import {
@@ -86,52 +87,74 @@ const SWEPT_KEYS = Object.entries(ROUTE_PERMISSIONS)
 const isWrite = (method: string) => method !== 'GET' && method !== 'DELETE';
 
 const HANDLER_PRECONDITIONS: Record<string, string> = {
-  'POST /api/v1/vehicles/:vehicleId/photos': 'the account has no storage provider',
-  'POST /api/v1/photos/:entityType/:entityId': 'the account has no storage provider',
-  'POST /api/v1/providers': 'a Google provider needs the nonce from its OAuth start',
-  'POST /api/v1/assistant/chat': 'the account has no LLM provider',
-  'POST /api/v1/sync/restore/from-provider': 'the account has no backup provider',
-  'POST /api/v1/sync/restore/from-backup': 'the uploaded bytes are not a backup ZIP',
+  'POST /api/v1/vehicles/:vehicleId/photos': 'No storage provider configured',
+  'POST /api/v1/photos/:entityType/:entityId': 'No storage provider configured',
+  'POST /api/v1/providers': 'Missing nonce',
+  'POST /api/v1/assistant/chat': 'No assistant (LLM) provider is configured',
+  'POST /api/v1/sync/restore/from-provider': 'Provider not found or inactive',
+  'POST /api/v1/sync/restore/from-backup': 'not a readable VROOM backup ZIP',
 };
 
+const quietPush = { send: async () => ({ kind: 'ok' as const }) };
+
 function sweepRequests(
-  ownerId: string
-): [key: string, method: string, path: string, call: SweepCall][] {
-  const calls = writeRouteCalls(VEHICLE_ID, ownerId);
+  memberId: string
+): [key: string, method: string, path: string, call: SweepCall | undefined][] {
+  const calls = writeRouteCalls(VEHICLE_ID, memberId);
   return SWEPT_KEYS.map((key) => {
     const [method = 'GET', template = '/'] = key.split(' ');
-    const call = calls[key] ?? (isWrite(method) ? { body: { vehicleId: VEHICLE_ID } } : {});
-    const path = call.path ?? template.replace(/:[A-Za-z]+/g, VEHICLE_ID);
+    const call = calls[key] ?? (isWrite(method) ? { body: { vehicleId: VEHICLE_ID } } : undefined);
+    const path = call?.path ?? template.replace(/:[A-Za-z]+/g, VEHICLE_ID);
     return [key, method, `${path}${path.includes('?') ? '&' : '?'}vehicleId=${VEHICLE_ID}`, call];
   });
 }
 
-describe('the sweep sends write routes a body they accept', () => {
+async function inputOutcome(key: string, res: Response): Promise<string | 'precondition' | null> {
+  if (res.status === 401 || res.status === 429 || res.status >= 500) return String(res.status);
+  if (res.status !== 400) return null;
+  const text = await res.text();
+  const expected = HANDLER_PRECONDITIONS[key];
+  return expected && text.includes(expected) ? 'precondition' : text.slice(0, 160);
+}
+
+async function seedSweepCar(ctx: TestApp): Promise<Members> {
+  seedCar(ctx, VEHICLE_ID);
+  ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 1 WHERE id = ?', [VEHICLE_ID]);
+  return seedMembers(ctx, VEHICLE_ID, 'sweep');
+}
+
+describe('the sweep sends each route with a body one it accepts', () => {
   let ctx: TestApp;
+  let members: Members;
 
   beforeEach(async () => {
     ctx = await createTestApp();
-    seedCar(ctx, VEHICLE_ID);
+    members = await seedSweepCar(ctx);
+    setPushSenderForTest(quietPush);
   }, SETUP_TIMEOUT_MS);
-  afterEach(() => ctx.close());
+  afterEach(() => {
+    setPushSenderForTest(null);
+    ctx.close();
+  });
 
-  test('every body entry names a mapped write route', () => {
+  test('every call entry names a mapped route', () => {
     const keys = new Set(SWEPT_KEYS);
     const stale = Object.keys(writeRouteCalls(VEHICLE_ID, 'u')).filter((key) => !keys.has(key));
     expect(stale).toEqual([]);
   });
 
-  test('the owner gets past input validation on every write route', async () => {
+  test('the owner gets past input validation on every route that takes input', async () => {
     const refused: string[] = [];
     const preconditionsHit = new Set<string>();
-    for (const [key, method, path, call] of sweepRequests(ctx.user.id)) {
-      if (!isWrite(method)) continue;
+    for (const [key, method, path, call] of sweepRequests(members.editor.id)) {
+      if (!call) continue;
       const { cookie } = await requestAs(ctx, ctx.user.id);
-      const res = await sendSweepCall(ctx.app, cookie, method, path, call);
-      expect(res.status, key).not.toBe(401);
-      if (res.status !== 400) continue;
-      if (key in HANDLER_PRECONDITIONS) preconditionsHit.add(key);
-      else refused.push(`${key} -> ${(await res.text()).slice(0, 160)}`);
+      const outcome = await inputOutcome(
+        key,
+        await sendSweepCall(ctx.app, cookie, method, path, call)
+      );
+      if (outcome === 'precondition') preconditionsHit.add(key);
+      else if (outcome) refused.push(`${key} -> ${outcome}`);
     }
     expect(refused).toEqual([]);
     expect([...preconditionsHit].sort()).toEqual(Object.keys(HANDLER_PRECONDITIONS).sort());
@@ -144,23 +167,28 @@ describe('every mapped route loads the scopes it checks', () => {
 
   beforeEach(async () => {
     ctx = await createTestApp();
-    seedCar(ctx, VEHICLE_ID);
-    members = await seedMembers(ctx, VEHICLE_ID, 'sweep');
+    members = await seedSweepCar(ctx);
+    setPushSenderForTest(quietPush);
   }, SETUP_TIMEOUT_MS);
-  afterEach(() => ctx.close());
+  afterEach(() => {
+    setPushSenderForTest(null);
+    ctx.close();
+  });
 
   async function sweepAs(userId: string): Promise<string[]> {
     const raised: string[] = [];
     const stack = spyOn(Error, 'captureStackTrace');
     try {
-      for (const [, method, path, call] of sweepRequests(ctx.user.id)) {
+      for (const [, method, path, call] of sweepRequests(members.editor.id)) {
         const before = stack.mock.calls.filter(([, ctor]) => ctor === ScopeNotLoadedError).length;
         const { cookie } = await requestAs(ctx, userId);
-        const res = await sendSweepCall(ctx.app, cookie, method, path, call);
+        const res = await sendSweepCall(ctx.app, cookie, method, path, call ?? {});
         const after = stack.mock.calls.filter(([, ctor]) => ctor === ScopeNotLoadedError).length;
         const body = await res.text();
         if (after > before || body.includes('ScopeNotLoadedError')) {
           raised.push(`${method} ${path} -> ${res.status}`);
+        } else if (res.status === 401 || res.status === 429) {
+          raised.push(`${method} ${path} -> ${res.status}, so the route was never checked`);
         }
       }
     } finally {
