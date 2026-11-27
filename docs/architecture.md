@@ -153,8 +153,8 @@ vehicle's car-share flag through `repos().vehicles`.
 Some repositories hold two handles on the same connection while the move is under way: the
 async session for ordinary queries, and `syncDb` for the sync transactions they still open.
 Expenses, odometer and reminders keep all their own queries on `syncDb`. Community stats,
-insurance policies and photos use `syncDb` only to open their transactions (and insurance for
-its vehicle access checks). When you edit one of these, use the transaction handle `tx`
+insurance policies and photos use `syncDb` only to open their transactions. When you edit one
+of these, use the transaction handle `tx`
 inside a transaction callback and the async session outside it, and never pass `syncDb` to
 code that runs on the async session. The sync transactions and `syncDb` go in part C.
 
@@ -165,8 +165,27 @@ That covers the role, override and share guards in `src/api/roles/routes.ts` and
 `src/api/shares/routes.ts`, the invite and signup-settings writes in
 `src/api/signup/store.ts`, and the profile backfill and provider token update in
 `src/api/auth/routes.ts`. In part C each such check moves inside the async transaction that
-does the write. The permission resolver in `src/permissions/grants.ts` is synchronous too and
-moves in its own step.
+does the write.
+
+**Permissions load, then check.** A request's resolver reads its grants on the async session
+before anything is decided. `authorize()` calls `loadResolver(c, resources)` for the resources
+it checks, and `requestResolver(c)` then hands out that same resolver, whose `can()` and
+`rulesFor()` stay synchronous. A check on a scope nobody loaded throws `ScopeNotLoadedError`,
+which the error handler answers with a 500, so a missed load fails closed and never allows.
+Code that checks a vehicle the route didn't authorize (a list across cars, an expense moved to
+another car, a reminder's other cars) calls `loadResolver` with those vehicles first; the
+server scope is loaded with any load. Outside a request, `resolverFor(userId, resources)`
+loads and returns a resolver. `src/permissions/__tests__/scope-loading.test.ts` sends a
+request to every route in the permission route map as the owner, an editor, a viewer and a
+stranger, and fails on any `ScopeNotLoadedError`. Its requests carry a placeholder id and a
+minimal body, so they reach `authorize()` and the code before validation; checks deeper in a
+handler are covered by that route's own tests, which fail on the same 500. The 500 response
+carries a generic message, and the unloaded scope goes only to the server log. Three places
+still use the synchronous
+resolver, `syncResolverFor`, until part C: the role-manager count inside
+`keepingARoleManager`'s transaction, `vehiclePeople` in the roles routes, and
+`isNetworkAdmin` in `src/utils/outbound-url.ts`, which provider construction calls
+synchronously.
 
 One ordering rule holds the migration together: sync queries must be gone before the first
 async transaction ships, because a sync query issued while an async transaction is open runs

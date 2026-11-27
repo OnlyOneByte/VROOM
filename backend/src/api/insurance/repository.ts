@@ -173,7 +173,7 @@ export class InsurancePolicyRepository {
   async create(data: CreatePolicyData, userId: string): Promise<InsurancePolicyWithVehicles> {
     try {
       const allVehicleIds = [...new Set(data.terms.flatMap((t) => t.vehicleCoverage.vehicleIds))];
-      await requireVehiclesAccess(allVehicleIds, userId, 'owner', this.syncDb);
+      await requireVehiclesAccess(allVehicleIds, userId, 'owner', this.db);
 
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Policy creation requires sequential steps within a transaction
       return this.syncDb.transaction((tx) => {
@@ -367,7 +367,7 @@ export class InsurancePolicyRepository {
     userId: string
   ): Promise<InsurancePolicyWithVehicles & { newTermId: string }> {
     try {
-      await requireVehiclesAccess(term.vehicleCoverage.vehicleIds, userId, 'owner', this.syncDb);
+      await requireVehiclesAccess(term.vehicleCoverage.vehicleIds, userId, 'owner', this.db);
 
       const termId = createId();
       this.syncDb.transaction((tx) => {
@@ -441,7 +441,7 @@ export class InsurancePolicyRepository {
     try {
       const { vehicleCoverage, ...termFields } = updates;
       if (vehicleCoverage) {
-        await requireVehiclesAccess(vehicleCoverage.vehicleIds, userId, 'owner', this.syncDb);
+        await requireVehiclesAccess(vehicleCoverage.vehicleIds, userId, 'owner', this.db);
       }
 
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Term update requires field-by-field mapping and junction management

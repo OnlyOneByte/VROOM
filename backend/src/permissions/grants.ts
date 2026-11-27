@@ -1,5 +1,7 @@
 import { and, eq, inArray, isNull, notInArray, type SQL } from 'drizzle-orm';
 import type { Context } from 'hono';
+import { appContext } from '../app-context';
+import type { AsyncAppDatabase } from '../db/async-sqlite';
 import type { AppDatabase } from '../db/connection';
 import {
   permissionOverrides,
@@ -12,14 +14,18 @@ import {
   vehicles,
 } from '../db/schema';
 import type { DrizzleTransaction } from '../db/types';
-import { ConflictError, ForbiddenError, ValidationError } from '../errors';
+import { ConflictError, ForbiddenError, ScopeNotLoadedError, ValidationError } from '../errors';
 import { PERMISSION_REGISTRY } from './registry';
 import {
   type Actor,
+  type AsyncGrantSource,
+  createLoadingResolver,
   createResolver,
   type GrantSource,
   type HeldRole,
+  type LoadingResolver,
   type Resolver,
+  type Resource,
   type ScopeGrants,
 } from './resolve';
 import { DEMO_ROLE_KEY, ROLE_REACH, ROLE_TEMPLATES, type RoleScope } from './roles';
@@ -28,7 +34,7 @@ type Db = AppDatabase | DrizzleTransaction;
 
 declare module 'hono' {
   interface ContextVariableMap {
-    resolver: Resolver;
+    resolver: LoadingResolver;
   }
 }
 
@@ -164,15 +170,85 @@ export function endVehicleMembership(db: Db, vehicleId: string, userId: string):
     .run();
 }
 
-function heldRoles(db: Db, where: SQL | undefined): HeldRole[] {
-  const rows = db
+const OVERRIDE_COLUMNS = {
+  permission: permissionOverrides.permission,
+  effect: permissionOverrides.effect,
+};
+
+function serverRolesWhere(userId: string): SQL | undefined {
+  return and(
+    eq(roleAssignments.userId, userId),
+    isNull(roleAssignments.scopeId),
+    eq(roles.scope, 'server')
+  );
+}
+
+function vehicleRolesWhere(userId: string, vehicleId: string): SQL | undefined {
+  return and(
+    eq(roleAssignments.userId, userId),
+    eq(roleAssignments.scopeId, vehicleId),
+    eq(roles.scope, 'vehicle')
+  );
+}
+
+function overridesWhere(
+  userId: string,
+  scope: 'server' | 'vehicle',
+  scopeId: string | null
+): SQL | undefined {
+  return and(
+    eq(permissionOverrides.userId, userId),
+    eq(permissionOverrides.scope, scope),
+    scopeId === null
+      ? isNull(permissionOverrides.scopeId)
+      : eq(permissionOverrides.scopeId, scopeId)
+  );
+}
+
+function builtInDemoWhere(userId: string): SQL | undefined {
+  return and(
+    eq(roleAssignments.userId, userId),
+    isNull(roleAssignments.scopeId),
+    eq(roles.builtIn, true),
+    eq(roles.key, DEMO_ROLE_KEY)
+  );
+}
+
+function memberWhere(vehicleId: string, userId: string): SQL | undefined {
+  return and(
+    eq(vehicleShares.vehicleId, vehicleId),
+    eq(vehicleShares.sharedWithId, userId),
+    eq(vehicleShares.status, 'accepted')
+  );
+}
+
+function demoRoleJoin(): SQL | undefined {
+  return and(
+    eq(roleAssignments.userId, users.id),
+    isNull(roleAssignments.scopeId),
+    eq(roleAssignments.roleId, builtInRoleId(DEMO_ROLE_KEY))
+  );
+}
+
+const ACTOR_COLUMNS = { disabledAt: users.disabledAt, demoRole: roleAssignments.id };
+
+function actorQuery(db: AsyncAppDatabase, userId: string) {
+  return db
+    .select(ACTOR_COLUMNS)
+    .from(users)
+    .leftJoin(roleAssignments, demoRoleJoin())
+    .where(eq(users.id, userId));
+}
+
+function heldRoles(tx: Db, where: SQL | undefined): HeldRole[] {
+  const rows = tx
     .select({ id: roles.id, key: roles.key, builtIn: roles.builtIn })
     .from(roleAssignments)
     .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
     .where(where)
     .all();
   if (rows.length === 0) return [];
-  const permissions = db
+  const permissions = tx
     .select()
     .from(rolePermissions)
     .where(
@@ -189,126 +265,192 @@ function heldRoles(db: Db, where: SQL | undefined): HeldRole[] {
   }));
 }
 
-function overridesAt(db: Db, userId: string, scope: 'server' | 'vehicle', scopeId: string | null) {
-  return db
-    .select({ permission: permissionOverrides.permission, effect: permissionOverrides.effect })
-    .from(permissionOverrides)
-    .where(
-      and(
-        eq(permissionOverrides.userId, userId),
-        eq(permissionOverrides.scope, scope),
-        scopeId === null
-          ? isNull(permissionOverrides.scopeId)
-          : eq(permissionOverrides.scopeId, scopeId)
-      )
-    )
-    .all();
-}
-
-function holdsBuiltInDemo(db: Db, userId: string): boolean {
-  const row = db
-    .select({ id: roles.id })
-    .from(roleAssignments)
-    .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
-    .where(
-      and(
-        eq(roleAssignments.userId, userId),
-        isNull(roleAssignments.scopeId),
-        eq(roles.builtIn, true),
-        eq(roles.key, DEMO_ROLE_KEY)
-      )
-    )
-    .get();
-  return row !== undefined;
-}
-
 export function isVehicleMember(db: Db, vehicleId: string, userId: string): boolean {
   const share = db
     .select({ id: vehicleShares.id })
     .from(vehicleShares)
-    .where(
-      and(
-        eq(vehicleShares.vehicleId, vehicleId),
-        eq(vehicleShares.sharedWithId, userId),
-        eq(vehicleShares.status, 'accepted')
-      )
-    )
+    .where(memberWhere(vehicleId, userId))
     .get();
   return share !== undefined;
 }
 
-export function dbGrantSource(db: Db): GrantSource {
-  const serverGrants = (userId: string): ScopeGrants => ({
-    roles: heldRoles(
-      db,
-      and(
-        eq(roleAssignments.userId, userId),
-        isNull(roleAssignments.scopeId),
-        eq(roles.scope, 'server')
-      )
-    ),
-    overrides: overridesAt(db, userId, 'server', null),
-  });
+function syncGrantSource(tx: Db): GrantSource {
   return {
-    serverGrants,
+    serverGrants: (userId) => ({
+      roles: heldRoles(tx, serverRolesWhere(userId)),
+      overrides: tx
+        .select(OVERRIDE_COLUMNS)
+        .from(permissionOverrides)
+        .where(overridesWhere(userId, 'server', null))
+        .all(),
+    }),
     vehicleFacts: (userId, vehicleId) => {
-      const vehicle = db
+      const vehicle = tx
         .select({ ownerId: vehicles.userId })
         .from(vehicles)
         .where(eq(vehicles.id, vehicleId))
         .get();
       if (!vehicle) return null;
       const owner = vehicle.ownerId === userId;
-      const member = !owner && isVehicleMember(db, vehicleId, userId);
+      const member = !owner && isVehicleMember(tx, vehicleId, userId);
       const grants: ScopeGrants = member
         ? {
-            roles: heldRoles(
-              db,
-              and(
-                eq(roleAssignments.userId, userId),
-                eq(roleAssignments.scopeId, vehicleId),
-                eq(roles.scope, 'vehicle')
-              )
-            ),
-            overrides: overridesAt(db, userId, 'vehicle', vehicleId),
+            roles: heldRoles(tx, vehicleRolesWhere(userId, vehicleId)),
+            overrides: tx
+              .select(OVERRIDE_COLUMNS)
+              .from(permissionOverrides)
+              .where(overridesWhere(userId, 'vehicle', vehicleId))
+              .all(),
           }
         : { roles: [], overrides: [] };
-      const demoGarage = !owner && !member && holdsBuiltInDemo(db, vehicle.ownerId);
+      const demoGarage =
+        !owner &&
+        !member &&
+        tx
+          .select({ id: roles.id })
+          .from(roleAssignments)
+          .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
+          .where(builtInDemoWhere(vehicle.ownerId))
+          .get() !== undefined;
       return { owner, member, demoGarage, grants };
     },
   };
 }
 
-export function actorFor(db: Db, userId: string): Actor {
-  const row = db
-    .select({ disabledAt: users.disabledAt, demoRole: roleAssignments.id })
+export function syncResolverFor(tx: Db, userId: string): Resolver {
+  const row = tx
+    .select(ACTOR_COLUMNS)
     .from(users)
-    .leftJoin(
-      roleAssignments,
-      and(
-        eq(roleAssignments.userId, users.id),
-        isNull(roleAssignments.scopeId),
-        eq(roleAssignments.roleId, builtInRoleId(DEMO_ROLE_KEY))
-      )
-    )
+    .leftJoin(roleAssignments, demoRoleJoin())
     .where(eq(users.id, userId))
     .get();
+  const actor = { userId, disabled: !row || row.disabledAt !== null, demo: Boolean(row?.demoRole) };
+  return createResolver(actor, syncGrantSource(tx));
+}
+
+async function heldRolesAsync(db: AsyncAppDatabase, where: SQL | undefined): Promise<HeldRole[]> {
+  const rows = await db
+    .select({ id: roles.id, key: roles.key, builtIn: roles.builtIn })
+    .from(roleAssignments)
+    .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
+    .where(where);
+  if (rows.length === 0) return [];
+  const permissions = await db
+    .select()
+    .from(rolePermissions)
+    .where(
+      inArray(
+        rolePermissions.roleId,
+        rows.map((row) => row.id)
+      )
+    );
+  return rows.map((row) => ({
+    id: row.id,
+    permissions: permissions.filter((p) => p.roleId === row.id).map((p) => p.permission),
+    builtInDemo: row.builtIn && row.key === DEMO_ROLE_KEY,
+  }));
+}
+
+function asyncGrantSource(db: AsyncAppDatabase): AsyncGrantSource {
+  return {
+    serverGrants: async (userId) => ({
+      roles: await heldRolesAsync(db, serverRolesWhere(userId)),
+      overrides: await db
+        .select(OVERRIDE_COLUMNS)
+        .from(permissionOverrides)
+        .where(overridesWhere(userId, 'server', null)),
+    }),
+    vehicleFacts: async (userId, vehicleId) => {
+      const vehicle = await db
+        .select({ ownerId: vehicles.userId })
+        .from(vehicles)
+        .where(eq(vehicles.id, vehicleId))
+        .get();
+      if (!vehicle) return null;
+      const owner = vehicle.ownerId === userId;
+      const member =
+        !owner &&
+        (await db
+          .select({ id: vehicleShares.id })
+          .from(vehicleShares)
+          .where(memberWhere(vehicleId, userId))
+          .get()) !== undefined;
+      const grants: ScopeGrants = member
+        ? {
+            roles: await heldRolesAsync(db, vehicleRolesWhere(userId, vehicleId)),
+            overrides: await db
+              .select(OVERRIDE_COLUMNS)
+              .from(permissionOverrides)
+              .where(overridesWhere(userId, 'vehicle', vehicleId)),
+          }
+        : { roles: [], overrides: [] };
+      const demoGarage =
+        !owner &&
+        !member &&
+        (await db
+          .select({ id: roles.id })
+          .from(roleAssignments)
+          .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
+          .where(builtInDemoWhere(vehicle.ownerId))
+          .get()) !== undefined;
+      return { owner, member, demoGarage, grants };
+    },
+  };
+}
+
+async function actorForAsync(db: AsyncAppDatabase, userId: string): Promise<Actor> {
+  const row = await actorQuery(db, userId).get();
   return { userId, disabled: !row || row.disabledAt !== null, demo: Boolean(row?.demoRole) };
 }
 
-export function resolverFor(db: Db, userId: string): Resolver {
-  return createResolver(actorFor(db, userId), dbGrantSource(db));
+export async function loadingResolverFor(
+  userId: string,
+  db: AsyncAppDatabase = appContext().asyncDb
+): Promise<LoadingResolver> {
+  return createLoadingResolver(await actorForAsync(db, userId), asyncGrantSource(db));
 }
 
-export function requestResolver(c: Context, db: Db): Resolver {
-  const cached = c.get('resolver') as Resolver | undefined;
-  if (cached) return cached;
-  const resolver = resolverFor(db, c.get('user').id);
-  c.set('resolver', resolver);
+export async function resolverFor(
+  userId: string,
+  resources: readonly Resource[],
+  db: AsyncAppDatabase = appContext().asyncDb
+): Promise<Resolver> {
+  const resolver = await loadingResolverFor(userId, db);
+  await resolver.load(resources);
   return resolver;
 }
 
-function roleManagerCount(db: Db): number {
+export function vehicleResources(vehicleIds: Iterable<string>): Resource[] {
+  return [...vehicleIds].map((vehicleId) => ({ kind: 'vehicle', vehicleId }));
+}
+
+const creating = new WeakMap<Context, Promise<LoadingResolver>>();
+
+export async function loadResolver(
+  c: Context,
+  resources: readonly Resource[]
+): Promise<LoadingResolver> {
+  let resolver = c.get('resolver');
+  if (!resolver) {
+    let pending = creating.get(c);
+    if (!pending) {
+      pending = loadingResolverFor(c.get('user').id);
+      creating.set(c, pending);
+    }
+    resolver = await pending;
+    c.set('resolver', resolver);
+  }
+  await resolver.load(resources);
+  return resolver;
+}
+
+export function requestResolver(c: Context): Resolver {
+  const resolver = c.get('resolver');
+  if (!resolver) throw new ScopeNotLoadedError('request');
+  return resolver;
+}
+
+function roleManagerCount(db: DrizzleTransaction): number {
   const viaRoles = db
     .selectDistinct({ userId: roleAssignments.userId })
     .from(roleAssignments)
@@ -330,7 +472,7 @@ function roleManagerCount(db: Db): number {
     .all();
   const candidates = new Set([...viaRoles, ...viaOverrides].map((row) => row.userId));
   return [...candidates].filter(
-    (userId) => resolverFor(db, userId).can(ROLE_MANAGE_PERMISSION, { kind: 'server' }).allow
+    (userId) => syncResolverFor(db, userId).can(ROLE_MANAGE_PERMISSION, { kind: 'server' }).allow
   ).length;
 }
 

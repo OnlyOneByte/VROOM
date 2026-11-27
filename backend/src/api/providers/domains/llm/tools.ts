@@ -1,7 +1,7 @@
 // userId always comes from the session, never from model arguments.
 
 import { z } from 'zod';
-import { appContext, repos } from '../../../../app-context';
+import { repos } from '../../../../app-context';
 import { enforce } from '../../../../permissions/authorize';
 import { resolverFor } from '../../../../permissions/grants';
 import { calendarParts, zonedCalendar } from '../../../../utils/analytics-charts';
@@ -105,19 +105,17 @@ function defineTool<A, R>(spec: AssistantToolSpec<A, R>): AssistantTool<A> {
   };
 }
 
-function requireExpenseRead(vehicleId: string | undefined, userId: string): void {
+async function requireExpenseRead(vehicleId: string | undefined, userId: string): Promise<void> {
   if (!vehicleId) return;
-  const decision = resolverFor(appContext().db, userId).can('vehicle.expense.read', {
-    kind: 'vehicle',
-    vehicleId,
-  });
-  enforce(decision, 'Vehicle');
+  const vehicle = { kind: 'vehicle' as const, vehicleId };
+  const resolver = await resolverFor(userId, [vehicle]);
+  enforce(resolver.can('vehicle.expense.read', vehicle), 'Vehicle');
 }
 
 // Without a vehicleId, scope to the user's own vehicles: shared ones would leak another user's name to the LLM provider.
 async function resolveScope(vehicleId: string | undefined, userId: string): Promise<string> {
   if (!vehicleId) return userId;
-  requireExpenseRead(vehicleId, userId);
+  await requireExpenseRead(vehicleId, userId);
   return (await requireVehicleAccess(vehicleId, userId, 'read')).ownerId;
 }
 
@@ -137,7 +135,7 @@ const TOOL_LIST: AssistantTool[] = [
       'Optionally scoped to one vehicle.',
     schema: rangeVehicleArgs,
     read: async (args, userId) => {
-      requireExpenseRead(args.vehicleId, userId);
+      await requireExpenseRead(args.vehicleId, userId);
       return repos().expenses.getSummary({
         ...(await resolveExpenseReadScope(args.vehicleId, userId)),
         period: toExpensePeriod(args.range),

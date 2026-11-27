@@ -1,10 +1,10 @@
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
-import { appContext, repos } from '../../app-context';
+import { repos } from '../../app-context';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';
-import { requestResolver } from '../../permissions/grants';
+import { loadResolver, requestResolver, vehicleResources } from '../../permissions/grants';
 import {
   insuranceClaimFromApi,
   insuranceClaimToApi,
@@ -153,7 +153,7 @@ routes.get(
     const user = c.get('user');
     const { vehicleId } = c.req.valid('param');
     const access = await requireVehicleAccess(vehicleId, user.id, 'read');
-    const seesCosts = requestResolver(c, appContext().db).can('vehicle.insurance.read', {
+    const seesCosts = requestResolver(c).can('vehicle.insurance.read', {
       kind: 'vehicle',
       vehicleId,
     }).allow;
@@ -365,7 +365,10 @@ routes.get(
     const policy = await repos().insurancePolicies.findById(id);
     if (!policy) throw new NotFoundError('Insurance policy');
     const claims = await repos().insuranceClaims.findByPolicyId(id);
-    const resolver = requestResolver(c, appContext().db);
+    const resolver = await loadResolver(
+      c,
+      vehicleResources(claims.flatMap((cl) => (cl.vehicleId === null ? [] : [cl.vehicleId])))
+    );
     const scoped =
       policy.userId === c.get('user').id
         ? claims

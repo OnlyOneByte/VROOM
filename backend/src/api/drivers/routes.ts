@@ -86,12 +86,12 @@ driverRoutes.get(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
-    const { db, asyncDb } = appContext();
+    const { asyncDb } = appContext();
     const car = await repos().vehicles.findById(vehicleId);
     if (!car?.carShareEnabled) throw new NotFoundError('Car sharing');
     const to = query.to ? Date.parse(query.to) : Date.now();
     const from = query.from ? Date.parse(query.from) : to - 30 * DAY;
-    const resolver = requestResolver(c, db);
+    const resolver = requestResolver(c);
     const vehicle = { kind: 'vehicle' as const, vehicleId };
     const scale = await repos().preferences.moneyScale(car.userId);
     return c.json({
@@ -115,8 +115,8 @@ driverRoutes.get(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     await requireCarShare(vehicleId);
-    const { db, asyncDb } = appContext();
-    const everyone = requestResolver(c, db).can('vehicle.driver_stats.read', {
+    const { asyncDb } = appContext();
+    const everyone = requestResolver(c).can('vehicle.driver_stats.read', {
       kind: 'vehicle',
       vehicleId,
     }).allow;
@@ -157,9 +157,9 @@ driverRoutes.get(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
-    const { db, asyncDb } = appContext();
+    const { asyncDb } = appContext();
     await requireCarShare(vehicleId);
-    const resolver = requestResolver(c, db);
+    const resolver = requestResolver(c);
     const vehicle = { kind: 'vehicle' as const, vehicleId };
     if (!resolver.can('vehicle.expense.read', vehicle).allow) {
       throw new ForbiddenError("You don't have permission to see this vehicle's costs");

@@ -5,7 +5,7 @@ import {
   assignServerRole,
   builtInRoleId,
   grantShareRole,
-  resolverFor,
+  syncResolverFor,
 } from '../../../permissions/grants';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import { seedVehicle } from '../../../test-helpers/seed';
@@ -161,11 +161,11 @@ describe('restore re-creates role assignments from restored accepted shares only
     expect(ctx.sqlite.query('SELECT id FROM permission_overrides').all()).toEqual([]);
     expect(vehicleRoles('stranger-1')).toEqual([]);
     const db = getDb();
-    expect(resolverFor(db, ctx.user.id).can('server.roles.manage', { kind: 'server' }).allow).toBe(
-      false
-    );
     expect(
-      resolverFor(db, 'stranger-1').can('vehicle.read', { kind: 'vehicle', vehicleId })
+      syncResolverFor(db, ctx.user.id).can('server.roles.manage', { kind: 'server' }).allow
+    ).toBe(false);
+    expect(
+      syncResolverFor(db, 'stranger-1').can('vehicle.read', { kind: 'vehicle', vehicleId })
     ).toEqual({ allow: false, reason: 'not_found' });
   });
 });

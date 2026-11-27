@@ -1,5 +1,6 @@
 import { createMongoAbility, type MongoAbility, type RawRuleOf } from '@casl/ability';
 import { type PackRule, packRules } from '@casl/ability/extra';
+import { ScopeNotLoadedError } from '../errors';
 import { PERMISSION_REGISTRY } from './registry';
 import { type PermissionScope, parsePermissionId } from './vocabulary';
 
@@ -261,4 +262,36 @@ export function createResolver(actor: Actor, source: GrantSource): Resolver {
   };
 
   return { can, rulesFor, packedRulesFor: (resource) => packRules(rulesFor(resource)) };
+}
+
+export interface AsyncGrantSource {
+  serverGrants(userId: string): Promise<ScopeGrants>;
+  vehicleFacts(userId: string, vehicleId: string): Promise<VehicleFacts | null>;
+}
+
+export interface LoadingResolver extends Resolver {
+  load(resources: readonly Resource[]): Promise<void>;
+}
+
+export function createLoadingResolver(actor: Actor, source: AsyncGrantSource): LoadingResolver {
+  let server: ScopeGrants | undefined;
+  const vehicles = new Map<string, VehicleFacts | null>();
+  const resolver = createResolver(actor, {
+    serverGrants: () => {
+      if (!server) throw new ScopeNotLoadedError('server');
+      return server;
+    },
+    vehicleFacts: (_userId, vehicleId) => {
+      if (!vehicles.has(vehicleId)) throw new ScopeNotLoadedError(`vehicle ${vehicleId}`);
+      return vehicles.get(vehicleId) ?? null;
+    },
+  });
+  const load = async (resources: readonly Resource[]): Promise<void> => {
+    server ??= await source.serverGrants(actor.userId);
+    for (const resource of resources) {
+      if (resource.kind !== 'vehicle' || vehicles.has(resource.vehicleId)) continue;
+      vehicles.set(resource.vehicleId, await source.vehicleFacts(actor.userId, resource.vehicleId));
+    }
+  };
+  return { ...resolver, load };
 }

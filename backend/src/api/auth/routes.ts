@@ -10,7 +10,7 @@ import { userProviders, users } from '../../db/schema';
 import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
-import { assignServerRole, requestResolver, resolverFor } from '../../permissions/grants';
+import { assignServerRole, loadResolver, resolverFor } from '../../permissions/grants';
 import { PERMISSION_REGISTRY, type PermissionId } from '../../permissions/registry';
 import { ROLE_TEMPLATES } from '../../permissions/roles';
 import { getClientRateKey } from '../../utils/client-ip';
@@ -443,8 +443,9 @@ export async function checkLinkConflicts(
   return 'account_conflict';
 }
 
-function holdsOnOwnAccount(userId: string, permission: PermissionId): boolean {
-  return resolverFor(appContext().db, userId).can(permission, { kind: 'account', userId }).allow;
+async function holdsOnOwnAccount(userId: string, permission: PermissionId): Promise<boolean> {
+  const account = { kind: 'account' as const, userId };
+  return (await resolverFor(userId, [account])).can(permission, account).allow;
 }
 
 // Register before the generic /callback/:authProvider route, which would shadow it.
@@ -475,7 +476,7 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
     });
     return c.redirect(profileRedirect('link_error=session_mismatch'));
   }
-  if (!holdsOnOwnAccount(authResult.user.id, 'account.signin.manage')) {
+  if (!(await holdsOnOwnAccount(authResult.user.id, 'account.signin.manage'))) {
     return c.redirect(profileRedirect('link_error=forbidden'));
   }
 
@@ -650,8 +651,10 @@ routes.patch('/me', requireAuth, authorize(ownAccount), async (c) => {
   });
 });
 
-routes.get('/capabilities', requireAuth, (c) =>
-  c.json({
+routes.get('/capabilities', requireAuth, async (c) => {
+  const server = { kind: 'server' as const };
+  const resolver = await loadResolver(c, [server]);
+  return c.json({
     success: true,
     data: {
       permissions: PERMISSION_REGISTRY.list.map(
@@ -670,10 +673,10 @@ routes.get('/capabilities', requireAuth, (c) =>
         scope,
         permissions,
       })),
-      rules: requestResolver(c, appContext().db).packedRulesFor({ kind: 'server' }),
+      rules: resolver.packedRulesFor(server),
     },
-  })
-);
+  });
+});
 
 routes.post('/logout', async (c) => {
   const sessionId = getCookie(c, appContext().lucia.sessionCookieName);
@@ -984,7 +987,7 @@ routes.get('/callback/provider/google', async (c) => {
     });
     return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=session_mismatch`));
   }
-  if (!holdsOnOwnAccount(state.userId, 'account.provider.manage')) {
+  if (!(await holdsOnOwnAccount(state.userId, 'account.provider.manage'))) {
     return c.redirect(frontendRedirect(`${state.returnTo}?provider_error=forbidden`));
   }
 
