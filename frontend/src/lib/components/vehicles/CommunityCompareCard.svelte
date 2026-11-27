@@ -247,7 +247,11 @@
 					See how {isOwner ? 'your' : 'this'}
 					{vehicle.model} compares with other owners on this server.
 				</p>
-				{#if authStore.user?.demo !== true}
+				{#if authStore.user?.demo === true}
+					<p class="text-sm text-muted-foreground">
+						Community comparisons aren’t part of the demo.
+					</p>
+				{:else}
 					<Button href={`${resolve(routes.settings)}#community-comparisons`} variant="outline">
 						Turn on community stats
 					</Button>
