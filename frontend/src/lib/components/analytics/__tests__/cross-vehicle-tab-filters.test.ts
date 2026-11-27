@@ -5,7 +5,7 @@ const api = vi.hoisted(() => ({
 	getCrossVehicle: vi.fn(),
 	getFinancing: vi.fn(),
 	getInsurance: vi.fn(),
-	query: vi.fn(() => Promise.resolve(null))
+	query: vi.fn((): Promise<unknown> => Promise.resolve({ series: [] }))
 }));
 
 vi.mock('#lib/components/charts/index.ts', () => ({
@@ -95,6 +95,29 @@ describe('CrossVehicleTab with the page filters', () => {
 		});
 		await waitFor(() => expect(api.query).toHaveBeenCalledTimes(17));
 		expect(api.getFinancing).toHaveBeenCalledTimes(2);
+	});
+
+	test('a lifetime query that failed is sent again on the next range change', async () => {
+		api.query.mockImplementationOnce(() => Promise.resolve(null));
+		api.query.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+		const { rerender } = render(CrossVehicleTab, {
+			dateRange: { startDate: 100, endDate: 200, ytdStart: 50 }
+		});
+		await screen.findByLabelText('Cross-vehicle overview');
+		expect(api.query).toHaveBeenCalledTimes(8);
+
+		await rerender({ dateRange: { startDate: 150, endDate: 250, ytdStart: 50 } });
+		await waitFor(() => expect(api.query).toHaveBeenCalledTimes(16));
+		expect(api.getFinancing).toHaveBeenCalledTimes(2);
+	});
+
+	test('after a failed load, Retry fetches the lifetime data again', async () => {
+		api.getFinancing.mockRejectedValueOnce(new Error('offline'));
+		render(CrossVehicleTab);
+		await fireEvent.click(await screen.findByRole('button', { name: /retry/i }));
+		await screen.findByLabelText('Cross-vehicle overview');
+		expect(api.getFinancing).toHaveBeenCalledTimes(2);
+		expect(api.query).toHaveBeenCalledTimes(16);
 	});
 
 	test('without a filter an empty account shows no filter message', async () => {

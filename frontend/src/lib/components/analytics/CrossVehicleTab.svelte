@@ -89,15 +89,18 @@
 			isLoading = true;
 			const overview = overviewRequests(dateRange, vehicleIds);
 			const key = JSON.stringify(vehicleIds ?? null);
-			if (lifetime?.key !== key) lifetime = { key, data: loadLifetime(overview) };
-			const entry = lifetime;
+			if (lifetime?.key !== key) {
+				const entry = { key, data: loadLifetime(overview) };
+				const drop = () => {
+					if (lifetime === entry) lifetime = null;
+				};
+				entry.data.then(results => results.includes(null) && drop(), drop);
+				lifetime = entry;
+			}
 			const [cv, running, [fin, ins, allIn, ...categories]] = await Promise.all([
 				analyticsApi.getCrossVehicle({ ...dateRange, vehicleIds }),
 				analyticsApi.query(overview.running).catch(() => null),
-				entry.data.catch(e => {
-					if (lifetime === entry) lifetime = null;
-					throw e;
-				})
+				lifetime.data
 			]);
 			if (current !== request) return;
 			crossVehicle = cv;

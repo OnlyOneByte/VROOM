@@ -107,4 +107,16 @@ describe('CrossVehicleOverview', () => {
 		);
 		expect(screen.getAllByRole('rowheader').length).toBeGreaterThan(0);
 	});
+
+	test('the hero says "per kilometer" for kilometre units', () => {
+		render(CrossVehicleOverview, {
+			hero: { cheapest: 'Civic', costliest: 'Camry' },
+			running,
+			allIn,
+			matrix: categoryMatrix(spend, new Set()),
+			rangeText: 'Last 30 days',
+			distanceUnit: 'km'
+		});
+		expect(screen.getByText(/costs the most/).textContent).toMatch(/per kilometer all in\./);
+	});
 });
