@@ -627,6 +627,7 @@
 	<div class="space-y-6">
 		<PageHeader
 			variant="display"
+			eyebrow="Log"
 			title="Expenses"
 			description="Track and categorize expenses across all vehicles"
 		/>
@@ -642,6 +643,7 @@
 	<div class="space-y-6">
 		<PageHeader
 			variant="display"
+			eyebrow="Log"
 			title="Expenses"
 			description="Track and categorize expenses across all vehicles"
 		>
@@ -669,6 +671,7 @@
 	<div class="space-y-6">
 		<PageHeader
 			variant="display"
+			eyebrow="Log"
 			title="Expenses"
 			description="Track and categorize expenses across all vehicles"
 		/>
@@ -680,7 +683,7 @@
 	<div class="space-y-6">
 		<div class="flex items-start justify-between gap-3">
 			<div class="min-w-0 flex-1">
-				<PageHeader variant="display" title="Expenses" description={countLine}>
+				<PageHeader variant="display" eyebrow="Log" title="Expenses" description={countLine}>
 					{#snippet actions()}
 						<div class="hidden sm:flex sm:items-center sm:gap-2 short:hidden">
 							{@render importExportActions('outline', '')}
