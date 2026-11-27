@@ -21,8 +21,6 @@ import {
 import type { ChartAnnotations } from '#lib/components/charts/types.ts';
 import { metricInfo, type ExploreQuery } from './query-state';
 
-export const queryCache = new Map<string, AnalyticsQueryResponse>();
-
 export interface ExploreSeries {
 	key: string;
 	sourceKey: string;

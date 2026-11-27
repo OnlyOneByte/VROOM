@@ -12,7 +12,7 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: { getVehicles: () => Promise.resolve([]) }
 }));
 vi.mock('#lib/services/analytics-api.ts', () => ({
-	analyticsApi: { getSummary },
+	analyticsApi: { query: () => new Promise(() => {}), getSummary },
 	getDefaultDateRange: () => ({ startDate: 1, endDate: 2, ytdStart: 1 })
 }));
 
