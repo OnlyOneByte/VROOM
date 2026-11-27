@@ -138,3 +138,30 @@ test.describe('A save that never answers', () => {
 		await expect(row.getByText(/^Changes not saved:/)).toHaveCount(0);
 	});
 });
+
+test('a save refused for lack of access offers no Retry, Edit or Undo anywhere', async ({
+	page,
+	context
+}) => {
+	await addSessionCookie(context);
+	await mockApi(page);
+	await page.route(
+		url => url.pathname === '/api/v1/expenses/expense-maint',
+		async route => {
+			if (route.request().method() !== 'PUT') return route.fallback();
+			return route.fulfill({ status: 403, json: { success: false, message: 'No access' } });
+		}
+	);
+
+	await editOilChangeAmount(page);
+
+	const row = page.getByTestId('expense-row').filter({ hasText: 'Oil change' });
+	await expect(row.getByText(/^Changes not saved:/)).toBeVisible();
+	await expect(row.getByRole('button', { name: /^Retry/ })).toHaveCount(0);
+	await expect(row.getByRole('link', { name: /^Edit / })).toHaveCount(0);
+	const toast = page.locator('[data-sonner-toast]').filter({
+		hasText: "Your changes to the expense weren't saved"
+	});
+	await expect(toast).toBeVisible();
+	await expect(toast.getByRole('button', { name: /^(Retry|Undo)$/ })).toHaveCount(0);
+});
