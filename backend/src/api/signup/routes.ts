@@ -82,12 +82,10 @@ signupRoutes.put('/signup', authorize(SERVER), zValidator('json', settingsSchema
   return c.json({ success: true, data: settings });
 });
 
-signupRoutes.get('/invites', authorize(SERVER), (c) => {
+signupRoutes.get('/invites', authorize(SERVER), async (c) => {
   const now = new Date();
-  return c.json({
-    success: true,
-    data: listInvites(appContext().db).map((invite) => inviteView(invite, now)),
-  });
+  const invites = await listInvites(appContext().asyncDb);
+  return c.json({ success: true, data: invites.map((invite) => inviteView(invite, now)) });
 });
 
 signupRoutes.post('/invites', authorize(SERVER), zValidator('json', inviteSchema), (c) => {
@@ -116,15 +114,16 @@ signupRoutes.delete(
   }
 );
 
-signupRoutes.get('/pending-accounts', authorize(SERVER), (c) =>
-  c.json({
+signupRoutes.get('/pending-accounts', authorize(SERVER), async (c) => {
+  const accounts = await pendingAccounts(appContext().asyncDb);
+  return c.json({
     success: true,
-    data: pendingAccounts(appContext().db).map((account) => ({
+    data: accounts.map((account) => ({
       ...account,
       pendingSince: account.pendingSince?.toISOString() ?? null,
     })),
-  })
-);
+  });
+});
 
 signupRoutes.post(
   '/pending-accounts/:id/approve',

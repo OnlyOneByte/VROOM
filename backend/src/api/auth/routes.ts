@@ -97,7 +97,7 @@ function lacksRequiredScope(
 
 async function ownedProviderType(providerId: string, userId: string): Promise<string> {
   const row = await appContext()
-    .db.select({ providerType: userProviders.providerType })
+    .asyncDb.select({ providerType: userProviders.providerType })
     .from(userProviders)
     .where(and(eq(userProviders.id, providerId), eq(userProviders.userId, userId)))
     .limit(1);
@@ -265,7 +265,7 @@ export async function updateExistingUserProfile(
   authRowId: string,
   userInfo: { email: string; displayName: string; avatarUrl?: string }
 ) {
-  const db = appContext().db;
+  const db = appContext().asyncDb;
   await repos().authProviders.updateProfile(authRowId, userId, {
     email: userInfo.email,
     displayName: userInfo.displayName,
@@ -314,9 +314,9 @@ export async function updateExistingUserProfile(
 }
 
 export async function attachPendingInvitesOnSignIn(userId: string): Promise<void> {
-  const db = appContext().db;
+  const { db, asyncDb } = appContext();
   try {
-    const [account] = await db
+    const [account] = await asyncDb
       .select({ email: users.email, pendingApprovalAt: users.pendingApprovalAt })
       .from(users)
       .where(eq(users.id, userId))
@@ -333,9 +333,9 @@ export async function resolveNewUser(
   authProviderId: string,
   userInfo: { providerAccountId: string; email: string; displayName: string; avatarUrl?: string }
 ): Promise<{ userId: string } | { redirect: string }> {
-  const db = appContext().db;
+  const { db, asyncDb } = appContext();
   const email = userInfo.email.toLowerCase();
-  const existingByEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const existingByEmail = await asyncDb.select().from(users).where(eq(users.email, email)).limit(1);
 
   if (existingByEmail.length > 0) {
     return { redirect: `${CONFIG.frontend.url}/auth?auth_error=email_exists` };
@@ -634,7 +634,7 @@ routes.patch('/me', requireAuth, authorize(ownAccount), async (c) => {
     });
   }
 
-  const db = appContext().db;
+  const db = appContext().asyncDb;
   const [updated] = await db
     .update(users)
     .set({ displayName, updatedAt: new Date() })
@@ -866,7 +866,7 @@ async function updateExistingProvider(
   refreshToken: string,
   email: string
 ): Promise<void> {
-  const db = appContext().db;
+  const db = appContext().asyncDb;
   const existing = await db
     .select()
     .from(userProviders)

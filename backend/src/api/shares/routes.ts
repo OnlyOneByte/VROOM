@@ -177,8 +177,8 @@ routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle),
 
   const vehicle = await repos().vehicles.findById(vehicleId);
   if (!vehicle) throw new NotFoundError('Vehicle');
-  const owner = appContext()
-    .db.select({ email: users.email })
+  const owner = await appContext()
+    .asyncDb.select({ email: users.email })
     .from(users)
     .where(eq(users.id, vehicle.userId))
     .get();
@@ -191,7 +191,7 @@ routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle),
   }
   refuseUnheldLevel(c, vehicleId, level);
 
-  const inviteeId = await findInviteeId(appContext().db, email);
+  const inviteeId = await findInviteeId(appContext().asyncDb, email);
 
   const alreadyShared = new ConflictError('This vehicle is already shared with that email');
   if (await repos().vehicleShares.findActiveInvite(vehicleId, email, inviteeId)) {
