@@ -19,9 +19,7 @@ ratchet({
 		'lib/components/common/page-header.svelte',
 		'routes/+error.svelte',
 		'routes/+page.svelte',
-		'routes/auth/+page.svelte',
-		'routes/privacypolicy/+page.svelte',
-		'routes/termsofservice/+page.svelte'
+		'routes/auth/+page.svelte'
 	],
 	guidance:
 		'A hand-rolled <h1>. Render the page title with common/page-header.svelte ' +
