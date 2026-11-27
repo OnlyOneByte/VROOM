@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 
 const mocks = vi.hoisted(() => ({
@@ -17,6 +17,10 @@ vi.mock('$app/state', () => ({
 	}
 }));
 vi.mock('#lib/components/analytics/fuel/FuelStatsTab.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({
+	AppBarChart: () => {},
+	AppLineChart: () => {}
+}));
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicles: () =>
@@ -38,6 +42,10 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 import Page from '../+page.svelte';
 
 let releaseSummary: (value: unknown) => void = () => {};
+
+beforeAll(async () => {
+	await import('#lib/components/analytics/explore/ExploreTab.svelte');
+}, 60_000);
 
 beforeEach(() => {
 	mocks.url = new URL('https://vroom.test/analytics');
@@ -67,21 +75,19 @@ describe('the Explore query on page load', () => {
 		expect(mocks.summary).toHaveBeenCalledTimes(1);
 
 		releaseSummary(SUMMARY);
-		expect(
-			await screen.findByLabelText('Loading the chart', undefined, { timeout: 10_000 })
-		).toBeTruthy();
+		expect(await screen.findByLabelText('Loading the chart')).toBeTruthy();
 		expect(mocks.query).toHaveBeenCalledTimes(1);
-	}, 20_000);
+	});
 
 	test('leaving Explore for another tab sends no further Explore query', async () => {
 		render(Page);
 		releaseSummary(SUMMARY);
-		await screen.findByLabelText('Loading the chart', undefined, { timeout: 10_000 });
+		await screen.findByLabelText('Loading the chart');
 
 		await fireEvent.click(screen.getByRole('tab', { name: 'Fuel & charging' }));
 		await screen.findByRole('heading', { name: 'Fuel & charging' });
 		expect(mocks.query).toHaveBeenCalledTimes(1);
-	}, 20_000);
+	});
 
 	test('with cars and a range in the URL, Explore still matches the prefetch and sends nothing more', async () => {
 		mocks.url = new URL('https://vroom.test/analytics?range=3m&cars=rav4,civic');
@@ -90,9 +96,9 @@ describe('the Explore query on page load', () => {
 		expect(mocks.query.mock.calls[0]?.[0]).toMatchObject({ vehicleIds: ['rav4', 'civic'] });
 
 		releaseSummary(SUMMARY);
-		await screen.findByLabelText('Loading the chart', undefined, { timeout: 10_000 });
+		await screen.findByLabelText('Loading the chart');
 		expect(mocks.query).toHaveBeenCalledTimes(1);
-	}, 20_000);
+	});
 
 	test('with no vehicles, the prefetch is cancelled once the summary says so', async () => {
 		render(Page);
@@ -103,5 +109,5 @@ describe('the Explore query on page load', () => {
 		releaseSummary({ ...SUMMARY, quickStats: { ...SUMMARY.quickStats, vehicleCount: 0 } });
 		await waitFor(() => expect(signal.aborted).toBe(true));
 		expect(mocks.query).toHaveBeenCalledTimes(1);
-	}, 20_000);
+	});
 });

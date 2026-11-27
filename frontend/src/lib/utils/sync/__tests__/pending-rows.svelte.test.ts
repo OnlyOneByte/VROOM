@@ -5,6 +5,7 @@ import type { ExpenseSummary } from '#lib/types/index.ts';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import {
+	fitsFirstPage,
 	matchesFilters,
 	pendingExpenseRow,
 	pendingRowState,
@@ -88,6 +89,39 @@ describe('pending rows and the list filters', () => {
 		[{ tags: ['trip'] }, false]
 	])('%o matches: %s', (filters, expected) => {
 		expect(matchesFilters(row, filters)).toBe(expected);
+	});
+});
+
+describe('whether a row sorts onto the first page of a list', () => {
+	const at = (id: string, day: string, amount = 40) =>
+		pendingExpenseRow(entry(id, { date: dateOnlyToISO(day), amount }));
+	const listed = [at('m', '2026-11-20', 90), at('k', '2026-11-10', 50)];
+	const page = (sortDir: 'asc' | 'desc', sortBy: 'date' | 'amount' = 'date', totalCount = 5) => ({
+		rows: sortDir === 'desc' ? listed : [...listed].reverse(),
+		totalCount,
+		sortBy,
+		sortDir
+	});
+
+	test.each([
+		['newer than the last row, newest first', at('x', '2026-11-15'), page('desc'), true],
+		['older than the last row, newest first', at('x', '2026-11-01'), page('desc'), false],
+		['older than the last row, oldest first', at('x', '2026-11-15'), page('asc'), true],
+		['newer than the last row, oldest first', at('x', '2026-11-25'), page('asc'), false],
+		['same date, larger id, newest first', at('z', '2026-11-10'), page('desc'), true],
+		['same date, smaller id, newest first', at('a', '2026-11-10'), page('desc'), false],
+		['same date, smaller id, oldest first', at('a', '2026-11-20'), page('asc'), true],
+		['larger amount than the last row', at('x', '2026-11-01', 60), page('desc', 'amount'), true],
+		['smaller amount than the last row', at('x', '2026-11-30', 45), page('desc', 'amount'), false],
+		[
+			'any row when the list is the whole view',
+			at('x', '2026-11-01'),
+			page('desc', 'date', 2),
+			true
+		],
+		['any row on an empty list', at('x', '2026-11-01'), { ...page('desc'), rows: [] }, true]
+	])('%s: %s', (_name, row, listedPage, expected) => {
+		expect(fitsFirstPage(row, listedPage)).toBe(expected);
 	});
 });
 

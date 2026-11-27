@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { Hono } from 'hono';
+import { setPushSenderForTest } from '../../api/push/push-service';
 import { ScopeNotLoadedError } from '../../errors';
 import { errorHandler } from '../../middleware';
 import {
@@ -9,6 +10,7 @@ import {
   type TestApp,
 } from '../../test-helpers/http-client';
 import { type Members, seedCar, seedMembers } from '../../test-helpers/members';
+import { type SweepCall, sendSweepCall, writeRouteCalls } from '../../test-helpers/route-bodies';
 import { logger } from '../../utils/logger';
 import { loadResolver, requestResolver } from '../grants';
 import {
@@ -72,18 +74,92 @@ describe('a resolver that loads before it checks', () => {
 
 const VEHICLE_ID = 'sweep-car';
 
-function concretePath(key: string): [method: string, path: string] {
-  const [method = 'GET', template = '/'] = key.split(' ');
-  const path = template.replace(/:[A-Za-z]+/g, VEHICLE_ID);
-  return [method, `${path}${path.includes('?') ? '&' : '?'}vehicleId=${VEHICLE_ID}`];
-}
-
 const METHOD_ORDER = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
-const SWEEP = Object.entries(ROUTE_PERMISSIONS)
+const SWEPT_KEYS = Object.entries(ROUTE_PERMISSIONS)
   .filter(([, rule]) => !isPublicRule(rule))
-  .map(([key]) => concretePath(key))
-  .sort(([a], [b]) => METHOD_ORDER.indexOf(a) - METHOD_ORDER.indexOf(b));
+  .map(([key]) => key)
+  .sort(
+    (a, b) =>
+      METHOD_ORDER.indexOf(a.split(' ')[0] ?? '') - METHOD_ORDER.indexOf(b.split(' ')[0] ?? '')
+  );
+
+const isWrite = (method: string) => method !== 'GET' && method !== 'DELETE';
+
+const HANDLER_PRECONDITIONS: Record<string, string> = {
+  'POST /api/v1/vehicles/:vehicleId/photos': 'No storage provider configured',
+  'POST /api/v1/photos/:entityType/:entityId': 'No storage provider configured',
+  'POST /api/v1/providers': 'Missing nonce',
+  'POST /api/v1/assistant/chat': 'No assistant (LLM) provider is configured',
+  'POST /api/v1/sync/restore/from-provider': 'Provider not found or inactive',
+  'POST /api/v1/sync/restore/from-backup': 'not a readable VROOM backup ZIP',
+};
+
+const quietPush = { send: async () => ({ kind: 'ok' as const }) };
+
+function sweepRequests(
+  memberId: string
+): [key: string, method: string, path: string, call: SweepCall | undefined][] {
+  const calls = writeRouteCalls(VEHICLE_ID, memberId);
+  return SWEPT_KEYS.map((key) => {
+    const [method = 'GET', template = '/'] = key.split(' ');
+    const call = calls[key] ?? (isWrite(method) ? { body: { vehicleId: VEHICLE_ID } } : undefined);
+    const path = call?.path ?? template.replace(/:[A-Za-z]+/g, VEHICLE_ID);
+    return [key, method, `${path}${path.includes('?') ? '&' : '?'}vehicleId=${VEHICLE_ID}`, call];
+  });
+}
+
+async function inputOutcome(key: string, res: Response): Promise<string | 'precondition' | null> {
+  if (res.status === 401 || res.status === 429 || res.status >= 500) return String(res.status);
+  if (res.status !== 400) return null;
+  const text = await res.text();
+  const expected = HANDLER_PRECONDITIONS[key];
+  return expected && text.includes(expected) ? 'precondition' : text.slice(0, 160);
+}
+
+async function seedSweepCar(ctx: TestApp): Promise<Members> {
+  seedCar(ctx, VEHICLE_ID);
+  ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 1 WHERE id = ?', [VEHICLE_ID]);
+  return seedMembers(ctx, VEHICLE_ID, 'sweep');
+}
+
+describe('the sweep sends each route with a body one it accepts', () => {
+  let ctx: TestApp;
+  let members: Members;
+
+  beforeEach(async () => {
+    ctx = await createTestApp();
+    members = await seedSweepCar(ctx);
+    setPushSenderForTest(quietPush);
+  }, SETUP_TIMEOUT_MS);
+  afterEach(() => {
+    setPushSenderForTest(null);
+    ctx.close();
+  });
+
+  test('every call entry names a mapped route', () => {
+    const keys = new Set(SWEPT_KEYS);
+    const stale = Object.keys(writeRouteCalls(VEHICLE_ID, 'u')).filter((key) => !keys.has(key));
+    expect(stale).toEqual([]);
+  });
+
+  test('the owner gets past input validation on every route that takes input', async () => {
+    const refused: string[] = [];
+    const preconditionsHit = new Set<string>();
+    for (const [key, method, path, call] of sweepRequests(members.editor.id)) {
+      if (!call) continue;
+      const { cookie } = await requestAs(ctx, ctx.user.id);
+      const outcome = await inputOutcome(
+        key,
+        await sendSweepCall(ctx.app, cookie, method, path, call)
+      );
+      if (outcome === 'precondition') preconditionsHit.add(key);
+      else if (outcome) refused.push(`${key} -> ${outcome}`);
+    }
+    expect(refused).toEqual([]);
+    expect([...preconditionsHit].sort()).toEqual(Object.keys(HANDLER_PRECONDITIONS).sort());
+  }, 120_000);
+});
 
 describe('every mapped route loads the scopes it checks', () => {
   let ctx: TestApp;
@@ -91,27 +167,28 @@ describe('every mapped route loads the scopes it checks', () => {
 
   beforeEach(async () => {
     ctx = await createTestApp();
-    seedCar(ctx, VEHICLE_ID);
-    members = await seedMembers(ctx, VEHICLE_ID, 'sweep');
+    members = await seedSweepCar(ctx);
+    setPushSenderForTest(quietPush);
   }, SETUP_TIMEOUT_MS);
-  afterEach(() => ctx.close());
+  afterEach(() => {
+    setPushSenderForTest(null);
+    ctx.close();
+  });
 
   async function sweepAs(userId: string): Promise<string[]> {
     const raised: string[] = [];
     const stack = spyOn(Error, 'captureStackTrace');
     try {
-      for (const [method, path] of SWEEP) {
+      for (const [, method, path, call] of sweepRequests(members.editor.id)) {
         const before = stack.mock.calls.filter(([, ctor]) => ctor === ScopeNotLoadedError).length;
-        const { request } = await requestAs(ctx, userId);
-        const res = await request(
-          method,
-          path,
-          method === 'GET' ? undefined : { vehicleId: VEHICLE_ID }
-        );
+        const { cookie } = await requestAs(ctx, userId);
+        const res = await sendSweepCall(ctx.app, cookie, method, path, call ?? {});
         const after = stack.mock.calls.filter(([, ctor]) => ctor === ScopeNotLoadedError).length;
         const body = await res.text();
         if (after > before || body.includes('ScopeNotLoadedError')) {
           raised.push(`${method} ${path} -> ${res.status}`);
+        } else if (res.status === 401 || res.status === 429) {
+          raised.push(`${method} ${path} -> ${res.status}, so the route was never checked`);
         }
       }
     } finally {

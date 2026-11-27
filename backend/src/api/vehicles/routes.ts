@@ -57,7 +57,7 @@ import { carShareAccess } from '../drivers/attribution';
 import { carShareRoutes, driverRoutes } from '../drivers/routes';
 import { nextUpdatedAtFor } from '../expenses/updated-at';
 import { withComputedBalance } from '../financing/repository';
-import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
+import { deleteWithPhotos } from '../photos/photo-service';
 import { vehiclePeople } from '../roles/routes';
 import { photoRoutes } from './photo-routes';
 
@@ -547,16 +547,16 @@ routes.delete(
     const { id } = c.req.valid('param');
 
     // Photos have no FK: the vehicle cascade would orphan them, so delete them before the row goes.
-    const [expenseIds, odometerIds, splitGroupIds] = await Promise.all([
-      repos().expenses.findIdsByVehicleId(id),
-      repos().odometer.findIdsByVehicleId(id),
-      splitGroupIdsForVehicle(id, user.id),
-    ]);
-    await deleteAllPhotosForEntity('vehicle', id, user.id);
-    await deletePhotosForEntities('expense', expenseIds, user.id);
-    await deletePhotosForEntities('odometer_entry', odometerIds, user.id);
-
-    await repos().vehicles.delete(id);
+    const splitGroupIds = await splitGroupIdsForVehicle(id, user.id);
+    await deleteWithPhotos(
+      user.id,
+      async () => [
+        { entityType: 'vehicle', entityIds: [id] },
+        { entityType: 'expense', entityIds: await repos().expenses.findIdsByVehicleId(id) },
+        { entityType: 'odometer_entry', entityIds: await repos().odometer.findIdsByVehicleId(id) },
+      ],
+      () => repos().vehicles.delete(id)
+    );
 
     // Errors are logged, not thrown: the delete has already committed, and a retry would 404.
     try {

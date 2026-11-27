@@ -1,4 +1,4 @@
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import type { Photo, PhotoRef } from '../../db/schema';
 import {
   NotFoundError,
@@ -394,23 +394,6 @@ async function deleteObjectsFromProvider(
   return failed;
 }
 
-export async function deleteAllPhotosForEntity(
-  entityType: string,
-  entityId: string,
-  userId: string
-): Promise<void> {
-  await validateEntityOwnership(entityType, entityId, userId);
-
-  const entityPhotos = await repos().photos.findByEntity(entityType, entityId);
-  if (entityPhotos.length === 0) return;
-
-  await deletePhotoRowsAndObjects(
-    entityPhotos.map((p) => p.id),
-    userId
-  );
-  await repos().photos.deleteByEntity(entityType, entityId);
-}
-
 export async function countOrphanedPhotos(userId: string): Promise<number> {
   return (await repos().photos.findOrphanedByUser(userId)).length;
 }
@@ -455,6 +438,28 @@ export async function deleteStoredPhotoObjects(refs: PhotoRef[], userId: string)
   for (const [providerId, providerRefs] of groupActiveRefsByProvider(refs)) {
     await deleteObjectsFromProvider(providerId, providerRefs, userId);
   }
+}
+
+export interface PhotoOwners {
+  entityType: string;
+  entityIds: string[];
+}
+
+export async function deleteWithPhotos<T>(
+  userId: string,
+  owners: () => Promise<PhotoOwners[]>,
+  deleteRows: () => Promise<T>
+): Promise<T> {
+  const refs: PhotoRef[] = [];
+  const result = await appContext().asyncDb.transaction(async () => {
+    for (const { entityType, entityIds } of await owners()) {
+      refs.push(...(await storedPhotoObjects(entityType, entityIds)));
+      if (entityIds.length > 0) await repos().photos.deleteByEntities(entityType, entityIds);
+    }
+    return deleteRows();
+  });
+  await deleteStoredPhotoObjects(refs, userId);
+  return result;
 }
 
 export async function deletePhotosForEntities(

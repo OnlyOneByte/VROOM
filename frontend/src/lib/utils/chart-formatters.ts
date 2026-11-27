@@ -123,6 +123,8 @@ function tickLabelWidth(label: string): number {
 	return width;
 }
 
+const EDGE_LABEL_MARGIN = 2;
+
 export function edgeLabelShift(
 	x: unknown,
 	label: unknown,
@@ -132,9 +134,9 @@ export function edgeLabelShift(
 	const at = Number(x);
 	if (!Number.isFinite(at) || plotWidth <= 0) return 0;
 	const half = tickLabelWidth(String(label ?? '')) / 2;
-	const pastRight = at + half - (plotWidth + padding.right);
+	const pastRight = at + half - (plotWidth + padding.right - EDGE_LABEL_MARGIN);
 	if (pastRight > 0) return -pastRight;
-	const pastLeft = -padding.left - (at - half);
+	const pastLeft = EDGE_LABEL_MARGIN - padding.left - (at - half);
 	return pastLeft > 0 ? pastLeft : 0;
 }
 

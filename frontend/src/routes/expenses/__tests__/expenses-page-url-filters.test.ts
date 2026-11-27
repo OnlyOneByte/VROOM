@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import type { UserSettings, Vehicle } from '#lib/types/index.ts';
+import type { Expense, UserSettings, Vehicle } from '#lib/types/index.ts';
 
 const nav = vi.hoisted(() => ({
 	page: { url: new URL('http://localhost/expenses'), state: {} },
@@ -45,12 +45,14 @@ const getAllExpenses = vi.fn();
 const getExpenseSummary = vi.fn();
 const getVehicles = vi.fn();
 const getMonthlyTotals = vi.fn();
+const updateExpense = vi.fn();
 
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		getAllExpenses: (...args: unknown[]) => getAllExpenses(...args),
 		getExpenseSummary: (...args: unknown[]) => getExpenseSummary(...args),
 		getMonthlyTotals: (...args: unknown[]) => getMonthlyTotals(...args),
+		updateExpense: (...args: unknown[]) => updateExpense(...args),
 		downloadExpensesCsv: () => Promise.resolve()
 	}
 }));
@@ -71,6 +73,7 @@ vi.mock('#lib/services/settings-api.ts', () => ({
 import Page from '../+page.svelte';
 import { settingsStore } from '#lib/stores/settings.svelte.ts';
 import { offlineExpenseQueue, onlineStatus } from '#lib/stores/offline.svelte.ts';
+import { resetPendingEdits, scheduleEdit, undoEdit } from '#lib/utils/pending-edits.svelte.ts';
 
 const VEHICLE = {
 	id: 'v1',
@@ -273,5 +276,55 @@ describe('/expenses filters in the URL', () => {
 
 		await waitFor(() => expect(getMonthlyTotals).toHaveBeenCalledTimes(2));
 		expect(getMonthlyTotals.mock.lastCall?.[0]).toMatchObject({ category: 'maintenance' });
+	});
+});
+
+describe('/expenses after an Undo of a move off the filtered car', () => {
+	const row = (id: string, day: number) =>
+		({
+			id,
+			vehicleId: 'v1',
+			userId: 'u1',
+			category: 'fuel',
+			amount: 10,
+			date: `2026-01-${String(day).padStart(2, '0')}T12:00:00.000Z`,
+			tags: [],
+			createdAt: '2026-01-01T00:00:00.000Z',
+			updatedAt: '2026-01-01T00:00:00.000Z'
+		}) as unknown as Expense;
+	const listedIds = () => ((tableProps['expenses'] ?? []) as Expense[]).map(expense => expense.id);
+
+	test('a list answered while the Undo was saving keeps an expense that sorts onto a later page off page 1', async () => {
+		const moved = row('e1', 2);
+		const newer = Array.from({ length: 20 }, (_, i) => row(`n${i}`, 25 - i));
+		updateExpense
+			.mockResolvedValueOnce({ ...moved, vehicleId: 'v2', updatedAt: '2026-01-01T00:00:01.000Z' })
+			.mockReturnValueOnce(new Promise(() => {}));
+		getAllExpenses.mockResolvedValue({
+			data: newer.slice(0, 19),
+			pagination: { totalCount: 19, limit: 20, offset: 0, hasMore: false }
+		});
+		try {
+			scheduleEdit(moved, { ...moved, vehicleId: 'v2' }, {
+				vehicleId: 'v2',
+				category: 'fuel',
+				amount: 10
+			} as never);
+			await new Promise(resolve => setTimeout(resolve, 0));
+			openAt('?vehicleId=v1');
+			await waitFor(() => expect(listedIds()).toHaveLength(19));
+
+			undoEdit('e1');
+			await waitFor(() => expect(listedIds()[0]).toBe('e1'));
+
+			getAllExpenses.mockResolvedValue({
+				data: newer,
+				pagination: { totalCount: 21, limit: 20, offset: 0, hasMore: true }
+			});
+			(tableProps['onSortChange'] as (by: string, dir: string) => void)('date', 'desc');
+			await waitFor(() => expect(listedIds()).toEqual(newer.map(expense => expense.id)));
+		} finally {
+			resetPendingEdits();
+		}
 	});
 });

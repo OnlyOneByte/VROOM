@@ -13,7 +13,12 @@ import {
 import { calendarParts, zonedCalendar } from '../../utils/analytics-charts';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { zValidator } from '../../utils/validation';
-import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access';
+import {
+  type ReadableVehicle,
+  readableVehicles,
+  requireVehicleAccess,
+  seesFinancials,
+} from '../../utils/vehicle-access';
 import { QUERY_ANNOTATIONS } from './annotations';
 import {
   analyticsQueryToApi,
@@ -216,6 +221,15 @@ const bucketItemsSchema = z
 
 const fromVehicleQuery: ResourceOf = (c) => vehicleOrOwnAccount(c.req.query('vehicleId'), c);
 
+async function queryScope(userId: string, vehicleIds?: string[]): Promise<ReadableVehicle[]> {
+  const readable = await readableVehicles(userId, vehicleIds);
+  const currencyOf = await repos().preferences.currencies([
+    userId,
+    ...readable.map((v) => v.ownerId),
+  ]);
+  return readable.filter((v) => currencyOf(v.ownerId) === currencyOf(userId));
+}
+
 routes.use('*', requireAuth);
 
 routes.get(
@@ -224,7 +238,9 @@ routes.get(
   authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
-    const data = await repos().analyticsQuery.items(user.id, c.req.valid('query'));
+    const query = c.req.valid('query');
+    const scope = await queryScope(user.id, query.vehicleIds);
+    const data = await repos().analyticsQuery.items(user.id, query, scope);
     return c.json({
       success: true,
       data: bucketItemsToApi(data, await repos().preferences.moneyScale(user.id)),
@@ -255,7 +271,9 @@ routes.get(
   authorize(ownAccount),
   async (c) => {
     const user = c.get('user');
-    const data = await repos().analyticsQuery.query(user.id, c.req.valid('query'));
+    const query = c.req.valid('query');
+    const scope = await queryScope(user.id, query.vehicleIds);
+    const data = await repos().analyticsQuery.query(user.id, query, scope);
     return c.json({
       success: true,
       data: analyticsQueryToApi(data, await repos().preferences.moneyScale(user.id)),
