@@ -65,6 +65,18 @@ describe('validateExpenseField — amount bounds', () => {
 		expect(validateExpenseField('amount', ctx({ formData: { amount: '19.9' } }))).toBeNull();
 	});
 
+	test("a shared car checks decimals in its owner's currency, not the viewer's", () => {
+		const yenCar = { id: 'v1', ownerCurrency: 'JPY' } as Vehicle;
+		const dollarCar = { id: 'v2', ownerCurrency: 'USD' } as Vehicle;
+		const amount = { amount: '12.50' };
+		expect(validateExpenseField('amount', ctx({ vehicle: yenCar, formData: amount }))).toBe(
+			'Amount must be a whole number'
+		);
+		expect(
+			validateExpenseField('amount', ctx({ vehicle: dollarCar, formData: amount }))
+		).toBeNull();
+	});
+
 	test('a normal positive amount → null', () => {
 		expect(validateExpenseField('amount', ctx({ formData: { amount: '42.50' } }))).toBeNull();
 	});

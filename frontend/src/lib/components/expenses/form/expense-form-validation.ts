@@ -5,8 +5,8 @@ import { EXPENSE_LIMITS } from '#lib/constants/limits.ts';
 
 const MINOR_UNIT_TOLERANCE = 1e-6;
 
-function fitsMinorUnit(amount: number): boolean {
-	const minor = amount * minorUnitScale();
+function fitsMinorUnit(amount: number, currency?: string): boolean {
+	const minor = amount * minorUnitScale(currency);
 	return Math.abs(minor - Math.round(minor)) < MINOR_UNIT_TOLERANCE;
 }
 
@@ -44,8 +44,8 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 			if (amount > EXPENSE_LIMITS.MAX_AMOUNT) {
 				return `Amount must be ${formatNumber(EXPENSE_LIMITS.MAX_AMOUNT, 0)} or less`;
 			}
-			if (!fitsMinorUnit(amount)) {
-				const digits = Math.log10(minorUnitScale());
+			if (!fitsMinorUnit(amount, ctx.vehicle?.ownerCurrency)) {
+				const digits = Math.log10(minorUnitScale(ctx.vehicle?.ownerCurrency));
 				return digits > 0
 					? `Amount can have at most ${digits} decimal places`
 					: 'Amount must be a whole number';

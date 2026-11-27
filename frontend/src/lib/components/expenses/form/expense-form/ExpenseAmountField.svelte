@@ -10,6 +10,7 @@
 		ref?: HTMLInputElement | null;
 		quick?: boolean;
 		onAmountBlur: () => void;
+		currency?: string;
 	}
 
 	let {
@@ -17,10 +18,11 @@
 		amountError,
 		ref = $bindable(null),
 		quick = false,
-		onAmountBlur
+		onAmountBlur,
+		currency
 	}: Props = $props();
 
-	const currencySymbol = $derived(getCurrencySymbol());
+	const currencySymbol = $derived(getCurrencySymbol(currency));
 	const numberClass =
 		'[appearance:textfield] rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent aria-invalid:ring-0 aria-invalid:border-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
 </script>
@@ -47,10 +49,10 @@
 				id="amount"
 				type="number"
 				inputmode="decimal"
-				step={amountStep()}
+				step={amountStep(currency)}
 				min="0"
 				bind:value={amount}
-				placeholder={amountPlaceholder()}
+				placeholder={amountPlaceholder(currency)}
 				class="h-auto min-w-[3ch] py-0 text-center text-7xl leading-none tabular-nums caret-needle placeholder:text-muted-foreground [field-sizing:content] sm:h-auto sm:text-8xl md:text-8xl {numberClass}"
 				onblur={onAmountBlur}
 				aria-invalid={!!amountError}
@@ -72,10 +74,10 @@
 				id="amount"
 				type="number"
 				inputmode="decimal"
-				step={amountStep()}
+				step={amountStep(currency)}
 				min="0"
 				bind:value={amount}
-				placeholder={amountPlaceholder()}
+				placeholder={amountPlaceholder(currency)}
 				style="padding-left: calc(1.125rem + {currencySymbol.length}ch)"
 				class="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 				onblur={onAmountBlur}

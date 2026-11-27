@@ -27,6 +27,7 @@ export interface Vehicle {
 	financing?: VehicleFinancing;
 	unitPreferences?: UnitPreferences;
 	sharedAccess?: SharedAccess;
+	ownerCurrency?: string;
 	carShareEnabled?: boolean;
 	carShare?: { enabled: boolean; manage: boolean; record: boolean };
 	createdAt: string;
