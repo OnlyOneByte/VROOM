@@ -28,13 +28,18 @@ import { formatNumber } from '#lib/utils/formatters.ts';
 describe('edgeLabelShift (x labels at the plot edges stay inside the chart)', () => {
 	const padding = { left: 48, right: 4 };
 
-	test('a label centred on the right edge moves left by just what sticks out', () => {
-		expect(edgeLabelShift(241, 'Nov ’26', 241, padding)).toBeCloseTo(-20.5);
-		expect(edgeLabelShift(225, 'Nov ’26', 241, padding)).toBeCloseTo(-4.5);
+	test('a label centred on the right edge moves left by what sticks out, plus a 2px margin', () => {
+		expect(edgeLabelShift(241, 'Nov ’26', 241, padding)).toBeCloseTo(-22.5);
+		expect(edgeLabelShift(225, 'Nov ’26', 241, padding)).toBeCloseTo(-6.5);
 	});
 
-	test('a label that sticks out past the left edge moves right by just that much', () => {
-		expect(edgeLabelShift(-46, 'Jan 1 ’25', 241, padding)).toBeCloseTo(29.5);
+	test('a label that sticks out past the left edge moves right by that much, plus a 2px margin', () => {
+		expect(edgeLabelShift(-46, 'Jan 1 ’25', 241, padding)).toBeCloseTo(31.5);
+	});
+
+	test('a label that would end inside the 2px margin moves just enough to clear it', () => {
+		expect(edgeLabelShift(220, 'Nov ’26', 241, padding)).toBeCloseTo(-1.5);
+		expect(edgeLabelShift(218, 'Nov ’26', 241, padding)).toBe(0);
 	});
 
 	test('labels with room on both sides stay where they are', () => {
