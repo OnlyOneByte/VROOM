@@ -13,18 +13,6 @@ async function holdVehicleLists(page: Page, post: 'slow' | 'quick') {
 		const { pathname } = new URL(response.url());
 		if (pathname === '/api/v1/expenses' && response.request().method() === 'POST') markAnswered();
 	});
-	if (post === 'quick') {
-		await page.route(
-			url => url.pathname === '/api/v1/vehicles/vehicle-camry',
-			async route => {
-				if (saved) {
-					await answered;
-					await new Promise(resolve => setTimeout(resolve, 500));
-				}
-				return route.fallback();
-			}
-		);
-	}
 	await page.route(
 		url => url.pathname === '/api/v1/expenses',
 		async route => {
@@ -38,7 +26,7 @@ async function holdVehicleLists(page: Page, post: 'slow' | 'quick') {
 			return route.fallback();
 		}
 	);
-	return { release: () => release(), saved: () => saved };
+	return { release: () => release(), saved: () => saved, answered };
 }
 
 async function saveFromVehicle(page: Page) {
@@ -49,6 +37,18 @@ async function saveFromVehicle(page: Page) {
 	await page.getByRole('button', { name: /More details/ }).click();
 	await page.getByLabel('Description (Optional)').fill('Car wash on Elm');
 	await page.getByRole('button', { name: 'Save Expense' }).click();
+	await expect(page).toHaveURL(new RegExp(`${VEHICLE}$`));
+}
+
+async function reopenOnceSynced(page: Page, answered: Promise<void>) {
+	await answered;
+	await expect(page.getByText('Up to date').first()).toBeVisible();
+	await page.getByRole('link', { name: 'Garage' }).first().click();
+	await expect(page).toHaveURL(/\/vehicles$/);
+	await page
+		.getByRole('link', { name: /Daily Driver/ })
+		.first()
+		.click();
 	await expect(page).toHaveURL(new RegExp(`${VEHICLE}$`));
 }
 
@@ -65,6 +65,7 @@ test.describe("A new expense shows on its vehicle's page before the page's lists
 		}) => {
 			const lists = await holdVehicleLists(page, post);
 			await saveFromVehicle(page);
+			if (post === 'quick') await reopenOnceSynced(page, lists.answered);
 			expect(lists.saved()).toBe(true);
 
 			const recent = page.locator('section, div').filter({
@@ -106,8 +107,9 @@ test.describe("A car's first expense shows instead of the empty overview", () =>
 		test(`a ${state} first expense replaces "no expenses yet" on the overview`, async ({
 			page
 		}) => {
-			await holdVehicleLists(page, post);
+			const lists = await holdVehicleLists(page, post);
 			await saveFromVehicle(page);
+			if (post === 'quick') await reopenOnceSynced(page, lists.answered);
 
 			const overview = page.getByRole('tabpanel', { name: 'Overview' });
 			await expect(overview.getByRole('heading', { name: 'Recent expenses' })).toBeVisible();
