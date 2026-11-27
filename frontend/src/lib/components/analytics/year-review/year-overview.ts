@@ -9,18 +9,49 @@ export function yearRange(year: number, now: Date = new Date()) {
 	return { start, end: Math.min(yearEnd, today), soFar: today < yearEnd };
 }
 
+export const YEAR_QUERIES = [
+	'monthly',
+	'categories',
+	'counts',
+	'running',
+	'fills',
+	'efficiency',
+	'previous'
+] as const;
+export type YearQuery = (typeof YEAR_QUERIES)[number];
+
 export function yearRequests(
 	year: number,
-	now?: Date
-): Record<'monthly' | 'counts' | 'running' | 'fills', AnalyticsQueryParams> {
-	const { start, end } = yearRange(year, now);
+	now: Date = new Date()
+): Record<YearQuery, AnalyticsQueryParams> {
+	const { start, end, soFar } = yearRange(year, now);
 	const whole = { interval: 'none' as const, start, end };
+	const before = {
+		start: Math.floor(new Date(year - 1, 0, 1).getTime() / 1000),
+		end: soFar
+			? Math.floor(new Date(year - 1, now.getMonth(), now.getDate() + 1).getTime() / 1000)
+			: start
+	};
 	return {
 		monthly: { metric: 'cost', interval: 'month', include: 'all', start, end },
+		categories: { ...whole, metric: 'cost', groupBy: 'category', include: 'all' },
 		counts: { ...whole, metric: 'count', groupBy: 'category', include: 'all' },
 		running: { ...whole, metric: 'costPerDistance', groupBy: 'vehicle', include: 'running' },
-		fills: { ...whole, metric: 'count', groupBy: 'vehicle', categories: ['fuel'], include: 'all' }
+		fills: { ...whole, metric: 'count', groupBy: 'vehicle', categories: ['fuel'], include: 'all' },
+		efficiency: { metric: 'efficiency', interval: 'month', start, end },
+		previous: {
+			metric: 'cost',
+			interval: 'none',
+			include: 'all',
+			start: before.start,
+			end: before.end
+		}
 	};
+}
+
+export function percentChange(current: number, previous: number | null | undefined) {
+	if (previous == null || previous <= 0) return null;
+	return ((current - previous) / previous) * 100;
 }
 
 export function yearCounts(response: AnalyticsQueryResponse | null) {

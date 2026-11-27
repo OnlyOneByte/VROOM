@@ -11,26 +11,30 @@
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import { buildCategoryPieData, buildChartConfig } from '#lib/utils/chart-colors.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
-	import type { AnalyticsQueryResponse, YearEndResponse } from '#lib/types/index.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import type { AnalyticsQueryResponse, Vehicle, YearEndResponse } from '#lib/types/index.ts';
 	import {
 		formatCurrency,
 		formatDateWith,
 		formatNumber,
 		formatNumberUpTo
 	} from '#lib/utils/formatters.ts';
-	import { formatDecimalAxis, parseMonthToDate, unitTooltip } from '#lib/utils/chart-formatters.ts';
+	import { formatDecimalAxis, unitTooltip } from '#lib/utils/chart-formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getFuelEfficiencyLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import ChartGroup from './fuel/ChartGroup.svelte';
 	import { bucketDate } from './explore/explore-data';
 	import {
+		YEAR_QUERIES,
 		biggestMonth,
 		cheapestToRun,
 		mostFills,
+		percentChange,
 		yearCounts,
 		yearRange,
-		yearRequests
+		yearRequests,
+		type YearQuery
 	} from './year-review/year-overview';
 
 	const currentYear = new Date().getFullYear();
@@ -38,10 +42,8 @@
 
 	let selectedYear = $state(currentYear);
 	let yearEnd = $state<YearEndResponse | null>(null);
-	let monthly = $state<AnalyticsQueryResponse | null>(null);
-	let counts = $state<AnalyticsQueryResponse | null>(null);
-	let running = $state<AnalyticsQueryResponse | null>(null);
-	let fills = $state<AnalyticsQueryResponse | null>(null);
+	let vehicles = $state<Vehicle[]>([]);
+	let results = $state<Record<YearQuery, AnalyticsQueryResponse> | null>(null);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 	let request = 0;
@@ -51,19 +53,17 @@
 		const queries = yearRequests(year);
 		try {
 			isLoading = true;
-			const [summary, months, byCategory, rates, fillUps] = await Promise.all([
+			const [summary, cars, ...responses] = await Promise.all([
 				analyticsApi.getYearEnd({ year }),
-				analyticsApi.query(queries.monthly),
-				analyticsApi.query(queries.counts),
-				analyticsApi.query(queries.running),
-				analyticsApi.query(queries.fills)
+				vehicleApi.getVehicles(),
+				...YEAR_QUERIES.map(key => analyticsApi.query(queries[key]))
 			]);
 			if (current !== request) return;
 			yearEnd = summary;
-			monthly = months;
-			counts = byCategory;
-			running = rates;
-			fills = fillUps;
+			vehicles = cars;
+			results = Object.fromEntries(
+				YEAR_QUERIES.map((key, i) => [key, responses[i] as AnalyticsQueryResponse])
+			) as Record<YearQuery, AnalyticsQueryResponse>;
 			error = null;
 		} catch (e) {
 			if (current !== request) return;
@@ -93,18 +93,25 @@
 	const monthName = (bucket: string, month: 'short' | 'long' = 'short') =>
 		formatDateWith(bucketDate(bucket), { month });
 
+	let monthly = $derived(results?.monthly ?? null);
+	let ownedCount = $derived(vehicles.filter(v => !v.sharedAccess).length);
+	let hasShared = $derived(vehicles.some(v => v.sharedAccess));
+	let total = $derived(monthly?.totals.value ?? 0);
 	let categories = $derived.by(() => {
-		const rows = buildCategoryPieData(yearEnd?.categoryBreakdown ?? []).sort(
-			(a, b) => b.value - a.value
-		);
+		const breakdown = (results?.categories.series ?? []).map(s => ({
+			category: s.key,
+			amount: s.values[0] ?? 0
+		}));
+		const rows = buildCategoryPieData(breakdown).sort((a, b) => b.value - a.value);
 		const max = rows[0]?.value ?? 0;
 		return rows.map(r => ({ ...r, share: max > 0 ? r.value / max : 0 }));
 	});
-	let tally = $derived(yearCounts(counts));
+	let tally = $derived(yearCounts(results?.counts ?? null));
 	let peak = $derived(biggestMonth(monthly));
-	let cheapest = $derived(cheapestToRun(running));
-	let fillLeader = $derived(mostFills(fills));
-	let change = $derived(yearEnd?.previousYearComparison?.percentageChange ?? null);
+	let cheapest = $derived(cheapestToRun(results?.running ?? null));
+	let fillLeader = $derived(mostFills(results?.fills ?? null));
+	let change = $derived(percentChange(total, results?.previous.totals.value));
+	let biggestExpense = $derived(hasShared ? null : (yearEnd?.biggestExpense ?? null));
 
 	const isMobile = new IsMobile();
 	let monthRows = $derived(
@@ -120,36 +127,40 @@
 	const monthSeries = [{ key: 'value', label: 'Spent', color: 'var(--chart-1)' }];
 	const monthConfig: Chart.ChartConfig = { value: { label: 'Spent', color: 'var(--chart-1)' } };
 
-	let effTrendData = $derived(
-		(yearEnd?.efficiencyTrend ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
-	);
+	let effTrendData = $derived.by(() => {
+		const eff = results?.efficiency;
+		return (eff?.buckets ?? []).flatMap((bucket, i) => {
+			const efficiency = eff?.series[0]?.values[i];
+			return efficiency == null ? [] : [{ date: bucketDate(bucket), efficiency }];
+		});
+	});
 	let effTrendSeries = $derived([
 		{ key: 'efficiency', label: efficiencyLabel, color: 'var(--chart-1)' }
 	]);
 	let effTrendConfig = $derived(buildChartConfig(effTrendSeries));
 
-	let detailTiles = $derived(
-		yearEnd
-			? [
-					{
-						label: `Average ${efficiencyLabel}`,
-						value: yearEnd.avgEfficiency != null ? formatNumber(yearEnd.avgEfficiency, 1) : 'N/A',
-						subtitle: 'Across all vehicles'
-					},
-					{
-						label: `Cost per ${distWord}`,
-						value:
-							yearEnd.costPerDistance != null ? formatCurrency(yearEnd.costPerDistance) : 'N/A',
-						subtitle: 'All costs'
-					},
-					{
-						label: `Total ${distLong}`,
-						value: formatNumberUpTo(yearEnd.totalDistance, 1),
-						subtitle: `${yearEnd.vehicleCount} ${yearEnd.vehicleCount === 1 ? 'vehicle' : 'vehicles'}`
-					}
-				]
-			: []
-	);
+	let carsText = $derived(`${ownedCount} ${ownedCount === 1 ? 'vehicle' : 'vehicles'}`);
+	let detailTiles = $derived.by(() => {
+		const avgEff = results?.efficiency.totals.value ?? null;
+		const perDistance = monthly?.totals.perDistance ?? null;
+		return [
+			{
+				label: `Average ${efficiencyLabel}`,
+				value: avgEff != null ? formatNumber(avgEff, 1) : 'N/A',
+				subtitle: 'Fuel, across your cars'
+			},
+			{
+				label: `Cost per ${distWord}`,
+				value: perDistance != null ? formatCurrency(perDistance) : 'N/A',
+				subtitle: 'All costs'
+			},
+			{
+				label: `Total ${distLong}`,
+				value: formatNumberUpTo(monthly?.totals.distance ?? 0, 1),
+				subtitle: carsText
+			}
+		];
+	});
 </script>
 
 <div class="space-y-6 md:space-y-8">
@@ -176,7 +187,7 @@
 			message={error}
 			onRetry={() => loadData(selectedYear)}
 		/>
-	{:else if yearEnd && yearEnd.totalSpent <= 0}
+	{:else if results && total <= 0}
 		<EmptyState level={2}>
 			{#snippet icon()}
 				<div class="mb-4 rounded-full bg-muted p-4">
@@ -186,15 +197,18 @@
 			{#snippet title()}No expenses in {selectedYear}{/snippet}
 			{#snippet description()}Pick another year, or log an expense to start this one.{/snippet}
 		</EmptyState>
-	{:else if yearEnd}
+	{:else if results}
 		<section aria-label="{selectedYear} in review" class="space-y-8">
+			{#if hasShared}
+				<p class="text-sm text-muted-foreground">
+					These figures cover the {carsText} you own. Cars shared with you aren't included yet.
+				</p>
+			{/if}
 			<div class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
 				<div class="space-y-2">
 					<HeroFigure
-						label="{selectedYear}{soFar
-							? ' so far'
-							: ''} · {yearEnd.vehicleCount} {yearEnd.vehicleCount === 1 ? 'vehicle' : 'vehicles'}"
-						value={formatCurrency(yearEnd.totalSpent, undefined, 0)}
+						label="{selectedYear}{soFar ? ' so far' : ''} · {carsText}"
+						value={formatCurrency(total, undefined, 0)}
 					/>
 					<p class="max-w-md text-muted-foreground">
 						Across <strong class="text-foreground">{formatNumber(tally.expenses, 0)}</strong>
@@ -208,7 +222,7 @@
 						{/if}
 						{#if change != null && change !== 0}
 							That's {formatNumber(Math.abs(change), 0)}% {change > 0 ? 'more' : 'less'} than
-							{selectedYear - 1}.
+							{soFar ? `the same point in ${selectedYear - 1}` : selectedYear - 1}.
 						{/if}
 					</p>
 				</div>
@@ -286,17 +300,18 @@
 								<Fuel class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
 							</li>
 						{/if}
-						{#if yearEnd.biggestExpense}
+						{#if biggestExpense}
 							<li class="flex items-center justify-between gap-3 py-3">
 								<div>
 									<p class="font-medium">Biggest single expense</p>
 									<p class="text-sm text-muted-foreground">
-										{yearEnd.biggestExpense.description} · {formatCurrency(
-											yearEnd.biggestExpense.amount
-										)} · {formatDateWith(new Date(yearEnd.biggestExpense.date), {
-											month: 'short',
-											day: 'numeric'
-										})}
+										{biggestExpense.description} · {formatCurrency(biggestExpense.amount)} · {formatDateWith(
+											new Date(biggestExpense.date),
+											{
+												month: 'short',
+												day: 'numeric'
+											}
+										)}
 									</p>
 								</div>
 								<Receipt class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
