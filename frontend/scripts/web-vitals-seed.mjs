@@ -38,7 +38,9 @@ const fleet = [
 const economy = {
 	'Model 3': [3.6, 4.4],
 	Prius: [48, 55],
-	'F-150': [17, 22]
+	'F-150': [17, 22],
+	Camry: [28, 34],
+	Civic: [32, 38]
 };
 const categories = [
 	'fuel',
@@ -99,20 +101,37 @@ db.transaction(() => {
 			.query('select count(*) as n from expenses where vehicle_id = ?')
 			.get(vehicle.id).n;
 		const count = expensesPerVehicle - existing;
-		const band = existing === 0 ? economy[vehicle.model] : undefined;
+		const band = economy[vehicle.model];
 		const electric = vehicle.vehicle_type === 'electric';
 		const pool = band ? categories : otherCategories;
+		const first = db
+			.query(
+				'select date, mileage, volume from expenses where vehicle_id = ? and mileage is not null order by date limit 1'
+			)
+			.get(vehicle.id);
+		const end = first ? first.date - 86400 : now;
+		const endMiles =
+			first && band
+				? first.mileage - Math.round((first.volume ?? 0) * ((band[0] + band[1]) / 2))
+				: null;
+		const startMiles = endMiles == null ? 10000 : Math.max(500, endMiles - count * 60);
+		const steps = Array.from({ length: count }, () => 0.75 + random() * 0.5);
+		const scale =
+			(endMiles == null ? count * 60 : endMiles - startMiles) / steps.reduce((a, b) => a + b, 0);
+		const dateAt = i => now - span + Math.floor(((end - now + span) * i) / count);
 		const odometer = [];
-		let miles = 10000;
+		let exact = startMiles;
+		let miles = startMiles;
 		let lastFill = miles;
 		for (let i = 0; i < count; i++) {
-			const date = now - span + Math.floor((span * i) / count);
-			const category = pool[i % pool.length];
+			const date = dateAt(i);
+			const category = band && i === count - 1 ? 'fuel' : pool[i % pool.length];
 			const isFuel = category === 'fuel';
-			miles += 45 + Math.floor(random() * 30);
+			exact += steps[i] * scale;
+			miles = Math.round(exact);
 			odometer.push(miles);
-			const fast = electric && i % 6 === 0;
-			const volume = isFuel ? Math.round(((miles - lastFill) / between(band)) * 100) / 100 : null;
+			const fast = electric && i % 12 === 0;
+			const volume = isFuel ? Math.round(((miles - lastFill) / between(band)) * 1000) / 1000 : null;
 			const price = electric
 				? fast
 					? between([0.38, 0.48])
@@ -141,7 +160,7 @@ db.transaction(() => {
 		if (!band) continue;
 		for (let i = 0; i < odometerPerVehicle; i++) {
 			const at = Math.floor((count * i) / odometerPerVehicle);
-			const date = now - span + Math.floor((span * at) / count);
+			const date = dateAt(at);
 			insertOdometer.run(
 				id('odo'),
 				vehicle.id,

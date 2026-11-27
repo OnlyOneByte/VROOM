@@ -72,7 +72,7 @@ describe('the seeded garage, after the web-vitals seed', () => {
       expect(economy.length).toBeGreaterThan(10);
       expect({
         model,
-        outside: economy.filter((e) => e < low - 0.5 || e > high + 0.5),
+        outside: economy.filter((e) => e < low * 0.99 || e > high * 1.01),
       }).toEqual({
         model,
         outside: [],
@@ -91,6 +91,39 @@ describe('the seeded garage, after the web-vitals seed', () => {
     for (const [model, rows] of readings) {
       const drops = rows.slice(1).filter((row, i) => row.mileage < (rows[i] as Row).mileage);
       expect({ model, drops: drops.length }).toEqual({ model, drops: 0 });
+    }
+  });
+
+  test('charging sessions carry a valid charger type, and only charging sessions do', () => {
+    const types = db
+      .query(
+        `select fuel_type as fuelType, charger_type as chargerType, count(*) as n from expenses
+         where category = 'fuel' group by 1, 2 order by 1, 2`
+      )
+      .all();
+    expect(types).toEqual([
+      { fuelType: null, chargerType: null, n: expect.any(Number) },
+      { fuelType: '87 (Regular)', chargerType: null, n: expect.any(Number) },
+      { fuelType: 'DC Fast Charging', chargerType: 'dc_fast', n: expect.any(Number) },
+      { fuelType: 'Level 2 (AC)', chargerType: 'home', n: expect.any(Number) },
+    ]);
+  });
+
+  test('every car carries the perf load: about 1,000 fill-ups and 200 odometer readings', () => {
+    const load = db
+      .query(
+        `select v.model,
+           (select count(*) from expenses e where e.vehicle_id = v.id and e.category = 'fuel') as fills,
+           (select count(*) from odometer_entries o where o.vehicle_id = v.id) as readings
+         from vehicles v order by v.model`
+      )
+      .all() as { model: string; fills: number; readings: number }[];
+    for (const car of load) {
+      expect({ model: car.model, fills: car.fills >= 900, readings: car.readings }).toEqual({
+        model: car.model,
+        fills: true,
+        readings: 200,
+      });
     }
   });
 });
