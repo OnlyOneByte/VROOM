@@ -161,7 +161,21 @@ describe('changing the distance unit converts the stored rate', () => {
     expect((await read()).businessMileageRate).toBe(0.00005033);
   });
 
-  test('a rate under 0.001 keeps 4 significant digits both ways, so it survives a round trip', async () => {
+  test.each([
+    ['miles', 'kilometers', 0.00105],
+    ['kilometers', 'miles', 0.001026],
+    ['miles', 'kilometers', 0.0123],
+  ])('%s → %s → back keeps the rate to 4 significant digits', async (from, to, rate) => {
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: from },
+      businessMileageRate: rate,
+    });
+    await ctx.authed('PUT', '/api/v1/settings', { unitPreferences: { distanceUnit: to } });
+    await ctx.authed('PUT', '/api/v1/settings', { unitPreferences: { distanceUnit: from } });
+    expect((await read()).businessMileageRate).toBe(rate);
+  });
+
+  test('a small rate keeps 4 significant digits both ways, so it survives a round trip', async () => {
     await ctx.authed('PUT', '/api/v1/settings', {
       unitPreferences: { distanceUnit: 'kilometers' },
       businessMileageRate: 0.0005,
