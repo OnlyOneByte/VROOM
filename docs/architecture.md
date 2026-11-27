@@ -115,7 +115,8 @@ the wait or the queue fails a test. Rows map the same as with the sync driver, D
 relational queries and raw SQL included. Builder queries read positional rows, so joined
 tables that share a column name still map correctly. Raw `db.all(sql…)` and `db.get(sql…)`
 return rows keyed by column name, and raw `db.values(sql…)` returns positional arrays. A raw
-query that selects two columns with the same name keeps only the last, so alias them. App
+query that selects two columns with the same name keeps only the last, so alias them. Inside
+`db.batch`, raw `all` and `get` still return positional rows, so keep raw SQL out of batches. App
 code runs raw SQL through `rawAll` in `src/db/dialect`. The module keeps its own cache of 500 prepared
 statements, because `bun:sqlite`'s `query()` cache holds only 20 and the app has hundreds of
 distinct statements. Over 20,000 single-row selects cycling through 200 statement shapes, a

@@ -477,6 +477,9 @@ begin`,
     };
     expectJoined(await joined());
     expectJoined(await transaction(async () => joined()));
+    expectJoined(await transaction(async () => transaction(async () => joined())));
+    const [batched] = await db.batch([joined()]);
+    expectJoined(batched);
     expect(
       await db
         .select({ vehicleId: vehicles.id, userId: users.id, id: sql<string>`${users.id}` })
@@ -501,8 +504,10 @@ begin`,
       year: 2015,
     });
     expect(
-      await db.all(sql`select v.id, u.id from vehicles v join users u on u.id = v.user_id`)
-    ).toHaveLength(2);
+      await db.all(
+        sql`select v.id, u.id from vehicles v join users u on u.id = v.user_id order by v.id`
+      )
+    ).toEqual([{ id: 'u1' }, { id: 'u2' }]);
   });
 
   test('a query built inside a transaction and run after it ended is refused', async () => {
