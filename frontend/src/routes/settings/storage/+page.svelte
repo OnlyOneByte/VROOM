@@ -222,7 +222,7 @@
 					aria-label="Back to Settings"
 					href={resolve(routes.settings)}
 				>
-					<ArrowLeft class="size-5" />
+					<ArrowLeft class="size-5" aria-hidden="true" />
 				</Button>
 			{/snippet}
 		</PageHeader>

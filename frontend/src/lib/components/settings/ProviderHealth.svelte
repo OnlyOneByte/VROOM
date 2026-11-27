@@ -101,14 +101,14 @@
 		class="h-10 min-w-36 text-foreground"
 		data-test-connection
 		aria-disabled={isTesting}
-		aria-label="Test Connection to {provider.displayName}"
+		aria-label="Test connection to {provider.displayName}"
 		onclick={testConnection}
 	>
 		{#if isTesting}
 			<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
 			Testing…
 		{:else}
-			Test Connection
+			Test connection
 		{/if}
 	</Button>
 {/snippet}
