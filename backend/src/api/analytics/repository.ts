@@ -2052,25 +2052,32 @@ export class AnalyticsRepository {
     }
   }
 
+  private async insuranceAcrossOwners(
+    userId: string,
+    timeZone: string | undefined,
+    filter: VehicleFilter,
+    readable: readonly ReadableVehicle[]
+  ): Promise<InsuranceData> {
+    const shared = new Map<string, string[]>();
+    for (const v of readable) {
+      if (v.ownerId === userId || v.hideFinancials) continue;
+      shared.set(v.ownerId, [...(shared.get(v.ownerId) ?? []), v.vehicleId]);
+    }
+    const own = readable.filter((v) => v.ownerId === userId).map((v) => v.vehicleId);
+    const parts = await Promise.all([
+      this.getInsurance(userId, timeZone, filter ?? own),
+      ...[...shared].map(([ownerId, ids]) => this.getInsurance(ownerId, timeZone, ids)),
+    ]);
+    return mergeInsurance(parts);
+  }
+
   async getInsurance(
     userId: string,
     timeZone?: string,
     filter?: VehicleFilter,
     readable?: readonly ReadableVehicle[]
   ): Promise<InsuranceData> {
-    if (readable) {
-      const shared = new Map<string, string[]>();
-      for (const v of readable) {
-        if (v.ownerId === userId || v.hideFinancials) continue;
-        shared.set(v.ownerId, [...(shared.get(v.ownerId) ?? []), v.vehicleId]);
-      }
-      const own = readable.filter((v) => v.ownerId === userId).map((v) => v.vehicleId);
-      const parts = await Promise.all([
-        this.getInsurance(userId, timeZone, filter ?? own),
-        ...[...shared].map(([ownerId, ids]) => this.getInsurance(ownerId, timeZone, ids)),
-      ]);
-      return mergeInsurance(parts);
-    }
+    if (readable) return this.insuranceAcrossOwners(userId, timeZone, filter, readable);
     const calendar = zonedCalendar(timeZone);
     try {
       const vehicleNameMap = await this.queryVehicleNameMap(userId);
