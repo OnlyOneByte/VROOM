@@ -325,6 +325,29 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect((await listExpenses()).length).toBe(0);
   });
 
+  test('a yen account flags fractional yen per row in the dry run, and the import keeps the good rows', async () => {
+    await seedCivic('Daily Driver');
+    expect((await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'JPY' })).status).toBe(200);
+    const csv = [
+      'date,vehicle,category,amount',
+      '2024-06-01T00:00:00.000Z,Daily Driver,misc,1200',
+      '2024-06-02T00:00:00.000Z,Daily Driver,misc,12.50',
+    ].join('\n');
+
+    const preview = await json<ImportResponse>(
+      await ctx.authed('POST', '/api/v1/expenses/import', { csv, dryRun: true })
+    );
+    expect(preview.data.readyCount).toBe(1);
+    const [bad] = preview.data.rows.filter((r) => r.status === 'error');
+    expect(bad?.row).toBe(3);
+    expect(bad?.message).toMatch(/at most 0 decimal places/);
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    expect(res.status).toBe(200);
+    expect((await json<ImportResponse>(res)).data.imported).toBe(1);
+    expect((await listExpenses()).map((e) => e.expenseAmount)).toEqual([1200]);
+  });
+
   test('reports per-row errors (bad category / amount / date) and imports the good ones', async () => {
     await seedCivic('Daily Driver');
     const csv = [

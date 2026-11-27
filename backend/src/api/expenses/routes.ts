@@ -785,9 +785,10 @@ routes.post(
       }
     }
 
+    const scale = minorUnitScale(accountCurrency);
     let plan: ReturnType<typeof buildImportPlan>;
     try {
-      plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone);
+      plan = buildImportPlan(importCsv, vehicles, rowErrors, timeZone, scale);
     } catch (err) {
       if (err instanceof CsvImportError) throw new ValidationError(err.message);
       throw err;
@@ -805,7 +806,6 @@ routes.post(
       });
     }
 
-    const scale = minorUnitScale(accountCurrency);
     const readyRows = plan.rows
       .filter((row) => row.status === 'ready' && row.expense)
       .map(
