@@ -240,7 +240,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			'Backed up to 1 provider. Office S3 failed. Check it under Storage Providers, then try again.',
+			'Backed up to 1 provider. Office S3 failed. Check it under Connected, then try again.',
 			{ id: 'toast-1' }
 		);
 		expect(toast.error).not.toHaveBeenCalled();
@@ -263,7 +263,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.error).toHaveBeenCalledWith(
-			"Couldn't back up. p1 failed. Check it under Storage Providers, then try again.",
+			"Couldn't back up. p1 failed. Check it under Connected, then try again.",
 			{ id: 'toast-1' }
 		);
 	});
@@ -285,7 +285,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			'Backed up to 1 provider. Office S3, Home NAS, and Cabin S3 failed. Check them under Storage Providers, then try again.',
+			'Backed up to 1 provider. Office S3, Home NAS, and Cabin S3 failed. Check them under Connected, then try again.',
 			{ id: 'toast-1' }
 		);
 	});
@@ -308,7 +308,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 1 provider. Office S3 and Home NAS failed and Old Drive can't be used. Check them under Storage Providers, then try again.",
+			"Backed up to 1 provider. Office S3 and Home NAS failed and Old Drive can't be used. Check them under Connected, then try again.",
 			{ id: 'toast-1' }
 		);
 	});
@@ -325,7 +325,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 1 provider. Office S3 failed and Old Drive can't be used. Check them under Storage Providers, then try again.",
+			"Backed up to 1 provider. Office S3 failed and Old Drive can't be used. Check them under Connected, then try again.",
 			{ id: 'toast-1' }
 		);
 	});
@@ -333,11 +333,11 @@ describe('Backups and storage page backups', () => {
 	test.each([
 		[
 			{ p1: { success: false, capabilities: {} } },
-			"Couldn't back up. Family Drive failed. Check it under Storage Providers, then try again."
+			"Couldn't back up. Family Drive failed. Check it under Connected, then try again."
 		],
 		[
 			{ p1: { success: false, unusable: true, capabilities: {} } },
-			"Couldn't back up. Family Drive can't be used. Reconnect it under Storage Providers, then try again."
+			"Couldn't back up. Family Drive can't be used. Reconnect it under Connected, then try again."
 		]
 	])(
 		'an all-failed 502 names the provider from the error details (%o)',

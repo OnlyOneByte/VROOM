@@ -72,7 +72,7 @@ describe('Storage Providers card errors read as plain sentences', () => {
 		expect(screen.queryByText(/boom/)).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-		expect(await screen.findByText('No storage provider connected')).toBeInTheDocument();
+		expect(await screen.findByText(/No storage connected yet/)).toBeInTheDocument();
 		expect(screen.queryByText("Couldn't load your storage providers")).toBeNull();
 		await waitFor(() => expect(screen.getAllByRole('button')[0]).toHaveFocus());
 	});
@@ -112,7 +112,8 @@ describe('Storage Providers card errors read as plain sentences', () => {
 		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 
 		await waitFor(() => expect(providers).toHaveBeenCalledTimes(2));
-		expect(screen.getByText('Providers')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Connected' })).toBeInTheDocument();
+		expect(screen.queryByRole('status', { name: /Loading your storage/ })).toBeNull();
 		expect(screen.getByText('Family Drive')).toBeInTheDocument();
 	});
 });

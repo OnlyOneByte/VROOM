@@ -289,12 +289,12 @@ describe('ProviderInfoCard last backup time', () => {
 		['2026-05-01T12:00:00.000Z', '9 days ago']
 	])('a backup at %s reads %s', async (lastBackupAt, text) => {
 		await mount({ lastBackupAt });
-		expect(screen.getByText(`Last backup: ${text}`)).toBeInTheDocument();
+		expect(screen.getByText(`Last backup ${text}`)).toBeInTheDocument();
 	});
 
-	test('no last backup hides the line', async () => {
+	test('no last backup hides the pill', async () => {
 		await mount();
-		expect(screen.queryByText(/Last backup:/)).toBeNull();
+		expect(screen.queryByText(/Last backup/)).toBeNull();
 	});
 });
 
