@@ -221,8 +221,8 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Neighbouring chart slots (`chart-1`…`chart-8`) in every theme and mode stay at least ΔE 15 apart
   (OKLab ×100) and ΔE 8 apart under simulated protanopia, deuteranopia and tritanopia;
   `chart-palette.test.ts` fails a theme that drifts.
-- A chart is never the only way to read a number: pair it with a stat tile, a legend with values
-  (as the category pie does), or a table.
+- A chart is never the only way to read a number: pair it with a stat tile, a ranked list with
+  values (as the Cross-vehicle cost bars do), or a table.
 - Every chart can be read without seeing it: the wrappers give the plot a `role="img"` summary
   (range, highest, lowest), one tab stop where the arrow keys step through the buckets with the
   tooltip text read out, and a Chart/Table toggle whose table uses the tooltip's formatters.

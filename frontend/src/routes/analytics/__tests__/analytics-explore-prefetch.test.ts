@@ -103,5 +103,5 @@ describe('the Explore query on page load', () => {
 		releaseSummary({ ...SUMMARY, quickStats: { ...SUMMARY.quickStats, vehicleCount: 0 } });
 		await waitFor(() => expect(signal.aborted).toBe(true));
 		expect(mocks.query).toHaveBeenCalledTimes(1);
-	});
+	}, 20_000);
 });

@@ -91,4 +91,20 @@ describe('CrossVehicleOverview', () => {
 		expect(screen.getByText(/costs the most/).textContent).not.toMatch(/loan/);
 		expect(screen.getByRole('list', { name: 'Running cost per mi, last 30 days' })).toBeTruthy();
 	});
+
+	test('the hero says "per mile", and names one car once when it is both cheapest and costliest', () => {
+		render(CrossVehicleOverview, {
+			hero: { cheapest: 'Civic', costliest: 'Civic', reason: 'maintenance' },
+			running,
+			allIn,
+			matrix: categoryMatrix(spend, new Set()),
+			rangeText: 'Last 30 days',
+			distanceUnit: 'mi'
+		});
+		const hero = screen.getByText(/costs the most/);
+		expect(hero.textContent?.replace(/\s+/g, ' ')).toContain(
+			'Civic is cheapest to run but costs the most per mile all in, mostly maintenance.'
+		);
+		expect(screen.getAllByRole('rowheader').length).toBeGreaterThan(0);
+	});
 });
