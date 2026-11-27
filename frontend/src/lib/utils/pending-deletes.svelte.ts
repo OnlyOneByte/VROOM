@@ -43,7 +43,7 @@ async function send(key: string): Promise<void> {
 		update(key, { status: 'failed', error: reason });
 		appStore.addNotification({
 			type: 'error',
-			message: `Couldn't delete “${expenseName(entry.expense)}”`,
+			message: `Couldn’t delete “${expenseName(entry.expense)}”`,
 			description: reason,
 			toastId: toastId(key),
 			duration: Number.POSITIVE_INFINITY,

@@ -1,5 +1,5 @@
 import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
-import { formatCurrency, formatDateWith } from '#lib/utils/formatters.ts';
+import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
 import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 
@@ -15,8 +15,9 @@ export function deleteDescription(
 	kind: 'single' | 'split' | 'insurance' = 'single'
 ): string {
 	const owner = vehicle && kind === 'single' ? ` for ${getVehicleDisplayName(vehicle)}` : '';
-	const day = formatDateWith(new Date(expense.date), { month: 'short', day: 'numeric' });
-	const lead = `“${expenseName(expense)}”${owner}, ${formatCurrency(expense.amount, expense.currency)} on ${day}.`;
+	const day = formatDate(new Date(expense.date));
+	const amount = kind === 'single' ? expense.amount : (expense.groupTotal ?? expense.amount);
+	const lead = `“${expenseName(expense)}”${owner}, ${formatCurrency(amount, expense.currency)} on ${day}.`;
 	const scope =
 		kind === 'insurance'
 			? ' This deletes the whole insurance group and every expense in it.'

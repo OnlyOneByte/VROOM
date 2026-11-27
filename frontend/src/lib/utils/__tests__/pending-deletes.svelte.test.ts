@@ -54,7 +54,7 @@ describe('deleting an expense waits 5 s for Undo', () => {
 		);
 		await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS + 100);
 		expect(appStore.addNotification).toHaveBeenLastCalledWith(
-			expect.objectContaining({ message: "Couldn't delete “Car wash”", type: 'error' })
+			expect.objectContaining({ message: 'Couldn’t delete “Car wash”', type: 'error' })
 		);
 
 		resetPendingDeletes();

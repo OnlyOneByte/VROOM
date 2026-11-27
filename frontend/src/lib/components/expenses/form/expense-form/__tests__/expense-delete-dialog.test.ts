@@ -11,7 +11,7 @@ const EXPENSE: Expense = {
 	tags: ['oil', 'service'],
 	category: 'maintenance',
 	amount: 89.5,
-	date: '2026-03-15T12:00:00.000Z',
+	date: new Date(2026, 2, 15, 12).toISOString(),
 	description: 'Synthetic oil change',
 	createdAt: '2026-03-15T12:00:00.000Z',
 	updatedAt: '2026-03-15T12:00:00.000Z'
@@ -62,28 +62,50 @@ describe('ExpenseDeleteDialog: what it says', () => {
 		renderDialog();
 
 		expect(await description()).toBe(
-			`“Synthetic oil change” for Sparky, $89.50 on Mar 15. ${UNDO}`
+			`“Synthetic oil change” for Sparky, $89.50 on Mar 15, 2026. ${UNDO}`
 		);
 	});
 
 	test('falls back to the category name, and leaves the vehicle out when it is unknown', async () => {
 		renderDialog({ originalExpense: { ...EXPENSE, description: '  ' }, vehicle: null });
 
-		expect(await description()).toBe(`“Maintenance”, $89.50 on Mar 15. ${UNDO}`);
+		expect(await description()).toBe(`“Maintenance”, $89.50 on Mar 15, 2026. ${UNDO}`);
 	});
 
-	test('an insurance-managed group warns that the whole group goes', async () => {
-		renderDialog({ isInsuranceManaged: true, groupId: 'g1' });
+	const GROUP_CHILD = { ...EXPENSE, groupId: 'g1', amount: 50, groupTotal: 100 };
 
-		expect(await description()).toContain('deletes the whole insurance group');
-	});
-
-	test('a split group warns that every vehicle share goes and names no single vehicle', async () => {
-		renderDialog({ isGroupEditMode: true, groupId: 'g1' });
+	test('an insurance-managed group warns that the whole group goes and shows its total', async () => {
+		renderDialog({ isInsuranceManaged: true, groupId: 'g1', originalExpense: GROUP_CHILD });
 
 		const text = await description();
-		expect(text).toContain("every vehicle's share is deleted");
-		expect(text).not.toContain('Sparky');
+		expect(text).toContain('deletes the whole insurance group');
+		expect(text).toContain('$100.00');
+	});
+
+	test('a split group shows the total being deleted and names no single vehicle', async () => {
+		renderDialog({ isGroupEditMode: true, groupId: 'g1', originalExpense: GROUP_CHILD });
+
+		const text = await description();
+		expect(text).toBe(
+			`“Synthetic oil change”, $100.00 on Mar 15, 2026. It's a split expense, so every vehicle's share is deleted. ${UNDO}`
+		);
+	});
+
+	test('the table dialog shows a split row’s total too', async () => {
+		render(TableDeleteDialog, {
+			open: true,
+			expense: GROUP_CHILD,
+			vehicle: SPARKY,
+			onConfirm: () => Promise.resolve()
+		});
+
+		expect(await description()).toContain('$100.00 on Mar 15, 2026');
+	});
+
+	test('the amount is shown in the expense’s own currency', async () => {
+		renderDialog({ originalExpense: { ...EXPENSE, currency: 'EUR' } });
+
+		expect(await description()).toContain('€89.50');
 	});
 
 	test.each<[string, Options]>([
@@ -104,7 +126,7 @@ describe('ExpenseDeleteDialog: what it says', () => {
 		});
 
 		expect(await description()).toBe(
-			`“Synthetic oil change” for Sparky, $89.50 on Mar 15. ${UNDO}`
+			`“Synthetic oil change” for Sparky, $89.50 on Mar 15, 2026. ${UNDO}`
 		);
 	});
 });
