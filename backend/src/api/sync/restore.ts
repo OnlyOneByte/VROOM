@@ -286,8 +286,8 @@ class RestoreService {
     try {
       return await this.readSheetsAndRestore(userId, providerId, sheetsSpreadsheetId, mode, signal);
     } catch (error) {
-      await repos().preferences.mergeJsonField(userId, 'backupConfig', {
-        providers: { [providerId]: { sheetsAutoPausedAt: new Date().toISOString() } },
+      await repos().preferences.mergeLiveBackupProviders(userId, {
+        [providerId]: { sheetsAutoPausedAt: new Date().toISOString() },
       });
       throw error;
     }

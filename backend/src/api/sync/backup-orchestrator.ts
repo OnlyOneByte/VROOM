@@ -61,24 +61,6 @@ export function chosenProviders(
 
 type ConfigPatch = Record<string, Record<string, string | number | boolean | null>>;
 
-function savePatchForCurrentProviders(userId: string, patch: ConfigPatch): Promise<void> {
-  return appContext().asyncDb.transaction(async () => {
-    const live = await loadProviderTypes(userId);
-    const providers = Object.fromEntries(Object.entries(patch).filter(([id]) => live.has(id)));
-    if (Object.keys(providers).length === 0) return;
-    const defaults = { ...NEW_PROVIDER_BACKUP_SETTINGS, enabled: false };
-    await repos().preferences.mergeJsonField(
-      userId,
-      'backupConfig',
-      { providers },
-      {
-        parent: 'providers',
-        entries: Object.fromEntries(Object.keys(providers).map((id) => [id, defaults])),
-      }
-    );
-  });
-}
-
 export function needsZipGeneration(
   enabledProviders: [string, ProviderBackupSettings][],
   providerTypes: ProviderTypes
@@ -339,7 +321,10 @@ export class BackupOrchestrator {
       }
 
       if (Object.keys(configPatch).length > 0) {
-        await savePatchForCurrentProviders(userId, configPatch);
+        await repos().preferences.mergeLiveBackupProviders(userId, configPatch, {
+          ...NEW_PROVIDER_BACKUP_SETTINGS,
+          enabled: false,
+        });
       }
       const coveredEveryEnabled =
         !providerIds ||

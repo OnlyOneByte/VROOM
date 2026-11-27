@@ -1,4 +1,4 @@
-import { eq, getTableColumns, inArray, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import { jsonAddMissingEntries, jsonMergePatch } from '../../db/dialect';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
@@ -10,6 +10,7 @@ import {
   reminders,
   syncState,
   userPreferences,
+  userProviders,
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
@@ -147,6 +148,29 @@ export class PreferencesRepository {
     } catch (error) {
       throw new DatabaseError('Failed to merge user preferences JSON field', error);
     }
+  }
+
+  mergeLiveBackupProviders(
+    userId: string,
+    providers: Record<string, Record<string, unknown>>,
+    defaultsIfMissing?: Record<string, unknown>
+  ): Promise<UserPreferences | null> {
+    return this.db.transaction(async () => {
+      const ids = Object.keys(providers);
+      if (ids.length === 0) return null;
+      const rows = await this.db
+        .select({ id: userProviders.id })
+        .from(userProviders)
+        .where(and(eq(userProviders.userId, userId), inArray(userProviders.id, ids)));
+      const live = new Set(rows.map((row) => row.id));
+      const kept = Object.fromEntries(Object.entries(providers).filter(([id]) => live.has(id)));
+      if (Object.keys(kept).length === 0) return null;
+      const addMissing = defaultsIfMissing && {
+        parent: 'providers',
+        entries: Object.fromEntries(Object.keys(kept).map((id) => [id, defaultsIfMissing])),
+      };
+      return this.mergeJsonField(userId, 'backupConfig', { providers: kept }, addMissing);
+    });
   }
 }
 
