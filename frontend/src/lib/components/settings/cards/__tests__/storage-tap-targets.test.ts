@@ -44,17 +44,18 @@ function expectTouchHeight(button: HTMLElement): void {
 }
 
 describe('Storage Providers controls are 40px tap targets on phones', () => {
-	test('with no providers: one Add Storage Provider row and no photo-source settings yet', async () => {
+	test('with no providers: one Add storage button under Connected and no photo-source settings yet', async () => {
 		providers.mockResolvedValue([]);
 		render(StorageProvidersCard, { props: {} });
 
-		await screen.findByText('No storage provider connected');
+		await screen.findByText(/No storage connected yet/);
+		expect(screen.getByRole('heading', { level: 2, name: 'Connected' })).toBeInTheDocument();
 		expect(
-			screen.getByRole('heading', { level: 3, name: 'Storage Providers' })
+			screen.getByRole('heading', { level: 2, name: 'Back up now and restore' })
 		).toBeInTheDocument();
 		const addButtons = screen.getAllByRole('button', { name: /^Add / });
 		expect(addButtons).toHaveLength(1);
-		expect(addButtons[0]).toHaveAccessibleName('Add Storage Provider');
+		expect(addButtons[0]).toHaveAccessibleName('Add storage');
 		expectTouchHeight(addButtons[0] as HTMLElement);
 		expect(screen.queryByRole('button', { name: /Customize per photo type/ })).toBeNull();
 		expect(screen.queryByText(/Enable backup on a provider/)).toBeNull();
@@ -74,16 +75,16 @@ describe('Storage Providers controls are 40px tap targets on phones', () => {
 		expectTouchHeight(await screen.findByRole('button', { name: /Sync All/ }));
 	});
 
-	test('with a provider: one Add Storage Provider button in the Providers row, no empty state', async () => {
+	test('with a provider: one Add storage button under Connected, no empty state', async () => {
 		providers.mockResolvedValue([DRIVE]);
 		render(StorageProvidersCard, { props: {} });
 
 		await screen.findByRole('button', { name: 'Edit Family Drive' });
 		const addButtons = screen.getAllByRole('button', { name: /^Add / });
 		expect(addButtons).toHaveLength(1);
-		expect(addButtons[0]).toHaveAccessibleName('Add Storage Provider');
+		expect(addButtons[0]).toHaveAccessibleName('Add storage');
 		expectTouchHeight(addButtons[0] as HTMLElement);
-		expect(screen.queryByText('No storage provider connected')).toBeNull();
+		expect(screen.queryByText(/No storage connected yet/)).toBeNull();
 		expectTouchHeight(screen.getByRole('button', { name: /Customize per photo type/ }));
 	});
 

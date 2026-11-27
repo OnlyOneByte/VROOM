@@ -129,7 +129,7 @@
 		];
 		const them = failedProviders.length === 1 ? 'it' : 'them';
 		const fix = failed.length > 0 ? 'Check' : 'Reconnect';
-		return `${problems.join(' and ')}. ${fix} ${them} under Storage Providers, then try again.`;
+		return `${problems.join(' and ')}. ${fix} ${them} under Connected, then try again.`;
 	}
 
 	function failedBackupProblem(error: unknown): string | null {
