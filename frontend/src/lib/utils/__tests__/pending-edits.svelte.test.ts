@@ -15,7 +15,6 @@ import {
 	EXPENSE_CHANGED_MESSAGE,
 	EDIT_TIMEOUT_MS,
 	editFailureStates,
-	editedRows,
 	resetPendingEdits,
 	retryEdit,
 	scheduleEdit,
@@ -64,7 +63,6 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		scheduleEdit(saved, changed, payload);
 
 		expect(shownExpense(saved)).toMatchObject({ amount: 55, description: 'Shell' });
-		expect(editedRows([saved])).toEqual({ before: [saved], after: [changed] });
 		expect(notices()).toEqual([
 			expect.objectContaining({ type: 'success', toastId: 'expense-edit-e1' })
 		]);
@@ -223,7 +221,6 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		restore.resolve(restored);
 		await flush();
 		expect(shownExpense(landed)).toMatchObject({ amount: 40, description: 'Arco' });
-		expect(editedRows([landed]).after).toEqual([expect.objectContaining({ amount: 40 })]);
 		expect(shownExpense(restored)).toBe(restored);
 	});
 
@@ -346,7 +343,6 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		await vi.waitFor(() => expect(appStore.addNotification).toHaveBeenCalledTimes(2));
 
 		expect(shownExpense(saved)).toBe(saved);
-		expect(editedRows([saved])).toEqual({ before: [], after: [] });
 		const [[id, state] = []] = editFailureStates([saved]);
 		expect(id).toBe('e1');
 		expect(state).toMatchObject({ status: 'failed', kind: 'edit' });

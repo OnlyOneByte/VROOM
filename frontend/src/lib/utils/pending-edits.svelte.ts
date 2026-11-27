@@ -413,19 +413,6 @@ export function stillInView<T extends Expense>(listed: T, inView: (shown: T) => 
 	return !overlay(withLatest(listed)) || inView(shownExpense(listed));
 }
 
-export function editedRows(expenses: readonly Expense[]): { before: Expense[]; after: Expense[] } {
-	const before: Expense[] = [];
-	const after: Expense[] = [];
-	for (const expense of expenses) {
-		const entry = overlay(expense);
-		if (entry) {
-			before.push(expense);
-			after.push({ ...expense, ...entry.after });
-		}
-	}
-	return { before, after };
-}
-
 export function editFailureStates(expenses: readonly Expense[]): [string, PendingRowState][] {
 	const states: [string, PendingRowState][] = [];
 	for (const expense of expenses) {
