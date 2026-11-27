@@ -38,6 +38,7 @@ import {
   buildMaintenanceTimeline,
   buildMonthlyCostHeatmap,
   buildMonthlyExpenseTrends,
+  buildTotalsByVehicle,
   buildVehicleExpenseBreakdown,
   buildVehicleMaintenanceCosts,
   buildVehicleRadar,
@@ -168,6 +169,8 @@ interface FleetUnitConverter extends RadarUnitConverters {
 
 const identity = (value: number) => value;
 
+type VehicleFuelTotals = ReturnType<typeof buildTotalsByVehicle>[number];
+
 interface EfficiencyTotals {
   distance: number;
   energy: number;
@@ -255,7 +258,10 @@ export interface FuelStatsData {
     month: string;
     fuelType: string;
     pricePerVolume: number;
+    volume: number;
   }>;
+  fillupsByVehicle: VehicleFuelTotals[];
+  chargingByVehicle: VehicleFuelTotals[];
   fillupCostByVehicle: Array<{
     month: string;
     vehicleId: string;
@@ -1650,6 +1656,8 @@ export class AnalyticsRepository {
       distance,
       monthlyConsumption: this.buildMonthlyConsumption(fuelRowsByVehicle, convert),
       gasPriceHistory: buildGasPriceHistory(fuelRows, isFillup, convert.volume, convert.calendar),
+      fillupsByVehicle: buildTotalsByVehicle(fuelRows, vehicleNameMap, isFillup, convert.volume),
+      chargingByVehicle: buildTotalsByVehicle(fuelRows, vehicleNameMap, isChargeSession),
       fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap, convert.calendar),
       odometerProgression: this.buildOdometerProgression(
         fuelRows,

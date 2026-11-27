@@ -2,9 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import {
   buildGasPriceHistory,
   buildMaintenanceTimeline,
+  buildTotalsByVehicle,
   buildVehicleMaintenanceCosts,
   type FuelExpenseRow,
   type GeneralExpenseRow,
+  isChargeSession,
+  isFillup,
   zonedCalendar,
 } from '../analytics-charts';
 
@@ -57,11 +60,67 @@ describe('buildGasPriceHistory', () => {
     expect(out[0]?.fuelType).toBe('premium');
   });
 
-  test('a null fuelType falls back to "Regular"', () => {
-    const out = buildGasPriceHistory([fuelRow({ fuelType: null })]);
-    expect(out[0]?.fuelType).toBe('Regular');
+  test('a null fuelType counts with "87 (Regular)", the form\'s regular grade', () => {
+    const out = buildGasPriceHistory([
+      fuelRow({ fuelType: null }),
+      fuelRow({ fuelType: '87 (Regular)' }),
+    ]);
+    expect(out.map((r) => r.fuelType)).toEqual(['87 (Regular)', '87 (Regular)']);
   });
 
+  test("each entry carries its volume in the user's unit, for volume-weighted averages", () => {
+    const toLitres = (v: number) => v * 3.78541;
+    const out = buildGasPriceHistory(
+      [fuelRow({ volume: 10, expenseAmount: 40 })],
+      isFillup,
+      toLitres
+    );
+    expect(out[0]?.volume).toBeCloseTo(37.8541, 4);
+    expect(out[0]?.pricePerVolume).toBeCloseTo(40 / 37.8541, 6);
+  });
+});
+
+describe('buildTotalsByVehicle', () => {
+  const names = new Map([
+    ['v1', 'Daily Driver'],
+    ['v2', 'Weekend Car'],
+  ]);
+
+  test('sums count, volume and cost per car for the rows it includes, busiest car first', () => {
+    const out = buildTotalsByVehicle(
+      [
+        fuelRow({ vehicleId: 'v2', volume: 8, expenseAmount: 30 }),
+        fuelRow({ vehicleId: 'v1', volume: 10, expenseAmount: 40 }),
+        fuelRow({ vehicleId: 'v1', volume: 12, expenseAmount: 48 }),
+        fuelRow({ vehicleId: 'v1', volume: 30, fuelType: 'Level 2 (AC)', expenseAmount: 9 }),
+        fuelRow({ vehicleId: 'v2', volume: null }),
+      ],
+      names,
+      isFillup,
+      (v) => v * 2
+    );
+    expect(out).toEqual([
+      { vehicleId: 'v1', vehicleName: 'Daily Driver', count: 2, volume: 44, cost: 88 },
+      { vehicleId: 'v2', vehicleName: 'Weekend Car', count: 1, volume: 16, cost: 30 },
+    ]);
+  });
+
+  test('charge sessions total separately, in raw energy', () => {
+    const out = buildTotalsByVehicle(
+      [
+        fuelRow({ vehicleId: 'v1', volume: 30, fuelType: 'Level 2 (AC)', expenseAmount: 9 }),
+        fuelRow({ vehicleId: 'v1', volume: 10, expenseAmount: 40 }),
+      ],
+      names,
+      isChargeSession
+    );
+    expect(out).toEqual([
+      { vehicleId: 'v1', vehicleName: 'Daily Driver', count: 1, volume: 30, cost: 9 },
+    ]);
+  });
+});
+
+describe('buildGasPriceHistory filtering', () => {
   test('drops rows with no volume, no amount, zero volume, or no date (no NaN/Infinity price)', () => {
     const out = buildGasPriceHistory([
       fuelRow({ volume: null }),
