@@ -1,38 +1,68 @@
 import { describe, expect, test } from 'bun:test';
-import type { PGlite } from '@electric-sql/pglite';
 import { STARTUP_ATTEMPTS, startPglite } from './start-pglite';
 
-const engine = {} as PGlite;
 const crash = () => new WebAssembly.RuntimeError('access to a null reference');
 
-function failingThen(failures: Error[]) {
-  let calls = 0;
-  const create = async () => {
-    const error = failures[calls++];
-    if (error) throw error;
+function engines(failures: Error[]) {
+  const made: { closed: boolean; waitReady: Promise<void>; close: () => Promise<void> }[] = [];
+  const create = () => {
+    const error = failures[made.length];
+    const engine = {
+      closed: false,
+      waitReady: error ? Promise.reject(error) : Promise.resolve(),
+      close: async () => {
+        engine.closed = true;
+      },
+    };
+    made.push(engine);
     return engine;
   };
-  return { create, calls: () => calls };
+  return { create, made };
 }
 
 describe('startPglite', () => {
-  test('starts again after an engine crash during startup', async () => {
-    const attempt = failingThen([crash()]);
+  test('closes a crashed engine, records the retry, then starts a new one', async () => {
+    const attempt = engines([crash()]);
     const retries: number[] = [];
-    expect(await startPglite(attempt.create, (n) => retries.push(n))).toBe(engine);
-    expect(attempt.calls()).toBe(2);
+    const started = await startPglite(attempt.create, (n) => retries.push(n));
+    expect(started).toBe(attempt.made[1]);
+    expect(attempt.made.map((e) => e.closed)).toEqual([true, false]);
     expect(retries).toEqual([1]);
   });
 
-  test(`gives up after ${STARTUP_ATTEMPTS} crashes`, async () => {
-    const attempt = failingThen(Array.from({ length: STARTUP_ATTEMPTS }, crash));
-    await expect(startPglite(attempt.create)).rejects.toThrow('access to a null reference');
-    expect(attempt.calls()).toBe(STARTUP_ATTEMPTS);
+  test(`records each retry as it happens and gives up after ${STARTUP_ATTEMPTS} crashes`, async () => {
+    const attempt = engines(Array.from({ length: STARTUP_ATTEMPTS }, crash));
+    const retries: number[] = [];
+    await expect(startPglite(attempt.create, (n) => retries.push(n))).rejects.toThrow(
+      'access to a null reference'
+    );
+    expect(retries).toEqual([1, 2]);
+    expect(attempt.made.every((e) => e.closed)).toBe(true);
+  });
+
+  test('does not retry a different WASM error', async () => {
+    const attempt = engines([new WebAssembly.RuntimeError('unreachable')]);
+    await expect(startPglite(attempt.create)).rejects.toThrow('unreachable');
+    expect(attempt.made).toHaveLength(1);
+    expect(attempt.made[0]?.closed).toBe(true);
   });
 
   test('does not retry any other startup error', async () => {
-    const attempt = failingThen([new Error('could not create data directory')]);
+    const attempt = engines([new Error('could not create data directory')]);
     await expect(startPglite(attempt.create)).rejects.toThrow('could not create data directory');
-    expect(attempt.calls()).toBe(1);
+    expect(attempt.made).toHaveLength(1);
+  });
+
+  test('a close that hangs does not stop the retry', async () => {
+    let made = 0;
+    const create = () => {
+      made++;
+      return {
+        waitReady: made === 1 ? Promise.reject(crash()) : Promise.resolve(),
+        close: () => new Promise<void>(() => {}),
+      };
+    };
+    await startPglite(create);
+    expect(made).toBe(2);
   });
 });

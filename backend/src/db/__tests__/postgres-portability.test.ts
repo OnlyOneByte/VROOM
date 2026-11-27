@@ -202,11 +202,15 @@ async function captureWorkload(userId: string): Promise<Captured[]> {
   return out;
 }
 
+function writeSummary(text: string): void {
+  console.log(text);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${text}\n`);
+}
+
 describe.skipIf(!ENABLED)('raw SQL runs the same on Postgres', () => {
   test('every captured query returns the same rows, or is a listed expected failure', async () => {
-    const startupRetries: string[] = [];
     const pg = await startPglite(undefined, (attempt, error) =>
-      startupRetries.push(`PGlite startup attempt ${attempt} crashed (#1931): ${error}`)
+      writeSummary(`- PGlite startup attempt ${attempt} crashed and was retried (#1931): ${error}`)
     );
     const ctx = await createTestApp();
     await seedGarage(ctx.user.id);
@@ -241,11 +245,8 @@ describe.skipIf(!ENABLED)('raw SQL runs the same on Postgres', () => {
       `${captured.length} queries: ${passed} pass, ${failures.size} fail (${Object.keys(EXPECTED_FAILURES).length} expected).`,
       '',
       ...[...failures].map(([label, why]) => `- \`${label}\`: ${why}`),
-      ...startupRetries.map((line) => `- ${line}`),
     ].join('\n');
-    console.log(summary);
-    if (process.env.GITHUB_STEP_SUMMARY)
-      appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+    writeSummary(summary);
 
     const unexpected = [...failures]
       .filter(([label, why]) => {
