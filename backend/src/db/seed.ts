@@ -26,6 +26,10 @@ import {
   vehicles,
 } from './schema.js';
 
+function seedDb() {
+  return openAsyncDatabase(getDb().$client).db;
+}
+
 function daysAgo(days: number): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() - days, 12);
@@ -132,17 +136,11 @@ function loanPayments(loan: VehicleFinancing, pattern: DrivingPattern): NewExpen
 }
 
 async function shareWeekendCar(pattern: DrivingPattern): Promise<void> {
-  const db = getDb();
+  const db = seedDb();
   const { vehicleId, userId } = pattern;
-  const asyncDb = openAsyncDatabase(db.$client).db;
-  await setCarShare(asyncDb, vehicleId, true);
-  const owner = await ownDriverId(asyncDb, vehicleId, userId);
-  const jamie = await addGuestDriver(
-    asyncDb,
-    vehicleId,
-    { name: 'Jamie', color: 'chart-3' },
-    userId
-  );
+  await setCarShare(db, vehicleId, true);
+  const owner = await ownDriverId(db, vehicleId, userId);
+  const jamie = await addGuestDriver(db, vehicleId, { name: 'Jamie', color: 'chart-3' }, userId);
   const rows = await db
     .select({ id: expenses.id, category: expenses.category })
     .from(expenses)
@@ -157,7 +155,7 @@ async function shareWeekendCar(pattern: DrivingPattern): Promise<void> {
 }
 
 export async function seedDatabase() {
-  const db = getDb();
+  const db = seedDb();
   try {
     logger.info('Seeding database with sample data...');
 
@@ -169,7 +167,7 @@ export async function seedDatabase() {
       })
       .returning();
 
-    await assignServerRole(openAsyncDatabase(db.$client).db, sampleUser.id, 'member');
+    await assignServerRole(db, sampleUser.id, 'member');
     logger.info('Created sample user', { userId: sampleUser.id });
 
     await db.insert(userProviders).values({
@@ -190,8 +188,12 @@ export async function seedDatabase() {
   }
 }
 
-export async function seedGarage(userId: string) {
-  const db = getDb();
+export function seedGarage(userId: string): Promise<void> {
+  return seedDb().transaction(() => seedGarageRows(userId));
+}
+
+async function seedGarageRows(userId: string) {
+  const db = seedDb();
   try {
     await db.insert(userPreferences).values({
       userId,

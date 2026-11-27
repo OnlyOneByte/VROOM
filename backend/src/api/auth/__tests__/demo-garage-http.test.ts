@@ -359,20 +359,23 @@ describe('demo garage, on', () => {
     expect((await startDemo()).status).toBe(404);
   });
 
-  test('if the clean-up after a failed rebuild also fails, the seeding error still surfaces', async () => {
+  test('a failed rebuild surfaces the seeding error and leaves nothing of the new garage', async () => {
     await db.delete(users).where(eq(users.id, DEMO_USER_ID));
     ctx.sqlite.exec(
       `CREATE TRIGGER fail_demo_seed BEFORE INSERT ON vehicles WHEN NEW.user_id = '${DEMO_USER_ID}' BEGIN SELECT RAISE(ABORT, 'seed failed'); END`
     );
-    ctx.sqlite.exec(
-      `CREATE TRIGGER fail_demo_cleanup BEFORE DELETE ON users WHEN OLD.id = '${DEMO_USER_ID}' BEGIN SELECT RAISE(ABORT, 'cleanup failed'); END`
-    );
+    let error: unknown;
     try {
-      await expect(prepareDemoGarage()).rejects.toThrow('seed failed');
+      error = await prepareDemoGarage().catch((e: unknown) => e);
     } finally {
       ctx.sqlite.exec('DROP TRIGGER fail_demo_seed');
-      ctx.sqlite.exec('DROP TRIGGER fail_demo_cleanup');
     }
+    const cause = (error as { cause?: unknown }).cause ?? error;
+    expect(String((cause as Error).message)).toContain('seed failed');
+    const left = ctx.sqlite
+      .query("SELECT COUNT(*) AS n FROM role_assignments WHERE user_id = 'demo-garage'")
+      .get() as { n: number };
+    expect(left.n).toBe(0);
     expect((await startDemo()).status).toBe(404);
   });
 });

@@ -148,8 +148,10 @@ transactions, and the boot-time role sync and first-admin check. Since C2, so ar
 split-expense, trip, odometer, reminder-trigger and financing transactions.
 `BaseRepository`'s shared methods run on it for every subclass.
 
-Since C3, every repository and every transaction runs on the async session, except the
-key-rotation script and sample seeding, which move in C4. The analytics
+Every repository, every transaction, the key-rotation script and sample and demo seeding run
+on the async session. Key rotation reads each batch and decrypts it before its write
+transaction opens, then writes with a compare-and-set on the old ciphertext; a demo or sample
+garage is seeded in one transaction, so a failed seed leaves none of it. The analytics
 repositories already query through the async session; only their constructors still take the
 sync handle, until C5. Inside a transaction callback, use the transaction handle `tx`; outside it, use the
 async session. Insurance writes check vehicle ownership inside the transaction that writes,
@@ -202,7 +204,9 @@ async too, and the provider create and photo backfill transactions run on the as
 Restore runs its wipe and inserts in one async transaction (see
 `docs/conventions/BackupRestore.md`).
 
-What part C still has to move: the key-rotation script, and demo and sample seeding (C4).
+What part C still has to move (C5): the sync `AppDatabase` and `syncDb` themselves, the
+analytics constructors' sync parameter, `syncResolverFor` and the tests that still use the sync
+handle.
 Connection upkeep in `src/db/connection.ts` stays sync by design.
 
 **Permissions load, then check.** A request's resolver reads its grants on the async session

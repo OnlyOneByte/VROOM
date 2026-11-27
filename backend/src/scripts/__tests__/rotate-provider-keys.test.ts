@@ -104,7 +104,8 @@ describe('bun run providers:rotate-key', () => {
     await useKeys(OLD_KEY, `next=${NEW_KEY}`);
     const { rotateProviderKeys } = await import('../rotate-provider-keys');
     const { getDb } = await import('../../db/connection');
-    expect(rotateProviderKeys(getDb(), 2)).toEqual({
+    const asyncDb = (await import('../../app-context')).appContext().asyncDb;
+    expect(await rotateProviderKeys(asyncDb, 2)).toEqual({
       rotated: 3,
       unchanged: 0,
       empty: 1,
@@ -113,7 +114,7 @@ describe('bun run providers:rotate-key', () => {
     for (const row of rows().filter((r) => r.credentials !== '')) {
       expect(row.credentials.startsWith('v2:next:')).toBe(true);
     }
-    expect(rotateProviderKeys(getDb()).unchanged).toBe(3);
+    expect((await rotateProviderKeys(asyncDb)).unchanged).toBe(3);
 
     await useKeys(undefined, `next=${NEW_KEY}`);
     const { storageProviderRegistry, decryptRefreshToken } = await import(
@@ -139,8 +140,8 @@ describe('bun run providers:rotate-key', () => {
     });
     const before = rows()[0]?.credentials;
     const { rotateProviderKeys } = await import('../rotate-provider-keys');
-    const { getDb } = await import('../../db/connection');
-    expect(rotateProviderKeys(getDb()).failed).toEqual(['x-lost']);
+    const asyncDb = (await import('../../app-context')).appContext().asyncDb;
+    expect((await rotateProviderKeys(asyncDb)).failed).toEqual(['x-lost']);
     expect(rows()[0]?.credentials).toBe(before);
   });
 

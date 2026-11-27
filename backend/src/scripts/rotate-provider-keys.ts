@@ -1,5 +1,5 @@
 import { and, asc, eq, gt } from 'drizzle-orm';
-import type { AppDatabase } from '../db/connection';
+import type { AsyncAppDatabase } from '../db/async-sqlite';
 import { userProviders } from '../db/schema';
 import { decrypt, encrypt, isCurrentEnvelope, secretContextOf } from '../utils/encryption';
 
@@ -37,45 +37,49 @@ function rotatedSecret(row: SecretRow, report: RotationReport): string | null {
   }
 }
 
-export function rotateProviderKeys(database: AppDatabase, batchSize = BATCH_SIZE): RotationReport {
+export async function rotateProviderKeys(
+  asyncDb: AsyncAppDatabase,
+  batchSize = BATCH_SIZE
+): Promise<RotationReport> {
   const report: RotationReport = { rotated: 0, unchanged: 0, empty: 0, failed: [] };
   let after = '';
   for (;;) {
-    const lastId = database.transaction((tx) => {
-      const rows = tx
-        .select({
-          id: userProviders.id,
-          userId: userProviders.userId,
-          domain: userProviders.domain,
-          credentials: userProviders.credentials,
-        })
-        .from(userProviders)
-        .where(gt(userProviders.id, after))
-        .orderBy(asc(userProviders.id))
-        .limit(batchSize)
-        .all();
-      for (const row of rows) {
-        const credentials = rotatedSecret(row, report);
-        if (credentials === null) continue;
-        const written = tx
+    const rows = await asyncDb
+      .select({
+        id: userProviders.id,
+        userId: userProviders.userId,
+        domain: userProviders.domain,
+        credentials: userProviders.credentials,
+      })
+      .from(userProviders)
+      .where(gt(userProviders.id, after))
+      .orderBy(asc(userProviders.id))
+      .limit(batchSize);
+    const last = rows.at(-1);
+    if (!last) return report;
+    const changes = rows.flatMap((row) => {
+      const credentials = rotatedSecret(row, report);
+      return credentials === null ? [] : [{ row, credentials }];
+    });
+    await asyncDb.transaction(async (tx) => {
+      for (const { row, credentials } of changes) {
+        const written = await tx
           .update(userProviders)
           .set({ credentials })
           .where(and(eq(userProviders.id, row.id), eq(userProviders.credentials, row.credentials)))
-          .returning({ id: userProviders.id })
-          .all();
+          .returning({ id: userProviders.id });
         if (written.length > 0) report.rotated++;
         else report.unchanged++;
       }
-      return rows.at(-1)?.id ?? null;
     });
-    if (lastId === null) return report;
-    after = lastId;
+    after = last.id;
   }
 }
 
 if (import.meta.main) {
   const { getDb } = await import('../db/connection');
-  const report = rotateProviderKeys(getDb());
+  const { openAsyncDatabase } = await import('../db/async-sqlite');
+  const report = await rotateProviderKeys(openAsyncDatabase(getDb().$client).db);
   console.log(
     `Provider secrets: ${report.rotated} re-encrypted, ${report.unchanged} already on the current key, ${report.empty} with no secret, ${report.failed.length} unreadable.`
   );
