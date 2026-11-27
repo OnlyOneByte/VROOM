@@ -491,7 +491,7 @@ export class GoogleSheetsService {
     userId: string
   ): Promise<void> {
     await this.ensureRequiredSheets(spreadsheetId);
-    const db = appContext().db;
+    const db = appContext().asyncDb;
 
     const [userVehicles, userExpenses, userInsurance, userFinancing, userOdometer] =
       await Promise.all([
@@ -787,7 +787,7 @@ export async function createSheetsServiceForProvider(
   providerId: string,
   userId: string
 ): Promise<GoogleSheetsService> {
-  const db = appContext().db;
+  const db = appContext().asyncDb;
   const providerRow = await db
     .select()
     .from(userProviders)

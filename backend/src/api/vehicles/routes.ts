@@ -503,7 +503,7 @@ routes.put(
 // Must run before the vehicle delete: the FK cascade removes the legs.
 async function splitGroupIdsForVehicle(vehicleId: string, userId: string): Promise<string[]> {
   const rows = await appContext()
-    .db.selectDistinct({ groupId: expenses.groupId })
+    .asyncDb.selectDistinct({ groupId: expenses.groupId })
     .from(expenses)
     .where(
       and(

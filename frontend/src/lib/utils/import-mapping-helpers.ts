@@ -5,10 +5,32 @@ export const NATIVE_HEADERS = ['date', 'vehicle', 'category', 'amount'] as const
 
 export const DETECT_SAMPLE_LENGTH = 8192;
 
+export function splitCsvLine(line: string): string[] {
+	const cells: string[] = [];
+	let cell = '';
+	let quoted = false;
+	for (let i = 0; i < line.length; i++) {
+		const ch = line[i];
+		if (quoted && ch === '"' && line[i + 1] === '"') {
+			cell += '"';
+			i++;
+		} else if (ch === '"') {
+			quoted = !quoted;
+		} else if (ch === ',' && !quoted) {
+			cells.push(cell.trim());
+			cell = '';
+		} else {
+			cell += ch;
+		}
+	}
+	cells.push(cell.trim());
+	return cells;
+}
+
 export function parseCsvHeaders(csvText: string): string[] {
 	const firstLine = csvText.split('\n', 1)[0]?.trim();
 	if (!firstLine) return [];
-	return firstLine.split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+	return splitCsvLine(firstLine);
 }
 
 export function isNativeImportHeaders(headers: string[]): boolean {

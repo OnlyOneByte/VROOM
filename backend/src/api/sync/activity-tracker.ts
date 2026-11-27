@@ -71,7 +71,7 @@ export class UserActivityTracker {
 
   private async performAutoBackup(userId: string): Promise<void> {
     try {
-      const db = appContext().db;
+      const db = appContext().asyncDb;
 
       const userResult = await db
         .select()

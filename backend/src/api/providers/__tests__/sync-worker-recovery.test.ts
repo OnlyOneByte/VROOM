@@ -111,7 +111,7 @@ describe('photo sync worker liveness', () => {
           Promise.resolve({ id: 'photo-x', entityType: 'vehicle', fileName: 'a.jpg' } as Photo),
       },
       registry: {
-        getProviderInternal: () => Promise.resolve(provider),
+        getProvider: () => Promise.resolve(provider),
         resolveProviderFolderPath: () => Promise.resolve(''),
       },
     } as unknown as SyncWorkerDeps;
@@ -152,15 +152,15 @@ describe('photo sync worker liveness', () => {
       },
     });
     const registry = sharedDeps.registry as unknown as {
-      getProviderInternal: () => Promise<{ upload: (input: { entityId?: string }) => unknown }>;
+      getProvider: () => Promise<{ upload: (input: { entityId?: string }) => unknown }>;
     };
-    const provider = await registry.getProviderInternal();
+    const provider = await registry.getProvider();
     const originalUpload = provider.upload;
     provider.upload = (input) => {
       uploads.push(String((input as { fileName?: string }).fileName ?? 'file'));
       return originalUpload(input);
     };
-    registry.getProviderInternal = () => Promise.resolve(provider);
+    registry.getProvider = () => Promise.resolve(provider);
     try {
       const first = processBatch(sharedDeps);
       await new Promise((resolve) => setTimeout(resolve, 0));

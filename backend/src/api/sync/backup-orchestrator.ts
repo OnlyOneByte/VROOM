@@ -25,7 +25,7 @@ export type ProviderTypes = ReadonlyMap<string, string>;
 
 export async function loadProviderTypes(userId: string): Promise<Map<string, string>> {
   const rows = await appContext()
-    .db.select({ id: userProviders.id, providerType: userProviders.providerType })
+    .asyncDb.select({ id: userProviders.id, providerType: userProviders.providerType })
     .from(userProviders)
     .where(eq(userProviders.userId, userId));
   return new Map(rows.map((row) => [row.id, row.providerType]));
@@ -137,7 +137,7 @@ export class BackupOrchestrator {
         providers: {},
       };
 
-      const db = appContext().db;
+      const db = appContext().asyncDb;
       const providerRows = await db
         .select()
         .from(userProviders)

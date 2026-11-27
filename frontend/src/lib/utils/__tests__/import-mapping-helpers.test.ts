@@ -7,7 +7,8 @@ import {
 	guessManualColumns,
 	isNativeImportHeaders,
 	parseCsvHeaders,
-	presetImportMapping
+	presetImportMapping,
+	splitCsvLine
 } from '#lib/utils/import-mapping-helpers.ts';
 import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 
@@ -40,6 +41,24 @@ describe('parseCsvHeaders', () => {
 
 	test('a single header line (no data rows) still parses', () => {
 		expect(parseCsvHeaders('a,b,c')).toEqual(['a', 'b', 'c']);
+	});
+
+	test('a quoted header with a comma stays one header', () => {
+		expect(parseCsvHeaders('Date,"Cost, USD",Notes')).toEqual(['Date', 'Cost, USD', 'Notes']);
+	});
+});
+
+describe('splitCsvLine', () => {
+	test('keeps a comma inside quotes in its cell', () => {
+		expect(splitCsvLine('2025-03-14,"Costco, Mountain View",37.05')).toEqual([
+			'2025-03-14',
+			'Costco, Mountain View',
+			'37.05'
+		]);
+	});
+
+	test('reads a doubled quote as one quote, and keeps empty cells', () => {
+		expect(splitCsvLine('"He said ""hi""",,x')).toEqual(['He said "hi"', '', 'x']);
 	});
 });
 
