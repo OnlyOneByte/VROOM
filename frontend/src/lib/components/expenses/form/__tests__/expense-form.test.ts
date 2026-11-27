@@ -770,7 +770,7 @@ describe('ExpenseForm edit mode', () => {
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/expenses'));
-		expect(notificationMessages()).toContain('Expense deleted');
+		expect(notificationMessages()).toContain('Deleted “Oil change”');
 		expect(isDeleteHidden({ id: 'exp-1' })).toBe(true);
 		expect(deleteExpense).not.toHaveBeenCalled();
 		resetPendingDeletes();

@@ -7,6 +7,7 @@ import {
 	deleteExpenseRecord
 } from '#lib/components/expenses/expenses-table/expense-table-actions.ts';
 import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
+import { expenseName } from '#lib/components/expenses/expense-delete-copy.ts';
 
 export const UNDO_WINDOW_MS = 5000;
 
@@ -42,7 +43,7 @@ async function send(key: string): Promise<void> {
 		update(key, { status: 'failed', error: reason });
 		appStore.addNotification({
 			type: 'error',
-			message: "Couldn't delete the expense",
+			message: `Couldn't delete “${expenseName(entry.expense)}”`,
 			description: reason,
 			toastId: toastId(key),
 			duration: Number.POSITIVE_INFINITY,
@@ -71,7 +72,7 @@ export function scheduleDelete(expense: Expense, onDeleted?: () => Promise<void>
 	});
 	appStore.addNotification({
 		type: 'success',
-		message: 'Expense deleted',
+		message: `Deleted “${expenseName(expense)}”`,
 		toastId: toastId(key),
 		duration: UNDO_WINDOW_MS,
 		action: { label: 'Undo', onClick: () => undoDelete(key) }
