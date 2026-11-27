@@ -25,7 +25,12 @@ import {
 import { readJsonBody } from '../../utils/request-body';
 import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import { commonSchemas, zValidator } from '../../utils/validation';
-import { requireVehicleAccess, requireVehiclesAccess } from '../../utils/vehicle-access';
+import {
+  FINANCIAL_READS,
+  isFinancialExpense,
+  requireVehicleAccess,
+  requireVehiclesAccess,
+} from '../../utils/vehicle-access';
 import { hideDriverFields } from '../drivers/attribution';
 import { recurringCostSummary } from './reminder-cost';
 import type { ReminderWithVehicles } from './repository';
@@ -447,9 +452,12 @@ routes.get(
       c,
       vehicleResources(materialized.map((expense) => expense.vehicleId))
     );
-    const readable = materialized.filter(
-      (expense) => resolver.can('vehicle.expense.read', vehicleResource(expense.vehicleId)).allow
-    );
+    const readable = materialized.filter((expense) => {
+      const vehicle = vehicleResource(expense.vehicleId);
+      if (!resolver.can('vehicle.expense.read', vehicle).allow) return false;
+      const seesFinancial = FINANCIAL_READS.every((p) => resolver.can(p, vehicle).allow);
+      return seesFinancial || !isFinancialExpense(expense);
+    });
     const scale = await repos().preferences.moneyScale(existing.reminder.userId);
     return c.json({
       success: true,

@@ -4,7 +4,7 @@ import { NotFoundError, ValidationError } from '../../errors';
 import type { ResourceOf } from '../../permissions/authorize';
 import type { Resource } from '../../permissions/resolve';
 import {
-  assertMayTouchFinancialExpense,
+  assertMaySeeExpense,
   requireVehicleAccess,
   seesFinancials,
 } from '../../utils/vehicle-access';
@@ -32,7 +32,7 @@ export async function validateEntityOwnership(
       const expense = await repos().expenses.findById(entityId);
       if (!expense) throw new NotFoundError('Expense');
       const access = await requireVehicleAccess(expense.vehicleId, userId, 'read');
-      assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
+      assertMaySeeExpense(seesFinancials(access), expense);
       return access.ownerId;
     }
     case 'odometer_entry': {

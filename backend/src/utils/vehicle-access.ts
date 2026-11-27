@@ -14,7 +14,7 @@ export interface VehicleAccess {
   financials: { read: boolean; write: boolean };
 }
 
-const FINANCIAL_READS = ['vehicle.financing.read', 'vehicle.insurance.read'] as const;
+export const FINANCIAL_READS = ['vehicle.financing.read', 'vehicle.insurance.read'] as const;
 const FINANCIAL_WRITES = ['vehicle.financing.write', 'vehicle.insurance.write'] as const;
 
 async function memberFinancials(
@@ -175,8 +175,24 @@ function isFinancialSource(sourceType: string | null | undefined): boolean {
   return (FINANCIAL_SOURCE_TYPES as readonly (string | null | undefined)[]).includes(sourceType);
 }
 
+export const FINANCIAL_CATEGORIES = ['financial'] as const;
+
 export function hiddenFinancialsScope(): SQL {
-  return sql`(${isNull(expenses.sourceType)} or ${notInArray(expenses.sourceType, [...FINANCIAL_SOURCE_TYPES])})`;
+  return sql`((${isNull(expenses.sourceType)} or ${notInArray(expenses.sourceType, [...FINANCIAL_SOURCE_TYPES])}) and ${notInArray(expenses.category, [...FINANCIAL_CATEGORIES])})`;
+}
+
+export function isFinancialExpense(expense: { sourceType: string | null; category: string }) {
+  return (
+    isFinancialSource(expense.sourceType) ||
+    (FINANCIAL_CATEGORIES as readonly string[]).includes(expense.category)
+  );
+}
+
+export function assertMaySeeExpense(
+  seesFinancialRecords: boolean,
+  expense: { sourceType: string | null; category: string }
+): void {
+  if (!seesFinancialRecords && isFinancialExpense(expense)) throw new NotFoundError('Expense');
 }
 
 export function assertMayTouchFinancialExpense(
