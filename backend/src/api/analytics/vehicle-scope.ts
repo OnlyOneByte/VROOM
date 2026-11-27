@@ -18,7 +18,7 @@ function hiddenFinancials(alias: Alias): SQL {
   return sql`(${source} IS NULL OR ${source} NOT IN (${list(FINANCIAL_SOURCE_TYPES)})) AND ${category} NOT IN (${list(OWNERSHIP_CATEGORIES)})`;
 }
 
-export function ownedRowsOf(
+export function readableRowsOf(
   alias: Alias,
   scope: readonly ReadableVehicle[],
   { expenses }: { expenses: boolean }
@@ -33,6 +33,20 @@ export function ownedRowsOf(
   return sql`(${sql.join(parts, sql` OR `)})`;
 }
 
+export function readableDriver(scope: readonly ReadableVehicle[]): SQL {
+  const hidden = scope.filter((v) => !v.seesDrivers).map((v) => v.vehicleId);
+  const driver = sql`COALESCE(e.paid_by_driver_id, '')`;
+  return hidden.length
+    ? sql`(CASE WHEN e.vehicle_id IN (${list(hidden)}) THEN '' ELSE ${driver} END)`
+    : driver;
+}
+
 export function ownedScope(userId: string, vehicleIds: readonly string[]): ReadableVehicle[] {
-  return vehicleIds.map((vehicleId) => ({ vehicleId, ownerId: userId, hideFinancials: false }));
+  return vehicleIds.map((vehicleId) => ({
+    vehicleId,
+    ownerId: userId,
+    hideFinancials: false,
+    seesTrips: true,
+    seesDrivers: true,
+  }));
 }

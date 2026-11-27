@@ -4,7 +4,7 @@ import { rawAll } from '../../db/dialect';
 import type { UnitPreferences } from '../../types';
 import { convertDistance } from '../../utils/unit-conversions';
 import type { ReadableVehicle } from '../../utils/vehicle-access';
-import { ownedRowsOf } from './vehicle-scope';
+import { readableRowsOf } from './vehicle-scope';
 
 export const QUERY_ANNOTATIONS = ['services', 'trips'] as const;
 export type QueryAnnotation = (typeof QUERY_ANNOTATIONS)[number];
@@ -47,7 +47,7 @@ export async function serviceAnnotations(
     db,
     sql`
     SELECT e.date, e.vehicle_id, e.description, e.expense_amount AS amount FROM expenses e
-    WHERE ${ownedRowsOf('e', scope.readable, { expenses: true })} AND e.category = 'maintenance'
+    WHERE ${readableRowsOf('e', scope.readable, { expenses: true })} AND e.category = 'maintenance'
       AND e.date >= ${scope.start} AND e.date < ${scope.end}
     ORDER BY e.date DESC, e.id DESC LIMIT ${MAX_SERVICES + 1}
   `
@@ -79,7 +79,11 @@ export async function tripLane(
     db,
     sql`
     SELECT t.trip_date AS date, t.vehicle_id, t.end_odometer - t.start_odometer AS distance FROM trips t
-    WHERE ${ownedRowsOf('t', scope.readable, { expenses: false })}
+    WHERE ${readableRowsOf(
+      't',
+      scope.readable.filter((v) => v.seesTrips),
+      { expenses: false }
+    )}
       AND t.trip_date >= ${scope.start} AND t.trip_date < ${scope.end}
   `
   );

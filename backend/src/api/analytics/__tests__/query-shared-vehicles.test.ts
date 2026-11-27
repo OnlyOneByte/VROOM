@@ -186,3 +186,73 @@ describe('analytics query for a car shared with the viewer', () => {
     expect(result.totals.value).toBe(80 + 400 + 1200 + 50 + 700);
   });
 });
+
+describe('analytics query follows the per-car permissions of a share', () => {
+  test('a viewer denied expense reads on the shared car gets nothing for it', async () => {
+    overrideOn(ctx, SHARED, viewer, 'vehicle.expense.read', 'deny');
+    for (const scope of ['', `vehicleIds=${SHARED}`]) {
+      expect((await query(viewer.request, `interval=none&${scope}`)).totals.value, scope).toBe(0);
+      expect((await items(viewer.request, scope)).count, scope).toBe(0);
+    }
+  });
+
+  test('a viewer denied trip reads gets the costs but no trips', async () => {
+    ctx.sqlite.run(
+      "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date) VALUES ('qs-trip', ?, ?, 100, 200, 'personal', ?)",
+      [SHARED, ctx.user.id, JUNE]
+    );
+    const trips = async () => {
+      const res = await viewer.request(
+        'GET',
+        `/api/v1/analytics/query?metric=cost&${RANGE}&interval=none&annotations=trips`
+      );
+      return (await json<DataEnvelope<{ trips: { count: number[] } }>>(res)).data.trips.count;
+    };
+    expect(await trips()).toEqual([1]);
+
+    overrideOn(ctx, SHARED, viewer, 'vehicle.trip.read', 'deny');
+    expect(await trips()).toEqual([0]);
+    expect((await query(viewer.request, 'interval=none')).totals.value).toBe(80);
+  });
+
+  test('a viewer who may not see drivers gets the costs without who paid them', async () => {
+    ctx.sqlite.run(
+      "INSERT INTO vehicle_drivers (id, vehicle_id, user_id, name) VALUES ('qs-driver', ?, NULL, 'Alice')",
+      [SHARED]
+    );
+    ctx.sqlite.run('UPDATE expenses SET paid_by_driver_id = ? WHERE vehicle_id = ?', [
+      'qs-driver',
+      SHARED,
+    ]);
+
+    const seen = await query(viewer.request, 'interval=none&groupBy=driver');
+    expect(seen.series.map((s) => s.key)).toEqual(['']);
+    expect(JSON.stringify(seen)).not.toContain('Alice');
+    expect((await items(viewer.request, 'groupBy=driver&keys=%5B%22qs-driver%22%5D')).count).toBe(
+      0
+    );
+
+    const own = await query(ctx.authed, `interval=none&groupBy=driver&vehicleIds=${SHARED}`);
+    expect(own.series.map((s) => s.key)).toEqual(['qs-driver']);
+  });
+
+  test('an editor share reads the shared car the same way', async () => {
+    const editor = await createInvitee(ctx, 'qs-editor');
+    shareCar(ctx, SHARED, editor, 'editor');
+    expect((await query(editor.request, `${ALL_BY_CATEGORY}`)).totals.value).toBe(80);
+  });
+
+  test('hidden financial rows do not move counts or the start of the range', async () => {
+    ctx.sqlite.run(
+      'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      ['qs-early-loan', SHARED, ctx.user.id, 'financial', 9900, 1609459200, 'financing']
+    );
+    const res = await viewer.request(
+      'GET',
+      `/api/v1/analytics/query?metric=count&include=all&interval=none&vehicleIds=${SHARED}&end=1735689600`
+    );
+    const data = (await json<DataEnvelope<Period & { range: { start: number } }>>(res)).data;
+    expect(data.totals.value).toBe(1);
+    expect(data.range.start).toBe(JUNE);
+  });
+});

@@ -32,7 +32,7 @@ import {
   type TripLane,
   tripLane,
 } from './annotations';
-import { ownedRowsOf, ownedScope } from './vehicle-scope';
+import { ownedScope, readableDriver, readableRowsOf } from './vehicle-scope';
 
 export const QUERY_METRICS = [
   'cost',
@@ -438,14 +438,14 @@ function electricFilter(energy: QueryEnergy): SQL {
     : sql`(e.fuel_type IS NULL OR e.fuel_type NOT IN (${list}))`;
 }
 
-function keyExpression(groupBy: QueryGroupBy): SQL {
+function keyExpression(groupBy: QueryGroupBy, readable: readonly ReadableVehicle[]): SQL {
   switch (groupBy) {
     case 'category':
       return sql`e.category`;
     case 'vehicle':
       return sql`e.vehicle_id`;
     case 'driver':
-      return sql`COALESCE(e.paid_by_driver_id, '')`;
+      return readableDriver(readable);
     default:
       return typedParam(TOTAL_KEY, 'text');
   }
@@ -545,14 +545,18 @@ function tagFilter(keys: string[]): SQL {
   return parts.length ? sql`(${sql.join(parts, sql` OR `)})` : sqlFalse();
 }
 
-function keyFilter(groupBy: QueryGroupBy, keys: string[]): SQL | null {
+function keyFilter(
+  groupBy: QueryGroupBy,
+  keys: string[],
+  readable: readonly ReadableVehicle[]
+): SQL | null {
   const column =
     groupBy === 'fuelType'
-      ? sql`e.fuel_type`
+      ? sql`COALESCE(e.fuel_type, '')`
       : groupBy === 'driver'
-        ? sql`e.paid_by_driver_id`
+        ? readableDriver(readable)
         : null;
-  if (column) return keys.length ? sql`COALESCE(${column}, '') IN (${inList(keys)})` : sqlFalse();
+  if (column) return keys.length ? sql`${column} IN (${inList(keys)})` : sqlFalse();
   return groupBy === 'tag' ? tagFilter(keys) : null;
 }
 
@@ -563,12 +567,12 @@ function itemsWhere(
   groupBy: QueryGroupBy
 ): SQL {
   const conditions: SQL[] = [
-    ownedRowsOf('e', readable, { expenses: true }),
+    readableRowsOf('e', readable, { expenses: true }),
     sql`e.category IN (${inList(categories)})`,
     sql`e.date >= ${query.start}`,
     sql`e.date < ${query.end}`,
   ];
-  const keyed = query.keys ? keyFilter(groupBy, query.keys) : null;
+  const keyed = query.keys ? keyFilter(groupBy, query.keys, readable) : null;
   if (keyed) conditions.push(keyed);
   if (query.metric === 'volume' || query.metric === 'efficiency') {
     conditions.push(electricFilter(query.energy ?? 'fuel'));
@@ -714,15 +718,26 @@ export class AnalyticsQueryRepository {
       vehicleInfo,
       userUnits,
       periods,
-      driverNames: query.groupBy === 'driver' ? await this.driverNames(vehicleInfo) : new Map(),
+      driverNames:
+        query.groupBy === 'driver'
+          ? await this.driverNames(
+              vehicleInfo,
+              readable.filter((v) => v.seesDrivers).map((v) => v.vehicleId)
+            )
+          : new Map(),
     };
     return { ctx, currency: prefs?.currency ?? 'USD', range, prior };
   }
 
-  private async driverNames(vehicleInfo: Map<string, VehicleInfo>): Promise<Map<string, string>> {
+  private async driverNames(
+    vehicleInfo: Map<string, VehicleInfo>,
+    visible: string[]
+  ): Promise<Map<string, string>> {
     const many = vehicleInfo.size > 1;
     const names = new Map<string, string>();
-    for (const [vehicleId, info] of vehicleInfo) {
+    for (const vehicleId of visible) {
+      const info = vehicleInfo.get(vehicleId);
+      if (!info) continue;
       for (const driver of await listDrivers(this.db, vehicleId)) {
         const car = many ? ` (${info.name})` : '';
         names.set(driver.id, `${driver.name}${car}`);
@@ -745,7 +760,7 @@ export class AnalyticsQueryRepository {
         unitPreferences: vehicles.unitPreferences,
         earliest: sql<
           number | null
-        >`(SELECT MIN(x.date) FROM expenses x WHERE x.vehicle_id = vehicles.id AND ${ownedRowsOf('x', readable, { expenses: true })})`,
+        >`(SELECT MIN(x.date) FROM expenses x WHERE x.vehicle_id = vehicles.id AND ${readableRowsOf('x', readable, { expenses: true })})`,
       })
       .from(vehicles)
       .where(inArray(vehicles.id, [...owners.keys()]));
@@ -874,12 +889,12 @@ export class AnalyticsQueryRepository {
   }
 
   private scope(ctx: QueryContext): SQL {
-    return sql`${ownedRowsOf('e', ctx.readable, { expenses: true })} AND e.category IN (${inList(ctx.categories)})`;
+    return sql`${readableRowsOf('e', ctx.readable, { expenses: true })} AND e.category IN (${inList(ctx.categories)})`;
   }
 
   private expenseAggregate(ctx: QueryContext): Promise<AggregateRow[]> {
     if (ctx.query.groupBy === 'tag') return this.tagAggregate(ctx);
-    const key = keyExpression(ctx.query.groupBy);
+    const key = keyExpression(ctx.query.groupBy, ctx.readable);
     return rawAll<AggregateRow>(
       this.db,
       sql`
@@ -966,12 +981,12 @@ export class AnalyticsQueryRepository {
       raw AS (
         SELECT b.period, b.idx, e.vehicle_id, e.date, e.id, e.mileage
         FROM b CROSS JOIN expenses e
-        WHERE e.date >= b.t0 AND e.date < b.t1 AND ${ownedRowsOf('e', ctx.readable, { expenses: true })}
+        WHERE e.date >= b.t0 AND e.date < b.t1 AND ${readableRowsOf('e', ctx.readable, { expenses: true })}
           AND e.mileage IS NOT NULL
         UNION ALL
         SELECT p.period, -2 AS idx, vu.vehicle_id, p.t0 - 1 AS date, '' AS id,
           (SELECT x.mileage FROM expenses x
-            WHERE ${ownedRowsOf('x', ctx.readable, { expenses: true })} AND x.vehicle_id = vu.vehicle_id
+            WHERE ${readableRowsOf('x', ctx.readable, { expenses: true })} AND x.vehicle_id = vu.vehicle_id
               AND x.mileage IS NOT NULL AND x.date < p.t0
             ORDER BY x.date DESC, x.mileage DESC, x.id DESC LIMIT 1) AS mileage
         FROM p CROSS JOIN vu
