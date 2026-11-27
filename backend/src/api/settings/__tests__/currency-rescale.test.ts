@@ -67,7 +67,65 @@ async function setCurrency(code: string): Promise<void> {
   expect(res.status).toBe(200);
 }
 
+function seedFinanceAndOtherUser(): void {
+  const run = (sql: string, params: (string | number)[]) => ctx.sqlite.run(sql, params);
+  run(
+    'INSERT INTO vehicle_financing (id, vehicle_id, provider, original_amount, term_months, start_date, payment_amount, residual_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ['f', vehicleId, 'Bank', 1000000, 36, 1700000000, 37286, 149]
+  );
+  run('INSERT INTO insurance_policies (id, user_id, company) VALUES (?, ?, ?)', [
+    'p',
+    ctx.user.id,
+    'Co',
+  ]);
+  run(
+    'INSERT INTO insurance_terms (id, policy_id, start_date, end_date, total_cost, monthly_cost) VALUES (?, ?, ?, ?, ?, ?)',
+    ['t', 'p', 1700000000, 1730000000, 120000, 10050]
+  );
+  run(
+    'INSERT INTO insurance_claims (id, policy_id, claim_date, claim_type, payout_amount) VALUES (?, ?, ?, ?, ?)',
+    ['c', 'p', 1700000000, 'collision', -150]
+  );
+  run("INSERT INTO users (id, email, display_name) VALUES ('other', 'o@x.test', 'O')", []);
+  run(
+    "INSERT INTO vehicles (id, user_id, make, model, year, purchase_price) VALUES ('ov', 'other', 'M', 'X', 2020, 2500050)",
+    []
+  );
+  run(
+    "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('oe', 'ov', 'other', 'fuel', 1700000000, 12345)",
+    []
+  );
+}
+
 describe('PUT /settings rescales stored money when the decimals change', () => {
+  test('rescales financing and insurance, and leaves another user’s rows alone', async () => {
+    seedFinanceAndOtherUser();
+    await setCurrency('JPY');
+    const one = (sql: string) => ctx.sqlite.query(sql).get();
+    expect(
+      one(
+        "SELECT original_amount, payment_amount, residual_value FROM vehicle_financing WHERE id = 'f'"
+      )
+    ).toEqual({
+      original_amount: 10000,
+      payment_amount: 373,
+      residual_value: 1,
+    });
+    expect(one("SELECT total_cost, monthly_cost FROM insurance_terms WHERE id = 't'")).toEqual({
+      total_cost: 1200,
+      monthly_cost: 101,
+    });
+    expect(one("SELECT payout_amount FROM insurance_claims WHERE id = 'c'")).toEqual({
+      payout_amount: -2,
+    });
+    expect(one("SELECT purchase_price FROM vehicles WHERE id = 'ov'")).toEqual({
+      purchase_price: 2500050,
+    });
+    expect(one("SELECT expense_amount FROM expenses WHERE id = 'oe'")).toEqual({
+      expense_amount: 12345,
+    });
+  });
+
   test('USD to JPY divides by 100, keeps splits adding up, and the API shows the same yen', async () => {
     seedMoney();
     await setCurrency('JPY');

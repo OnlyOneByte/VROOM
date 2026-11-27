@@ -297,7 +297,7 @@ export const CONFIG = {
     maxUncompressedSize: 200 * 1024 * 1024,
     // Measured from the real compressed size: the ZIP directory's declared size is attacker-controlled.
     maxCompressionRatio: 1000,
-    currentVersion: '3.0.0',
+    currentVersion: '3.1.0',
     supportedModes: ['preview', 'replace', 'merge'] as const,
     defaultRetentionCount: 10,
     maxRetentionCount: 50,

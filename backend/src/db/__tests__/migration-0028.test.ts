@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { centsToMinorUnits } from '../../api/sync/backup';
+import { centsToMinorUnits, rescaleParts } from '../../api/sync/backup';
 import SHARED_CURRENCIES from '../../shared-currencies.json';
 import { applyMigration, applyMigrationsUpTo, loadMigrations } from './migration-helpers';
 
@@ -146,6 +146,30 @@ describe('Migration 0028: money in minor units for currencies without decimals',
     applyMigration(db, money);
     const config = JSON.parse(String(snapshot(db, 'jpy').reminder.expense_split_config));
     expect(config.allocations.map((a: { amount: number }) => a.amount)).toEqual([1, 0]);
+  });
+
+  test('a refund leg below zero still keeps the group total', () => {
+    db.run("UPDATE expenses SET group_total = 5000 WHERE id LIKE 'jpy-g%'");
+    db.run("UPDATE expenses SET expense_amount = -1650 WHERE id = 'jpy-g3'");
+    db.run("UPDATE expenses SET expense_amount = 3316 WHERE id = 'jpy-g2'");
+    applyMigration(db, money);
+    const legs = snapshot(db, 'jpy').expenses.filter((e) => e.id.includes('-g'));
+    expect(legs.map((l) => l.expense_amount)).toEqual(
+      rescaleParts(5000, [3334, 3316, -1650], 100, 1).parts
+    );
+    expect(legs.map((l) => l.expense_amount)).toEqual([33, 33, -16]);
+    expect(legs.reduce((sum, l) => sum + l.expense_amount, 0)).toBe(50);
+  });
+
+  test('leaves split configs it cannot read, or whose allocations are not a list, as they were', () => {
+    db.run("UPDATE reminders SET expense_split_config = 'not json' WHERE id = 'jpy-r'");
+    db.run(
+      `UPDATE reminders SET expense_split_config = '{"method":"absolute","allocations":{"a":1}}' WHERE id = 'jpy-r2'`
+    );
+    applyMigration(db, money);
+    const jpy = snapshot(db, 'jpy');
+    expect(jpy.reminder).toEqual({ expense_amount: 100, expense_split_config: 'not json' });
+    expect(jpy.emptySplit.expense_split_config).toBe('{"method":"absolute","allocations":{"a":1}}');
   });
 
   test('leaves an absolute split without allocations as it was', () => {

@@ -47,9 +47,11 @@ FROM (
 				OVER (PARTITION BY `r`.`id`)) AS `total`
 		FROM `reminders` AS `r`,
 			json_each(
-				CASE WHEN json_valid(`r`.`expense_split_config`)
-					AND json_extract(`r`.`expense_split_config`, '$.method') = 'absolute'
-					THEN `r`.`expense_split_config` END,
+				CASE WHEN json_valid(`r`.`expense_split_config`) THEN
+					CASE WHEN json_extract(`r`.`expense_split_config`, '$.method') = 'absolute'
+						AND json_type(`r`.`expense_split_config`, '$.allocations') = 'array'
+						THEN `r`.`expense_split_config` END
+				END,
 				'$.allocations'
 			) AS `a`
 		WHERE `r`.`user_id` IN (SELECT `user_id` FROM `__money_zero_users`)
@@ -115,10 +117,13 @@ WHERE `user_id` IN (SELECT `user_id` FROM `__money_zero_users`);
 --> statement-breakpoint
 UPDATE `reminders` SET
 	`expense_split_config` = json_set(`expense_split_config`, '$.allocations', json((
-		SELECT json_group_array(json_set(`a`.`value`, '$.amount', `m`.`amount`) ORDER BY `m`.`idx`)
-		FROM json_each(`reminders`.`expense_split_config`, '$.allocations') AS `a`
-		JOIN `__money_allocations` AS `m`
-			ON `m`.`reminder_id` = `reminders`.`id` AND `m`.`idx` = `a`.`key`
+		SELECT json_group_array(json(`item`)) FROM (
+			SELECT json_set(`a`.`value`, '$.amount', `m`.`amount`) AS `item`
+			FROM json_each(`reminders`.`expense_split_config`, '$.allocations') AS `a`
+			JOIN `__money_allocations` AS `m`
+				ON `m`.`reminder_id` = `reminders`.`id` AND `m`.`idx` = `a`.`key`
+			ORDER BY `m`.`idx`
+		) AS `ordered`
 	)))
 WHERE `id` IN (SELECT `reminder_id` FROM `__money_allocations`);
 --> statement-breakpoint

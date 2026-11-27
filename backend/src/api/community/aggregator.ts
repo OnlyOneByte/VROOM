@@ -17,7 +17,7 @@ import type { CommunityStatsRepository } from './repository';
 export type CommunityMetric = 'efficiency' | 'running_cost' | 'maintenance' | 'insurance';
 export type CommunityUnit = 'km_per_l' | 'km_per_kwh' | 'cents_per_km' | 'cents_per_year';
 
-export const COMMUNITY_SCHEMA_VERSION = 1;
+export const COMMUNITY_SCHEMA_VERSION = 2;
 export const COMMUNITY_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 export const LOCAL_SCOPE = 'local';
 const MIN_EFFICIENCY_INTERVALS = 3;

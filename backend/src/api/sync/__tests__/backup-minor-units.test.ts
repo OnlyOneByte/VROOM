@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import AdmZip from 'adm-zip';
 import { useTestApp } from '../../../test-helpers/http-client';
-import { backupService, centsToMinorUnits } from '../backup';
+import { backupService, centsToMinorUnits, rescaleParts } from '../backup';
 import { restoreService } from '../restore';
 
 const FIXTURE_DIR = join(import.meta.dir, 'fixtures', 'backup-2.0.0');
@@ -12,11 +12,14 @@ const LOAN_PAYMENT_ID = 'xdfo83wsg1gk954b2slxyb2s';
 
 const app = useTestApp();
 
-function fixtureZip(currency: string): Buffer {
+function fixtureZip(currency: string, version?: string): Buffer {
   const zip = new AdmZip();
   for (const name of readdirSync(FIXTURE_DIR).sort()) {
     let content = readFileSync(join(FIXTURE_DIR, name), 'utf-8');
     if (name === 'user_preferences.csv') content = content.replace('"USD"', `"${currency}"`);
+    if (name === 'metadata.json' && version) {
+      content = JSON.stringify({ ...JSON.parse(content), version });
+    }
     zip.addFile(name, Buffer.from(content, 'utf-8'));
   }
   return zip.toBuffer();
@@ -35,8 +38,8 @@ function stored(sql: string, ...params: string[]): number {
 const loanPayment = () =>
   stored('SELECT expense_amount FROM expenses WHERE id = ?', LOAN_PAYMENT_ID);
 
-describe('backup 3.0.0 stores minor units of the backup currency', () => {
-  test('a 2.0.0 backup restores, exports as 3.0.0 and restores again unchanged', async () => {
+describe('backup 3.1.0 stores minor units of the backup currency', () => {
+  test('a 2.0.0 backup restores, exports as 3.1.0 and restores again unchanged', async () => {
     const first = await restoreService.restoreFromBackup(
       app().user.id,
       fixtureZip('USD'),
@@ -47,7 +50,7 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
 
     const exported = await backupService.exportAsZip(app().user.id);
     const metadata = JSON.parse(new AdmZip(exported).readAsText('metadata.json'));
-    expect(metadata.version).toBe('3.0.0');
+    expect(metadata.version).toBe('3.1.0');
 
     const second = await restoreService.restoreFromBackup(app().user.id, exported, 'replace');
     expect(second.success, JSON.stringify(second)).toBe(true);
@@ -67,6 +70,20 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
     const second = await restoreService.restoreFromBackup(app().user.id, exported, 'replace');
     expect(second.success, JSON.stringify(second)).toBe(true);
     expect(loanPayment()).toBe(373);
+  });
+
+  test('a 3.0.0 yen backup still holds cents and is rescaled on restore', async () => {
+    const result = await restoreService.restoreFromBackup(
+      app().user.id,
+      fixtureZip('JPY', '3.0.0'),
+      'replace'
+    );
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(loanPayment()).toBe(373);
+  });
+
+  test('equal remainders go to the earlier part, compared exactly', () => {
+    expect(rescaleParts(4566, [3333, 1233], 100, 1)).toEqual({ total: 46, parts: [34, 12] });
   });
 
   test('split legs still add up to their group total after rounding', () => {
@@ -95,8 +112,8 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
     expect(JSON.parse(String(reminders[0]?.expenseSplitConfig)).allocations[0].amount).toBe(1200);
   });
 
-  test('the frozen 3.0.0 yen fixture is unchanged and restores without rescaling', async () => {
-    const dir = join(import.meta.dir, 'fixtures', 'backup-3.0.0-jpy');
+  test('the frozen 3.1.0 yen fixture is unchanged and restores without rescaling', async () => {
+    const dir = join(import.meta.dir, 'fixtures', 'backup-3.1.0-jpy');
     const hash = createHash('sha256');
     const zip = new AdmZip();
     for (const name of readdirSync(dir).sort()) {
@@ -105,7 +122,7 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
       zip.addFile(name, readFileSync(join(dir, name)));
     }
     expect(hash.digest('hex')).toBe(
-      '8b93aa4f2b02f47582608899d5ea8eb1619360b67b139113d603ada424bf7b98'
+      '856b2152dac1a77338af224739a0707fcbd91befcd19dba57dd876e44931a43c'
     );
     const result = await restoreService.restoreFromBackup(app().user.id, zip.toBuffer(), 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);

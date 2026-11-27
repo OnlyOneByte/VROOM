@@ -9,7 +9,12 @@ import {
   seedUser,
   type TestDb,
 } from '../../analytics/__tests__/analytics-test-generators';
-import { firstRunDelayMs, refreshCommunityStats, refreshSafely } from '../aggregator';
+import {
+  COMMUNITY_SCHEMA_VERSION,
+  firstRunDelayMs,
+  refreshCommunityStats,
+  refreshSafely,
+} from '../aggregator';
 import { CommunityStatsRepository } from '../repository';
 import { NO_NOISE, NOW } from './community-fixtures';
 
@@ -161,18 +166,19 @@ describe('community stats refresh against the database', () => {
     expect(maintenance()).toEqual([{ n_published: 30 }]);
   });
 
-  test('publishedBuckets filters out rows below the minimum group in the query itself', async () => {
-    for (const [key, n] of [
-      ['a', 5],
-      ['b', 10],
-      ['c', 25],
+  test('publishedBuckets filters out rows below the minimum group or from an older schema', async () => {
+    for (const [key, n, version] of [
+      ['a', 5, COMMUNITY_SCHEMA_VERSION],
+      ['b', 10, COMMUNITY_SCHEMA_VERSION],
+      ['c', 25, COMMUNITY_SCHEMA_VERSION],
+      ['old', 25, COMMUNITY_SCHEMA_VERSION - 1],
     ] as const) {
       db.sqlite.run(
-        "INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, computed_at, schema_version) VALUES (?, 'local', 'efficiency', ?, 'km_per_l', ?, 12, 0, 1)",
-        [key, key, n]
+        "INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, computed_at, schema_version) VALUES (?, 'local', 'efficiency', ?, 'km_per_l', ?, 12, 0, ?)",
+        [key, key, n, version]
       );
     }
-    const keys = ['a', 'b', 'c'];
+    const keys = ['a', 'b', 'c', 'old'];
     expect(
       (await repository.publishedBuckets('local', keys, 10)).map((r) => r.bucketKey).sort()
     ).toEqual(['b', 'c']);

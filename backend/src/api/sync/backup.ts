@@ -164,10 +164,10 @@ function roundHalfAway(value: number): number {
 
 export function rescaleParts(total: number, parts: number[], from: number, to: number) {
   const rescaledTotal = roundHalfAway((total * to) / from);
-  const exact = parts.map((part) => (part * to) / from);
-  const floored = exact.map(Math.floor);
-  const byRemainder = exact
-    .map((value, index) => ({ index, remainder: value - Math.floor(value) }))
+  const scaled = parts.map((part) => Math.round(part) * to);
+  const floored = scaled.map((value) => Math.floor(value / from));
+  const byRemainder = scaled
+    .map((value, index) => ({ index, remainder: value - (floored[index] ?? 0) * from }))
     .sort((a, b) => b.remainder - a.remainder || a.index - b.index);
   let left = rescaledTotal - floored.reduce((sum, part) => sum + part, 0);
   for (const { index } of byRemainder) {
@@ -275,7 +275,7 @@ export function rescaleMoneyTables(tables: BackupTables, from: number, to: numbe
 
 const BACKUP_UPGRADE_STEPS: BackupUpgradeStep[] = [
   { to: '2.0.0', upgrade: dollarsToCents },
-  { to: '3.0.0', upgrade: centsToMinorUnits },
+  { to: '3.1.0', upgrade: centsToMinorUnits },
 ];
 
 export function upgradeBackupTables(
