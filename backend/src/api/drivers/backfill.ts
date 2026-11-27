@@ -11,7 +11,7 @@ import {
 } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
-import { listDrivers } from './repository';
+import { carShareEnabled, listDrivers } from './repository';
 
 export type BackfillRequest =
   | { mode: 'logged' }
@@ -124,6 +124,7 @@ export async function summarize(
 
 async function setDriver(
   tx: AsyncHandle,
+  vehicleId: string,
   entry: BackfilledEntry,
   from: string | null,
   to: string | null,
@@ -134,7 +135,7 @@ async function setDriver(
     const rows = await tx
       .update(trips)
       .set({ driverId: to })
-      .where(and(eq(trips.id, entry.id), match(trips.driverId)))
+      .where(and(eq(trips.id, entry.id), eq(trips.vehicleId, vehicleId), match(trips.driverId)))
       .returning({ id: trips.id });
     return rows.length > 0;
   }
@@ -142,7 +143,13 @@ async function setDriver(
     const rows = await tx
       .update(odometerEntries)
       .set({ driverId: to })
-      .where(and(eq(odometerEntries.id, entry.id), match(odometerEntries.driverId)))
+      .where(
+        and(
+          eq(odometerEntries.id, entry.id),
+          eq(odometerEntries.vehicleId, vehicleId),
+          match(odometerEntries.driverId)
+        )
+      )
       .returning({ id: odometerEntries.id });
     return rows.length > 0;
   }
@@ -152,12 +159,25 @@ async function setDriver(
     .where(
       and(
         eq(expenses.id, entry.id),
+        eq(expenses.vehicleId, vehicleId),
         match(expenses.paidByDriverId),
         visibleExpenses(hideFinancials)
       )
     )
     .returning({ id: expenses.id });
   return rows.length > 0;
+}
+
+async function requireCarShareIn(tx: AsyncHandle, vehicleId: string): Promise<void> {
+  if (!(await carShareEnabled(tx, vehicleId))) throw new NotFoundError('Car sharing');
+}
+
+async function driverIds(tx: AsyncHandle, vehicleId: string): Promise<Set<string>> {
+  const rows = await tx
+    .select({ id: vehicleDrivers.id })
+    .from(vehicleDrivers)
+    .where(eq(vehicleDrivers.vehicleId, vehicleId));
+  return new Set(rows.map((row) => row.id));
 }
 
 export function applyBackfill(
@@ -169,9 +189,12 @@ export function applyBackfill(
   hideFinancials: boolean
 ): Promise<{ batchId: string | null; entries: BackfilledEntry[] }> {
   return asyncDb.transaction(async (tx) => {
+    await requireCarShareIn(tx, vehicleId);
+    const drivers = await driverIds(tx, vehicleId);
     const applied: BackfilledEntry[] = [];
-    for (const entry of planned) {
-      if (await setDriver(tx, entry, null, entry.driverId, hideFinancials)) applied.push(entry);
+    for (const entry of planned.filter((e) => drivers.has(e.driverId))) {
+      if (await setDriver(tx, vehicleId, entry, null, entry.driverId, hideFinancials))
+        applied.push(entry);
     }
     if (applied.length === 0) return { batchId: null, entries: applied };
     const [batch] = await tx
@@ -199,6 +222,7 @@ export function undoBackfill(
   hideFinancials: boolean
 ): Promise<number> {
   return asyncDb.transaction(async (tx) => {
+    await requireCarShareIn(tx, vehicleId);
     const batch = await tx
       .select()
       .from(driverBackfills)
@@ -208,7 +232,7 @@ export function undoBackfill(
     const kept: BackfilledEntry[] = [];
     let reverted = 0;
     for (const entry of batch.entries) {
-      if (await setDriver(tx, entry, entry.driverId, null, hideFinancials)) reverted++;
+      if (await setDriver(tx, vehicleId, entry, entry.driverId, null, hideFinancials)) reverted++;
       else if (hideFinancials && entry.kind === 'expense' && (await stillPaidBy(tx, entry)))
         kept.push(entry);
     }

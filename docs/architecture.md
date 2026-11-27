@@ -167,11 +167,15 @@ change in the same transaction. Each request's own permissions are still loaded 
 its transaction opens (see "Permissions load, then check").
 
 Inside an async transaction, await only database work. The transaction holds the write lock,
-so a network call there stalls every other writer for as long as the call takes. In tests,
-`src/test-helpers/transaction-guard.ts` refuses `fetch` and outbound DNS lookups while a
-transaction is open and fails the test even when the code catches the error;
-`inAsyncTransaction()` in `src/db/async-sqlite.ts` tells it when one is. Use
-`outsideTransaction` for work that must start inside one and outlive it.
+so a network call there stalls every other writer for as long as the call takes. Tests enforce
+the network part of that rule: `src/test-helpers/transaction-guard.ts` refuses `fetch` and
+outbound DNS lookups while a transaction is open, including stubs a test assigns over them, and
+fails the test even when the code catches the error. `inAsyncTransaction()` in
+`src/db/async-sqlite.ts` tells it when one is. Other slow awaits, such as file reads, are not
+checked. Use `outsideTransaction` for work that must start inside one and outlive it.
+
+The role-manager count skips accounts still waiting for approval, so a role given to one can't
+stand in for the last real role manager.
 
 Expenses, trips, odometer, reminders and financing still guard some writes with a sync read
 in the same synchronous stretch; those move inside their async transactions in part C2.

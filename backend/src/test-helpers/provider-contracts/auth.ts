@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import {
   NoVerifiedEmailError,
   type OAuthFlow,
   type OAuthProviderConfig,
 } from '../../api/auth/providers/types';
+import { spyOnGuarded } from '../transaction-guard';
 
 export interface AuthContractSubject {
   provider: OAuthProviderConfig;
@@ -37,7 +38,7 @@ export function describeAuthContract(name: string, subject: AuthContractSubject)
     test('an unverified email is refused', async () => {
       const responses = subject.unverifiedResponses();
       spies.push(
-        spyOn(globalThis, 'fetch').mockImplementation((async () => {
+        spyOnGuarded(globalThis, 'fetch').mockImplementation((async () => {
           const next = responses.shift();
           if (!next) throw new Error('the provider made more requests than the contract planned');
           return next;

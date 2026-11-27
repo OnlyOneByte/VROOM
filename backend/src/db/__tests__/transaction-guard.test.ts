@@ -1,8 +1,8 @@
 import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
 import {
+  NetworkInsideTransactionError,
   takeTransactionViolations,
-  WorkInsideTransactionError,
 } from '../../test-helpers/transaction-guard';
 import { outboundResolver } from '../../utils/outbound-url';
 import { inAsyncTransaction, openAsyncDatabase } from '../async-sqlite';
@@ -11,7 +11,7 @@ function setup() {
   return openAsyncDatabase(new Database(':memory:'));
 }
 
-describe('only database work runs inside an async transaction', () => {
+describe('network calls stay outside async transactions', () => {
   test('the marker is set inside a transaction and its savepoints, and clear outside', async () => {
     const { db, transaction, outsideTransaction } = setup();
     const seen: Record<string, boolean> = { before: inAsyncTransaction() };
@@ -45,7 +45,28 @@ describe('only database work runs inside an async transaction', () => {
       }
       await outboundResolver.lookup('example.com').catch(() => undefined);
     });
-    expect(caught).toBeInstanceOf(WorkInsideTransactionError);
+    expect(caught).toBeInstanceOf(NetworkInsideTransactionError);
     expect(takeTransactionViolations()).toEqual(['fetch', 'An outbound DNS lookup']);
+  });
+
+  test('a stub a test assigns is guarded too, and restoring the original does not stack', async () => {
+    const { transaction } = setup();
+    const original = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = (async () => {
+      calls.push('stub');
+      return new Response('ok');
+    }) as unknown as typeof fetch;
+    try {
+      expect(await (await fetch('http://stub.test')).text()).toBe('ok');
+      await transaction(async () => {
+        await fetch('http://stub.test').catch(() => undefined);
+      });
+    } finally {
+      globalThis.fetch = original;
+    }
+    expect(calls).toEqual(['stub']);
+    expect(takeTransactionViolations()).toEqual(['fetch']);
+    expect(globalThis.fetch).toBe(original);
   });
 });
