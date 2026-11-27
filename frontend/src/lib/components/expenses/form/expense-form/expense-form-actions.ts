@@ -1,6 +1,7 @@
 import { expenseApi } from '#lib/services/expense-api.ts';
 import { isOdometerOrderError } from '#lib/services/odometer-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { authStore } from '#lib/stores/auth.svelte.ts';
 import { onlineStatus } from '#lib/stores/offline.svelte.ts';
 import { addOfflineExpense, currentOfflineQueueOwner } from '#lib/utils/offline-storage.ts';
 import { classifySyncFailure } from '#lib/utils/sync/classify-failure.ts';
@@ -226,7 +227,7 @@ export async function submitExpense(state: ExpenseFormState): Promise<void> {
 
 export function deleteExpense(state: ExpenseFormState): Promise<void> {
 	const expense = state.originalExpense;
-	if (state.ctx.expenseId && expense) {
+	if (state.ctx.expenseId && expense && !authStore.user?.demo) {
 		scheduleDelete(state.groupId ? { ...expense, groupId: state.groupId } : expense);
 		state.showDeleteConfirm = false;
 		gotoDynamic(state.ctx.returnTo);

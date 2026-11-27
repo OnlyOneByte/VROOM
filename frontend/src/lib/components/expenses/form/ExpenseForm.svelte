@@ -684,6 +684,9 @@
 					: 'space-y-6'}
 		>
 			{@render createHeader()}
+			{#if demo && !quickActions}
+				<DemoSaveNote id={null} class="lg:hidden short:hidden" />
+			{/if}
 
 			<form
 				bind:this={formEl}
@@ -949,6 +952,6 @@
 		isGroupEditMode={form.isGroupEditMode}
 		groupId={form.groupId}
 		originalExpense={form.originalExpense}
-		onConfirm={() => (demo ? Promise.resolve() : deleteExpense(form))}
+		onConfirm={() => deleteExpense(form)}
 	/>
 </FormLayout>
