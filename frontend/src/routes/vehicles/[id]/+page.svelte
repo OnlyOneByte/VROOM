@@ -190,7 +190,10 @@
 	let chartSummary = $derived.by(() => {
 		const edited = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
 		const removed = [...expenses.filter(isDeleteHidden), ...edited.before];
-		return withRowsInBreakdowns(withoutRowsInBreakdowns(summary, removed), edited.after);
+		return withRowsInBreakdowns(withoutRowsInBreakdowns(summary, removed), [
+			...edited.after,
+			...pending.saving
+		]);
 	});
 
 	let expenseTrendData = $derived.by(() => {
