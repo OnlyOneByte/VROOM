@@ -130,7 +130,7 @@
 						onclick={() =>
 							onFix(provider, provider.status === 'needs_reauth' ? 'reconnect' : 'edit')}
 					>
-						{provider.status === 'needs_reauth' ? 'Reconnect' : 'Edit Provider'}
+						{provider.status === 'needs_reauth' ? 'Reconnect' : 'Edit provider'}
 					</Button>
 					{@render testButton()}
 				</div>

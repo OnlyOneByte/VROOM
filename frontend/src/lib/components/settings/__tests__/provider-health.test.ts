@@ -29,7 +29,7 @@ describe('ProviderHealth', () => {
 		expect(
 			screen.getByText('This server only lets providers reach public https:// addresses.')
 		).toBeTruthy();
-		expect(screen.getByRole('button', { name: 'Edit Provider' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Edit provider' })).toBeTruthy();
 	});
 
 	test('a settings problem keeps its own message', () => {

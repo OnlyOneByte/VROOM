@@ -128,10 +128,10 @@ describe('ProviderInfoCard header', () => {
 		expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'prov-1' }));
 	});
 
-	test('a provider that is not working says what to check and offers Edit Provider', async () => {
+	test('a provider that is not working says what to check and offers Edit provider', async () => {
 		await mount({ provider: provider({ status: 'error', lastErrorCode: 'unreachable' }) });
 		expect(screen.getByText("Couldn't reach the provider.")).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Edit Provider' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Edit provider' })).toBeInTheDocument();
 	});
 
 	test('Test connection checks the provider and hands back its refreshed status', async () => {
@@ -196,7 +196,7 @@ describe('ProviderInfoCard header', () => {
 		expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ status: 'error' }));
 	});
 
-	test('Reconnect uses onReconnect when the card has one, and Edit Provider always edits', async () => {
+	test('Reconnect uses onReconnect when the card has one, and Edit provider always edits', async () => {
 		const onReconnect = vi.fn<(p: UserProviderInfo) => void>();
 		await mount({ provider: provider({ status: 'needs_reauth' }), onReconnect });
 		await fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
