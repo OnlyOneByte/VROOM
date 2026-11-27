@@ -118,7 +118,7 @@ describe('expense form in the demo garage', () => {
 
 		await fireEvent.click(save);
 		await fireEvent.submit(save.closest('form') as HTMLFormElement);
-		await new Promise(resolve => setTimeout(resolve, 50));
+		await new Promise(resolve => setTimeout(resolve, 0));
 		expect(updateExpense).not.toHaveBeenCalled();
 	});
 

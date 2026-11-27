@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { formatCurrency, numberFormat } from '#lib/utils/formatters.ts';
+	import { currencyFractionDigits, formatCurrency, numberFormat } from '#lib/utils/formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
 	interface Props {
@@ -35,10 +35,12 @@
 	}
 
 	let cells = $derived.by((): Cell[] => {
+		const digits = cents ? currencyFractionDigits(currencyCode) : 0;
 		const parts = numberFormat({
 			style: 'currency',
 			currency: currencyCode,
-			...(!cents && { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+			minimumFractionDigits: digits,
+			maximumFractionDigits: digits
 		}).formatToParts(value);
 		const out: Cell[] = [];
 		for (const part of parts) {

@@ -285,14 +285,15 @@ test.describe('Expense list', () => {
 		await first.getByRole('button', { name: /Costco fill-up|Oil change/ }).click();
 		await first.getByRole('button', { name: 'Delete', exact: true }).click();
 
-		const dialog = page.getByRole('alertdialog', { name: 'Delete Expense' });
-		await expect(dialog.getByText('You can undo it for 5 seconds.')).toBeVisible();
-		const described = (await dialog.getByText(/Costco fill-up|Oil change/).textContent())?.trim();
-		await dialog.getByRole('button', { name: 'Delete' }).click();
+		const dialog = page.getByRole('alertdialog', { name: 'Delete expense?' });
+		await expect(dialog.getByText(/You can undo it for 5 seconds\./)).toBeVisible();
+		const described = await dialog.getByText(/Costco fill-up|Oil change/).textContent();
+		await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
 
-		const name = described === 'Costco fill-up' ? 'Costco fill-up' : 'Oil change';
+		const fuel = described?.includes('Costco fill-up') ?? false;
+		const name = fuel ? 'Costco fill-up' : 'Oil change';
 		const row = page.getByTestId('expense-row').filter({ hasText: name });
-		const id = described === 'Costco fill-up' ? 'expense-fuel' : 'expense-maint';
+		const id = fuel ? 'expense-fuel' : 'expense-maint';
 		return { deleted, row, path: `/api/v1/expenses/${id}` };
 	}
 
