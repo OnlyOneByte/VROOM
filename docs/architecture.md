@@ -140,16 +140,18 @@ own pooled transaction, so call sites won't change again.
 **Moving the app across (#1378).** `appContext().asyncDb` is the async session over the same
 connection as `appContext().db`, and repositories move to it area by area. The settings,
 auth-provider, photo-ref, insurance-claim, financing, push, vehicle, trip and share
-repositories are on it so far, and so are analytics, community stats, insurance policies and
-photos outside their transactions. `BaseRepository`'s shared methods run on it for every
-subclass.
+repositories are on it so far, and so are analytics, community stats, insurance policies,
+photos, drivers, the calendar feed and the settings routes outside their transactions.
+`BaseRepository`'s shared methods run on it for every subclass. In `src/api/drivers/`,
+`carShareEnabled` and `ensureMemberDriver` take only a sync transaction handle, because the
+share-accept and car-share transactions call them; code outside a transaction reads a
+vehicle's car-share flag through `repos().vehicles`.
 
 Some repositories hold two handles on the same connection while the move is under way: the
 async session for ordinary queries, and `syncDb` for the sync transactions they still open.
 Expenses, odometer and reminders keep all their own queries on `syncDb`. Community stats,
 insurance policies and photos use `syncDb` only to open their transactions (and insurance for
-its vehicle access checks), and the analytics query repository uses it only for the drivers
-lookup. When you edit one of these, use the
+its vehicle access checks). When you edit one of these, use the
 transaction handle `tx` inside a transaction callback and the async session outside it, and
 never pass `syncDb` to code that runs on the async session. The sync transactions and
 `syncDb` go in part C. One ordering
