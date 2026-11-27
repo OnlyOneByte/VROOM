@@ -153,9 +153,9 @@
 				<Label for="calendar-url">Your private calendar link</Label>
 				<div class="flex gap-2">
 					<Input id="calendar-url" value={link} readonly class="min-w-0 font-mono text-xs" />
-					<Button variant="outline" class="h-11.5 shrink-0" onclick={copyLink}>
-						<Copy class="mr-1 h-4 w-4" />
-						Copy Link
+					<Button variant="outline" class="h-11.5 shrink-0 rounded-full" onclick={copyLink}>
+						<Copy class="mr-1 h-4 w-4" aria-hidden="true" />
+						Copy link
 					</Button>
 				</div>
 				<p class="text-xs text-muted-foreground">
@@ -165,7 +165,7 @@
 				{#if webcal && onApple}
 					<Button
 						variant="outline"
-						class="h-10"
+						class="h-10 rounded-full"
 						onclick={() => openInCalendarApp(webcal)}
 						data-testid="calendar-webcal"
 					>
@@ -184,32 +184,33 @@
 			<div class="flex flex-wrap gap-2">
 				<Button
 					variant="outline"
-					class="h-10"
+					class="h-10 rounded-full"
 					onclick={() => (confirmRotate = true)}
 					disabled={busy}
 					data-testid="calendar-rotate"
 				>
-					Get a New Link
+					Get a new link
 				</Button>
 				<Button
 					variant="outline"
-					class="h-10 text-destructive"
+					class="h-10 rounded-full text-destructive"
 					onclick={() => (confirmOff = true)}
 					disabled={busy}
 					data-testid="calendar-off"
 				>
-					Turn Off
+					Turn off
 				</Button>
 			</div>
 		{:else}
 			<Button
-				class="h-10"
+				variant="outline"
+				class="h-10 rounded-full"
 				onclick={() => void createLink().catch(() => undefined)}
 				disabled={busy}
 				data-testid="calendar-create"
 			>
-				{#if busy}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
-				Create Link
+				{#if busy}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />{/if}
+				Create link
 			</Button>
 		{/if}
 	{/if}
@@ -219,7 +220,7 @@
 	bind:open={confirmRotate}
 	title="Get a new calendar link?"
 	description="The current link stops working at once. Calendars subscribed to it need the new link."
-	confirmLabel="Get a New Link"
+	confirmLabel="Get a new link"
 	onConfirm={createLink}
 />
 
@@ -227,6 +228,6 @@
 	bind:open={confirmOff}
 	title="Turn off the calendar link?"
 	description="Calendars subscribed to it stop updating and its events disappear. You can create a new link at any time."
-	confirmLabel="Turn Off"
+	confirmLabel="Turn off"
 	onConfirm={turnOff}
 />
