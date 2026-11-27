@@ -190,7 +190,7 @@
 				photoLossConfirmOpen = true;
 				return;
 			}
-			appStore.showError(`Couldn't remove the provider. ${userFacingErrorMessage(error)}`);
+			appStore.showError(`Couldn't remove the storage. ${userFacingErrorMessage(error)}`);
 		}
 	}
 
@@ -459,8 +459,8 @@
 
 <ConfirmDialog
 	bind:open={deleteConfirmOpen}
-	title="Delete {pendingDelete?.displayName ?? 'provider'}?"
-	description="Backups to this provider stop and its settings are removed from VROOM. Your files stay in the provider itself."
+	title="Delete {pendingDelete?.displayName ?? 'storage'}?"
+	description="VROOM stops backing up here and removes this storage's settings. Your files stay in the storage itself."
 	onConfirm={async () => {
 		if (pendingDelete) await handleProviderDelete(pendingDelete);
 	}}
@@ -468,7 +468,7 @@
 
 <ConfirmDialog
 	bind:open={photoLossConfirmOpen}
-	title="Delete {photoLossConfirm?.provider.displayName ?? 'provider'}?"
+	title="Delete {photoLossConfirm?.provider.displayName ?? 'storage'}?"
 	description={photoLossConfirm?.message ?? ''}
 	confirmLabel="Delete anyway"
 	onConfirm={async () => {
