@@ -1,6 +1,5 @@
 import { eq, getTableColumns, inArray, sql } from 'drizzle-orm';
-import type { AsyncAppDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import { jsonMergePatch } from '../../db/dialect';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
 import {
@@ -14,7 +13,6 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES } from '../../types';
 import { minorUnitScale } from '../../utils/money';
@@ -145,76 +143,76 @@ const OWNED_MONEY_TABLES = {
   reminders,
 } as const;
 
-function ownedMoneyRows(tx: DrizzleTransaction, userId: string): BackupTables {
+async function ownedMoneyRows(tx: AsyncHandle, userId: string): Promise<BackupTables> {
   const ids = (rows: { id: string }[]) => rows.map((row) => row.id);
   const vehicleIds = ids(
-    tx.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.userId, userId)).all()
+    await tx.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.userId, userId))
   );
   const policyIds = ids(
-    tx
+    await tx
       .select({ id: insurancePolicies.id })
       .from(insurancePolicies)
       .where(eq(insurancePolicies.userId, userId))
-      .all()
   );
   return {
-    vehicles: tx.select().from(vehicles).where(eq(vehicles.userId, userId)).all(),
-    expenses: tx.select().from(expenses).where(eq(expenses.userId, userId)).all(),
-    financing: tx
+    vehicles: await tx.select().from(vehicles).where(eq(vehicles.userId, userId)),
+    expenses: await tx.select().from(expenses).where(eq(expenses.userId, userId)),
+    financing: await tx
       .select()
       .from(vehicleFinancing)
-      .where(inArray(vehicleFinancing.vehicleId, vehicleIds))
-      .all(),
-    insuranceTerms: tx
+      .where(inArray(vehicleFinancing.vehicleId, vehicleIds)),
+    insuranceTerms: await tx
       .select()
       .from(insuranceTerms)
-      .where(inArray(insuranceTerms.policyId, policyIds))
-      .all(),
-    insuranceClaims: tx
+      .where(inArray(insuranceTerms.policyId, policyIds)),
+    insuranceClaims: await tx
       .select()
       .from(insuranceClaims)
-      .where(inArray(insuranceClaims.policyId, policyIds))
-      .all(),
-    reminders: tx.select().from(reminders).where(eq(reminders.userId, userId)).all(),
+      .where(inArray(insuranceClaims.policyId, policyIds)),
+    reminders: await tx.select().from(reminders).where(eq(reminders.userId, userId)),
   };
 }
 
-function rescaleOwnedMoney(tx: DrizzleTransaction, userId: string, from: number, to: number): void {
-  const rescaled = rescaleMoneyTables(ownedMoneyRows(tx, userId), from, to);
+async function rescaleOwnedMoney(
+  tx: AsyncHandle,
+  userId: string,
+  from: number,
+  to: number
+): Promise<void> {
+  const rescaled = rescaleMoneyTables(await ownedMoneyRows(tx, userId), from, to);
   for (const [key, table] of Object.entries(OWNED_MONEY_TABLES)) {
     const columns = Object.keys(getTableColumns(table)).filter(
       (name) => MONEY_CENTS_FIELDS.has(name) || name === 'expenseSplitConfig'
     );
     for (const row of rescaled[key] ?? []) {
       const set = Object.fromEntries(columns.map((name) => [name, row[name]]));
-      tx.update(table)
+      await tx
+        .update(table)
         .set(set)
-        .where(eq(table.id, String(row.id)))
-        .run();
+        .where(eq(table.id, String(row.id)));
     }
   }
 }
 
 export function updatePreferencesWithCurrency(
-  db: AppDatabase,
+  db: AsyncAppDatabase,
   userId: string,
   updates: Partial<NewUserPreferences> & { currencyUnit: string }
-): UserPreferences {
-  return db.transaction((tx) => {
-    const current = tx
+): Promise<UserPreferences> {
+  return db.transaction(async (tx) => {
+    const current = await tx
       .select({ currency: userPreferences.currencyUnit })
       .from(userPreferences)
       .where(eq(userPreferences.userId, userId))
       .get();
     const from = minorUnitScale(current?.currency ?? DEFAULT_CURRENCY);
     const to = minorUnitScale(updates.currencyUnit);
-    if (from !== to) rescaleOwnedMoney(tx, userId, from, to);
-    const updated = tx
+    if (from !== to) await rescaleOwnedMoney(tx, userId, from, to);
+    const [updated] = await tx
       .update(userPreferences)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(userPreferences.userId, userId))
-      .returning()
-      .get();
+      .returning();
     if (!updated) throw new DatabaseError('User preferences row vanished during a currency change');
     return updated;
   });

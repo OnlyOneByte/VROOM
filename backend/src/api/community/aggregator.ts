@@ -375,7 +375,7 @@ export async function refreshCommunityStats(
     noiseKey: await repository.noiseKey(LOCAL_SCOPE),
     uniform,
   });
-  repository.replaceScope(LOCAL_SCOPE, result.rows, now);
+  await repository.replaceScope(LOCAL_SCOPE, result.rows, now);
   const ms = Math.round(performance.now() - started);
   logger.info(
     `community stats refreshed: ${result.published} buckets published, ${result.suppressed} below the threshold, ${input.optedInOwners} opted-in owners, ${ms} ms`

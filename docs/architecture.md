@@ -148,12 +148,10 @@ transactions, and the boot-time role sync and first-admin check. Since C2, so ar
 split-expense, trip, odometer, reminder-trigger and financing transactions.
 `BaseRepository`'s shared methods run on it for every subclass.
 
-Some repositories hold two handles on the same connection while the move is under way: the
-async session for ordinary queries, and `syncDb` for the sync transactions they still open.
-Community stats, insurance policies and photos use `syncDb` only to open their transactions. When you edit one
-of these, use the transaction handle `tx`
-inside a transaction callback and the async session outside it, and never pass `syncDb` to
-code that runs on the async session. The sync transactions and `syncDb` go in part C.
+Since C3, every repository and every transaction outside the restore path runs on the async
+session. Inside a transaction callback, use the transaction handle `tx`; outside it, use the
+async session. Insurance writes check vehicle ownership inside the transaction that writes,
+and a currency change rescales the owner's money and saves the new currency in one transaction.
 
 A read that gates a write runs inside the async transaction that does the write. An async
 transaction opens with `BEGIN IMMEDIATE` and the session queues every other writer behind it,
@@ -189,9 +187,7 @@ Provider construction resolves its private-network policy on the async session:
 provider (`createProviderInstance`) and resolving model settings (`resolveModelSettings`) are
 async too, and the provider create and photo backfill transactions run on the async session.
 
-What part C still has to move: the insurance, community and photo transactions, and settings
-(C3); and the restore path, a
-read transaction for backups, the key-rotation script, and demo and sample seeding (C4).
+What part C still has to move: the restore path, a read transaction for backups, the key-rotation script, and demo and sample seeding (C4).
 Restore keeps a sync copy of the share-role change, `changeShareRoleInSyncTransaction`, until
 C4 moves it.
 Connection upkeep in `src/db/connection.ts` stays sync by design.
