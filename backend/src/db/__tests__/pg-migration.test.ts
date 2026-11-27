@@ -52,20 +52,49 @@ async function ddlFor(tables: Record<string, unknown>): Promise<string[]> {
 type Insertable = { insert(table: unknown): { values(row: unknown): Promise<unknown> } };
 type Tables = typeof sqlite;
 
+function isUniqueViolation(error: unknown): boolean {
+  for (let e: unknown = error; e instanceof Error; e = e.cause) {
+    const code = (e as { code?: unknown }).code;
+    if (code === '23505' || code === 'SQLITE_CONSTRAINT_UNIQUE') return true;
+    if (/UNIQUE constraint failed|duplicate key value/.test(e.message)) return true;
+  }
+  return false;
+}
+
 async function attempts(db: Insertable, table: unknown, rows: unknown[]): Promise<boolean[]> {
   const out: boolean[] = [];
   for (const row of rows) {
-    out.push(
-      await db
-        .insert(table)
-        .values(row)
-        .then(
-          () => true,
-          () => false
-        )
-    );
+    const ok = await db
+      .insert(table)
+      .values(row)
+      .then(
+        () => true,
+        (error: unknown) => {
+          if (isUniqueViolation(error)) return false;
+          throw error;
+        }
+      );
+    out.push(ok);
   }
   return out;
+}
+
+async function catalog(client: PGlite): Promise<string[]> {
+  const queries = [
+    "SELECT table_name || '.' || column_name || ' ' || data_type || ' ' || is_nullable || ' ' || coalesce(column_default, '-') || ' ' || coalesce(identity_generation, '-') AS x FROM information_schema.columns WHERE table_schema = 'public'",
+    "SELECT indexdef AS x FROM pg_indexes WHERE schemaname = 'public'",
+    "SELECT conrelid::regclass::text || ' ' || conname || ' ' || pg_get_constraintdef(oid) AS x FROM pg_constraint WHERE connamespace = 'public'::regnamespace",
+  ];
+  const rows = await Promise.all(queries.map((q) => client.query<{ x: string }>(q)));
+  return rows.flatMap((r) => r.rows.map((row) => row.x)).sort();
+}
+
+type SnapshotTables = { tables: Record<string, { columns: Record<string, unknown> }> };
+
+function tableAndColumnNames(json: unknown): string[] {
+  return Object.entries((json as SnapshotTables).tables)
+    .flatMap(([table, { columns }]) => [table, ...Object.keys(columns).map((c) => `${table}.${c}`)])
+    .sort();
 }
 
 const OVERRIDE_CASES: Record<string, (db: Insertable, t: Tables) => Promise<boolean[]>> = {
@@ -74,28 +103,41 @@ const OVERRIDE_CASES: Record<string, (db: Insertable, t: Tables) => Promise<bool
     await db
       .insert(t.vehicles)
       .values({ id: 'v', userId: 'u', make: 'Kia', model: 'Rio', year: 2020 });
-    const loan = (id: string, isActive: boolean) => ({
+    const loan = (id: string, isActive: boolean, provider: string, vehicleId = 'v') => ({
       id,
-      vehicleId: 'v',
-      provider: 'Bank',
+      vehicleId,
+      provider,
       originalAmount: 1000,
       termMonths: 12,
       startDate: new Date('2024-01-01T00:00:00Z'),
       paymentAmount: 100,
       isActive,
+      financingType: provider === 'Lessor' ? 'lease' : 'loan',
     });
+    await db
+      .insert(t.vehicles)
+      .values({ id: 'w', userId: 'u', make: 'Kia', model: 'Soul', year: 2021 });
     return attempts(db, t.vehicleFinancing, [
-      loan('a', true),
-      loan('b', false),
-      loan('c', false),
-      loan('d', true),
+      loan('a', true, 'Bank'),
+      loan('b', false, 'Other'),
+      loan('c', false, 'Bank'),
+      loan('d', true, 'Other'),
+      loan('e', false, 'Lessor'),
+      loan('f', true, 'Lessor', 'w'),
+      loan('g', true, 'Bank', 'w'),
     ]);
   },
 };
 
 describe('the Postgres baseline migration', () => {
   test('is up to date with the Postgres schema', async () => {
-    const pending = await generateMigration(latestSnapshot(), generateDrizzleJson(pgExports));
+    const snapshot = latestSnapshot();
+    const current = generateDrizzleJson(pgExports);
+    expect(
+      tableAndColumnNames(current),
+      'A table or column was added, removed or renamed: run `bun run db:generate:pg` and commit drizzle-pg/'
+    ).toEqual(tableAndColumnNames(snapshot));
+    const pending = await generateMigration(snapshot, current);
     expect(pending, 'Run `bun run db:generate:pg` and commit drizzle-pg/:').toEqual([]);
   });
 
@@ -138,6 +180,21 @@ describe('the Postgres baseline migration', () => {
       expect(wantIndexes.filter((name) => !liveIndexes.has(String(name)))).toEqual([]);
     } finally {
       await client.close();
+    }
+  });
+
+  test('builds exactly the database the schema describes: types, defaults, indexes and constraints', async () => {
+    const migrated = new PGlite();
+    const fromSchema = new PGlite();
+    try {
+      await pgMigrate(pgDrizzle(migrated), { migrationsFolder: PG_MIGRATIONS });
+      for (const statement of await ddlFor(pgExports)) await fromSchema.exec(statement);
+      const want = await catalog(fromSchema);
+      expect(want.length).toBeGreaterThan(500);
+      expect(await catalog(migrated)).toEqual(want);
+    } finally {
+      await migrated.close();
+      await fromSchema.close();
     }
   });
 });
