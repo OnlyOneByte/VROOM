@@ -120,6 +120,32 @@ describe('CrossVehicleTab with the page filters', () => {
 		expect(api.query).toHaveBeenCalledTimes(16);
 	});
 
+	test('a shared car left out for its currency gets a note above the overview', async () => {
+		api.getCrossVehicle.mockResolvedValue({
+			...EMPTY,
+			coverage: {
+				vehicleIds: ['civic'],
+				otherCurrency: [{ vehicleId: 'golf', currency: 'EUR' }],
+				unavailable: 0
+			}
+		});
+		render(CrossVehicleTab, { vehicleIds: ['civic', 'golf'] });
+		await screen.findByLabelText('Cross-vehicle overview');
+		expect(
+			screen.getByText('Not included: cars shared with you in EUR. These figures are in USD.')
+		).toBeTruthy();
+	});
+
+	test('no note when the cross-vehicle data left no car out', async () => {
+		api.getCrossVehicle.mockResolvedValue({
+			...EMPTY,
+			coverage: { vehicleIds: ['civic'], otherCurrency: [], unavailable: 1 }
+		});
+		render(CrossVehicleTab, { vehicleIds: ['civic'] });
+		await screen.findByLabelText('Cross-vehicle overview');
+		expect(screen.queryByText(/Not included/)).toBeNull();
+	});
+
 	test('without a filter an empty account shows no filter message', async () => {
 		render(CrossVehicleTab);
 		await waitFor(() => expect(api.getCrossVehicle).toHaveBeenCalled());

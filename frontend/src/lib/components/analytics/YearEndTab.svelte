@@ -27,6 +27,7 @@
 	import { getFuelEfficiencyLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
 	import ChartGroup from './fuel/ChartGroup.svelte';
+	import SharedCurrencyNote from './SharedCurrencyNote.svelte';
 	import { bucketDate } from './explore/explore-data';
 	import {
 		YEAR_QUERIES,
@@ -97,10 +98,7 @@
 
 	let monthly = $derived(results?.monthly ?? null);
 	let currency = $derived(monthly?.unit ?? null);
-	let covered = $derived(coveredCars(monthly));
-	let carCount = $derived(covered.count);
-	const listOf = (items: string[]) =>
-		new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(items);
+	let carCount = $derived(coveredCars(monthly));
 	let total = $derived(monthly?.totals.value ?? 0);
 	let categories = $derived.by(() => {
 		const breakdown = (results?.categories.series ?? []).map(s => ({
@@ -356,10 +354,5 @@
 </div>
 
 {#snippet sharedNote()}
-	{#if covered.otherCurrencies.length > 0}
-		<p class="text-sm text-muted-foreground">
-			Not included: cars shared with you in {listOf(covered.otherCurrencies)}. These figures are in
-			{currency}.
-		</p>
-	{/if}
+	<SharedCurrencyNote coverage={monthly?.coverage} {currency} />
 {/snippet}

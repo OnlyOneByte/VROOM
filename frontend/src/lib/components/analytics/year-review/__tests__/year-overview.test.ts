@@ -65,7 +65,7 @@ describe('covered cars', () => {
 		expect(Object.keys(yearRequests(2026, NOW))).not.toContain('cars');
 	});
 
-	test('counts every car the query covered and names each left-out currency once', () => {
+	test('counts every car the query covered, not the ones left out for their currency', () => {
 		const response = {
 			coverage: {
 				vehicleIds: ['civic', 'rav4'],
@@ -77,8 +77,8 @@ describe('covered cars', () => {
 				unavailable: 0
 			}
 		} as unknown as AnalyticsQueryResponse;
-		expect(coveredCars(response)).toEqual({ count: 2, otherCurrencies: ['EUR', 'GBP'] });
-		expect(coveredCars(null)).toEqual({ count: 0, otherCurrencies: [] });
+		expect(coveredCars(response)).toBe(2);
+		expect(coveredCars(null)).toBe(0);
 	});
 });
 
