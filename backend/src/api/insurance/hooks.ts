@@ -223,14 +223,15 @@ export async function updateTermExpenses(
 
   const { termId, vehicleIds, userId } = params;
   const totalCost = effectiveTermCost(params);
-  const linked = await repos().expenses.findBySource('insurance_term', termId, userId);
-  const photoObjects = await storedPhotoObjects(
-    'expense',
-    linked.map((expense) => expense.id)
-  );
+  let photoObjects: Awaited<ReturnType<typeof storedPhotoObjects>> = [];
 
   try {
     const deleted = await atScale(userId, scale, async () => {
+      const linked = await repos().expenses.findBySource('insurance_term', termId, userId);
+      photoObjects = await storedPhotoObjects(
+        'expense',
+        linked.map((expense) => expense.id)
+      );
       const removed = await repos().expenses.deleteBySource('insurance_term', termId, userId);
       if (totalCost > 0 && vehicleIds.length > 0) await createPremiumExpenses(params, totalCost);
       return removed;
