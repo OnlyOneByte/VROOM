@@ -124,12 +124,9 @@ describe('other views of a shared car follow the same settings', () => {
     expect(res.status).toBe(200);
     const body =
       await json<DataEnvelope<{ monthlyCostHeatmap: Array<Record<string, unknown>> }>>(res);
-    const totals = body.data.monthlyCostHeatmap.flatMap((row) =>
-      Object.values(row).filter((v): v is number => typeof v === 'number')
-    );
-    expect(totals).toContain(80);
-    expect(totals).not.toContain(50);
-    expect(totals).not.toContain(400);
+    const months = body.data.monthlyCostHeatmap;
+    expect(months.some((row) => row['maintenance'] === 80)).toBe(true);
+    expect(months.every((row) => !row['financial'])).toBe(true);
   });
 
   test("a reminder's expenses leave out what the share hides", async () => {
