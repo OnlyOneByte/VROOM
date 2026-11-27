@@ -49,6 +49,17 @@ describe('search by amount uses the owner’s minor unit', () => {
     const months = await ctx.authed('GET', '/api/v1/expenses/monthly-totals?search=1234');
     const totals = await json<DataEnvelope<{ amount: number }[]>>(months);
     expect(totals.data.map((m) => m.amount)).toEqual([1234]);
+
+    const exported = async (search: string) => {
+      const res = await ctx.authed(
+        'GET',
+        `/api/v1/expenses/export?search=${encodeURIComponent(search)}`
+      );
+      expect(res.status).toBe(200);
+      return (await res.text()).trim().split('\n').length - 1;
+    };
+    expect(await exported('1234')).toBe(1);
+    expect(await exported('12.34')).toBe(0);
   });
 
   test('a dollar user still finds cents exactly and whole dollars as a range', async () => {

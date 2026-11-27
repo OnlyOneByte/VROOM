@@ -649,7 +649,10 @@ routes.get(
 
     const scope = await resolveExpenseReadScope(vehicleId, user.id);
     const isSharedExport = scope.userId !== user.id;
-    const [rows, vehicles, sharedVehicles, prefs] = await Promise.all([
+    const prefs = await repos().preferences.getByUserId(scope.userId);
+    const currency = prefs?.currencyUnit || 'USD';
+    const scale = minorUnitScale(currency);
+    const [rows, vehicles, sharedVehicles] = await Promise.all([
       repos().expenses.findAll({
         ...scope,
         vehicleId,
@@ -659,15 +662,12 @@ routes.get(
         timeZone,
         ...plainDays,
         search,
+        moneyScale: scale,
         tags,
       }),
       repos().vehicles.findByUserId(user.id),
       isSharedExport && vehicleId ? repos().vehicles.findByIds([vehicleId]) : Promise.resolve([]),
-      repos().preferences.getByUserId(scope.userId),
     ]);
-
-    const currency = prefs?.currencyUnit || 'USD';
-    const scale = minorUnitScale(currency);
 
     const vehicleName = new Map(
       [...vehicles, ...sharedVehicles].map((v) => [
