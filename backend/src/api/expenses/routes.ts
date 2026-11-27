@@ -48,7 +48,7 @@ import {
   writesFinancials,
 } from '../../utils/vehicle-access';
 import { assertMayClearDriver, attributedDriver, hideDriverFields } from '../drivers/attribution';
-import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
+import { deleteWithPhotos } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import {
   buildImportPlan,
@@ -580,10 +580,16 @@ routes.delete(
     );
     assertMayTouchFinancialExpense(mayTouch, groupInfo.sourceType);
 
-    const siblingIds = await repos().expenses.findIdsByGroupId(id, groupInfo.ownerId);
-    await deletePhotosForEntities('expense', siblingIds, groupInfo.ownerId);
-
-    await repos().expenses.deleteSplitExpense(id, groupInfo.ownerId);
+    await deleteWithPhotos(
+      groupInfo.ownerId,
+      async () => [
+        {
+          entityType: 'expense',
+          entityIds: await repos().expenses.findIdsByGroupId(id, groupInfo.ownerId),
+        },
+      ],
+      () => repos().expenses.deleteSplitExpense(id, groupInfo.ownerId)
+    );
 
     return c.json({ success: true, message: 'Split expense deleted successfully' });
   }
@@ -1147,9 +1153,11 @@ routes.delete(
       );
     }
 
-    await deleteAllPhotosForEntity('expense', id, existingExpense.userId);
-
-    await repos().expenses.delete(id);
+    await deleteWithPhotos(
+      existingExpense.userId,
+      async () => [{ entityType: 'expense', entityIds: [id] }],
+      () => repos().expenses.delete(id)
+    );
     return c.json({ success: true, message: 'Expense deleted successfully' });
   }
 );

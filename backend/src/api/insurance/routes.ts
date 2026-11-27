@@ -13,7 +13,7 @@ import {
 } from '../../utils/money';
 import { validateInsuranceOwnership, zValidator } from '../../utils/validation';
 import { requireVehicleAccess } from '../../utils/vehicle-access';
-import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
+import { deleteWithPhotos } from '../photos/photo-service';
 import { fromPolicyOwner, fromPolicyReaders } from './access';
 import { createClaimSchema, updateClaimSchema } from './claims-validation';
 import {
@@ -236,19 +236,24 @@ routes.delete('/:id', zValidator('param', idParamSchema), authorize(fromPolicyOw
   const { id } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
 
-  // Photos have no FK, so they must be removed before the policy cascade orphans them.
-  const claims = await repos().insuranceClaims.findByPolicyId(id);
-  const claimIds = claims.map((claim) => claim.id);
-  await deleteAllPhotosForEntity('insurance_policy', id, user.id);
-  await deletePhotosForEntities('insurance_claim', claimIds, user.id);
-
   // Premium expenses link to terms by text, not FK, so they must be deleted explicitly before the cascade.
   const policyToDelete = await repos().insurancePolicies.findById(id);
   for (const term of policyToDelete?.terms ?? []) {
     await deleteTermExpenses(term.id, user.id);
   }
 
-  await repos().insurancePolicies.delete(id, user.id);
+  // Photos have no FK, so they must be removed before the policy cascade orphans them.
+  await deleteWithPhotos(
+    user.id,
+    async () => [
+      { entityType: 'insurance_policy', entityIds: [id] },
+      {
+        entityType: 'insurance_claim',
+        entityIds: (await repos().insuranceClaims.findByPolicyId(id)).map((claim) => claim.id),
+      },
+    ],
+    () => repos().insurancePolicies.delete(id, user.id)
+  );
   return c.json({ success: true, message: 'Insurance policy deleted successfully' });
 });
 
@@ -453,8 +458,11 @@ routes.delete(
     const user = c.get('user');
     const { id, claimId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
-    await deleteAllPhotosForEntity('insurance_claim', claimId, user.id);
-    await repos().insuranceClaims.delete(id, claimId);
+    await deleteWithPhotos(
+      user.id,
+      async () => [{ entityType: 'insurance_claim', entityIds: [claimId] }],
+      () => repos().insuranceClaims.delete(id, claimId)
+    );
     return c.json({ success: true, message: 'Claim deleted successfully' });
   }
 );
