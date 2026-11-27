@@ -151,11 +151,6 @@ export async function changeShareRole(db: AsyncHandle, share: ShareGrant): Promi
   await grantShareRole(db, share);
 }
 
-export function changeShareRoleInSyncTransaction(tx: DrizzleTransaction, share: ShareGrant): void {
-  tx.delete(roleAssignments).where(shareRolesWhere(share)).run();
-  tx.insert(roleAssignments).values(shareRoleValues(share)).onConflictDoNothing().run();
-}
-
 export async function endVehicleMembership(
   db: AsyncHandle,
   vehicleId: string,
@@ -521,14 +516,17 @@ export async function keepingARoleManager<T>(
   });
 }
 
-export function hasPerPersonVehicleGrants(db: Db, ownerId: string): boolean {
+export async function hasPerPersonVehicleGrants(
+  db: AsyncHandle,
+  ownerId: string
+): Promise<boolean> {
   const owned = db.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.userId, ownerId));
-  const override = db
+  const override = await db
     .select({ id: permissionOverrides.id })
     .from(permissionOverrides)
     .where(inArray(permissionOverrides.scopeId, owned))
     .get();
-  const customRole = db
+  const customRole = await db
     .select({ id: roleAssignments.id })
     .from(roleAssignments)
     .where(

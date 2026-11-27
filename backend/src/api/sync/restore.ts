@@ -2,7 +2,7 @@ import { and, eq, getTableColumns, inArray, ne, type Table } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { appContext, repos } from '../../app-context';
 import { TABLE_SCHEMA_MAP } from '../../config';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncHandle } from '../../db/async-sqlite';
 import {
   expenses,
   insuranceClaims,
@@ -33,10 +33,7 @@ import {
   SyncError,
   ValidationError,
 } from '../../errors';
-import {
-  changeShareRoleInSyncTransaction,
-  hasPerPersonVehicleGrants,
-} from '../../permissions/grants';
+import { changeShareRole, hasPerPersonVehicleGrants } from '../../permissions/grants';
 import {
   type BackupConfig,
   DEFAULT_PROVIDER_CAPABILITIES,
@@ -60,8 +57,6 @@ import {
   storageProviderIdentity,
   upgradeBackupTables,
 } from './backup';
-
-type DrizzleTransaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
 export interface Conflict {
   table: string;
@@ -140,7 +135,7 @@ function coerceRows(rows: Record<string, unknown>[], table: Table): Record<strin
 
 class RestoreService {
   private get db() {
-    return appContext().db;
+    return appContext().asyncDb;
   }
 
   async restoreFromBackup(
@@ -149,8 +144,9 @@ class RestoreService {
     mode: RestoreMode,
     signal?: AbortSignal
   ): Promise<RestoreResponse> {
+    const currency = await this.accountCurrency(userId);
     const { data: parsedBackup, skippedPhotos } = this.withoutOrphanPhotos(
-      await this.parseOrReject(file, await this.accountCurrency(userId))
+      await this.parseOrReject(file, currency)
     );
 
     const validation = backupService.validateBackupData(parsedBackup);
@@ -158,7 +154,7 @@ class RestoreService {
       throw new ValidationError('Backup validation failed', validation.errors);
     }
 
-    return this.applyRestore(userId, parsedBackup, mode, skippedPhotos, signal);
+    return this.applyRestore(userId, parsedBackup, mode, skippedPhotos, currency, signal);
   }
 
   private withoutOrphanPhotos(data: ParsedBackupData): {
@@ -177,6 +173,7 @@ class RestoreService {
     data: ParsedBackupData,
     mode: RestoreMode,
     skippedPhotos: number,
+    parsedWithCurrency: string | undefined,
     signal?: AbortSignal
   ): Promise<RestoreResponse> {
     const summary = summarizeBackup(data);
@@ -194,23 +191,27 @@ class RestoreService {
     }
 
     this.assertReplaceNotEmpty(summary, mode);
-    if (mode === 'replace' && hasPerPersonVehicleGrants(this.db, userId)) {
-      throw new ConflictError(
-        'Some people have their own roles or permission changes on your vehicles, and a full restore would remove them. Remove those changes first, or restore in merge mode.'
-      );
-    }
 
     signal?.throwIfAborted();
-    // bun:sqlite transactions must be synchronous: an async callback autocommits each statement.
     try {
-      this.db.transaction((tx) => {
-        // Read before the wipe: deleteUserData cascades vehicle_shares.
-        const consented = this.consentedShareKeys(tx, userId);
-        const currentPrefs = this.currentProviderPrefs(tx, userId);
-        if (mode === 'replace') {
-          this.deleteUserData(tx, userId, { keepPreferences: !data.userPreferences?.length });
+      await this.db.transaction(async (tx) => {
+        if (mode === 'replace' && (await hasPerPersonVehicleGrants(tx, userId))) {
+          throw new ConflictError(
+            'Some people have their own roles or permission changes on your vehicles, and a full restore would remove them. Remove those changes first, or restore in merge mode.'
+          );
         }
-        this.insertBackupData(tx, data, userId, consented, currentPrefs);
+        if ((await this.accountCurrency(userId, tx)) !== parsedWithCurrency) {
+          throw new ConflictError(
+            'The currency changed while this backup was being read. Reload and try again.'
+          );
+        }
+        // Read before the wipe: deleteUserData cascades vehicle_shares.
+        const consented = await this.consentedShareKeys(tx, userId);
+        const currentPrefs = await this.currentProviderPrefs(tx, userId);
+        if (mode === 'replace') {
+          await this.deleteUserData(tx, userId, { keepPreferences: !data.userPreferences?.length });
+        }
+        await this.insertBackupData(tx, data, userId, consented, currentPrefs);
       });
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error;
@@ -223,8 +224,16 @@ class RestoreService {
     return { success: true, imported: summary, ...skipped };
   }
 
-  private async accountCurrency(userId: string): Promise<string | undefined> {
-    return (await repos().preferences.getByUserId(userId))?.currencyUnit;
+  private async accountCurrency(
+    userId: string,
+    db: AsyncHandle = this.db
+  ): Promise<string | undefined> {
+    const row = await db
+      .select({ currency: userPreferences.currencyUnit })
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId))
+      .get();
+    return row?.currency;
   }
 
   private async parseOrReject(file: Buffer, accountCurrency?: string): Promise<ParsedBackupData> {
@@ -290,10 +299,11 @@ class RestoreService {
     const sheetsService = await createSheetsServiceForProvider(providerId, userId);
     const { metadata, ...sheetTables } =
       await sheetsService.readSpreadsheetData(sheetsSpreadsheetId);
+    const currency = await this.accountCurrency(userId);
     const sheet = upgradeBackupTables(
       metadata.version,
       sheetTables,
-      await this.accountCurrency(userId)
+      currency
     ) as typeof sheetTables;
 
     const { data: sheetData, skippedPhotos } = this.withoutOrphanPhotos({
@@ -329,7 +339,7 @@ class RestoreService {
       throw new ValidationError('Sheet data validation failed', validation.errors);
     }
 
-    return this.applyRestore(userId, sheetData, mode, skippedPhotos, signal);
+    return this.applyRestore(userId, sheetData, mode, skippedPhotos, currency, signal);
   }
 
   private async detectConflicts(data: ParsedBackupData, userId: string): Promise<Conflict[]> {
@@ -473,51 +483,48 @@ class RestoreService {
     return conflicts;
   }
 
-  private deleteUserData(
-    tx: DrizzleTransaction,
+  private async deleteUserData(
+    tx: AsyncHandle,
     userId: string,
     { keepPreferences }: { keepPreferences: boolean }
-  ): void {
-    const userVehicles = tx
+  ): Promise<void> {
+    const userVehicles = await tx
       .select({ id: vehicles.id })
       .from(vehicles)
-      .where(ownedVehiclesScope(userId))
-      .all();
+      .where(ownedVehiclesScope(userId));
     const vehicleIds = userVehicles.map((v) => v.id);
 
-    const keptPhotoIds = new Set(this.photosOnOtherOwnersVehicles(tx, userId));
-    const wipedPhotoIds = tx
-      .select({ id: photos.id })
-      .from(photos)
-      .where(eq(photos.userId, userId))
-      .all()
+    const keptPhotoIds = new Set(await this.photosOnOtherOwnersVehicles(tx, userId));
+    const wipedPhotoIds = (
+      await tx.select({ id: photos.id }).from(photos).where(eq(photos.userId, userId))
+    )
       .map((p) => p.id)
       .filter((id) => !keptPhotoIds.has(id));
     for (const idBatch of chunk(wipedPhotoIds)) {
-      tx.delete(photos).where(inArray(photos.id, idBatch)).run();
+      await tx.delete(photos).where(inArray(photos.id, idBatch));
     }
-    tx.delete(expenses).where(eq(expenses.userId, userId)).run();
-    tx.delete(trips).where(eq(trips.userId, userId)).run();
+    await tx.delete(expenses).where(eq(expenses.userId, userId));
+    await tx.delete(trips).where(eq(trips.userId, userId));
 
     for (const idBatch of chunk(vehicleIds)) {
-      tx.delete(odometerEntries).where(inArray(odometerEntries.vehicleId, idBatch)).run();
-      tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, idBatch)).run();
+      await tx.delete(odometerEntries).where(inArray(odometerEntries.vehicleId, idBatch));
+      await tx.delete(vehicleFinancing).where(inArray(vehicleFinancing.vehicleId, idBatch));
     }
 
-    tx.delete(insurancePolicies).where(eq(insurancePolicies.userId, userId)).run();
+    await tx.delete(insurancePolicies).where(eq(insurancePolicies.userId, userId));
 
-    tx.delete(reminders).where(eq(reminders.userId, userId)).run();
+    await tx.delete(reminders).where(eq(reminders.userId, userId));
 
     if (!keepPreferences) {
-      tx.delete(userPreferences).where(eq(userPreferences.userId, userId)).run();
+      await tx.delete(userPreferences).where(eq(userPreferences.userId, userId));
     }
-    tx.delete(syncState).where(eq(syncState.userId, userId)).run();
+    await tx.delete(syncState).where(eq(syncState.userId, userId));
 
-    tx.delete(vehicles).where(ownedVehiclesScope(userId)).run();
+    await tx.delete(vehicles).where(ownedVehiclesScope(userId));
   }
 
-  private photosOnOtherOwnersVehicles(tx: DrizzleTransaction, userId: string): string[] {
-    const onExpenses = tx
+  private async photosOnOtherOwnersVehicles(tx: AsyncHandle, userId: string): Promise<string[]> {
+    const onExpenses = await tx
       .select({ id: photos.id })
       .from(photos)
       .innerJoin(expenses, eq(expenses.id, photos.entityId))
@@ -528,9 +535,8 @@ class RestoreService {
           eq(photos.entityType, 'expense'),
           ne(vehicles.userId, userId)
         )
-      )
-      .all();
-    const onOdometer = tx
+      );
+    const onOdometer = await tx
       .select({ id: photos.id })
       .from(photos)
       .innerJoin(odometerEntries, eq(odometerEntries.id, photos.entityId))
@@ -541,8 +547,7 @@ class RestoreService {
           eq(photos.entityType, 'odometer_entry'),
           ne(vehicles.userId, userId)
         )
-      )
-      .all();
+      );
     return [...onExpenses, ...onOdometer].map((p) => p.id);
   }
 
@@ -585,37 +590,29 @@ class RestoreService {
     return consentedShares.has(shareConsentKey(String(vehicleId), userId)) ? userId : null;
   }
 
-  private insertRows<TTable extends SQLiteTable>(
-    tx: DrizzleTransaction,
+  private async insertRows<TTable extends SQLiteTable>(
+    tx: AsyncHandle,
     table: TTable,
     rows: Record<string, unknown>[]
-  ): void {
+  ): Promise<void> {
     if (rows.length === 0) return;
     const columnCount = Object.keys(getTableColumns(table)).length;
     for (const batch of chunk(rows, rowsPerInsert(columnCount))) {
-      tx.insert(table)
-        .values(batch as unknown as TTable['$inferInsert'][])
-        .run();
+      await tx.insert(table).values(batch as unknown as TTable['$inferInsert'][]);
     }
   }
 
-  private insertBackupData(
-    tx: DrizzleTransaction,
+  private async insertBackupData(
+    tx: AsyncHandle,
     data: ParsedBackupData,
     userId: string,
     consentedShares: Set<string>,
     currentPrefs: ProviderScopedPrefs | undefined
-  ): void {
-    const knownUserIds = new Set(
-      tx
-        .select({ id: users.id })
-        .from(users)
-        .all()
-        .map((u) => u.id)
-    );
+  ): Promise<void> {
+    const knownUserIds = new Set((await tx.select({ id: users.id }).from(users)).map((u) => u.id));
 
     // SQLite checks foreign keys on insert, so parents must be inserted before children.
-    this.insertRows(
+    await this.insertRows(
       tx,
       vehicles,
       this.stampUserId(data.vehicles, userId).map((row) => ({
@@ -628,7 +625,7 @@ class RestoreService {
         vehicleKind: isVehicleKind(row.vehicleKind) ? row.vehicleKind : 'car',
       }))
     );
-    this.insertRows(
+    await this.insertRows(
       tx,
       vehicleDrivers,
       (data.vehicleDrivers ?? []).map((driver) => ({
@@ -638,21 +635,21 @@ class RestoreService {
         createdBy: this.memberOfCar(driver.createdBy, driver.vehicleId, userId, consentedShares),
       }))
     );
-    this.insertRows(tx, vehicleFinancing, data.financing ?? []);
-    this.insertRows(tx, insurancePolicies, this.stampUserId(data.insurance, userId));
-    this.insertRows(tx, insuranceTerms, data.insuranceTerms ?? []);
-    this.insertRows(
+    await this.insertRows(tx, vehicleFinancing, data.financing ?? []);
+    await this.insertRows(tx, insurancePolicies, this.stampUserId(data.insurance, userId));
+    await this.insertRows(tx, insuranceTerms, data.insuranceTerms ?? []);
+    await this.insertRows(
       tx,
       insuranceTermVehicles,
       (data.insuranceTermVehicles ?? []).map((row, index) => ({ ...row, position: index + 1 }))
     );
-    this.insertRows(tx, insuranceClaims, data.insuranceClaims ?? []);
+    await this.insertRows(tx, insuranceClaims, data.insuranceClaims ?? []);
     const reminderVehicleIds = new Map<string, string[]>();
     for (const link of data.reminderVehicles ?? []) {
       const id = String(link.reminderId);
       reminderVehicleIds.set(id, [...(reminderVehicleIds.get(id) ?? []), String(link.vehicleId)]);
     }
-    this.insertRows(
+    await this.insertRows(
       tx,
       reminders,
       this.keepMemberAuthors(
@@ -661,34 +658,34 @@ class RestoreService {
         (row) => reminderVehicleIds.get(String(row.id)) ?? ['']
       )
     );
-    this.insertRows(tx, reminderVehicles, data.reminderVehicles ?? []);
-    this.insertRows(
+    await this.insertRows(tx, reminderVehicles, data.reminderVehicles ?? []);
+    await this.insertRows(
       tx,
       reminderNotifications,
       this.stampUserId(data.reminderNotifications, userId)
     );
-    this.insertRows(
+    await this.insertRows(
       tx,
       expenses,
       this.keepMemberAuthors(this.stampUserId(data.expenses, userId), consentedShares, (row) => [
         String(row.vehicleId),
       ])
     );
-    this.insertRows(
+    await this.insertRows(
       tx,
       odometerEntries,
       this.keepMemberAuthors(this.stampUserId(data.odometer, userId), consentedShares, (row) => [
         String(row.vehicleId),
       ])
     );
-    this.insertRows(
+    await this.insertRows(
       tx,
       trips,
       this.keepMemberAuthors(this.stampUserId(data.trips, userId), consentedShares, (row) => [
         String(row.vehicleId),
       ])
     );
-    this.insertRows(
+    await this.insertRows(
       tx,
       vehicleShares,
       (data.vehicleShares ?? [])
@@ -700,9 +697,9 @@ class RestoreService {
           status: this.resolveShareStatus(share, consentedShares),
         }))
     );
-    this.grantAcceptedShareRoles(tx, userId);
-    const ownedProviders = this.ownedProviderIds(tx, userId);
-    this.insertRows(
+    await this.grantAcceptedShareRoles(tx, userId);
+    const ownedProviders = await this.ownedProviderIds(tx, userId);
+    await this.insertRows(
       tx,
       userPreferences,
       this.stampUserId(data.userPreferences, userId).map((row) =>
@@ -711,7 +708,7 @@ class RestoreService {
         )
       )
     );
-    this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
+    await this.insertRows(tx, syncState, this.stampUserId(data.syncState, userId));
     const entryVehicle = new Map<string, string>(
       [...(data.expenses ?? []), ...(data.odometer ?? [])].map((row) => [
         String(row.id),
@@ -722,21 +719,21 @@ class RestoreService {
       row.entityType === 'vehicle'
         ? String(row.entityId)
         : (entryVehicle.get(String(row.entityId)) ?? '');
-    this.insertRows(
+    await this.insertRows(
       tx,
       photos,
       this.keepMemberAuthors(this.stampUserId(data.photos, userId), consentedShares, (row) => [
         photoVehicle(row),
       ])
     );
-    const refRows = this.relinkPhotoRefs(
+    const refRows = await this.relinkPhotoRefs(
       tx,
       (data.photoRefs ?? []) as Record<string, unknown>[],
       data.metadata.storageProviders ?? {},
       userId
     );
-    const knownProviders = this.knownProviderIds(tx, refRows, userId);
-    this.insertRows(
+    const knownProviders = await this.knownProviderIds(tx, refRows, userId);
+    await this.insertRows(
       tx,
       photoRefs,
       refRows.filter((ref) => knownProviders.has(String(ref.providerId)))
@@ -754,9 +751,9 @@ class RestoreService {
   }
 
   private currentProviderPrefs(
-    tx: DrizzleTransaction,
+    tx: AsyncHandle,
     userId: string
-  ): ProviderScopedPrefs | undefined {
+  ): Promise<ProviderScopedPrefs | undefined> {
     return tx
       .select({
         backupConfig: userPreferences.backupConfig,
@@ -768,15 +765,12 @@ class RestoreService {
       .get();
   }
 
-  private ownedProviderIds(tx: DrizzleTransaction, userId: string): Map<string, string> {
-    return new Map(
-      tx
-        .select({ id: userProviders.id, domain: userProviders.domain })
-        .from(userProviders)
-        .where(eq(userProviders.userId, userId))
-        .all()
-        .map((row) => [row.id, row.domain])
-    );
+  private async ownedProviderIds(tx: AsyncHandle, userId: string): Promise<Map<string, string>> {
+    const rows = await tx
+      .select({ id: userProviders.id, domain: userProviders.domain })
+      .from(userProviders)
+      .where(eq(userProviders.userId, userId));
+    return new Map(rows.map((row) => [row.id, row.domain]));
   }
 
   private keepOwnedProviderSettings<T extends Record<string, unknown>>(
@@ -831,15 +825,14 @@ class RestoreService {
     };
   }
 
-  private grantAcceptedShareRoles(tx: DrizzleTransaction, userId: string): void {
-    const accepted = tx
+  private async grantAcceptedShareRoles(tx: AsyncHandle, userId: string): Promise<void> {
+    const accepted = await tx
       .select()
       .from(vehicleShares)
-      .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')))
-      .all();
+      .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
     for (const share of accepted) {
       if (!share.sharedWithId) continue;
-      changeShareRoleInSyncTransaction(tx, {
+      await changeShareRole(tx, {
         vehicleId: share.vehicleId,
         sharedWithId: share.sharedWithId,
         level: share.level,
@@ -848,16 +841,15 @@ class RestoreService {
     }
   }
 
-  private consentedShareKeys(tx: DrizzleTransaction, userId: string): Set<string> {
+  private async consentedShareKeys(tx: AsyncHandle, userId: string): Promise<Set<string>> {
+    const rows = await tx
+      .select({ vehicleId: vehicleShares.vehicleId, sharedWithId: vehicleShares.sharedWithId })
+      .from(vehicleShares)
+      .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')));
     return new Set(
-      tx
-        .select({ vehicleId: vehicleShares.vehicleId, sharedWithId: vehicleShares.sharedWithId })
-        .from(vehicleShares)
-        .where(and(eq(vehicleShares.ownerId, userId), eq(vehicleShares.status, 'accepted')))
-        .all()
-        .flatMap((row) =>
-          row.sharedWithId ? [shareConsentKey(row.vehicleId, row.sharedWithId)] : []
-        )
+      rows.flatMap((row) =>
+        row.sharedWithId ? [shareConsentKey(row.vehicleId, row.sharedWithId)] : []
+      )
     );
   }
 
@@ -866,19 +858,18 @@ class RestoreService {
     return consented.has(key) ? 'accepted' : 'pending';
   }
 
-  private relinkPhotoRefs(
-    tx: DrizzleTransaction,
+  private async relinkPhotoRefs(
+    tx: AsyncHandle,
     refRows: Record<string, unknown>[],
     backupProviders: Record<string, string>,
     userId: string
-  ): Record<string, unknown>[] {
+  ): Promise<Record<string, unknown>[]> {
     const ownedByIdentity = new Map<string, string | null>();
     const ownedIds = new Set<string>();
-    for (const provider of tx
+    for (const provider of await tx
       .select()
       .from(userProviders)
-      .where(and(eq(userProviders.userId, userId), eq(userProviders.domain, 'storage')))
-      .all()) {
+      .where(and(eq(userProviders.userId, userId), eq(userProviders.domain, 'storage')))) {
       ownedIds.add(provider.id);
       const identity = storageProviderIdentity(provider);
       if (identity) {
@@ -908,20 +899,19 @@ class RestoreService {
     return relinked;
   }
 
-  private knownProviderIds(
-    tx: DrizzleTransaction,
+  private async knownProviderIds(
+    tx: AsyncHandle,
     refRows: Record<string, unknown>[],
     userId: string
-  ): Set<string> {
+  ): Promise<Set<string>> {
     // Ownership matters: the sync worker resolves a ref's provider by id alone.
     const providerIds = [...new Set(refRows.map((ref) => String(ref.providerId)))];
     const known = new Set<string>();
     for (const batch of chunk(providerIds)) {
-      for (const row of tx
+      for (const row of await tx
         .select({ id: userProviders.id })
         .from(userProviders)
-        .where(and(inArray(userProviders.id, batch), eq(userProviders.userId, userId)))
-        .all()) {
+        .where(and(inArray(userProviders.id, batch), eq(userProviders.userId, userId)))) {
         known.add(row.id);
       }
     }

@@ -149,7 +149,7 @@ split-expense, trip, odometer, reminder-trigger and financing transactions.
 `BaseRepository`'s shared methods run on it for every subclass.
 
 Since C3, every repository and every transaction runs on the async session, except the
-restore path, the key-rotation script and sample seeding, which move in C4. The analytics
+key-rotation script and sample seeding, which move in C4. The analytics
 repositories already query through the async session; only their constructors still take the
 sync handle, until C5. Inside a transaction callback, use the transaction handle `tx`; outside it, use the
 async session. Insurance writes check vehicle ownership inside the transaction that writes,
@@ -189,9 +189,10 @@ Provider construction resolves its private-network policy on the async session:
 provider (`createProviderInstance`) and resolving model settings (`resolveModelSettings`) are
 async too, and the provider create and photo backfill transactions run on the async session.
 
-What part C still has to move: the restore path, a read transaction for backups, the key-rotation script, and demo and sample seeding (C4).
-Restore keeps a sync copy of the share-role change, `changeShareRoleInSyncTransaction`, until
-C4 moves it.
+Restore runs its wipe and inserts in one async transaction (see
+`docs/conventions/BackupRestore.md`).
+
+What part C still has to move: a read transaction for backups, the key-rotation script, and demo and sample seeding (C4).
 Connection upkeep in `src/db/connection.ts` stays sync by design.
 
 **Permissions load, then check.** A request's resolver reads its grants on the async session

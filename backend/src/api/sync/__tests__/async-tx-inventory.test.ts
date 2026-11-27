@@ -115,9 +115,10 @@ countRatchet({
 });
 
 describe('async transaction callbacks: the highest-stakes site', () => {
-  test('the restore service — the highest-stakes transaction in the app — has none', () => {
+  test('the restore service — the highest-stakes transaction in the app — runs on the async session', () => {
     const restore = readFileSync(join(SRC_ROOT, 'api/sync/restore.ts'), 'utf-8');
     expect(countAsyncTransactions(restore)).toBe(0);
-    expect(restore).toContain('this.db.transaction((tx) => {');
+    expect(restore).toContain('return appContext().asyncDb;');
+    expect(restore).not.toMatch(/\.(run|all)\(\)/);
   });
 });

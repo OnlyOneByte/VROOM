@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import AdmZip from 'adm-zip';
 import { ConflictError } from '../../../errors';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
@@ -90,5 +90,74 @@ describe('a restore past its time limit', () => {
         .map((v) => v.make)
         .sort()
     ).toEqual(['Honda', 'Subaru']);
+  });
+});
+
+const OWNED_TABLES = [
+  'vehicles',
+  'expenses',
+  'trips',
+  'odometer_entries',
+  'reminders',
+  'reminder_vehicles',
+  'user_preferences',
+] as const;
+
+function snapshot(): Record<string, unknown[]> {
+  return Object.fromEntries(
+    OWNED_TABLES.map((table) => [
+      table,
+      ctx.sqlite.query(`SELECT * FROM ${table} ORDER BY rowid`).all(),
+    ])
+  );
+}
+
+describe('a replace restore that fails on its last step', () => {
+  test('leaves every table exactly as it was before the restore began', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2021 });
+    const write = async (path: string, body: Record<string, unknown>) =>
+      expect((await ctx.authed('POST', path, body)).status).toBe(201);
+    await write('/api/v1/expenses', {
+      vehicleId,
+      category: 'maintenance',
+      date: '2024-04-02',
+      expenseAmount: 30,
+    });
+    await write('/api/v1/trips', {
+      vehicleId,
+      startOdometer: 1000,
+      endOdometer: 1050,
+      purpose: 'personal',
+      tripDate: '2024-03-01',
+    });
+    await write('/api/v1/reminders', {
+      name: 'Oil',
+      type: 'notification',
+      frequency: 'monthly',
+      startDate: '2030-01-15T00:00:00.000Z',
+      vehicleIds: [vehicleId],
+    });
+
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
+    const before = snapshot();
+    expect(before.vehicles).toHaveLength(2);
+
+    const late = new Error('forced failure after every row was written');
+    const spy = spyOn(
+      restoreService as unknown as { knownProviderIds: () => Promise<Set<string>> },
+      'knownProviderIds'
+    ).mockRejectedValue(late);
+    try {
+      await expect(restoreService.restoreFromBackup(ctx.user.id, zip, 'replace')).rejects.toBe(
+        late
+      );
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(snapshot()).toEqual(before);
   });
 });
