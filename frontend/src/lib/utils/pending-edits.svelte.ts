@@ -18,6 +18,7 @@ interface PendingEdit {
 	savedAt?: string;
 	undo?: boolean;
 	undoneAt?: string;
+	undoSeq?: number;
 }
 
 const toastId = (id: string) => `expense-edit-${id}`;
@@ -41,7 +42,7 @@ async function put(id: string, seq: number, payload: EditPayload): Promise<void>
 		const stamp = saved?.updatedAt;
 		if (entry.seq === seq) {
 			edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
-		} else if (entry.undo && !entry.undoneAt && stamp) {
+		} else if (entry.undo && entry.undoSeq === seq && !entry.undoneAt && stamp) {
 			edits.set(id, { ...entry, undoneAt: stamp });
 		}
 	} catch (error) {
@@ -115,7 +116,7 @@ function restorePayload({ before, payload }: PendingEdit): EditPayload {
 
 export function undoEdit(id: string): void {
 	const entry = edits.get(id);
-	if (!entry) return;
+	if (!entry || entry.undo) return;
 	appStore.dismissToast(toastId(id));
 	edits.set(id, {
 		before: entry.before,
@@ -124,6 +125,7 @@ export function undoEdit(id: string): void {
 		status: 'saving',
 		seq: ++nextSeq,
 		undo: true,
+		undoSeq: entry.seq,
 		...(entry.savedAt && { undoneAt: entry.savedAt })
 	});
 	send(id);

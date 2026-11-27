@@ -20,9 +20,11 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 
 const createExpense = vi.fn(() => Promise.resolve({ id: 'e1' }));
 const deletePhoto = vi.fn();
+const updateExpense = vi.fn(() => Promise.resolve({ id: 'x1' }));
 vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		createExpense,
+		updateExpense,
 		deletePhoto,
 		getExpense: vi.fn(() =>
 			Promise.resolve({
@@ -113,6 +115,11 @@ describe('expense form in the demo garage', () => {
 		expect(save).toHaveAccessibleDescription(NOTE);
 		expect(screen.getByRole('button', { name: 'Duplicate' })).toBeEnabled();
 		expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+
+		await fireEvent.click(save);
+		await fireEvent.submit(save.closest('form') as HTMLFormElement);
+		await new Promise(resolve => setTimeout(resolve, 50));
+		expect(updateExpense).not.toHaveBeenCalled();
 	});
 
 	test.each([
