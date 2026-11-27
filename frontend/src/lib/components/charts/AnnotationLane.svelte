@@ -185,7 +185,7 @@
 					<div class={index === active ? 'font-medium' : ''}>
 						<span class="text-muted-foreground">{annotations.formatAt(marker.at)}:</span>
 						{marker.label}
-						{#if marker.detail}<div class="font-normal">{marker.detail}</div>{/if}
+						{#if marker.detail}<div class="truncate font-normal">{marker.detail}</div>{/if}
 					</div>
 				{/if}
 			{/each}
