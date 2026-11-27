@@ -57,7 +57,7 @@ let migrated = false;
 
 export const ON_POSTGRES = process.env.TEST_DB === 'postgres';
 
-let postgres: { client: import('@electric-sql/pglite').PGlite } | undefined;
+let postgres: Promise<import('@electric-sql/pglite').PGlite> | undefined;
 
 const NO_RAW_SQLITE = new Proxy({} as import('bun:sqlite').Database, {
   get() {
@@ -67,26 +67,35 @@ const NO_RAW_SQLITE = new Proxy({} as import('bun:sqlite').Database, {
   },
 });
 
-async function openPostgresTestDatabase(): Promise<void> {
+async function migratedPostgres(): Promise<import('@electric-sql/pglite').PGlite> {
   const { PGlite } = await import('@electric-sql/pglite');
   const { drizzle } = await import('drizzle-orm/pglite');
   const { migrate } = await import('drizzle-orm/pglite/migrator');
   const { openAsyncPostgres, pgliteConnection } = await import('../db/async-postgres');
   const { createPostgresAppContext, installAppContext } = await import('../app-context');
-  if (postgres) {
-    const tables = await postgres.client.query<{ name: string }>(
-      "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'"
-    );
-    const list = tables.rows.map((row) => `"${row.name}"`).join(', ');
-    await postgres.client.exec(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
-    return;
-  }
   const client = new PGlite();
   await migrate(drizzle(client), {
     migrationsFolder: `${import.meta.dir}/../../drizzle-pg`,
   });
   installAppContext(createPostgresAppContext(openAsyncPostgres(pgliteConnection(client)).db));
-  postgres = { client };
+  return client;
+}
+
+async function openPostgresTestDatabase(): Promise<void> {
+  if (!postgres) {
+    postgres = migratedPostgres().catch((error) => {
+      postgres = undefined;
+      throw error;
+    });
+    await postgres;
+    return;
+  }
+  const client = await postgres;
+  const tables = await client.query<{ name: string }>(
+    "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'"
+  );
+  const list = tables.rows.map((row) => `"${row.name}"`).join(', ');
+  await client.exec(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
 }
 
 async function createPostgresTestApp(seedUser: Partial<TestUser>): Promise<TestApp> {

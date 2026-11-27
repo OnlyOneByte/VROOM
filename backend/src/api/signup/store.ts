@@ -77,6 +77,7 @@ async function hasRealAccounts(db: AsyncHandle): Promise<boolean> {
     .select({ id: users.id })
     .from(users)
     .where(ne(users.id, DEMO_USER_ID))
+    .limit(1)
     .then(firstRow);
   return row !== undefined;
 }
@@ -86,6 +87,7 @@ async function hasServerAdmin(db: AsyncHandle): Promise<boolean> {
     .select({ id: roleAssignments.id })
     .from(roleAssignments)
     .where(and(eq(roleAssignments.roleId, builtInRoleId('admin')), isNull(roleAssignments.scopeId)))
+    .limit(1)
     .then(firstRow);
   return row !== undefined;
 }
@@ -128,6 +130,7 @@ export async function ensureServerAdmin(tx: AsyncHandle): Promise<string | null>
       )
     )
     .orderBy(sql`${users.createdAt} IS NULL`, users.createdAt, users.id)
+    .limit(1)
     .then(firstRow);
   if (!candidate) return null;
   await assignServerRole(tx, candidate.id, 'admin');
@@ -233,6 +236,7 @@ export async function hasShareInvite(db: AsyncHandle, email: string): Promise<bo
         ne(users.id, DEMO_USER_ID)
       )
     )
+    .limit(1)
     .then(firstRow);
   return row !== undefined;
 }
