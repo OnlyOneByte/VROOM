@@ -182,7 +182,7 @@ export function writeRouteCalls(vehicleId: string, memberId: string): Record<str
     'GET /api/v1/auth/providers/connect/google': {
       path: '/api/v1/auth/providers/connect/google?returnTo=/settings&nonce=sweep-nonce',
     },
-    'GET /api/v1/photos': { path: `/api/v1/photos?entityType=vehicle&entityId=${vehicleId}` },
+    'GET /api/v1/photos': { path: '/api/v1/photos?entityType=vehicle' },
     'GET /api/v1/analytics/query': {
       path: `/api/v1/analytics/query?metric=cost&${span}&vehicleIds=${vehicleId}`,
     },
