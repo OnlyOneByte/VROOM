@@ -18,6 +18,7 @@ import { PreferencesRepository, SyncStateRepository } from './api/settings/repos
 import { VehicleShareRepository } from './api/shares/repository';
 import { TripRepository } from './api/trips/repository';
 import { VehicleRepository } from './api/vehicles/repository';
+import { CONFIG } from './config';
 import type { AsyncPgDatabase } from './db/async-postgres';
 import { type AsyncAppDatabase, openAsyncDatabase } from './db/async-sqlite';
 import { getDb } from './db/connection';
@@ -70,6 +71,7 @@ export function appContext(): AppContext {
 }
 
 export function installAppContext(context: AppContext): void {
+  if (CONFIG.env !== 'test') throw new Error('installAppContext is only for tests');
   current = context;
 }
 
