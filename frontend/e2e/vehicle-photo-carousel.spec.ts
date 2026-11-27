@@ -10,6 +10,8 @@ async function openDetails(page: Page) {
 }
 
 test.describe("The vehicle page's photo carousel loads on its own", () => {
+	test.use({ serviceWorkers: 'block' });
+
 	test.beforeEach(async ({ page, context }) => {
 		await addSessionCookie(context);
 		await mockApi(page);
@@ -18,20 +20,21 @@ test.describe("The vehicle page's photo carousel loads on its own", () => {
 	test('a placeholder holds its place while the carousel code loads', async ({ page }) => {
 		let release: () => void = () => {};
 		const held = new Promise<void>(resolve => (release = resolve));
+		const details = page.locator('[data-slot="collapsible-content"]');
+		const photos = details.getByRole('heading', { name: 'Photos' });
 		await page.route(CAROUSEL_CHUNK, async route => {
 			await held;
 			return route.fallback();
 		});
+		try {
+			await openDetails(page);
 
-		await openDetails(page);
-
-		const details = page.locator('[data-slot="collapsible-content"]');
-		const photos = details.getByRole('heading', { name: 'Photos' });
-		await expect(details.locator('[data-slot="skeleton"]').first()).toBeVisible();
-		await expect(photos).toHaveCount(0);
-		await expect(details.getByRole('alert')).toHaveCount(0);
-
-		release();
+			await expect(details.locator('[data-slot="skeleton"]').first()).toBeVisible();
+			await expect(photos).toHaveCount(0);
+			await expect(details.getByRole('alert')).toHaveCount(0);
+		} finally {
+			release();
+		}
 		await expect(photos).toBeVisible();
 	});
 

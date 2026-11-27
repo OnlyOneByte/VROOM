@@ -112,6 +112,13 @@ export default defineConfig({
 				.pathname
 		}
 	},
+	optimizeDeps: {
+		include: [
+			'embla-carousel-svelte',
+			'@lucide/svelte/icons/arrow-left',
+			'@lucide/svelte/icons/arrow-right'
+		]
+	},
 	server: {
 		proxy: apiProxy
 	},

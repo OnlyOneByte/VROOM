@@ -624,6 +624,24 @@ describe('vehicle detail page tabs', () => {
 		expect(captured['table']?.['expenses']).toEqual([]);
 	});
 
+	test('a retry after a failed first load shows the loading state again, not "no expenses"', async () => {
+		let answer: (value: unknown) => void = () => {};
+		getExpensesByVehicle
+			.mockRejectedValueOnce(new ApiError('down', 500))
+			.mockReturnValueOnce(new Promise(resolve => (answer = resolve)));
+		await mount();
+
+		await openTab('Expenses');
+		await fireEvent.click(await screen.findByRole('button', { name: /retry/i }));
+
+		expect(await screen.findByRole('status', { name: 'Loading expenses' })).toBeInTheDocument();
+		expect(captured['table']).toBeUndefined();
+
+		answer({ data: [], pagination: { totalCount: 0, limit: 20, offset: 0, hasMore: false } });
+		await waitFor(() => expect(captured['table']).toBeDefined());
+		expect(screen.getByText('All Expenses (0)')).toBeInTheDocument();
+	});
+
 	test('the Expenses tab loads the first page only once, on first open', async () => {
 		await mount();
 		expect(getExpensesByVehicle).not.toHaveBeenCalled();

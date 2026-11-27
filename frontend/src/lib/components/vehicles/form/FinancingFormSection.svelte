@@ -83,7 +83,11 @@
 		<CardTitle level={2} class="text-base">Ownership</CardTitle>
 	</CardHeader>
 	<CardContent>
-		<div class="mb-6 flex items-start justify-between gap-4 border-b border-border pb-6">
+		<div
+			class="flex items-start justify-between gap-4 {financed
+				? 'mb-6 border-b border-border pb-6'
+				: ''}"
+		>
 			<div class="min-w-0">
 				<Label for="financed" class="text-base font-semibold">This car has a loan or lease</Label>
 				<p id="financed-hint" class="mt-1 text-sm text-muted-foreground">

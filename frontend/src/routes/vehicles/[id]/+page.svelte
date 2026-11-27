@@ -128,6 +128,7 @@
 	let totalCount = $state(0);
 	let isLoadingPage = $state(false);
 	let expensesFetched = $state(false);
+	let expensesLoaded = $state(false);
 	let hasLoadedExpensesTab = $state(false);
 	let expensesLoadError = $state<string | null>(null);
 	let expenseSortBy = $state<'date' | 'amount'>('date');
@@ -327,7 +328,7 @@
 		)
 	);
 	let tabExpenses = $derived(currentOffset === 0 ? [...pendingTabRows, ...expenses] : expenses);
-	let tabWaiting = $derived(!expensesFetched && tabExpenses.length === 0);
+	let tabWaiting = $derived(!expensesLoaded && tabExpenses.length === 0);
 
 	let firstExpense = $derived(
 		summary !== null &&
@@ -596,6 +597,7 @@
 			expenses = result.data;
 			totalCount = result.pagination.totalCount;
 			currentOffset = offset;
+			expensesLoaded = true;
 		} catch (error) {
 			logLoadFailure(error, "Couldn't load expenses");
 			expensesLoadError = userFacingErrorMessage(error);
