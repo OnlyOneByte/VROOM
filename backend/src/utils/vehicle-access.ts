@@ -1,8 +1,7 @@
 import { and, eq, isNull, notInArray, type SQL, sql } from 'drizzle-orm';
 import { appContext } from '../app-context';
-import type { AppDatabase } from '../db/connection';
+import type { AsyncAppDatabase } from '../db/async-sqlite';
 import { expenses, vehicleShares, vehicles } from '../db/schema';
-import type { DrizzleTransaction } from '../db/types';
 import { NotFoundError } from '../errors';
 import { resolverFor } from '../permissions/grants';
 
@@ -18,14 +17,15 @@ export interface VehicleAccess {
 const FINANCIAL_READS = ['vehicle.financing.read', 'vehicle.insurance.read'] as const;
 const FINANCIAL_WRITES = ['vehicle.financing.write', 'vehicle.insurance.write'] as const;
 
-function memberFinancials(
-  db: AppDatabase | DrizzleTransaction,
+async function memberFinancials(
+  db: AsyncAppDatabase,
   vehicleId: string,
   userId: string
-): VehicleAccess['financials'] {
-  const resolver = resolverFor(db, userId);
+): Promise<VehicleAccess['financials']> {
+  const vehicle = { kind: 'vehicle' as const, vehicleId };
+  const resolver = await resolverFor(userId, [vehicle], db);
   const holdsAll = (permissions: readonly string[]) =>
-    permissions.every((p) => resolver.can(p, { kind: 'vehicle', vehicleId }).allow);
+    permissions.every((p) => resolver.can(p, vehicle).allow);
   return { read: holdsAll(FINANCIAL_READS), write: holdsAll(FINANCIAL_WRITES) };
 }
 
@@ -39,7 +39,7 @@ const ROLES_FOR_MODE: Record<VehicleAccessMode, readonly VehicleRole[]> = {
 export async function resolveVehicleAccess(
   vehicleId: string,
   userId: string,
-  db: AppDatabase | DrizzleTransaction = appContext().db
+  db: AsyncAppDatabase = appContext().asyncDb
 ): Promise<VehicleAccess | null> {
   const rows = await db
     .select({ ownerId: vehicles.userId, level: vehicleShares.level })
@@ -63,7 +63,7 @@ export async function resolveVehicleAccess(
   return {
     role: row.level === 'editor' ? 'editor' : 'viewer',
     ownerId: row.ownerId,
-    financials: memberFinancials(db, vehicleId, userId),
+    financials: await memberFinancials(db, vehicleId, userId),
   };
 }
 
@@ -78,7 +78,7 @@ export async function requireVehicleAccess(
   vehicleId: string,
   userId: string,
   mode: VehicleAccessMode,
-  db: AppDatabase | DrizzleTransaction = appContext().db
+  db: AsyncAppDatabase = appContext().asyncDb
 ): Promise<VehicleAccess> {
   const access = await resolveVehicleAccess(vehicleId, userId, db);
   // 404, not 403, so a non-member cannot learn that the vehicle exists.
@@ -90,7 +90,7 @@ export async function requireVehiclesAccess(
   vehicleIds: readonly string[],
   userId: string,
   mode: VehicleAccessMode,
-  db: AppDatabase | DrizzleTransaction = appContext().db
+  db: AsyncAppDatabase = appContext().asyncDb
 ): Promise<Set<string>> {
   const ownerIds = new Set<string>();
   for (const vehicleId of new Set(vehicleIds)) {

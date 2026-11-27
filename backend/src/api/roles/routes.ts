@@ -1,4 +1,5 @@
 import { and, eq, inArray, isNull, or } from 'drizzle-orm';
+import type { MiddlewareHandler } from 'hono';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { appContext } from '../../app-context';
@@ -25,11 +26,12 @@ import { authorize, enforce, type ResourceOf } from '../../permissions/authorize
 import {
   isVehicleMember,
   keepingARoleManager,
+  loadResolver,
   ROLE_MANAGE_PERMISSION,
   refuseUngrantable,
   refuseUnheld,
   requestResolver,
-  resolverFor,
+  syncResolverFor,
 } from '../../permissions/grants';
 import { PERMISSION_REGISTRY } from '../../permissions/registry';
 import type { Resource } from '../../permissions/resolve';
@@ -92,7 +94,7 @@ interface Authority {
 }
 
 function authorityAt(c: Context, scope: RoleScope, scopeId: string | null | undefined): Authority {
-  const resolver = requestResolver(c, appContext().db);
+  const resolver = requestResolver(c);
   if (scope === 'server') {
     if (scopeId) throw new ValidationError('A server role or override takes no scopeId');
     enforce(resolver.can(ROLE_MANAGE_PERMISSION, SERVER), 'Role');
@@ -134,16 +136,13 @@ function requireTarget(authority: Authority, userId: string): void {
 }
 
 function requireRoleManager(c: Context): null {
-  enforce(requestResolver(c, appContext().db).can(ROLE_MANAGE_PERMISSION, SERVER), 'Role');
+  enforce(requestResolver(c).can(ROLE_MANAGE_PERMISSION, SERVER), 'Role');
   return null;
 }
 
 function requireLibrary(c: Context): string {
   const userId = c.get('user').id;
-  enforce(
-    requestResolver(c, appContext().db).can('account.roles.manage', { kind: 'account', userId }),
-    'Role'
-  );
+  enforce(requestResolver(c).can('account.roles.manage', { kind: 'account', userId }), 'Role');
   return userId;
 }
 
@@ -173,7 +172,7 @@ function visibleRoles(c: Context, scope: RoleScope) {
 
 function holdsForRole(c: Context, scope: RoleScope): (permission: string) => boolean {
   if (scope === 'vehicle') return () => true;
-  const resolver = requestResolver(c, appContext().db);
+  const resolver = requestResolver(c);
   return (p) => resolver.can(p, SERVER).allow;
 }
 
@@ -196,9 +195,16 @@ const updateRoleSchema = z.strictObject({
   color: colorSchema,
 });
 
+const loadRoleScopes: MiddlewareHandler = async (c, next) => {
+  const scopeId = c.req.query('scopeId');
+  await loadResolver(c, scopeId ? [{ kind: 'vehicle', vehicleId: scopeId }] : []);
+  await next();
+};
+
 export const roleRoutes = new Hono();
 roleRoutes.use('*', requireAuth);
 roleRoutes.use('*', changeTracker);
+roleRoutes.use('*', loadRoleScopes);
 
 roleRoutes.get('/', zValidator('query', z.object({ scope: z.enum(SCOPES) })), (c) => {
   const { scope } = c.req.valid('query');
@@ -318,6 +324,7 @@ function assignable(c: Context, input: z.infer<typeof assignmentSchema>) {
 export const assignmentRoutes = new Hono();
 assignmentRoutes.use('*', requireAuth);
 assignmentRoutes.use('*', changeTracker);
+assignmentRoutes.use('*', loadRoleScopes);
 
 assignmentRoutes.post(
   '/',
@@ -378,6 +385,7 @@ function overrideWhere(scope: RoleScope, userId: string, scopeId: string | null)
 export const overrideRoutes = new Hono();
 overrideRoutes.use('*', requireAuth);
 overrideRoutes.use('*', changeTracker);
+overrideRoutes.use('*', loadRoleScopes);
 
 overrideRoutes.get('/', zValidator('query', overrideTargetSchema), (c) => {
   const { userId, scope, scopeId } = c.req.valid('query');
@@ -457,7 +465,7 @@ overrideRoutes.delete(
 export function vehiclePeople(c: Context) {
   const vehicleId = c.req.param('id') ?? '';
   const vehicle: Resource = { kind: 'vehicle', vehicleId };
-  const caller = requestResolver(c, appContext().db);
+  const caller = requestResolver(c);
   enforce(caller.can('vehicle.share.read', vehicle), 'Vehicle');
   const detailed = caller.can('vehicle.share.manage', vehicle).allow;
   const db = appContext().db;
@@ -492,7 +500,7 @@ export function vehiclePeople(c: Context) {
           roles: heldRoles.map(({ name }) => ({ name })),
         };
       }
-      const resolver = resolverFor(db, person.id);
+      const resolver = syncResolverFor(db, person.id);
       return {
         userId: person.id,
         displayName: person.displayName,
