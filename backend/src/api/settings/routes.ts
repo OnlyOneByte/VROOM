@@ -239,8 +239,10 @@ function rateInNewDistanceUnit(
     .distanceUnit;
   if (to === from) return {};
   const perNewUnit = existing.businessMileageRate * convertDistance(1, to, from);
-  const fourDecimals = Math.round(perNewUnit * 10_000) / 10_000;
-  const rounded = fourDecimals > 0 ? fourDecimals : Number(perNewUnit.toPrecision(4));
+  const rounded =
+    perNewUnit < 0.0001
+      ? Number(perNewUnit.toPrecision(4))
+      : Math.round(perNewUnit * 10_000) / 10_000;
   return { businessMileageRate: Math.min(rounded, MAX_BUSINESS_MILEAGE_RATE) };
 }
 

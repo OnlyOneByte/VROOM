@@ -109,7 +109,7 @@ export function formatRate(rate: number, currency?: string): string {
 }
 
 export function plainDecimal(value: number): string {
-	return value.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 20 });
+	return value.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 100 });
 }
 
 export function getCurrencySymbol(currency?: string): string {
