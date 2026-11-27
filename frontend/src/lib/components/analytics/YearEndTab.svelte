@@ -354,5 +354,5 @@
 </div>
 
 {#snippet sharedNote()}
-	<SharedCurrencyNote coverage={monthly?.coverage} {currency} />
+	<SharedCurrencyNote coverage={monthly?.coverage} currency={currency ?? undefined} />
 {/snippet}

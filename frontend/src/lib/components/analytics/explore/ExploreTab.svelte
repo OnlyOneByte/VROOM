@@ -19,6 +19,7 @@
 	import NumbersTable from './NumbersTable.svelte';
 	import QueryBar from './QueryBar.svelte';
 	import DrillPanel from './DrillPanel.svelte';
+	import SharedCurrencyNote from '../SharedCurrencyNote.svelte';
 	import {
 		DEFAULT_EXPLORE,
 		EXPLORE_COMPARES,
@@ -578,6 +579,11 @@
 	{/if}
 
 	<QueryBar {query} onChange={onQueryChange} {driverSplit} {filters} />
+
+	<SharedCurrencyNote
+		coverage={response?.coverage}
+		currency={shown.metric === 'cost' || shown.metric === 'costPerDistance' ? undefined : null}
+	/>
 
 	{#if error && !response}
 		<LoadErrorCard
