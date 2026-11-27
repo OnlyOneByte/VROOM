@@ -87,9 +87,14 @@ every amount.
 2. `validateBackupData` — metadata and `backupVersionError`, then `createInsertSchema(table)` per row, then
    `validateReferentialIntegrity` (which also runs `validateUniqueConstraints`).
 3. `restoreFromBackup` — wipe (replace mode only) and insert in ONE transaction on the async
-   session (`appContext().asyncDb`). Inside it, the restore re-checks the guards that must hold at
-   write time: no per-person grants in replace mode, and the account currency still the one the
-   backup was parsed with.
+   session (`appContext().asyncDb`). Inside it, the restore re-checks the guard that must hold at
+   write time: the account currency is still the one the backup was parsed with.
+4. Per-person grants (overrides and non-share role assignments on the account's cars) are never
+   read from or written to a backup. In replace mode the restore reads them from the database
+   before the wipe and, after the insert, re-applies each one only if the car came back, the person
+   still holds an accepted share and is active, the grantor is the owner or a member, and the
+   role or permission is still grantable (`restore-grants.ts`). Every dropped grant is listed in
+   the result's `grants.dropped`, and the whole transaction keeps at least one role manager.
 
 All validation runs before the replace-mode wipe; it is the only thing between a corrupt download and
 an emptied account. Download, unzip, decryption and parsing all happen before the transaction opens;
