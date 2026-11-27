@@ -284,7 +284,7 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
 
   let sharedRows: Array<
     (typeof userVehicles)[number] & {
-      sharedAccess: { level: string; sharedBy: string };
+      sharedAccess: SharedAccess;
     }
   > = [];
   if (include === 'shared') {
@@ -300,9 +300,14 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
         sharedVehicles.map(async (v) => {
           const g = byVehicleId.get(v.id);
           const access = await resolveVehicleAccess(v.id, user.id);
+          const financial = access !== null && seesFinancials(access);
           return {
-            ...(access && seesFinancials(access) ? v : sharedVehicleView(v)),
-            sharedAccess: { level: g?.level ?? 'viewer', sharedBy: g?.ownerName ?? 'Unknown' },
+            ...(financial ? v : sharedVehicleView(v)),
+            sharedAccess: {
+              level: g?.level ?? 'viewer',
+              sharedBy: g?.ownerName ?? 'Unknown',
+              seesFinancials: financial,
+            },
           };
         })
       );

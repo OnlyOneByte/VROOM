@@ -84,8 +84,13 @@
 		}
 	}
 
-	function loadLifetime(vehicleId: string) {
-		const queries = perVehicleRequests(vehicleId, dateRange).lifetime;
+	function inOtherCurrency(vehicle: Vehicle | undefined): boolean {
+		const own = settingsStore.settings?.currencyUnit ?? 'USD';
+		return !!vehicle?.sharedAccess && !!vehicle.ownerCurrency && vehicle.ownerCurrency !== own;
+	}
+
+	function loadLifetime(vehicleId: string, queryable: boolean) {
+		const queries = queryable ? perVehicleRequests(vehicleId, dateRange).lifetime : [];
 		return Promise.all([
 			analyticsApi.getVehicleHealth(vehicleId),
 			analyticsApi.getVehicleTCO(vehicleId),
@@ -97,10 +102,11 @@
 
 	async function loadVehicleData(vehicleId: string) {
 		const current = ++request;
+		const queryable = !inOtherCurrency(vehicles.find(v => v.id === vehicleId));
 		try {
 			isLoadingData = true;
 			if (lifetime?.key !== vehicleId) {
-				const entry = { key: vehicleId, data: loadLifetime(vehicleId) };
+				const entry = { key: vehicleId, data: loadLifetime(vehicleId, queryable) };
 				entry.data.catch(() => {
 					if (lifetime === entry) lifetime = null;
 				});
@@ -111,7 +117,7 @@
 				await Promise.all([
 					lifetime.data,
 					analyticsApi.getVehicleExpenses(vehicleId, dateRange),
-					analyticsApi.query(monthlyQuery)
+					queryable ? analyticsApi.query(monthlyQuery) : null
 				]);
 			if (current !== request) return;
 			health = healthData;
@@ -292,6 +298,15 @@
 				message={error}
 				onRetry={() => selectedVehicleId && loadVehicleData(selectedVehicleId)}
 			/>
+		{:else if health && tco && expenses && selectedVehicle && inOtherCurrency(selectedVehicle)}
+			<p class="max-w-xl text-muted-foreground">
+				{carName(selectedVehicle)} is shared with you and kept in {selectedVehicle.ownerCurrency},
+				so it isn't summed into the overview. Here are its health score and the totals you can see.
+			</p>
+			{#if filterLabel && onClearFilters && breakdownRows.length === 0}
+				{@render noExpenses(filterLabel, onClearFilters)}
+			{/if}
+			{@render detail(health, 2)}
 		{:else if health && tco && expenses && selectedVehicle}
 			<section aria-label="{carName(selectedVehicle)} overview" class="space-y-8">
 				<div class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">

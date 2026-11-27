@@ -36,6 +36,14 @@ const getVehicles = vi.hoisted(() =>
 				make: 'Mazda',
 				model: 'CX-5',
 				sharedAccess: { seesFinancials: true }
+			},
+			{
+				id: 'euro',
+				year: 2017,
+				make: 'VW',
+				model: 'Golf',
+				ownerCurrency: 'EUR',
+				sharedAccess: { seesFinancials: true }
 			}
 		])
 	)
@@ -162,6 +170,14 @@ describe('PerVehicleTab', () => {
 		);
 		const breakdown = chart('Spending by category')?.data as Array<{ key: string }>;
 		expect(breakdown.map(r => r.key)).toEqual(['fuel']);
+	});
+
+	test('a shared car kept in another currency gets its health and totals, not a summed overview', async () => {
+		render(PerVehicleTab, { preferredVehicleId: 'euro' });
+		expect(await screen.findByText(/2017 VW Golf is shared with you and kept in EUR/)).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 2, name: 'Vehicle Health Score' })).toBeTruthy();
+		expect(api.query).not.toHaveBeenCalled();
+		expect(document.body.textContent ?? '').not.toMatch(/all time|\$0(?![.\d])|Not enough data/);
 	});
 
 	test('a car shared with full access shows its ownership totals and financial spend', async () => {

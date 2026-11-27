@@ -38,8 +38,12 @@ export function overviewRequests(
 	};
 }
 
-export function carValues(response: AnalyticsQueryResponse | null | undefined): CarValue[] {
+export function carValues(
+	response: AnalyticsQueryResponse | null | undefined,
+	leaveOut: ReadonlySet<string> = new Set()
+): CarValue[] {
 	const rows = (response?.series ?? [])
+		.filter(s => !leaveOut.has(s.key))
 		.flatMap(s => {
 			const value = s.values[0];
 			return value == null ? [] : [{ vehicleId: s.key, label: s.label, value }];
