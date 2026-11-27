@@ -33,7 +33,10 @@ import {
   SyncError,
   ValidationError,
 } from '../../errors';
-import { changeShareRoleInSyncTransaction, hasPerPersonVehicleGrants } from '../../permissions/grants';
+import {
+  changeShareRoleInSyncTransaction,
+  hasPerPersonVehicleGrants,
+} from '../../permissions/grants';
 import {
   type BackupConfig,
   DEFAULT_PROVIDER_CAPABILITIES,

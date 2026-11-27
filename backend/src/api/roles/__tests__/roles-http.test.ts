@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { unpackRules } from '@casl/ability/extra';
+import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
-import { getDb } from '../../../db/connection';
 import {
   assignServerRole,
   builtInRoleId,
@@ -68,12 +68,12 @@ function shareIdOf(userId: string): string {
   ).id;
 }
 
-function seedMember(member: Invitee, level: 'viewer' | 'editor'): void {
+async function seedMember(member: Invitee, level: 'viewer' | 'editor'): Promise<void> {
   ctx.sqlite.run(
     "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, ?, 'accepted', ?)",
     [`share-${member.id}`, vehicleId, ctx.user.id, member.id, level, member.email]
   );
-  grantShareRole(getDb(), {
+  await grantShareRole(appContext().asyncDb, {
     vehicleId,
     sharedWithId: member.id,
     level,
@@ -93,10 +93,10 @@ beforeEach(async () => {
   viewer = await createInvitee(ctx, 'viewer');
   stranger = await createInvitee(ctx, 'stranger');
   disabled = await createInvitee(ctx, 'disabled');
-  seedMember(coOwner, 'viewer');
-  seedMember(editor, 'editor');
-  seedMember(viewer, 'viewer');
-  seedMember(disabled, 'editor');
+  await seedMember(coOwner, 'viewer');
+  await seedMember(editor, 'editor');
+  await seedMember(viewer, 'viewer');
+  await seedMember(disabled, 'editor');
   ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [disabled.id]);
   ctx.sqlite.run(
     'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
@@ -331,7 +331,7 @@ describe('vehicle roles: the owner’s own library', () => {
     const role = (await json<DataEnvelope<{ id: string }>>(await create(asOwner, {}))).data;
     ctx.sqlite.run('DELETE FROM roles WHERE id = ?', [CO_OWNER]);
     ctx.sqlite.run("UPDATE roles SET key = 'co_owner' WHERE id = ?", [role.id]);
-    expect(() => syncBuiltInRoles(getDb())).not.toThrow();
+    await syncBuiltInRoles(appContext().asyncDb);
     expect(ctx.sqlite.query('SELECT key FROM roles WHERE id = ?').get(CO_OWNER)).toEqual({
       key: 'co_owner',
     });
@@ -344,8 +344,8 @@ describe('vehicle roles: the owner’s own library', () => {
 describe('server roles', () => {
   let admin: RequestFn;
 
-  beforeEach(() => {
-    assignServerRole(getDb(), editor.id, 'admin');
+  beforeEach(async () => {
+    await assignServerRole(appContext().asyncDb, editor.id, 'admin');
     admin = editor.request;
   });
 

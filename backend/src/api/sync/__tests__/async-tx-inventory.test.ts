@@ -29,16 +29,16 @@ function stripComments(src: string): string {
 }
 
 function countAsyncTransactions(src: string): number {
-  return (stripComments(src).match(/\.transaction\(\s*async\b/g) ?? []).length;
+  return (stripComments(src).match(/(?<!asyncDb)\.transaction\(\s*async\b/g) ?? []).length;
 }
 
 countRatchet({
   name: 'async transaction callbacks are ratcheted, not merely documented',
   tolerated: INVENTORY,
   guidance:
-    'An async transaction callback autocommits each statement, so a throw mid-write leaves earlier ' +
-    'writes committed. Make the callback synchronous (.run()/.all()/.get() inline), or inventory the ' +
-    'site in INVENTORY above with a reason:',
+    'An async callback on the synchronous database autocommits each statement, so a throw mid-write ' +
+    'leaves earlier writes committed. Run it on the async session (a handle named asyncDb), make the ' +
+    'callback synchronous, or inventory the site in INVENTORY above:',
   scan: () => {
     const counts = new Map<string, number>();
     for (const file of productionSources()) {
@@ -51,6 +51,9 @@ countRatchet({
     expect(countAsyncTransactions('await db.transaction(async (tx) => { x(); });')).toBe(1);
     expect(countAsyncTransactions('this.db.transaction(\n  async (tx) => { x(); }\n);')).toBe(1);
     expect(countAsyncTransactions('db.transaction((tx) => { x(); });')).toBe(0);
+    expect(countAsyncTransactions('appContext().asyncDb.transaction(async (tx) => 1);')).toBe(0);
+    expect(countAsyncTransactions('asyncDb.transaction(\n  async (tx) => 1\n);')).toBe(0);
+    expect(countAsyncTransactions('this.syncDb.transaction(async (tx) => 1);')).toBe(1);
     expect(
       countAsyncTransactions('// never db.transaction(async (tx) => …\ndb.transaction(() => 1);')
     ).toBe(0);

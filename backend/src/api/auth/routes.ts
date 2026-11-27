@@ -6,6 +6,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTPException } from 'hono/http-exception';
 import { type AppContext, appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
+import type { AsyncHandle } from '../../db/async-sqlite';
 import { userProviders, users } from '../../db/schema';
 import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
@@ -329,6 +330,28 @@ export async function attachPendingInvitesOnSignIn(userId: string): Promise<void
   }
 }
 
+async function grantNewUserAccess(
+  tx: AsyncHandle,
+  user: { id: string; email: string },
+  decision: Extract<ReturnType<typeof decideSignup>, { allow: true }>,
+  invite: Awaited<ReturnType<typeof activeInviteFor>>,
+  now: Date
+): Promise<void> {
+  if (decision.role !== 'pending') await assignServerRole(tx, user.id, 'member');
+  if (decision.role === 'admin') {
+    await assignServerRole(tx, user.id, 'admin');
+    await markAdminAssigned(tx, now);
+    logger.info('First admin account created', { userId: user.id });
+  }
+  if (invite && decision.via === 'server_invite') await consumeInvite(tx, invite.id, user.id, now);
+  if (decision.role === 'pending') return;
+  try {
+    await attachPendingInvites(tx, user.id, user.email);
+  } catch (error) {
+    logger.warn('Could not attach pending invites on signup', { userId: user.id, error });
+  }
+}
+
 export async function resolveNewUser(
   authProviderId: string,
   userInfo: { providerAccountId: string; email: string; displayName: string; avatarUrl?: string }
@@ -370,29 +393,16 @@ export async function resolveNewUser(
           .returning();
         if (!newUser) throw new Error('User insert returned no row');
         await tx.insert(userProviders).values({
-            userId: newUser.id,
-            domain: 'auth',
-            providerType: authProviderId,
-            providerAccountId: userInfo.providerAccountId,
-            displayName: userInfo.displayName,
-            credentials: '',
-            config: buildAuthProviderConfig(userInfo.email, userInfo.avatarUrl),
-            status: 'active',
-          });
-        if (decision.role !== 'pending') await assignServerRole(tx, newUser.id, 'member');
-        if (decision.role === 'admin') {
-          await assignServerRole(tx, newUser.id, 'admin');
-          await markAdminAssigned(tx, now);
-          logger.info('First admin account created', { userId: newUser.id });
-        }
-        if (invite && decision.via === 'server_invite')
-          await consumeInvite(tx, invite.id, newUser.id, now);
-        if (decision.role === 'pending') return { userId: newUser.id };
-        try {
-          await attachPendingInvites(tx, newUser.id, newUser.email);
-        } catch (error) {
-          logger.warn('Could not attach pending invites on signup', { userId: newUser.id, error });
-        }
+          userId: newUser.id,
+          domain: 'auth',
+          providerType: authProviderId,
+          providerAccountId: userInfo.providerAccountId,
+          displayName: userInfo.displayName,
+          credentials: '',
+          config: buildAuthProviderConfig(userInfo.email, userInfo.avatarUrl),
+          status: 'active',
+        });
+        await grantNewUserAccess(tx, newUser, decision, invite, now);
         return { userId: newUser.id };
       },
       { behavior: 'immediate' }

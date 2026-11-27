@@ -134,11 +134,11 @@ export async function ensureMemberDriver(
 }
 
 export async function setCarShare(
-  db: AsyncAppDatabase,
+  asyncDb: AsyncAppDatabase,
   vehicleId: string,
   enabled: boolean
 ): Promise<void> {
-  await db.transaction(async (tx) => {
+  await asyncDb.transaction(async (tx) => {
     await tx
       .update(vehicles)
       .set({ carShareEnabled: enabled, updatedAt: new Date() })

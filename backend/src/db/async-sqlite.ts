@@ -86,6 +86,12 @@ export class SyncQueryInAsyncTransactionError extends Error {
   }
 }
 
+const insideAny = new AsyncLocalStorage<boolean>();
+
+export function inAsyncTransaction(): boolean {
+  return insideAny.getStore() === true;
+}
+
 const opened = new WeakMap<Database, ReturnType<typeof createAsyncDatabase>>();
 
 export function openAsyncDatabase(sqlite: Database) {
@@ -317,15 +323,17 @@ function createAsyncDatabase(sqlite: Database) {
     scope.root = scope;
     open = scope;
     try {
-      return await scopes.run(scope, () =>
-        begin(
-          (tx) => {
-            refuseRawControl(tx, dialect, currentSession);
-            bindBuildersToScope(tx);
-            scope.tx = tx;
-            return sealWhenSettled(scope, () => callback(tx));
-          },
-          { behavior: config.behavior ?? 'immediate' }
+      return await insideAny.run(true, () =>
+        scopes.run(scope, () =>
+          begin(
+            (tx) => {
+              refuseRawControl(tx, dialect, currentSession);
+              bindBuildersToScope(tx);
+              scope.tx = tx;
+              return sealWhenSettled(scope, () => callback(tx));
+            },
+            { behavior: config.behavior ?? 'immediate' }
+          )
         )
       );
     } finally {
@@ -336,7 +344,9 @@ function createAsyncDatabase(sqlite: Database) {
   }
 
   function outsideTransaction<T>(fn: () => T | PromiseLike<T>): Promise<T> {
-    return scopes.exit(() => outside.run(true, () => Promise.resolve().then(fn)));
+    return insideAny.run(false, () =>
+      scopes.exit(() => outside.run(true, () => Promise.resolve().then(fn)))
+    );
   }
 
   Object.assign(db, { transaction });

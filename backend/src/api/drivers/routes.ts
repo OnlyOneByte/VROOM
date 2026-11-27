@@ -270,7 +270,14 @@ driverRoutes.post(
     const hide = await hidesFinancials(vehicleId, userId);
     const request = await backfillRequest(vehicleId, body);
     const planned = await planBackfill(asyncDb, vehicleId, request, hide);
-    const { batchId, entries } = await applyBackfill(asyncDb, vehicleId, body.mode, planned, userId, hide);
+    const { batchId, entries } = await applyBackfill(
+      asyncDb,
+      vehicleId,
+      body.mode,
+      planned,
+      userId,
+      hide
+    );
     const data = { batchId, ...(await summarize(asyncDb, vehicleId, entries)) };
     return c.json({ success: true, data }, batchId ? 201 : 200);
   }

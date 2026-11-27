@@ -69,8 +69,8 @@ export function builtInRoleId(key: string): string {
   return `builtin_${key}`;
 }
 
-export async function syncBuiltInRoles(db: AsyncAppDatabase): Promise<void> {
-  await db.transaction(async (tx) => {
+export async function syncBuiltInRoles(asyncDb: AsyncAppDatabase): Promise<void> {
+  await asyncDb.transaction(async (tx) => {
     await tx
       .update(roles)
       .set({ key: null })
@@ -280,8 +280,21 @@ function heldRoles(tx: Db, where: SQL | undefined): HeldRole[] {
   }));
 }
 
-export function isVehicleMember(db: Db, vehicleId: string, userId: string): boolean {
+function syncIsVehicleMember(db: Db, vehicleId: string, userId: string): boolean {
   const share = db
+    .select({ id: vehicleShares.id })
+    .from(vehicleShares)
+    .where(memberWhere(vehicleId, userId))
+    .get();
+  return share !== undefined;
+}
+
+export async function isVehicleMember(
+  db: AsyncHandle,
+  vehicleId: string,
+  userId: string
+): Promise<boolean> {
+  const share = await db
     .select({ id: vehicleShares.id })
     .from(vehicleShares)
     .where(memberWhere(vehicleId, userId))
@@ -307,7 +320,7 @@ function syncGrantSource(tx: Db): GrantSource {
         .get();
       if (!vehicle) return null;
       const owner = vehicle.ownerId === userId;
-      const member = !owner && isVehicleMember(tx, vehicleId, userId);
+      const member = !owner && syncIsVehicleMember(tx, vehicleId, userId);
       const grants: ScopeGrants = member
         ? {
             roles: heldRoles(tx, vehicleRolesWhere(userId, vehicleId)),
@@ -383,13 +396,7 @@ function asyncGrantSource(db: AsyncHandle): AsyncGrantSource {
         .get();
       if (!vehicle) return null;
       const owner = vehicle.ownerId === userId;
-      const member =
-        !owner &&
-        (await db
-          .select({ id: vehicleShares.id })
-          .from(vehicleShares)
-          .where(memberWhere(vehicleId, userId))
-          .get()) !== undefined;
+      const member = !owner && (await isVehicleMember(db, vehicleId, userId));
       const grants: ScopeGrants = member
         ? {
             roles: await heldRolesAsync(db, vehicleRolesWhere(userId, vehicleId)),
@@ -493,10 +500,10 @@ async function roleManagerCount(tx: AsyncHandle): Promise<number> {
 }
 
 export async function keepingARoleManager<T>(
-  db: AsyncAppDatabase,
+  asyncDb: AsyncAppDatabase,
   change: (tx: AsyncTransaction) => Promise<T>
 ): Promise<T> {
-  return db.transaction(async (tx) => {
+  return asyncDb.transaction(async (tx) => {
     const before = await roleManagerCount(tx);
     const result = await change(tx);
     if (before > 0 && (await roleManagerCount(tx)) === 0) {

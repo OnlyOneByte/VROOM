@@ -150,21 +150,25 @@ async function setDriver(
     .update(expenses)
     .set({ paidByDriverId: to })
     .where(
-      and(eq(expenses.id, entry.id), match(expenses.paidByDriverId), visibleExpenses(hideFinancials))
+      and(
+        eq(expenses.id, entry.id),
+        match(expenses.paidByDriverId),
+        visibleExpenses(hideFinancials)
+      )
     )
     .returning({ id: expenses.id });
   return rows.length > 0;
 }
 
 export function applyBackfill(
-  db: AsyncAppDatabase,
+  asyncDb: AsyncAppDatabase,
   vehicleId: string,
   mode: BackfillRequest['mode'],
   planned: BackfilledEntry[],
   userId: string,
   hideFinancials: boolean
 ): Promise<{ batchId: string | null; entries: BackfilledEntry[] }> {
-  return db.transaction(async (tx) => {
+  return asyncDb.transaction(async (tx) => {
     const applied: BackfilledEntry[] = [];
     for (const entry of planned) {
       if (await setDriver(tx, entry, null, entry.driverId, hideFinancials)) applied.push(entry);
@@ -189,12 +193,12 @@ async function stillPaidBy(tx: AsyncHandle, entry: BackfilledEntry): Promise<boo
 }
 
 export function undoBackfill(
-  db: AsyncAppDatabase,
+  asyncDb: AsyncAppDatabase,
   vehicleId: string,
   batchId: string,
   hideFinancials: boolean
 ): Promise<number> {
-  return db.transaction(async (tx) => {
+  return asyncDb.transaction(async (tx) => {
     const batch = await tx
       .select()
       .from(driverBackfills)

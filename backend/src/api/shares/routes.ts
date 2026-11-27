@@ -2,6 +2,7 @@ import { and, eq, notInArray } from 'drizzle-orm';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { appContext, repos } from '../../app-context';
+import type { AsyncHandle, AsyncTransaction } from '../../db/async-sqlite';
 import {
   permissionOverrides,
   roleAssignments,
@@ -11,7 +12,6 @@ import {
   vehicleShares,
   vehicles,
 } from '../../db/schema';
-import type { AsyncHandle, AsyncTransaction } from '../../db/async-sqlite';
 import type { ApiResponse } from '../../errors';
 import {
   ConflictError,
@@ -55,14 +55,14 @@ const ANY_STATUS = ['pending', 'accepted', 'declined', 'revoked'] as const;
 
 interface Transition {
   check?: (tx: AsyncTransaction, before: VehicleShare) => Promise<void>;
-  then: (tx: AsyncTransaction, before: VehicleShare, after: VehicleShare) => Promise<void>;
+  afterwards: (tx: AsyncTransaction, before: VehicleShare, after: VehicleShare) => Promise<void>;
 }
 
 function transitionShare(
   id: string,
   from: readonly string[],
   change: { status?: string; level?: string },
-  { check, then }: Transition
+  { check, afterwards }: Transition
 ): Promise<VehicleShare> {
   return appContext().asyncDb.transaction(async (tx) => {
     const before = await tx.select().from(vehicleShares).where(eq(vehicleShares.id, id)).get();
@@ -76,7 +76,7 @@ function transitionShare(
       .where(eq(vehicleShares.id, id))
       .returning();
     if (!after) throw new ConflictError('This share changed in the meantime. Reload and try again');
-    await then(tx, before, after);
+    await afterwards(tx, before, after);
     return after;
   });
 }
@@ -260,22 +260,27 @@ routes.put(
     refuseUnheldLevel(c, share.vehicleId, level);
 
     let ownerId: string | null = null;
-    const updated = await transitionShare(id, ACTIVE_SHARE_STATUSES, { level }, {
-      check: async (tx, before) => {
-        ownerId = await vehicleOwnerId(tx, before.vehicleId);
-        await refuseOverSharee(c, tx, before, ownerId, false);
-      },
-      then: async (tx, _, row) => {
-        if (row.status === 'accepted' && row.sharedWithId) {
-          await changeShareRole(tx, {
-            vehicleId: row.vehicleId,
-            sharedWithId: row.sharedWithId,
-            level,
-            grantedBy: ownerId ?? user.id,
-          });
-        }
-      },
-    });
+    const updated = await transitionShare(
+      id,
+      ACTIVE_SHARE_STATUSES,
+      { level },
+      {
+        check: async (tx, before) => {
+          ownerId = await vehicleOwnerId(tx, before.vehicleId);
+          await refuseOverSharee(c, tx, before, ownerId, false);
+        },
+        afterwards: async (tx, _, row) => {
+          if (row.status === 'accepted' && row.sharedWithId) {
+            await changeShareRole(tx, {
+              vehicleId: row.vehicleId,
+              sharedWithId: row.sharedWithId,
+              level,
+              grantedBy: ownerId ?? user.id,
+            });
+          }
+        },
+      }
+    );
     return c.json({ success: true, data: toOwnerView(updated), message: 'Share level updated' });
   }
 );
@@ -294,15 +299,20 @@ routes.delete(
     if (share.sharedWithId === c.get('user').id) {
       throw new ForbiddenError('To leave this vehicle, decline the share');
     }
-    await transitionShare(id, ANY_STATUS, { status: 'revoked' }, {
-      check: async (tx, before) =>
-        refuseOverSharee(c, tx, before, await vehicleOwnerId(tx, before.vehicleId), true),
-      then: async (tx, before) => {
-        if (before.status === 'accepted' && before.sharedWithId) {
-          await endVehicleMembership(tx, before.vehicleId, before.sharedWithId);
-        }
-      },
-    });
+    await transitionShare(
+      id,
+      ANY_STATUS,
+      { status: 'revoked' },
+      {
+        check: async (tx, before) =>
+          refuseOverSharee(c, tx, before, await vehicleOwnerId(tx, before.vehicleId), true),
+        afterwards: async (tx, before) => {
+          if (before.status === 'accepted' && before.sharedWithId) {
+            await endVehicleMembership(tx, before.vehicleId, before.sharedWithId);
+          }
+        },
+      }
+    );
     return c.json({ success: true, message: 'Share revoked' });
   }
 );
@@ -334,20 +344,25 @@ routes.post(
       throw new ConflictError('This invitation is no longer pending');
     }
 
-    const updated = await transitionShare(id, ['pending'], { status: 'accepted' }, {
-      then: async (tx, _, row) => {
-        await endVehicleMembership(tx, row.vehicleId, user.id);
-        await grantShareRole(tx, {
-          vehicleId: row.vehicleId,
-          sharedWithId: user.id,
-          level: row.level,
-          grantedBy: row.ownerId,
-        });
-        if (await carShareEnabled(tx, row.vehicleId)) {
-          await ensureMemberDriver(tx, row.vehicleId, user.id);
-        }
-      },
-    });
+    const updated = await transitionShare(
+      id,
+      ['pending'],
+      { status: 'accepted' },
+      {
+        afterwards: async (tx, _, row) => {
+          await endVehicleMembership(tx, row.vehicleId, user.id);
+          await grantShareRole(tx, {
+            vehicleId: row.vehicleId,
+            sharedWithId: user.id,
+            level: row.level,
+            grantedBy: row.ownerId,
+          });
+          if (await carShareEnabled(tx, row.vehicleId)) {
+            await ensureMemberDriver(tx, row.vehicleId, user.id);
+          }
+        },
+      }
+    );
     return c.json({ success: true, data: updated, message: 'Invitation accepted' });
   }
 );
@@ -368,11 +383,17 @@ routes.post(
       throw new ConflictError('This share is no longer active');
     }
 
-    await transitionShare(id, ACTIVE_SHARE_STATUSES, { status: 'declined' }, {
-      then: async (tx, before) => {
-        if (before.status === 'accepted') await endVehicleMembership(tx, before.vehicleId, user.id);
-      },
-    });
+    await transitionShare(
+      id,
+      ACTIVE_SHARE_STATUSES,
+      { status: 'declined' },
+      {
+        afterwards: async (tx, before) => {
+          if (before.status === 'accepted')
+            await endVehicleMembership(tx, before.vehicleId, user.id);
+        },
+      }
+    );
     return c.json({ success: true, message: 'Share declined' });
   }
 );

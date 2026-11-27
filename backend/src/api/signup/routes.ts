@@ -153,9 +153,7 @@ signupRoutes.delete(
   async (c) => {
     const id = await appContext().asyncDb.transaction(async (tx) => {
       const user = await pendingUser(tx, c.req.valid('param').id);
-      await tx
-        .delete(users)
-        .where(and(eq(users.id, user.id), isNotNull(users.pendingApprovalAt)));
+      await tx.delete(users).where(and(eq(users.id, user.id), isNotNull(users.pendingApprovalAt)));
       return user.id;
     });
     return c.json({ success: true, data: { id } });
