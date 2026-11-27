@@ -169,6 +169,14 @@ describe('CommunityCompareCard', () => {
 			screen.getByText('See how your Civic EX compares with other owners on this server.')
 		).toBeInTheDocument();
 		expect(screen.queryByRole('link', { name: 'Turn on community stats' })).toBeNull();
+		expect(screen.getByText('Community comparisons aren’t part of the demo.')).toBeInTheDocument();
+	});
+
+	test('a signed-in user who has not opted in gets the link and no demo line', async () => {
+		compare.mockResolvedValue(all('opt_in_required'));
+		await mount();
+		expect(screen.getByRole('link', { name: 'Turn on community stats' })).toBeInTheDocument();
+		expect(screen.queryByText('Community comparisons aren’t part of the demo.')).toBeNull();
 	});
 
 	test('a user whose opt-in is not in a refresh yet is told to wait, with no numbers', async () => {
