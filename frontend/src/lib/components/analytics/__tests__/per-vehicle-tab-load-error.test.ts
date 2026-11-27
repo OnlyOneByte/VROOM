@@ -4,7 +4,7 @@ import type { Vehicle } from '#lib/types/index.ts';
 import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
-vi.mock('#lib/components/charts/index.ts', () => ({ AppPieChart: () => {} }));
+vi.mock('#lib/components/charts/index.ts', () => ({ AppBarChart: () => {} }));
 
 const getVehicles = vi.fn<() => Promise<Vehicle[]>>();
 vi.mock('#lib/services/vehicle-api.ts', () => ({
@@ -16,7 +16,8 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: {
 		getVehicleHealth: () => getVehicleHealth(),
 		getVehicleTCO: () => new Promise(() => {}),
-		getVehicleExpenses: () => new Promise(() => {})
+		getVehicleExpenses: () => new Promise(() => {}),
+		query: () => new Promise(() => {})
 	},
 	getDefaultDateRange: () => ({})
 }));
@@ -47,7 +48,9 @@ describe('PerVehicleTab when the vehicles fail to load', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
-		expect(await screen.findByRole('combobox', { name: 'Select vehicle' })).toBeInTheDocument();
+		expect(
+			await screen.findByRole('button', { name: '2020 Toyota Camry', pressed: true })
+		).toBeInTheDocument();
 		expect(getVehicles).toHaveBeenCalledTimes(2);
 		expect(screen.queryByText("Couldn't load your vehicles")).toBeNull();
 	});
