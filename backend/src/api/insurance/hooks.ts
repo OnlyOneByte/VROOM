@@ -1,6 +1,6 @@
 import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { AppError, ValidationError } from '../../errors';
+import { AppError, ConflictError, ValidationError } from '../../errors';
 import { termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { formatNumberForMessage } from '../../utils/money';
@@ -113,24 +113,27 @@ export function assertTermPremiumWithinCap(
 
 async function materializeTermExpenses(
   params: TermExpenseParams,
-  totalCost: number
+  totalCost: number,
+  scale?: number
 ): Promise<void> {
   const { termId, vehicleIds, startDate, policyNumber, userId } = params;
   const description = policyNumber ? `Insurance premium — ${policyNumber}` : 'Insurance premium';
 
-  await repos().expenses.createSplitExpense(
-    {
-      splitConfig: { method: 'even', vehicleIds },
-      category: 'financial',
-      tags: ['insurance'],
-      date: startDate,
-      description,
-      totalAmount: totalCost,
-      sourceType: 'insurance_term',
-      sourceId: termId,
-    },
-    { ownerId: userId, createdBy: null }
-  );
+  const create = () =>
+    repos().expenses.createSplitExpense(
+      {
+        splitConfig: { method: 'even', vehicleIds },
+        category: 'financial',
+        tags: ['insurance'],
+        date: startDate,
+        description,
+        totalAmount: totalCost,
+        sourceType: 'insurance_term',
+        sourceId: termId,
+      },
+      { ownerId: userId, createdBy: null }
+    );
+  await (scale === undefined ? create() : repos().preferences.writeAtScale(userId, scale, create));
 
   logger.info('Auto-created insurance expenses for term', {
     termId,
@@ -139,14 +142,15 @@ async function materializeTermExpenses(
   });
 }
 
-export async function createTermExpenses(params: TermExpenseParams): Promise<void> {
+export async function createTermExpenses(params: TermExpenseParams, scale?: number): Promise<void> {
   const totalCost = effectiveTermCost(params);
 
   if (totalCost <= 0 || params.vehicleIds.length === 0) return;
 
   try {
-    await materializeTermExpenses(params, totalCost);
+    await materializeTermExpenses(params, totalCost, scale);
   } catch (error) {
+    if (error instanceof ConflictError) throw error;
     logger.error('Failed to auto-create insurance expenses', {
       termId: params.termId,
       error: error instanceof Error ? error.message : String(error),
@@ -197,7 +201,8 @@ async function termExpensesInSync(params: TermExpenseParams): Promise<boolean> {
 // Delete and recreate are not atomic: a failed recreate must throw rather than silently drop the premium.
 export async function updateTermExpenses(
   params: TermExpenseParams,
-  previous?: TermExpenseParams
+  previous?: TermExpenseParams,
+  scale?: number
 ): Promise<void> {
   if (
     previous &&
@@ -218,7 +223,7 @@ export async function updateTermExpenses(
   if (totalCost <= 0 || vehicleIds.length === 0) return;
 
   try {
-    await materializeTermExpenses(params, totalCost);
+    await materializeTermExpenses(params, totalCost, scale);
   } catch (error) {
     logger.error('Failed to recreate insurance expenses for term update', {
       termId,

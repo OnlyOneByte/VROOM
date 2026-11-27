@@ -427,11 +427,13 @@ routes.post(
     }
     const payerFor = (vehicleId: string) => payers.get(vehicleId) ?? null;
     const scale = await repos().preferences.moneyScale(ownerId);
-    const siblings = await repos().expenses.createSplitExpense(splitFromApi(data, scale), {
-      ownerId,
-      createdBy,
-      payerFor,
-    });
+    const siblings = await repos().preferences.writeAtScale(ownerId, scale, () =>
+      repos().expenses.createSplitExpense(splitFromApi(data, scale), {
+        ownerId,
+        createdBy,
+        payerFor,
+      })
+    );
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
       throw new ValidationError('Split expense creation returned invalid data');
@@ -495,10 +497,8 @@ routes.put(
     );
 
     const scale = await repos().preferences.moneyScale(groupInfo.ownerId);
-    const siblings = await repos().expenses.updateSplitExpense(
-      id,
-      splitFromApi(data, scale),
-      groupInfo.ownerId
+    const siblings = await repos().preferences.writeAtScale(groupInfo.ownerId, scale, () =>
+      repos().expenses.updateSplitExpense(id, splitFromApi(data, scale), groupInfo.ownerId)
     );
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
@@ -813,7 +813,9 @@ routes.post(
       .map(
         (row) => ({ ...expenseFromApi(row.expense ?? {}, scale), userId: user.id }) as NewExpense
       );
-    const { imported, duplicates } = await repos().expenses.importExpenses(readyRows, user.id);
+    const { imported, duplicates } = await repos().preferences.writeAtScale(user.id, scale, () =>
+      repos().expenses.importExpenses(readyRows, user.id)
+    );
 
     return c.json({
       success: true,
@@ -885,9 +887,12 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
     );
 
     const scale = await repos().preferences.moneyScale(ownerId);
-    createdExpense = await repos().expenses.createIdempotent(
-      { ...expenseFromApi(expenseData, scale), paidByDriverId, userId: ownerId, createdBy },
-      await odometerCheck({ ...expenseData, timeZone })
+    const odometer = await odometerCheck({ ...expenseData, timeZone });
+    createdExpense = await repos().preferences.writeAtScale(ownerId, scale, () =>
+      repos().expenses.createIdempotent(
+        { ...expenseFromApi(expenseData, scale), paidByDriverId, userId: ownerId, createdBy },
+        odometer
+      )
     );
   }
   assertMayTouchFinancialExpense(writesFinancials(access), createdExpense.sourceType);
@@ -1026,10 +1031,8 @@ routes.put(
 
     const existingExpense = await repos().expenses.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
-    const updateData = expenseFromApi(
-      body,
-      await repos().preferences.moneyScale(existingExpense.userId)
-    );
+    const scale = await repos().preferences.moneyScale(existingExpense.userId);
+    const updateData = expenseFromApi(body, scale);
     const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'read');
     assertMayTouchFinancialExpense(
       writesFinancials(access),
@@ -1081,7 +1084,11 @@ routes.put(
       timeZone,
     });
 
-    const updatedExpense = await repos().expenses.update(id, normalizedUpdate, odometer);
+    const updatedExpense = await repos().preferences.writeAtScale(
+      existingExpense.userId,
+      scale,
+      () => repos().expenses.update(id, normalizedUpdate, odometer)
+    );
 
     if (updatedExpense.mileage != null) {
       await reminderTriggerService.recheckMileageReminders(

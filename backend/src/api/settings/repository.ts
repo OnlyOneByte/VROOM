@@ -13,7 +13,7 @@ import {
   vehicleFinancing,
   vehicles,
 } from '../../db/schema';
-import { DatabaseError } from '../../errors';
+import { ConflictError, DatabaseError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES } from '../../types';
 import { minorUnitScale } from '../../utils/money';
 import { type BackupTables, MONEY_CENTS_FIELDS, rescaleMoneyTables } from '../sync/backup';
@@ -45,6 +45,17 @@ export class PreferencesRepository {
   async moneyScale(userId: string): Promise<number> {
     const prefs = await this.getByUserId(userId);
     return minorUnitScale(prefs?.currencyUnit ?? DEFAULT_CURRENCY);
+  }
+
+  writeAtScale<T>(userId: string, scale: number, write: () => Promise<T>): Promise<T> {
+    return this.db.transaction(async () => {
+      if ((await this.moneyScale(userId)) !== scale) {
+        throw new ConflictError(
+          'The currency changed while this was being saved. Reload and try again'
+        );
+      }
+      return write();
+    });
   }
 
   async currencies(userIds: Iterable<string>): Promise<(userId: string) => string> {

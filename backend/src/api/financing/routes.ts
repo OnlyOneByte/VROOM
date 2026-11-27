@@ -173,26 +173,26 @@ routes.post(
     const { vehicleId } = c.req.valid('param');
     const vehicle = await repos().vehicles.findById(vehicleId);
     if (!vehicle) throw new NotFoundError('Vehicle');
-    const financingData = financingFromApi(
-      c.req.valid('json'),
-      await repos().preferences.moneyScale(vehicle.userId)
-    );
+    const scale = await repos().preferences.moneyScale(vehicle.userId);
+    const financingData = financingFromApi(c.req.valid('json'), scale);
 
     const existingFinancing = await repos().financing.findByVehicleId(vehicleId);
 
     if (existingFinancing) {
       // update() skips undefined keys, so every reset field must be set to null explicitly.
-      const updatedFinancing = await repos().financing.update(existingFinancing.id, {
-        ...financingData,
-        apr: financingData.apr ?? null,
-        paymentDayOfMonth: financingData.paymentDayOfMonth ?? null,
-        paymentDayOfWeek: financingData.paymentDayOfWeek ?? null,
-        residualValue: financingData.residualValue ?? null,
-        mileageLimit: financingData.mileageLimit ?? null,
-        excessMileageFee: financingData.excessMileageFee ?? null,
-        isActive: true,
-        endDate: null,
-      });
+      const updatedFinancing = await repos().preferences.writeAtScale(vehicle.userId, scale, () =>
+        repos().financing.update(existingFinancing.id, {
+          ...financingData,
+          apr: financingData.apr ?? null,
+          paymentDayOfMonth: financingData.paymentDayOfMonth ?? null,
+          paymentDayOfWeek: financingData.paymentDayOfWeek ?? null,
+          residualValue: financingData.residualValue ?? null,
+          mileageLimit: financingData.mileageLimit ?? null,
+          excessMileageFee: financingData.excessMileageFee ?? null,
+          isActive: true,
+          endDate: null,
+        })
+      );
       return c.json({
         success: true,
         data: await financingRowToApi(updatedFinancing),
@@ -200,10 +200,9 @@ routes.post(
       });
     }
 
-    const createdFinancing = await repos().financing.create({
-      ...financingData,
-      vehicleId,
-    });
+    const createdFinancing = await repos().preferences.writeAtScale(vehicle.userId, scale, () =>
+      repos().financing.create({ ...financingData, vehicleId })
+    );
     return c.json(
       {
         success: true,
@@ -228,12 +227,15 @@ routes.patch(
   async (c) => {
     const { financingId } = c.req.valid('param');
     const { paymentAmount } = c.req.valid('json');
-    const scale = await repos().preferences.moneyScale(await financingOwner(financingId));
+    const ownerId = await financingOwner(financingId);
+    const scale = await repos().preferences.moneyScale(ownerId);
 
-    const updated = await repos().financing.update(financingId, {
-      paymentAmount: parsedToMinor(paymentAmount, scale),
-      updatedAt: new Date(),
-    });
+    const updated = await repos().preferences.writeAtScale(ownerId, scale, () =>
+      repos().financing.update(financingId, {
+        paymentAmount: parsedToMinor(paymentAmount, scale),
+        updatedAt: new Date(),
+      })
+    );
     return c.json({
       success: true,
       data: await financingRowToApi(updated),

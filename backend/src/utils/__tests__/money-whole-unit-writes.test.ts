@@ -1,14 +1,13 @@
-import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
-import { PreferencesRepository } from '../../api/settings/repository';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { type DataEnvelope, json, useTestApp } from '../../test-helpers/http-client';
 import { seedVehicle } from '../../test-helpers/seed';
 
 const app = useTestApp();
 
-beforeEach(() => {
-  spyOn(PreferencesRepository.prototype, 'moneyScale').mockResolvedValue(1);
+beforeEach(async () => {
+  const res = await app().authed('PUT', '/api/v1/settings', { currencyUnit: 'JPY' });
+  expect(res.status).toBe(200);
 });
-afterEach(() => mock.restore());
 
 describe('edits compare like units when the currency has no decimals', () => {
   test('a split leg keeps its amount and only its description changes', async () => {
