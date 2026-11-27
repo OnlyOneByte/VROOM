@@ -787,7 +787,7 @@ export async function createSheetsServiceForProvider(
   providerId: string,
   userId: string
 ): Promise<GoogleSheetsService> {
-  const db = appContext().db;
+  const db = appContext().asyncDb;
   const providerRow = await db
     .select()
     .from(userProviders)

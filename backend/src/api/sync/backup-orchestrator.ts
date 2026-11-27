@@ -137,7 +137,7 @@ export class BackupOrchestrator {
         providers: {},
       };
 
-      const db = appContext().db;
+      const db = appContext().asyncDb;
       const providerRows = await db
         .select()
         .from(userProviders)

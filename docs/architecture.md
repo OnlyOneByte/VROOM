@@ -167,6 +167,19 @@ That covers the role, override and share guards in `src/api/roles/routes.ts` and
 `src/api/auth/routes.ts`. In part C each such check moves inside the async transaction that
 does the write.
 
+Reads that must see one moment stay sync for the same reason. A backup (`createBackup` in
+`src/api/sync/backup.ts`) and the Sheets mirror (`updateSpreadsheetWithUserData` in
+`src/api/providers/services/google-sheets-service.ts`) read several tables together; on the
+sync driver no write lands between those reads, so an expense never names a vehicle the backup
+missed. On the async session they would need a read transaction, which part C adds.
+
+What part C still has to move, besides the transactions themselves: those guards and snapshot
+reads, the helpers that sign-up, share and car-share transactions also call (`assignServerRole`,
+`signupSettings`, `attachPendingInvites`, the invite helpers, `carShareEnabled`,
+`ensureMemberDriver`), the three `syncResolverFor` callers below, the restore path, demo and
+sample seeding, and the key-rotation script. Connection upkeep in `src/db/connection.ts` stays
+sync by design.
+
 **Permissions load, then check.** A request's resolver reads its grants on the async session
 before anything is decided. `authorize()` calls `loadResolver(c, resources)` for the resources
 it checks, and `requestResolver(c)` then hands out that same resolver, whose `can()` and
