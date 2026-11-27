@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { type Column, is, type SQL, sql } from 'drizzle-orm';
 import { type BunSQLiteDatabase, drizzle as sqliteDrizzle } from 'drizzle-orm/bun-sqlite';
-import { bigint, jsonb, PgTable, pgTable, text as pgText } from 'drizzle-orm/pg-core';
+import { bigint, jsonb, PgDialect, PgTable, pgTable, text as pgText } from 'drizzle-orm/pg-core';
 import { type PgliteDatabase, drizzle as pgDrizzle } from 'drizzle-orm/pglite';
 import { integer, SQLiteTable, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import * as pgSchema from '../../pg/schema';
@@ -33,6 +33,8 @@ const ROWS: [string, number, unknown, unknown][] = [
   ['r2', 1704067200, [], null],
   ['r3', 1719792000, null, { b: 3 }],
   ['r4', 1717245296, ['maintenance', 'fuel'], {}],
+  ['r5', 1717245296, ['x'], [1, 2]],
+  ['r6', 1717245296, ['x'], { b: { c: 5, z: null } }],
 ];
 
 let lite: Database;
@@ -115,7 +117,7 @@ describe('each Postgres dialect helper gives the same result as its SQLite twin'
       return sql`SELECT ${t.id} AS id, ${element} AS tag FROM probe ${join} ORDER BY id, tag`;
     });
     expect(joined[1]).toEqual(joined[0]);
-    expect(joined[0]).toHaveLength(6);
+    expect(joined[0]).toHaveLength(8);
   });
 
   test('typed parameters', async () => {
@@ -153,6 +155,45 @@ describe('each Postgres dialect helper gives the same result as its SQLite twin'
     });
     expect(() => DIALECT_SQL.pg.jsonAddMissingEntries(sql`'{}'`, 'bad key', {})).toThrow(TypeError);
   });
+
+  test('a top-level JSON array or a non-object entry is treated as an empty object', async () => {
+    const [onLite, onPg] = await both(
+      (d, t) =>
+        sql`SELECT ${t.id} AS id, ${d.jsonMergePatch(d.jsonAddMissingEntries(t.prefs, 'b', { c: { k: 9 }, z: { y: 2 } }), { b: { q: 1 } })} AS merged FROM probe WHERE ${t.id} IN ('r5', 'r6') ORDER BY id`
+    );
+    expect(normalize(onPg, ['merged'])).toEqual(normalize(onLite, ['merged']));
+    expect(normalize(onLite, ['merged'])).toEqual([
+      { id: 'r5', merged: { b: { c: { k: 9 }, z: { y: 2 }, q: 1 } } },
+      { id: 'r6', merged: { b: { c: {}, z: {}, q: 1 } } },
+    ]);
+  });
+
+  test('a 20-provider backup update stays small and matches SQLite', async () => {
+    const ids = Array.from({ length: 20 }, (_, i) => `p${i}`);
+    const entries = Object.fromEntries(ids.map((id) => [id, { enabled: true, keep: 5 }]));
+    const providers = Object.fromEntries(ids.map((id) => [id, { lastBackupAt: '2024-06-01' }]));
+    const update = (d: DialectSql, t: Probe) =>
+      d.jsonMergePatch(d.jsonAddMissingEntries(t.prefs, 'providers', entries), { providers });
+    const query = update(DIALECT_SQL.pg, pgProbe as unknown as Probe);
+    const rendered = new PgDialect().sqlToQuery(query);
+    expect(rendered.params.length).toBeLessThan(400);
+    const bound = rendered.sql.match(/ AS m\b/g)?.length ?? 0;
+    expect(bound).toBeGreaterThan(20);
+    expect(rendered.sql.match(/ AS m OFFSET 0\)/g)?.length).toBe(bound);
+    const [onLite, onPg] = await both(
+      (d, t) => sql`SELECT ${t.id} AS id, ${update(d, t)} AS merged FROM probe ORDER BY id`
+    );
+    expect(normalize(onPg, ['merged'])).toEqual(normalize(onLite, ['merged']));
+    const first = normalize(onLite, ['merged'])[0] as {
+      merged: { providers: Record<string, unknown> };
+    };
+    expect(Object.keys(first.merged.providers)).toHaveLength(20);
+    expect(first.merged.providers.p0).toEqual({
+      enabled: true,
+      keep: 5,
+      lastBackupAt: '2024-06-01',
+    });
+  }, 30_000);
 });
 
 describe('database errors are classified the same on both drivers', () => {
@@ -214,9 +255,11 @@ describe('the active dialect', () => {
     const run = Bun.spawnSync(['bun', '-e', script], {
       cwd: join(import.meta.dir, '../../../..'),
       env: { ...process.env, DATABASE_URL: 'postgres://user@127.0.0.1:1/vroom', NODE_ENV: 'test' },
+      timeout: 30_000,
       stdout: 'pipe',
       stderr: 'pipe',
     });
+    expect(run.exitCode, run.stderr.toString()).toBe(0);
     const out = JSON.parse(run.stdout.toString().trim().split('\n').at(-1) ?? '{}');
     expect(out.same, run.stderr.toString()).toBe(true);
     expect(out.refused).toContain('cannot connect to yet (#1635)');
