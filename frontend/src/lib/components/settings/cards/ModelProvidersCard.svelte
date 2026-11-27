@@ -378,7 +378,7 @@
 										<p class="font-medium break-words">{provider.displayName}</p>
 										<ProviderStatusBadge status={provider.status} />
 									</div>
-									<p class="truncate text-sm text-muted-foreground">
+									<p class="text-sm break-words text-muted-foreground">
 										{labelFor(provider.providerType)}
 										{#if typeof provider.config['model'] === 'string'}
 											· {provider.config['model']}

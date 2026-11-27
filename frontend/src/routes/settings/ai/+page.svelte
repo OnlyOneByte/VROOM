@@ -35,7 +35,7 @@
 		</PageHeader>
 	</div>
 
-	<div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
+	<div class="grid grid-cols-1 gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
 		<ModelProvidersCard domain="vlm" />
 		<ModelProvidersCard domain="llm" />
 	</div>
