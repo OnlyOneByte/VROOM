@@ -76,7 +76,7 @@ const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 describe('split group edit locks the fields the split API does not save', () => {
 	test('date, category and notes are disabled with a note; the amount stays editable', async () => {
 		render(ExpenseForm, { props: { expenseId: 'e1', returnTo: '/expenses' } });
-		await screen.findByRole('heading', { name: 'Edit Split Expense' });
+		await screen.findByTestId('split-edit-note');
 
 		expect(screen.getByTestId('split-edit-note').textContent).toContain(
 			'delete the split and add it again'
@@ -84,7 +84,7 @@ describe('split group edit locks the fields the split API does not save', () => 
 		expect(screen.getByTestId('split-edit-note').textContent).toContain(
 			'description, location or tags'
 		);
-		expect(screen.getByRole('radio', { name: /Misc/ })).toBeDisabled();
+		expect(screen.getByRole('combobox', { name: /Category/ })).toBeDisabled();
 		const date = screen.getByRole('button', { name: /^Date/ });
 		expect(date).toBeDisabled();
 		expect(date).toHaveAccessibleDescription('May 10, 2026');

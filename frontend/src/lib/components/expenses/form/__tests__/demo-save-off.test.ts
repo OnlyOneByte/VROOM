@@ -24,6 +24,20 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 	expenseApi: {
 		createExpense,
 		deletePhoto,
+		getExpense: vi.fn(() =>
+			Promise.resolve({
+				id: 'x1',
+				vehicleId: 'v1',
+				userId: 'user-1',
+				tags: [],
+				category: 'misc',
+				amount: 12,
+				date: '2026-01-02T12:00:00.000Z',
+				description: 'Car wash',
+				createdAt: '2026-01-02T12:00:00.000Z',
+				updatedAt: '2026-01-02T12:00:00.000Z'
+			})
+		),
 		getExpensesByVehicle: vi.fn(() => Promise.resolve({ data: [] })),
 		getPhotos: vi.fn(() =>
 			Promise.resolve({ data: [{ id: 'p1', fileName: 'r.pdf', mimeType: 'application/pdf' }] })
@@ -33,7 +47,6 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 }));
 
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
-const ExpenseActionBar = (await import('../expense-form/ExpenseActionBar.svelte')).default;
 const ExpensePhotoSection = (await import('../ExpensePhotoSection.svelte')).default;
 const InsuranceManagedView = (await import('../expense-form/InsuranceManagedView.svelte')).default;
 
@@ -89,32 +102,17 @@ describe('expense form in the demo garage', () => {
 		await vi.waitFor(() => expect(sent()).toBe(1));
 	});
 
-	test('on the edit bar Delete is off and Save is marked off, while Duplicate and Cancel still work', async () => {
+	test('when editing, Delete is off and Save is marked off, while Duplicate and Cancel still work', async () => {
 		authStore.setUser({ ...user, demo: true });
-		const handlers = {
-			onDelete: vi.fn(),
-			onDuplicate: vi.fn(),
-			onCancel: vi.fn(),
-			onSave: vi.fn()
-		};
-		render(ExpenseActionBar, {
-			props: {
-				isEditMode: true,
-				canDuplicate: true,
-				isSubmitting: false,
-				isDeleting: false,
-				...handlers
-			}
-		});
+		render(ExpenseForm, { props: { expenseId: 'x1', returnTo: '/expenses' } });
+		await screen.findByTestId('expense-edit-header');
+
 		expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
-		expect(screen.getByRole('button', { name: 'Update Expense' })).toHaveAttribute(
-			'aria-disabled',
-			'true'
-		);
-		await fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
-		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-		expect(handlers.onDuplicate).toHaveBeenCalledOnce();
-		expect(handlers.onCancel).toHaveBeenCalledOnce();
+		const save = screen.getByRole('button', { name: 'Save changes' });
+		expect(save).toHaveAttribute('aria-disabled', 'true');
+		expect(save).toHaveAccessibleDescription(NOTE);
+		expect(screen.getByRole('button', { name: 'Duplicate' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
 	});
 
 	test.each([true, false])(

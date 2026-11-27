@@ -30,12 +30,19 @@ vi.mock('#lib/utils/navigation.ts', () => ({ gotoDynamic }));
 const auth = vi.hoisted(() => ({ user: null as { demo?: boolean } | null }));
 vi.mock('#lib/stores/auth.svelte.ts', () => ({ authStore: auth }));
 const scheduleDelete = vi.hoisted(() => vi.fn());
-vi.mock('#lib/utils/pending-deletes.svelte.ts', () => ({ scheduleDelete }));
+vi.mock('#lib/utils/pending-deletes.svelte.ts', () => ({ scheduleDelete, UNDO_WINDOW_MS: 5000 }));
+const { loadOfflineExpenses, removeOfflineExpense, syncState } = vi.hoisted(() => ({
+	loadOfflineExpenses: vi.fn((): Array<Record<string, unknown>> => []),
+	removeOfflineExpense: vi.fn(),
+	syncState: { current: 'idle' }
+}));
 vi.mock('#lib/utils/offline-storage.ts', () => ({
 	addOfflineExpense,
+	loadOfflineExpenses,
+	removeOfflineExpense,
 	currentOfflineQueueOwner: () => 'alice'
 }));
-vi.mock('#lib/stores/offline.svelte.ts', () => ({ onlineStatus: online }));
+vi.mock('#lib/stores/offline.svelte.ts', () => ({ onlineStatus: online, syncState }));
 vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
 	syncManager: { syncSoon, requestAutoSync: vi.fn() }
 }));
@@ -55,6 +62,28 @@ function createState(expenseId?: string) {
 
 function notified(type: string, message: string) {
 	expect(addNotification).toHaveBeenCalledWith({ type, message });
+}
+
+function savedWithUndo(message: string) {
+	expect(addNotification).toHaveBeenCalledWith(
+		expect.objectContaining({
+			type: 'success',
+			message,
+			action: expect.objectContaining({ label: 'Undo' })
+		})
+	);
+}
+
+async function pressUndo(): Promise<void> {
+	const toast = addNotification.mock.calls
+		.map(([n]) => n as { action?: { label: string; onClick: () => void } })
+		.find(n => n.action?.label === 'Undo');
+	toast?.action?.onClick();
+	await vi.waitFor(() =>
+		expect(
+			scheduleDelete.mock.calls.length + removeOfflineExpense.mock.calls.length
+		).toBeGreaterThan(0)
+	);
 }
 
 beforeEach(() => {
@@ -121,10 +150,53 @@ describe('submitExpense — online create goes through the queue', () => {
 			'alice'
 		);
 		expect(expenseApiMock.createExpense).not.toHaveBeenCalled();
-		notified('success', 'Expense added successfully');
+		savedWithUndo('Saved $120.50');
 		expect(syncSoon).toHaveBeenCalledOnce();
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
 		expect(state.submitError).toBeNull();
+	});
+
+	test('the saved toast names the vehicle and, for a fill-up, the economy since the last one', async () => {
+		const state = createState();
+		state.vehicles = [makeVehicle('v1', { nickname: 'Daily Driver' })];
+		state.formData.category = 'fuel';
+		state.formData.volume = '10';
+		state.formData.mileage = '1300';
+		state.showMpgCalculation = true;
+		state.calculatedMpg = 31.08;
+		await submitExpense(state);
+		expect(addNotification).toHaveBeenCalledWith(
+			expect.objectContaining({
+				message: 'Saved $120.50 for Daily Driver',
+				description: '31.1 mi/gal since last fill-up'
+			})
+		);
+	});
+
+	test('Undo before the entry syncs takes it out of the queue without a request', async () => {
+		const state = createState();
+		await submitExpense(state);
+		const clientId = (addOfflineExpense.mock.calls[0] as unknown[] | undefined)?.[2];
+		loadOfflineExpenses.mockReturnValue([{ id: 'offline_1', clientId, synced: false }]);
+		await pressUndo();
+		expect(removeOfflineExpense).toHaveBeenCalledWith('offline_1');
+		expect(expenseApiMock.createExpense).not.toHaveBeenCalled();
+		expect(scheduleDelete).not.toHaveBeenCalled();
+	});
+
+	test('Undo after the entry synced finds the saved expense by its client id and deletes it with Undo', async () => {
+		const state = createState();
+		await submitExpense(state);
+		const clientId = (addOfflineExpense.mock.calls[0] as unknown[] | undefined)?.[2];
+		const saved = makeExpense('server-1');
+		expenseApiMock.createExpense.mockResolvedValue(saved);
+		loadOfflineExpenses.mockReturnValue([]);
+		await pressUndo();
+		expect(expenseApiMock.createExpense).toHaveBeenCalledWith(
+			expect.objectContaining({ vehicleId: 'v1' }),
+			clientId
+		);
+		expect(scheduleDelete).toHaveBeenCalledWith(saved);
 	});
 });
 
@@ -147,10 +219,18 @@ describe('submitExpense — online create when the queue cannot be stored', () =
 			}),
 			expect.any(String)
 		);
-		notified('success', 'Expense added successfully');
+		savedWithUndo('Saved $120.50');
 		expect(gotoDynamic).toHaveBeenCalledWith('/expenses');
 		expect(state.isSubmitting).toBe(false);
 		expect(state.submitError).toBeNull();
+	});
+
+	test('Undo deletes the created expense through the delete Undo window', async () => {
+		const created = makeExpense('new-5');
+		expenseApiMock.createExpense.mockResolvedValue(created);
+		await submitExpense(createState());
+		await pressUndo();
+		expect(scheduleDelete).toHaveBeenCalledWith(created);
 	});
 
 	test('uploads pending photos against the created expense and clears them', async () => {
@@ -172,7 +252,7 @@ describe('submitExpense — online create when the queue cannot be stored', () =
 		state.pendingFiles = [new File(['a'], 'a.jpg'), new File(['b'], 'b.jpg')];
 		await submitExpense(state);
 		notified('warning', '1 photo failed to upload. You can re-upload in edit mode.');
-		notified('success', 'Expense added successfully');
+		savedWithUndo('Saved $120.50');
 	});
 
 	test('warns with a plural message when several photo uploads fail', async () => {

@@ -12,11 +12,21 @@
 		error?: string;
 		describedBy?: string;
 		canSplit: boolean;
+		field?: boolean;
 		onSelect: (_vehicleId: string) => void;
 		onSplit: () => void;
 	}
 
-	let { vehicles, value, error, describedBy, canSplit, onSelect, onSplit }: Props = $props();
+	let {
+		vehicles,
+		value,
+		error,
+		describedBy,
+		canSplit,
+		field = false,
+		onSelect,
+		onSplit
+	}: Props = $props();
 
 	const selectedVehicle = $derived(vehicles.find(v => v.id === value));
 	const ariaDescribedBy = $derived(
@@ -24,7 +34,7 @@
 	);
 </script>
 
-<Label id="vehicle-label" for="vehicle" class="sr-only">Vehicle *</Label>
+<Label id="vehicle-label" for="vehicle" class={field ? '' : 'sr-only'}>Vehicle *</Label>
 <Select.Root
 	type="single"
 	{value}
@@ -35,9 +45,9 @@
 	<Select.Trigger
 		id="vehicle"
 		aria-labelledby="vehicle-label vehicle"
-		class="max-w-[14rem] min-w-0 gap-1.5 rounded-full data-[size=default]:h-10 border-primary bg-primary px-3.5 font-medium text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-primary-foreground {error
-			? 'border-destructive'
-			: ''}"
+		class={field
+			? 'w-full'
+			: `max-w-[14rem] min-w-0 gap-1.5 rounded-full data-[size=default]:h-10 border-primary bg-primary px-3.5 font-medium text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90 [&_svg:not([class*='text-'])]:text-primary-foreground ${error ? 'border-destructive' : ''}`}
 		aria-invalid={!!error}
 		aria-describedby={ariaDescribedBy}
 	>

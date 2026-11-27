@@ -37,7 +37,7 @@ function deferred() {
 }
 
 describe('editing an expense updates the row while the PUT runs', () => {
-	beforeEach(() => vi.clearAllMocks());
+	beforeEach(() => vi.resetAllMocks());
 	afterEach(() => resetPendingEdits());
 
 	function notices(): Record<string, unknown>[] {
@@ -109,6 +109,106 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		const fresh = { ...saved, amount: 60, updatedAt: '2026-11-25T09:00:00.000Z' };
 		expect(shownExpense(fresh)).toBe(fresh);
 		expect(shownExpense(saved)).toMatchObject({ amount: 55 });
+	});
+
+	test('Undo on the saved toast shows the old values at once and saves them back after the edit', async () => {
+		const first = deferred();
+		vi.mocked(expenseApi.updateExpense)
+			.mockReturnValueOnce(first.promise)
+			.mockResolvedValueOnce(saved);
+		scheduleEdit(saved, changed, payload, { message: 'Saved $55.00 for Sparky' });
+		const toast = notices()[0] ?? {};
+		expect(toast).toMatchObject({ message: 'Saved $55.00 for Sparky', duration: 5000 });
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+
+		(toast['action'] as { label: string; onClick: () => void }).onClick();
+		expect(appStore.dismissToast).toHaveBeenCalledWith('expense-edit-e1');
+		expect(shownExpense(saved)).toMatchObject({ amount: 40, description: 'Arco' });
+		await Promise.resolve();
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1);
+
+		first.resolve(changed);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith(
+			'e1',
+			expect.objectContaining({ amount: 40, description: 'Arco', category: 'fuel' })
+		);
+		expect(notices().filter(n => n['type'] === 'error')).toEqual([]);
+	});
+
+	function pressUndo(): void {
+		const toast = notices().find(n => (n['action'] as { label?: string })?.label === 'Undo');
+		(toast?.['action'] as { onClick: () => void }).onClick();
+	}
+
+	test('Undo after the edit landed shows the old values on a row the list reloaded', async () => {
+		const landed = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
+		const restored = { ...saved, updatedAt: '2026-11-26T10:00:05.000Z' };
+		const restore = deferred();
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce(landed)
+			.mockReturnValueOnce(restore.promise);
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+		await Promise.resolve();
+		expect(shownExpense(landed)).toBe(landed);
+
+		pressUndo();
+		expect(shownExpense(landed)).toMatchObject({ amount: 40, description: 'Arco' });
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+
+		restore.resolve(restored);
+		await new Promise(resolve => setTimeout(resolve, 0));
+		expect(shownExpense(landed)).toMatchObject({ amount: 40, description: 'Arco' });
+		expect(editedRows([landed]).after).toEqual([expect.objectContaining({ amount: 40 })]);
+		expect(shownExpense(restored)).toBe(restored);
+	});
+
+	test('a failed Undo on a reloaded row marks that row as failed', async () => {
+		const landed = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce(landed)
+			.mockRejectedValueOnce(new ApiError('down', 500));
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+		await Promise.resolve();
+		pressUndo();
+		await vi.waitFor(() => expect(editFailureStates([landed])).toHaveLength(1));
+	});
+
+	test('Undo restores a cleared financing link but never resends another kind of link', async () => {
+		vi.mocked(expenseApi.updateExpense).mockResolvedValue(changed);
+		const financed = { ...saved, sourceType: 'financing', sourceId: 'loan-1' };
+		const unlinked = { vehicleId: 'v1', category: 'fuel', amount: 55, sourceType: null };
+		scheduleEdit(financed, changed, unlinked as never);
+		pressUndo();
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith(
+			'e1',
+			expect.objectContaining({ sourceType: 'financing', sourceId: 'loan-1' })
+		);
+
+		resetPendingEdits();
+		vi.mocked(expenseApi.updateExpense).mockClear();
+		const reminder = { ...saved, sourceType: 'reminder', sourceId: 'rem-1' };
+		scheduleEdit(reminder, changed, payload);
+		pressUndo();
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+		const [, restore] = vi.mocked(expenseApi.updateExpense).mock.calls[1] ?? [];
+		expect(restore).not.toHaveProperty('sourceType');
+	});
+
+	test('a failed Undo says the undo failed, not the edit', async () => {
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce(changed)
+			.mockRejectedValueOnce(new ApiError('down', 500));
+		scheduleEdit(saved, changed, payload);
+		pressUndo();
+		await vi.waitFor(() =>
+			expect(
+				notices().some(n => n['message'] === "Couldn't undo your changes to the expense")
+			).toBe(true)
+		);
 	});
 
 	test('a failed PUT reverts the row, keeps its reason, and offers Retry once', async () => {

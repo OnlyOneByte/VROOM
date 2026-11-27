@@ -4,6 +4,7 @@ import { expenseApi } from '#lib/services/expense-api.ts';
 import type { Expense } from '#lib/types/index.ts';
 import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
+import { UNDO_WINDOW_MS } from '#lib/utils/pending-deletes.svelte.ts';
 
 type EditPayload = Parameters<typeof expenseApi.updateExpense>[1];
 
@@ -14,6 +15,9 @@ interface PendingEdit {
 	status: 'saving' | 'saved' | 'failed';
 	error?: string;
 	seq: number;
+	savedAt?: string;
+	undo?: boolean;
+	undoneAt?: string;
 }
 
 const toastId = (id: string) => `expense-edit-${id}`;
@@ -31,14 +35,23 @@ function settle(id: string, seq: number, change: Partial<PendingEdit>): boolean 
 
 async function put(id: string, seq: number, payload: EditPayload): Promise<void> {
 	try {
-		await expenseApi.updateExpense(id, payload);
-		settle(id, seq, { status: 'saved' });
+		const saved: Expense | undefined = await expenseApi.updateExpense(id, payload);
+		const entry = edits.get(id);
+		if (!entry) return;
+		const stamp = saved?.updatedAt;
+		if (entry.seq === seq) {
+			edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
+		} else if (entry.undo && !entry.undoneAt && stamp) {
+			edits.set(id, { ...entry, undoneAt: stamp });
+		}
 	} catch (error) {
 		const reason = userFacingErrorMessage(error);
 		if (!settle(id, seq, { status: 'failed', error: reason })) return;
 		appStore.addNotification({
 			type: 'error',
-			message: "Your changes to the expense weren't saved",
+			message: edits.get(id)?.undo
+				? "Couldn't undo your changes to the expense"
+				: "Your changes to the expense weren't saved",
 			description: reason,
 			toastId: toastId(id),
 			duration: Number.POSITIVE_INFINITY,
@@ -59,14 +72,61 @@ function send(id: string): void {
 	});
 }
 
-export function scheduleEdit(before: Expense, after: Expense, payload: EditPayload): void {
+export function scheduleEdit(
+	before: Expense,
+	after: Expense,
+	payload: EditPayload,
+	toast: { message: string; description?: string | undefined } = {
+		message: 'Expense updated successfully'
+	}
+): void {
 	edits.set(before.id, { before, after, payload, status: 'saving', seq: ++nextSeq });
 	appStore.addNotification({
 		type: 'success',
-		message: 'Expense updated successfully',
-		toastId: toastId(before.id)
+		...toast,
+		toastId: toastId(before.id),
+		duration: UNDO_WINDOW_MS,
+		action: { label: 'Undo', onClick: () => undoEdit(before.id) }
 	});
 	send(before.id);
+}
+
+function restorePayload({ before, payload }: PendingEdit): EditPayload {
+	return {
+		vehicleId: before.vehicleId,
+		tags: before.tags,
+		category: before.category,
+		amount: before.amount,
+		date: before.date,
+		mileage: before.mileage,
+		volume: before.volume,
+		charge: before.charge,
+		fuelType: before.fuelType,
+		description: before.description,
+		location: before.location,
+		currency: before.currency,
+		missedFillup: before.missedFillup,
+		...(payload.sourceType === null &&
+			before.sourceType === 'financing' &&
+			before.sourceId && { sourceType: before.sourceType, sourceId: before.sourceId }),
+		...('paidByDriverId' in payload && { paidByDriverId: before.paidByDriverId ?? null })
+	};
+}
+
+export function undoEdit(id: string): void {
+	const entry = edits.get(id);
+	if (!entry) return;
+	appStore.dismissToast(toastId(id));
+	edits.set(id, {
+		before: entry.before,
+		after: entry.before,
+		payload: restorePayload(entry),
+		status: 'saving',
+		seq: ++nextSeq,
+		undo: true,
+		...(entry.savedAt && { undoneAt: entry.savedAt })
+	});
+	send(id);
 }
 
 export function retryEdit(id: string): void {
@@ -77,10 +137,15 @@ export function retryEdit(id: string): void {
 	send(id);
 }
 
+function covers(entry: PendingEdit, expense: Expense): boolean {
+	if (expense.updatedAt === entry.before.updatedAt) return true;
+	return entry.undo === true && expense.updatedAt === entry.undoneAt;
+}
+
 function overlay(expense: Expense): PendingEdit | undefined {
 	const entry = edits.get(expense.id);
 	if (!entry || entry.status === 'failed') return undefined;
-	return entry.before.updatedAt === expense.updatedAt ? entry : undefined;
+	return covers(entry, expense) ? entry : undefined;
 }
 
 export function shownExpense<T extends Expense>(expense: T): T {
@@ -105,7 +170,7 @@ export function editFailureStates(expenses: readonly Expense[]): [string, Pendin
 	const states: [string, PendingRowState][] = [];
 	for (const expense of expenses) {
 		const entry = edits.get(expense.id);
-		if (entry?.status === 'failed' && entry.before.updatedAt === expense.updatedAt) {
+		if (entry?.status === 'failed' && covers(entry, expense)) {
 			states.push([expense.id, { status: 'failed', kind: 'edit', error: entry.error ?? '' }]);
 		}
 	}

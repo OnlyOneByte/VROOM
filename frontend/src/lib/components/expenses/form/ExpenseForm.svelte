@@ -17,6 +17,7 @@
 		amountPlaceholder,
 		dateOnlyToISO,
 		formatDate,
+		formatDateWith,
 		getCurrencySymbol,
 		toDateInputValue
 	} from '#lib/utils/formatters.ts';
@@ -26,7 +27,9 @@
 		Info,
 		CircleAlert,
 		TriangleAlert,
-		ChevronDown
+		ChevronDown,
+		Copy,
+		Trash2
 	} from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -51,6 +54,7 @@
 	import { convertVolume, distanceSinceLast } from './expense-form/mileage-efficiency';
 	import type { ReceiptDraft } from '#lib/services/vlm-api.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 	import {
 		ExpenseFormState,
 		FUEL_NEEDS_VEHICLE_MESSAGE,
@@ -72,10 +76,8 @@
 	import SplitVehiclePicker from './expense-form/SplitVehiclePicker.svelte';
 	import MileageField from './expense-form/MileageField.svelte';
 	import ExpenseFormHeader from './expense-form/ExpenseFormHeader.svelte';
-	import ExpenseActionBar from './expense-form/ExpenseActionBar.svelte';
 	import ExpenseSaveRow from './expense-form/ExpenseSaveRow.svelte';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
-	import DemoSaveNote from '#lib/components/common/demo-save-note.svelte';
 	import ExpenseDeleteDialog from './expense-form/ExpenseDeleteDialog.svelte';
 	import ExpenseAmountField from './expense-form/ExpenseAmountField.svelte';
 	import ExpenseSplitBreakdown from './expense-form/ExpenseSplitBreakdown.svelte';
@@ -204,7 +206,6 @@
 	let energyMode = $state<EnergyMode>('fuel');
 	let detailsOpen = $state(false);
 
-	const quickActions = $derived(!form.isEditMode);
 	const quickAdd = $derived(!form.isEditMode && !form.queuedExpense);
 	const sinceLast = $derived(distanceSinceLast(form.formData.mileage, form.previousFuelHint));
 	const payerEntry = $derived(
@@ -215,6 +216,7 @@
 				}
 			: undefined
 	);
+	const showsPayer = $derived(!form.isSplit && !form.isLoading && !!form.formData.vehicleId);
 	const showsSubtitle = $derived(form.isEditMode || !!form.queuedExpense || !onlineStatus.current);
 	const dateLabel = $derived(
 		form.formData.date === toDateInputValue(new Date())
@@ -264,7 +266,16 @@
 		);
 	}
 
-	const formTitle = $derived(
+	const categoryLabel = $derived(
+		Object.entries(EXPENSE_CATEGORY_INFO).find(([key]) => key === form.formData.category)?.[1]
+			.shortLabel
+	);
+	const editTitle = $derived(
+		form.originalExpense?.description?.trim() ||
+			categoryLabel ||
+			(form.isGroupEditMode ? 'Split expense' : 'Expense')
+	);
+	const plainTitle = $derived(
 		form.isGroupEditMode
 			? 'Edit Split Expense'
 			: form.isEditMode
@@ -273,6 +284,13 @@
 					? 'Edit Queued Expense'
 					: 'New expense'
 	);
+	const formTitle = $derived(form.isEditMode ? editTitle : plainTitle);
+	const editDate = $derived(
+		form.isEditMode && form.formData.date
+			? formatDateWith(new Date(`${form.formData.date}T00:00`), { month: 'short', day: 'numeric' })
+			: null
+	);
+	const backLabel = $derived(returnTo.startsWith('/expenses') ? 'Expenses' : 'Back');
 
 	const demo = $derived(authStore.user?.demo === true);
 
@@ -355,6 +373,10 @@
 		gotoWithQuery(resolve(routes.expenseNew), buildDuplicateQuery(returnTo, form.formData));
 	}
 
+	function keepFieldFocus(event: MouseEvent) {
+		event.preventDefault();
+	}
+
 	function confirmDelete() {
 		form.showDeleteConfirm = true;
 	}
@@ -363,6 +385,74 @@
 		form.groupId && form.originalExpense ? form.originalExpense.id : null
 	);
 </script>
+
+{#snippet detailsBody()}
+	<fieldset
+		disabled={form.isGroupEditMode}
+		class="min-w-0 space-y-5 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
+	>
+		{#if !form.showFuelFields && form.asksForMileage}
+			{@render mileageField()}
+		{/if}
+
+		{#if form.showFuelFields && form.vehicle}
+			{#key energyMode}
+				<FuelTypeFields
+					{energyMode}
+					bind:fuelType={form.formData.fuelType}
+					bind:missedFillup={form.formData.missedFillup}
+					onBlur={form.handleBlur}
+				/>
+			{/key}
+		{/if}
+
+		{#await notesFields then { default: ExpenseNotesFields }}
+			<ExpenseNotesFields
+				bind:description={form.formData.description}
+				bind:location={form.formData.location}
+				bind:tags={form.formData.tags}
+				tagError={form.errors['tags']}
+				tagTouched={form.touched['tags']}
+				tagSuggestions={form.tagSuggestions}
+			/>
+		{/await}
+	</fieldset>
+
+	{#if form.isEditMode}
+		{#if form.originalExpense}
+			<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
+		{/if}
+	{:else if form.queuedPhotosUnreadable && form.queuedExpense?.clientId}
+		{@const clientId = form.queuedExpense.clientId}
+		<div class="space-y-2" data-testid="queued-photos-unreadable">
+			<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
+			<p id="queued-photos-message" class="text-sm text-muted-foreground">
+				Couldn't load this entry's photos, so they can't be changed here. They stay saved with it
+				and will sync as they are.
+			</p>
+			<Button
+				variant="outline"
+				size="lg"
+				aria-describedby="queued-photos-message"
+				aria-disabled={isRetrying}
+				onclick={() => retryQueuedPhotos(clientId)}
+			>
+				Retry
+			</Button>
+			<p role="status" class="min-h-5 text-sm text-muted-foreground">
+				{#if photosRetryFailed}Still couldn't load them. Try again in a moment.{/if}
+			</p>
+		</div>
+	{:else}
+		<div bind:this={photoPicker}>
+			<PendingPhotoPreview
+				files={form.pendingFiles}
+				onAdd={file => (form.pendingFiles = [...form.pendingFiles, file])}
+				onRemove={i => (form.pendingFiles = form.pendingFiles.filter((_, idx) => idx !== i))}
+			/>
+		</div>
+	{/if}
+{/snippet}
 
 {#snippet mileageField()}
 	<MileageField
@@ -388,8 +478,87 @@
 			selectedVehicleIds={form.selectedVehicleIds}
 			vehicles={form.vehicles}
 			vehicle={form.vehicle}
+		/>{#if editDate}<span>{` · ${editDate}`}</span>{/if}
+	{/if}
+{/snippet}
+
+{#snippet vehicleField(field: boolean)}
+	<VehicleSelectField
+		vehicles={form.vehicles}
+		value={form.formData.vehicleId}
+		error={vehicleError}
+		describedBy={form.showFuelSplitHint ? 'fuel-split-hint' : undefined}
+		canSplit={form.canSplit}
+		{field}
+		onSelect={form.handleVehicleSelect}
+		onSplit={() => form.handleSplitToggle(true)}
+	/>
+{/snippet}
+
+{#snippet dateField(className: string)}
+	<DatePicker
+		id="date"
+		bind:value={form.formData.date}
+		placeholder="Select date"
+		label={dateLabel}
+		disabled={form.isGroupEditMode}
+		class={className}
+		aria-invalid={!!dateError}
+		aria-describedby={dateError ? 'date-error' : undefined}
+	/>
+{/snippet}
+
+{#snippet driverChip()}
+	{#if showsPayer}
+		<DriverChip
+			id="expense-paid-by"
+			label="Paid by"
+			vehicleId={form.formData.vehicleId}
+			bind:value={form.paidByDriverId}
+			sharing={showsDriverChip(form.vehicles.find(v => v.id === form.formData.vehicleId)) ?? false}
+			entry={payerEntry}
 		/>
 	{/if}
+{/snippet}
+
+{#snippet categoryField(select: boolean)}
+	<CategorySelector
+		value={form.formData.category}
+		disabledValues={form.isSplit && !form.isGroupEditMode ? ['fuel'] : []}
+		error={form.errors['category']}
+		touched={form.touched['category']}
+		quick={quickAdd}
+		{select}
+		onSelect={form.selectCategory}
+	/>
+{/snippet}
+
+{#snippet editActions()}
+	<div class="flex flex-wrap gap-2">
+		{#if form.canDuplicate}
+			<Button
+				type="button"
+				variant="outline"
+				onmousedown={keepFieldFocus}
+				onclick={handleDuplicate}
+				disabled={form.isSubmitting || form.isDeleting}
+			>
+				<Copy aria-hidden="true" />
+				Duplicate
+			</Button>
+		{/if}
+		<Button
+			type="button"
+			variant="outline"
+			class="text-destructive hover:text-destructive"
+			onmousedown={keepFieldFocus}
+			onclick={confirmDelete}
+			disabled={demo || form.isSubmitting || form.isDeleting}
+		>
+			<Trash2 aria-hidden="true" />
+			Delete
+		</Button>
+	</div>
 {/snippet}
 
 {#snippet createHeader()}
@@ -398,6 +567,9 @@
 		onBack={handleBack}
 		subtitle={showsSubtitle ? formSubtitle : undefined}
 		quick={quickAdd}
+		edit={form.isEditMode}
+		{backLabel}
+		actions={form.isEditMode ? editActions : undefined}
 	/>
 {/snippet}
 
@@ -427,7 +599,12 @@
 				class="flex items-start justify-center gap-1 border-b-2 border-transparent font-(family-name:--font-fig) leading-none font-bold text-muted-foreground"
 				aria-hidden="true"
 			>
-				<span class="mt-1.5 text-3xl sm:mt-2 sm:text-5xl">{getCurrencySymbol()}</span>
+				<span
+					class="mt-1.5 text-3xl sm:mt-2 sm:text-5xl {settingsStore.settings ? '' : 'invisible'}"
+					data-testid="loading-currency"
+				>
+					{getCurrencySymbol()}
+				</span>
 				<span class="text-7xl tabular-nums sm:text-8xl">{amountPlaceholder()}</span>
 			</p>
 			<div class="space-y-4 sm:space-y-6">
@@ -480,7 +657,7 @@
 	{:else if form.vehiclesError}
 		<div class="space-y-6">
 			<ExpenseFormHeader
-				title={formTitle}
+				title={plainTitle}
 				onBack={handleBack}
 				subtitle={showsSubtitle ? formSubtitle : undefined}
 			/>
@@ -500,14 +677,13 @@
 		</div>
 	{:else}
 		<div
-			class="{quickActions ? '' : 'pb-32 sm:pb-24 lg:pb-0 short:pb-0'} {quickAdd
+			class={quickAdd
 				? 'mx-auto max-w-[34rem] space-y-2 sm:space-y-6'
-				: 'space-y-6'}"
+				: form.isEditMode
+					? 'max-w-[40rem] space-y-6'
+					: 'space-y-6'}
 		>
 			{@render createHeader()}
-			{#if demo && !quickActions}
-				<DemoSaveNote id={null} class="lg:hidden short:hidden" />
-			{/if}
 
 			<form
 				bind:this={formEl}
@@ -518,7 +694,9 @@
 				}}
 				class={quickAdd
 					? 'space-y-4 sm:space-y-6'
-					: 'space-y-5 sm:rounded-lg sm:border sm:bg-card sm:p-6'}
+					: form.isEditMode
+						? 'space-y-5'
+						: 'space-y-5 sm:rounded-lg sm:border sm:bg-card sm:p-6'}
 			>
 				{#if quickAdd}
 					{@render amountField()}
@@ -564,46 +742,39 @@
 					/>
 				{/if}
 
-				<div class="space-y-2 {quickAdd ? '-mt-2 text-center' : ''}">
-					<div class="flex flex-wrap items-center gap-2 {quickAdd ? 'justify-center' : ''}">
+				{#if form.isEditMode}
+					<div class="grid gap-x-3 gap-y-5 sm:grid-cols-2" data-testid="expense-edit-grid">
+						{@render amountField()}
+						<div class="min-w-0 space-y-2">
+							<Label for="date">Date *</Label>
+							{@render dateField('w-full')}
+						</div>
+						<fieldset disabled={form.isGroupEditMode} class="contents">
+							{@render categoryField(true)}
+						</fieldset>
 						{#if !form.isSplit}
-							<VehicleSelectField
-								vehicles={form.vehicles}
-								value={form.formData.vehicleId}
-								error={vehicleError}
-								describedBy={form.showFuelSplitHint ? 'fuel-split-hint' : undefined}
-								canSplit={form.canSplit}
-								onSelect={form.handleVehicleSelect}
-								onSplit={() => form.handleSplitToggle(true)}
-							/>
-						{/if}
-						<Label for="date" class="sr-only">Date *</Label>
-						<DatePicker
-							id="date"
-							bind:value={form.formData.date}
-							placeholder="Select date"
-							label={dateLabel}
-							disabled={form.isGroupEditMode}
-							class="h-10 w-auto rounded-full px-3.5"
-							aria-invalid={!!dateError}
-							aria-describedby={dateError ? 'date-error' : undefined}
-						/>
-						{#if !form.isSplit && !form.isLoading && form.formData.vehicleId}
-							<DriverChip
-								id="expense-paid-by"
-								label="Paid by"
-								vehicleId={form.formData.vehicleId}
-								bind:value={form.paidByDriverId}
-								sharing={showsDriverChip(
-									form.vehicles.find(v => v.id === form.formData.vehicleId)
-								) ?? false}
-								entry={payerEntry}
-							/>
-						{/if}
-						{#if canScanReceipt}
-							<ReceiptScanButton onDraft={handleReceiptDraft} />
+							<div class="min-w-0 space-y-2">
+								{@render vehicleField(true)}
+							</div>
 						{/if}
 					</div>
+				{/if}
+				<div class="space-y-2 empty:hidden {quickAdd ? '-mt-2 text-center' : ''}">
+					{#if !form.isEditMode}
+						<div class="flex flex-wrap items-center gap-2 {quickAdd ? 'justify-center' : ''}">
+							{#if !form.isSplit}
+								{@render vehicleField(false)}
+							{/if}
+							<Label for="date" class="sr-only">Date *</Label>
+							{@render dateField('h-10 w-auto rounded-full px-3.5')}
+							{@render driverChip()}
+							{#if canScanReceipt}
+								<ReceiptScanButton onDraft={handleReceiptDraft} />
+							{/if}
+						</div>
+					{:else if showsPayer}
+						<div class="flex empty:hidden">{@render driverChip()}</div>
+					{/if}
 					{#if vehicleError}
 						<FormFieldError id="vehicleId-error">{vehicleError}</FormFieldError>
 					{/if}
@@ -657,7 +828,7 @@
 					{/if}
 				</div>
 
-				{#if !quickAdd}
+				{#if !quickAdd && !form.isEditMode}
 					{@render amountField()}
 				{/if}
 
@@ -676,16 +847,11 @@
 
 				<fieldset
 					disabled={form.isGroupEditMode}
-					class="min-w-0 space-y-5 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
+					class="min-w-0 space-y-5 empty:hidden disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
 				>
-					<CategorySelector
-						value={form.formData.category}
-						disabledValues={form.isSplit && !form.isGroupEditMode ? ['fuel'] : []}
-						error={form.errors['category']}
-						touched={form.touched['category']}
-						quick={quickAdd}
-						onSelect={form.selectCategory}
-					/>
+					{#if !form.isEditMode}
+						{@render categoryField(false)}
+					{/if}
 
 					{#if form.isFinancingPayment}
 						<div class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
@@ -729,90 +895,31 @@
 					{/if}
 				</fieldset>
 
-				<Collapsible bind:open={detailsOpen}>
-					<CollapsibleTrigger
-						class="flex min-h-12 w-full items-center justify-between gap-3 text-left font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 {quickAdd
-							? 'border-y px-0 hover:underline'
-							: 'rounded-md border bg-background px-3 text-sm hover:bg-muted'}"
-					>
-						<span class="shrink-0">More details</span>
-						<span class="flex min-w-0 items-center gap-1 text-xs font-normal text-muted-foreground">
-							<span class="truncate">{detailsSummary}</span>
-							<ChevronDown
-								class="size-4 shrink-0 transition-transform {detailsOpen ? 'rotate-180' : ''}"
-								aria-hidden="true"
-							/>
-						</span>
-					</CollapsibleTrigger>
-					<CollapsibleContent class="space-y-5 pt-5">
-						<fieldset
-							disabled={form.isGroupEditMode}
-							class="min-w-0 space-y-5 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
+				{#if form.isEditMode}
+					{@render detailsBody()}
+				{:else}
+					<Collapsible bind:open={detailsOpen}>
+						<CollapsibleTrigger
+							class="flex min-h-12 w-full items-center justify-between gap-3 text-left font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 {quickAdd
+								? 'border-y px-0 hover:underline'
+								: 'rounded-md border bg-background px-3 text-sm hover:bg-muted'}"
 						>
-							{#if !form.showFuelFields && form.asksForMileage}
-								{@render mileageField()}
-							{/if}
-
-							{#if form.showFuelFields && form.vehicle}
-								{#key energyMode}
-									<FuelTypeFields
-										{energyMode}
-										bind:fuelType={form.formData.fuelType}
-										bind:missedFillup={form.formData.missedFillup}
-										onBlur={form.handleBlur}
-									/>
-								{/key}
-							{/if}
-
-							{#await notesFields then { default: ExpenseNotesFields }}
-								<ExpenseNotesFields
-									bind:description={form.formData.description}
-									bind:location={form.formData.location}
-									bind:tags={form.formData.tags}
-									tagError={form.errors['tags']}
-									tagTouched={form.touched['tags']}
-									tagSuggestions={form.tagSuggestions}
+							<span class="shrink-0">More details</span>
+							<span
+								class="flex min-w-0 items-center gap-1 text-xs font-normal text-muted-foreground"
+							>
+								<span class="truncate">{detailsSummary}</span>
+								<ChevronDown
+									class="size-4 shrink-0 transition-transform {detailsOpen ? 'rotate-180' : ''}"
+									aria-hidden="true"
 								/>
-							{/await}
-						</fieldset>
-
-						{#if form.isEditMode}
-							{#if form.originalExpense}
-								<ExpensePhotoSection entityType="expense" entityId={form.originalExpense.id} />
-							{/if}
-						{:else if form.queuedPhotosUnreadable && form.queuedExpense?.clientId}
-							{@const clientId = form.queuedExpense.clientId}
-							<div class="space-y-2" data-testid="queued-photos-unreadable">
-								<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
-								<p id="queued-photos-message" class="text-sm text-muted-foreground">
-									Couldn't load this entry's photos, so they can't be changed here. They stay saved
-									with it and will sync as they are.
-								</p>
-								<Button
-									variant="outline"
-									size="lg"
-									aria-describedby="queued-photos-message"
-									aria-disabled={isRetrying}
-									onclick={() => retryQueuedPhotos(clientId)}
-								>
-									Retry
-								</Button>
-								<p role="status" class="min-h-5 text-sm text-muted-foreground">
-									{#if photosRetryFailed}Still couldn't load them. Try again in a moment.{/if}
-								</p>
-							</div>
-						{:else}
-							<div bind:this={photoPicker}>
-								<PendingPhotoPreview
-									files={form.pendingFiles}
-									onAdd={file => (form.pendingFiles = [...form.pendingFiles, file])}
-									onRemove={i =>
-										(form.pendingFiles = form.pendingFiles.filter((_, idx) => idx !== i))}
-								/>
-							</div>
-						{/if}
-					</CollapsibleContent>
-				</Collapsible>
+							</span>
+						</CollapsibleTrigger>
+						<CollapsibleContent class="space-y-5 pt-5">
+							{@render detailsBody()}
+						</CollapsibleContent>
+					</Collapsible>
+				{/if}
 
 				{#if form.submitError}
 					<FormFieldError
@@ -825,26 +932,14 @@
 					</FormFieldError>
 				{/if}
 
-				{#if quickActions}
-					<ExpenseSaveRow isSubmitting={form.isSubmitting} onCancel={handleBack} quick={quickAdd} />
-				{/if}
-			</form>
-
-			{#if !quickActions}
-				{#if demo}
-					<DemoSaveNote class="mt-6 text-center sm:text-right" />
-				{/if}
-				<ExpenseActionBar
-					isEditMode={form.isEditMode}
-					canDuplicate={form.canDuplicate}
+				<ExpenseSaveRow
 					isSubmitting={form.isSubmitting}
-					isDeleting={form.isDeleting}
-					onDelete={confirmDelete}
-					onDuplicate={handleDuplicate}
 					onCancel={handleBack}
-					onSave={save}
+					quick={quickAdd}
+					edit={form.isEditMode}
+					disabled={form.isDeleting}
 				/>
-			{/if}
+			</form>
 		</div>
 	{/if}
 
