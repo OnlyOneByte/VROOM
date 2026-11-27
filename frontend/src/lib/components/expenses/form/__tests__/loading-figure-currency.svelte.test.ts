@@ -36,7 +36,7 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 
 describe('the quick-add loading figure', () => {
-	test("keeps the currency symbol hidden until the car loads, since it is the owner's currency", async () => {
+	test("keeps the currency symbol hidden while the cars are still loading, since it is the owner's currency", async () => {
 		render(ExpenseForm);
 		await tick();
 

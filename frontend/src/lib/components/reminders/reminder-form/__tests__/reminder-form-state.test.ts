@@ -29,9 +29,11 @@ describe('ReminderFormState', () => {
 
 	test.each([
 		['JPY', [49, 51], undefined],
+		['JPY', [49.6, 50.4], 'Split amounts must be whole numbers'],
+		['USD', [49.6, 50.4], undefined],
 		['USD', [49.6, 50], 'Split amounts must total the expense amount']
 	])(
-		"a reminder's split total is checked in its cars' owner currency (%s)",
+		"a reminder's split is checked in its cars' owner currency (%s %j)",
 		(code, [first, second], error) => {
 			const form = new ReminderFormState();
 			form.load(null, [
