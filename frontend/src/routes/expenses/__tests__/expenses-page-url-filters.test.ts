@@ -458,7 +458,7 @@ describe('/expenses month totals after an Undo brings an expense back into a sea
 	}
 
 	test('an expense that does not match the search is not added back to the month totals', async () => {
-		expect(await undoWhileSearching('camry')).toBe(30);
+		expect(await undoWhileSearching('shell')).toBe(30);
 	});
 
 	test('an expense that matches the search is added back to the month totals', async () => {
