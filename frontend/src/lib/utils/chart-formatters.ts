@@ -66,8 +66,16 @@ export const TIME_X_PADDING: [number, number] = [16, 0];
 
 export function insetTimeTicks(ticks: unknown): TicksConfig | undefined {
 	if (typeof ticks !== 'number') return ticks as TicksConfig | undefined;
-	return (scale: AnyScale) =>
-		scale.ticks?.(ticks).filter((tick: Date) => scale(tick) >= TIME_X_PADDING[0]);
+	return (scale: AnyScale) => {
+		const inside: Date[] | undefined = scale
+			.ticks?.(ticks)
+			.filter((tick: Date) => scale(tick) >= TIME_X_PADDING[0]);
+		if (!inside) return inside;
+		const step = Math.ceil(inside.length / Math.max(1, ticks));
+		const firstJanuary = inside.findIndex(tick => tick.getMonth() === 0 && tick.getDate() === 1);
+		const phase = firstJanuary < 0 ? 0 : firstJanuary % step;
+		return inside.filter((_, i) => i % step === phase);
+	};
 }
 
 export const SMOOTH_CURVE = curveMonotoneX;
