@@ -600,10 +600,7 @@
 				class="flex items-start justify-center gap-1 border-b-2 border-transparent font-(family-name:--font-fig) leading-none font-bold text-muted-foreground"
 				aria-hidden="true"
 			>
-				<span
-					class="mt-1.5 text-3xl sm:mt-2 sm:text-5xl {settingsStore.settings ? '' : 'invisible'}"
-					data-testid="loading-currency"
-				>
+				<span class="invisible mt-1.5 text-3xl sm:mt-2 sm:text-5xl" data-testid="loading-currency">
 					{getCurrencySymbol()}
 				</span>
 				<span class="text-7xl tabular-nums sm:text-8xl">{amountPlaceholder()}</span>
