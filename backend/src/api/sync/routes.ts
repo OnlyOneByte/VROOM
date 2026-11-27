@@ -141,7 +141,7 @@ routes.get('/status', authorize(ownAccount), async (c) => {
   const providers = config?.providers;
   const providerRows = providers
     ? await appContext()
-        .db.select({
+        .asyncDb.select({
           id: userProviders.id,
           providerType: userProviders.providerType,
           status: userProviders.status,
@@ -218,7 +218,7 @@ routes.post(
     const user = c.get('user');
     const body = restoreFromProviderSchema.parse(await readJsonBody(c));
 
-    const db = appContext().db;
+    const db = appContext().asyncDb;
     const providerRow = await db
       .select()
       .from(userProviders)
@@ -317,7 +317,7 @@ export interface RestoreProviderInfo {
 
 routes.get('/restore/providers', syncRateLimiter, authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const db = appContext().db;
+  const db = appContext().asyncDb;
   const providers = await db
     .select()
     .from(userProviders)

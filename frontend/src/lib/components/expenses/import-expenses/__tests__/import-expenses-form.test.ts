@@ -223,7 +223,7 @@ describe('ImportExpensesForm: committing an import', () => {
 		mocks.importExpensesCsv.mockResolvedValue(previewResult({ readyCount: 0, errorCount: 2 }));
 		const form = new ImportExpensesForm(() => [CAMRY]);
 		await form.loadFile(new File([FOREIGN_CSV], 'bank.csv'));
-		form.setManualColumn('date', 'Transaction Date');
+		form.setColumnField('Transaction Date', 'date');
 		await flush();
 		const onImported = vi.fn();
 		const callsBeforeCommit = mocks.importExpensesCsv.mock.calls.length;
@@ -544,22 +544,41 @@ describe('ImportExpensesForm: a new file replaces the old preview at once', () =
 
 	test('choosing another category column drops the old column’s words and picks', async () => {
 		const form = new ImportExpensesForm(() => [CAMRY]);
-		await form.loadFile(new File([FOREIGN_CSV], 'foreign.csv'));
-		form.setManualColumn('date', 'Transaction Date');
-		form.setManualColumn('amount', 'Spent');
+		const csv = 'Transaction Date,Spent,Kind,Type\n2026-01-02,40,gas,ferry';
+		await form.loadFile(new File([csv], 'foreign.csv'));
+		form.setColumnField('Transaction Date', 'date');
+		form.setColumnField('Spent', 'amount');
 		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ unmappedCategories: ['gas'] }));
-		form.setManualColumn('category', 'Kind');
+		form.setColumnField('Kind', 'category');
 		await flush();
 		form.setCategoryRemap('gas', 'fuel');
 		await flush();
 		expect(form.unmappedCategories).toEqual(['gas']);
 
 		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ unmappedCategories: ['ferry'] }));
-		form.setManualColumn('category', 'Spent');
+		form.setColumnField('Type', 'category');
 		await flush();
 
 		expect(form.unmappedCategories).toEqual(['ferry']);
 		expect(form.categoryRemap).toEqual({});
+	});
+
+	test('mapping an unrelated column keeps the category picks', async () => {
+		const form = new ImportExpensesForm(() => [CAMRY]);
+		const csv = 'Transaction Date,Spent,Kind,Type\n2026-01-02,40,gas,ferry';
+		await form.loadFile(new File([csv], 'foreign.csv'));
+		form.setColumnField('Transaction Date', 'date');
+		form.setColumnField('Spent', 'amount');
+		mocks.importExpensesCsv.mockResolvedValueOnce(previewResult({ unmappedCategories: ['gas'] }));
+		form.setColumnField('Kind', 'category');
+		await flush();
+		form.setCategoryRemap('gas', 'fuel');
+		await flush();
+
+		form.setColumnField('Type', 'description');
+		await flush();
+
+		expect(form.categoryRemap).toEqual({ gas: 'fuel' });
 	});
 
 	test('a failed re-preview drops the old result instead of leaving it importable', async () => {

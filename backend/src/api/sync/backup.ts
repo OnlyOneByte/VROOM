@@ -420,7 +420,7 @@ class BackupService {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
 
-    const db = appContext().db;
+    const db = appContext().asyncDb;
     const { userProviders } = await import('../../db/schema');
     const providerRow = await db
       .select()
@@ -461,7 +461,7 @@ class BackupService {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
 
-    const db = appContext().db;
+    const db = appContext().asyncDb;
     const { userProviders } = await import('../../db/schema');
     const providerRow = await db
       .select()
@@ -500,7 +500,7 @@ class BackupService {
     if (Object.keys(config.providers).length === 0) return results;
 
     const providerRows = await appContext()
-      .db.select()
+      .asyncDb.select()
       .from(userProviders)
       .where(eq(userProviders.userId, userId));
     const providersById = new Map(providerRows.map((row) => [row.id, row]));
@@ -542,7 +542,7 @@ class BackupService {
   }
 
   async createBackup(userId: string): Promise<BackupData> {
-    const db = appContext().db;
+    const db = appContext().asyncDb;
     const [
       userVehicles,
       userExpenses,
@@ -677,7 +677,7 @@ class BackupService {
     const identities: Record<string, string> = {};
     for (const batch of chunk([...new Set(providerIds)])) {
       const rows = await appContext()
-        .db.select()
+        .asyncDb.select()
         .from(userProviders)
         .where(and(inArray(userProviders.id, batch), eq(userProviders.userId, userId)));
       for (const row of rows) {

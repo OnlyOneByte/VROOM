@@ -234,9 +234,16 @@ export class ImportExpensesForm {
 		this.runPreview();
 	}
 
-	setManualColumn(field: NativeImportField, header: string) {
-		this.manualColumns = { ...this.manualColumns, [field]: header };
-		if (field === 'category') {
+	setColumnField(header: string, field: NativeImportField | '') {
+		if (!header) return;
+		const next: ManualColumns = { ...this.manualColumns };
+		for (const key of Object.keys(next) as NativeImportField[]) {
+			if (next[key] === header) delete next[key];
+		}
+		if (field) next[field] = header;
+		const categoryChanged = (next.category ?? '') !== (this.manualColumns.category ?? '');
+		this.manualColumns = next;
+		if (categoryChanged) {
 			this.unmappedCategories = [];
 			this.categoryRemap = {};
 		}

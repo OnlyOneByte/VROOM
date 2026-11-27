@@ -50,7 +50,7 @@ function makeDeps(): SyncWorkerDeps {
       findById: mockFindById,
     },
     registry: {
-      getProviderInternal: mockGetProvider,
+      getProvider: mockGetProvider,
       resolveProviderFolderPath: mockResolveFolderPath,
     },
   } as unknown as SyncWorkerDeps;
@@ -265,6 +265,14 @@ describe('processBatch', () => {
       .mockResolvedValueOnce(targetProvider);
 
     await processBatch(makeDeps());
+
+    expect(mockGetProvider).toHaveBeenCalledWith(activeRef.providerId, photo.userId);
+    expect(mockGetProvider).toHaveBeenCalledWith(pendingRef.providerId, photo.userId);
+    expect(mockResolveFolderPath).toHaveBeenCalledWith(
+      pendingRef.providerId,
+      photo.userId,
+      'vehicle_photos'
+    );
 
     expect(mockDownload).toHaveBeenCalledWith({
       providerType: 'google-drive',
