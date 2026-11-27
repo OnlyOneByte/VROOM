@@ -10,8 +10,7 @@
 		LoaderCircle
 	} from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Card, CardContent, CardHeader } from '#lib/components/ui/card/index.ts';
-	import { Separator } from '#lib/components/ui/separator/index.ts';
+	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Progress } from '#lib/components/ui/progress/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -147,20 +146,26 @@
 	);
 </script>
 
-<Card>
-	<CardHeader class="pb-3">
+<div class="border-b py-3 last:border-b-0" data-slot="provider-tile">
+	<div>
 		<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
 		<div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 			<div class="flex items-center gap-3 min-w-0">
-				<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-					<Icon class="h-5 w-5 text-muted-foreground" />
+				<div
+					class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+					aria-hidden="true"
+				>
+					<Icon class="size-5 text-foreground" />
 				</div>
 				<div class="min-w-0">
 					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 sm:flex-nowrap">
-						<p class="text-sm font-semibold truncate min-w-0">{provider.displayName}</p>
+						<p class="truncate min-w-0 font-medium">{provider.displayName}</p>
 						<ProviderStatusBadge status={provider.status} />
+						{#if lastBackupAt}
+							<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
+						{/if}
 					</div>
-					<p class="text-xs text-muted-foreground truncate">
+					<p class="text-sm text-muted-foreground truncate">
 						{#if provider.config?.['accountEmail']}
 							{provider.config['accountEmail']} ·
 						{/if}
@@ -203,9 +208,9 @@
 				</Button>
 			</div>
 		</div>
-	</CardHeader>
+	</div>
 
-	<CardContent class="pt-0">
+	<div class="mt-3 sm:pl-14">
 		<div class="space-y-3">
 			<ProviderHealth
 				{provider}
@@ -280,17 +285,12 @@
 					</Alert>
 				{/if}
 			{/if}
-			{#if lastBackupAt}
-				<p class="text-xs text-muted-foreground">Last backup: {formatLastSync(lastBackupAt)}</p>
-			{/if}
 		</div>
-	</CardContent>
+	</div>
 
 	{#if expanded}
-		<CardContent class="pt-0">
-			<Separator class="mb-4" />
-
-			<div class="space-y-3 mb-4">
+		<div class="mt-4 sm:pl-14">
+			<div class="mb-4 space-y-3 border-t pt-4">
 				<p class="text-sm font-medium text-muted-foreground">Provider Settings</p>
 				{#if details.length > 0}
 					<div class="space-y-1 text-sm">
@@ -304,9 +304,7 @@
 				{/if}
 			</div>
 
-			<Separator class="mb-4" />
-
-			<div class="space-y-3">
+			<div class="space-y-3 border-t pt-4">
 				<div class="flex items-center justify-between">
 					<p class="text-sm font-medium text-muted-foreground">
 						Storage · <span class="font-mono text-xs">
@@ -363,6 +361,6 @@
 					{/each}
 				{/if}
 			</div>
-		</CardContent>
+		</div>
 	{/if}
-</Card>
+</div>
