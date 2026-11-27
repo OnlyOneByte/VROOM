@@ -64,6 +64,44 @@ describe('the built-in text reader engine', () => {
     expect(starts).toBe(2);
   });
 
+  test('a start that crashes after its timeout has turned scans off is not tried again', async () => {
+    let starts = 0;
+    setLocalOcrForTest({
+      timeoutMs: 20,
+      createWorker: () => {
+        starts++;
+        return new Promise<Worker>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new OcrUnavailableError(
+                  'The text reader failed to start: RuntimeError: Unreachable code should not be executed'
+                )
+              ),
+            60
+          )
+        );
+      },
+    });
+    await expect(recognizeText(Buffer.from('a'))).rejects.toBeInstanceOf(OcrUnavailableError);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(starts).toBe(1);
+  });
+
+  test('a start failure that only mentions RuntimeError somewhere else is not retried', async () => {
+    let starts = 0;
+    setLocalOcrForTest({
+      createWorker: () => {
+        starts++;
+        return Promise.reject(
+          new OcrUnavailableError('The text reader model is broken (see RuntimeError notes)')
+        );
+      },
+    });
+    await expect(recognizeText(Buffer.from('a'))).rejects.toBeInstanceOf(OcrUnavailableError);
+    expect(starts).toBe(1);
+  });
+
   test('two engine crashes in a row while starting turn scans off until a restart', async () => {
     let starts = 0;
     setLocalOcrForTest({
