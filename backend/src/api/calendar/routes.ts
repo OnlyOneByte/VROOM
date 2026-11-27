@@ -59,7 +59,11 @@ function describe(feed: CalendarFeed | undefined) {
 }
 
 async function feedOf(userId: string): Promise<CalendarFeed | undefined> {
-  return appContext().db.select().from(calendarFeeds).where(eq(calendarFeeds.userId, userId)).get();
+  return appContext()
+    .asyncDb.select()
+    .from(calendarFeeds)
+    .where(eq(calendarFeeds.userId, userId))
+    .get();
 }
 
 routes.get('/feed/:file', feedRateLimiter, async (c) => {
@@ -67,14 +71,14 @@ routes.get('/feed/:file', feedRateLimiter, async (c) => {
   const token = escaped ? undefined : TOKEN_FILE.exec(c.req.param('file') ?? '')?.[1];
   const feed = token
     ? await appContext()
-        .db.select()
+        .asyncDb.select()
         .from(calendarFeeds)
         .where(eq(calendarFeeds.tokenHash, hashFeedToken(token)))
         .get()
     : undefined;
   if (!feed) throw new NotFoundError('Calendar feed');
   await appContext()
-    .db.update(calendarFeeds)
+    .asyncDb.update(calendarFeeds)
     .set({ lastUsedAt: new Date() })
     .where(eq(calendarFeeds.id, feed.id));
   const body = toIcs(await buildFeedEvents(feed.userId, { ...DEFAULT_OPTIONS, ...feed.options }));
@@ -100,7 +104,7 @@ routes.post(
     const token = randomBytes(32).toString('base64url');
     const tokenHash = hashFeedToken(token);
     await appContext()
-      .db.insert(calendarFeeds)
+      .asyncDb.insert(calendarFeeds)
       .values({ userId, tokenHash, options })
       .onConflictDoUpdate({
         target: calendarFeeds.userId,
@@ -126,7 +130,7 @@ routes.put(
     const existing = await feedOf(userId);
     if (!existing) throw new NotFoundError('Calendar feed');
     await appContext()
-      .db.update(calendarFeeds)
+      .asyncDb.update(calendarFeeds)
       .set({ options: { ...DEFAULT_OPTIONS, ...existing.options, ...c.req.valid('json').options } })
       .where(eq(calendarFeeds.id, existing.id));
     return c.json({ success: true, data: { feed: describe(await feedOf(userId)) } });
@@ -135,7 +139,7 @@ routes.put(
 
 routes.delete('/feed', requireAuth, authorize(ownAccount), async (c) => {
   await appContext()
-    .db.delete(calendarFeeds)
+    .asyncDb.delete(calendarFeeds)
     .where(eq(calendarFeeds.userId, c.get('user').id));
   return c.json({ success: true, data: { feed: null } });
 });

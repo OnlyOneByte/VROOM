@@ -949,6 +949,6 @@
 		isGroupEditMode={form.isGroupEditMode}
 		groupId={form.groupId}
 		originalExpense={form.originalExpense}
-		onConfirm={() => (demo ? Promise.resolve() : deleteExpense(form))}
+		onConfirm={() => deleteExpense(form)}
 	/>
 </FormLayout>

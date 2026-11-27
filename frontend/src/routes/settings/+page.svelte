@@ -8,10 +8,15 @@
 	import { ApiError, logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { routes } from '#lib/routes.ts';
-	import { LoaderCircle, ChevronRight, CircleAlert, Server } from '@lucide/svelte';
+	import { LoaderCircle, ChevronRight, CircleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
-	import { Avatar, AvatarFallback } from '#lib/components/ui/avatar/index.ts';
+	import {
+		Card,
+		CardAction,
+		CardContent,
+		CardHeader,
+		CardTitle
+	} from '#lib/components/ui/card/index.ts';
 	import UnitPreferencesCard from '#lib/components/settings/cards/UnitPreferencesCard.svelte';
 	import CommunityStatsCard from '#lib/components/settings/cards/CommunityStatsCard.svelte';
 	import ThemeCard from '#lib/components/settings/cards/ThemeCard.svelte';
@@ -25,7 +30,6 @@
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { signupApi } from '#lib/services/signup-api.ts';
 	import { can } from '#lib/utils/permissions.ts';
-	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import { toast } from 'svelte-sonner';
 	import type {
 		BackupConfig,
@@ -38,15 +42,13 @@
 
 	let user = $derived(authStore.user);
 
-	let initials = $derived.by(() => {
-		if (!user?.displayName) return '?';
-		return user.displayName
-			.split(' ')
-			.map((n: string) => n[0])
-			.join('')
-			.toUpperCase()
-			.slice(0, 2);
-	});
+	async function handleSignOut() {
+		try {
+			await authStore.logout();
+		} catch (error) {
+			appStore.showError(`Couldn't sign out. ${userFacingErrorMessage(error)}`);
+		}
+	}
 
 	let settings = $derived(settingsStore.settings);
 	let loadError = $derived(settingsStore.error && !settings ? settingsStore.error : null);
@@ -345,7 +347,7 @@
 	<meta name="description" content="Manage your preferences, units, and storage providers" />
 </svelte:head>
 
-<FormLayout>
+<div class="mx-auto w-full max-w-2xl lg:max-w-5xl">
 	<div class="mb-6">
 		<PageHeader title="Settings" description="Manage your preferences and data" />
 	</div>
@@ -365,78 +367,114 @@
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<a href={resolve(routes.profile)} class="block w-full text-left">
-				<Card class="hover:bg-accent/50 transition-colors cursor-pointer">
-					<CardContent class="flex items-center gap-4 py-5">
-						<Avatar class="h-12 w-12">
-							<AvatarFallback class="bg-primary/10 text-primary text-sm font-medium">
-								{initials}
-							</AvatarFallback>
-						</Avatar>
-						<div class="flex-1 min-w-0">
-							<p class="text-sm font-semibold text-foreground truncate">
-								{user?.displayName ?? 'User'}
-							</p>
-							<p class="text-xs text-muted-foreground truncate">
-								{user?.email ?? 'Account & profile settings'}
-							</p>
-						</div>
-						<ChevronRight class="h-5 w-5 text-muted-foreground flex-shrink-0" />
-					</CardContent>
-				</Card>
-			</a>
-
-			{#if managesServer}
-				<a
-					href={resolve(routes.settingsServer)}
-					class="block w-full text-left"
-					data-testid="settings-server-link"
-				>
-					<Card class="hover:bg-accent/50 transition-colors cursor-pointer">
-						<CardContent class="flex items-center gap-4 py-5">
-							<Server class="h-5 w-5 shrink-0 text-muted-foreground" />
-							<div class="flex-1 min-w-0">
-								<p class="text-sm font-semibold text-foreground">Server</p>
-								<p class="text-xs text-muted-foreground">Who can join, invites and new accounts</p>
+			<div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
+				<div class="space-y-6">
+					<ThemeCard />
+					<ThemePickerCard />
+					<UnitPreferencesCard
+						bind:distanceUnit
+						bind:volumeUnit
+						bind:chargeUnit
+						bind:currencyUnit
+						onUnitsChange={saveUnits}
+						onCurrencyChange={saveCurrency}
+					/>
+					{#if settings.communityStatsMode !== 'off'}
+						<CommunityStatsCard
+							optIn={settings.communityStatsOptIn ?? false}
+							region={settings.communityRegion ?? null}
+							minGroup={settings.communityStatsMinGroup}
+							onSave={saveCommunityStats}
+						/>
+					{/if}
+				</div>
+				<div class="space-y-6">
+					<Card variant="section" role="region" aria-labelledby="settings-account">
+						<CardHeader>
+							<CardTitle level={2} id="settings-account" class="text-base">Account</CardTitle>
+							<CardAction>
+								<a
+									href={resolve(routes.profile)}
+									class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
+								>
+									Profile
+								</a>
+							</CardAction>
+						</CardHeader>
+						<CardContent class="divide-y">
+							<div class="flex items-center justify-between gap-4 [&>button]:shrink-0 pb-3">
+								<div class="min-w-0">
+									<p class="truncate font-medium">{user?.displayName ?? 'User'}</p>
+									{#if user?.email}
+										<p class="truncate text-sm text-muted-foreground">{user.email}</p>
+									{/if}
+								</div>
+								<Button variant="outline" class="h-10 rounded-full" onclick={handleSignOut}>
+									Sign out
+								</Button>
 							</div>
-							<ChevronRight class="h-5 w-5 text-muted-foreground flex-shrink-0" />
+							{#if managesServer}
+								<a
+									href={resolve(routes.settingsServer)}
+									class="flex items-center justify-between gap-4 py-3 hover:text-foreground"
+									data-testid="settings-server-link"
+								>
+									<span class="min-w-0">
+										<span class="block font-medium">Server</span>
+										<span class="block text-sm text-muted-foreground">
+											Who can join, invites and new accounts
+										</span>
+									</span>
+									<ChevronRight class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+								</a>
+							{/if}
 						</CardContent>
 					</Card>
-				</a>
-			{/if}
 
-			<ThemeCard />
-			<ThemePickerCard />
-			<UnitPreferencesCard
-				bind:distanceUnit
-				bind:volumeUnit
-				bind:chargeUnit
-				bind:currencyUnit
-				onUnitsChange={saveUnits}
-				onCurrencyChange={saveCurrency}
-			/>
-			{#if settings.communityStatsMode !== 'off'}
-				<CommunityStatsCard
-					optIn={settings.communityStatsOptIn ?? false}
-					region={settings.communityRegion ?? null}
-					minGroup={settings.communityStatsMinGroup}
-					onSave={saveCommunityStats}
-				/>
-			{/if}
-			<PWAInstallCard />
-			<PushNotificationsCard />
-			<CalendarFeedCard />
-			{#await migrateCard then { default: MigrateFromTrackerCard }}
-				<MigrateFromTrackerCard />
-			{:catch}
-				<p
-					class="rounded-lg border bg-card p-6 text-sm text-destructive"
-					role="alert"
-					data-testid="migrate-load-error"
-				>
-					Couldn't load the migration tool. Check your connection and reload.
-				</p>
-			{/await}
+					<Card variant="section" role="region" aria-labelledby="settings-data">
+						<CardHeader>
+							<CardTitle level={2} id="settings-data" class="text-base">Your data</CardTitle>
+						</CardHeader>
+						<CardContent class="divide-y">
+							{#await migrateCard then { default: MigrateFromTrackerCard }}
+								<MigrateFromTrackerCard />
+							{:catch}
+								<p
+									class="py-3 text-sm text-destructive"
+									role="alert"
+									data-testid="migrate-load-error"
+								>
+									Couldn't load the migration tool. Check your connection and reload.
+								</p>
+							{/await}
+							<div class="flex items-center justify-between gap-4 [&>button]:shrink-0 py-3">
+								<div class="min-w-0">
+									<p class="font-medium">Export everything</p>
+									<p class="text-sm text-muted-foreground">
+										A ZIP of CSV files you can restore later
+									</p>
+								</div>
+								<Button
+									variant="outline"
+									class="h-10 rounded-full"
+									onclick={handleBackup}
+									disabled={isBackingUp}
+								>
+									{#if isBackingUp}
+										<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+										Exporting…
+									{:else}
+										Export
+									{/if}
+								</Button>
+							</div>
+							<PWAInstallCard />
+							<PushNotificationsCard />
+							<CalendarFeedCard />
+						</CardContent>
+					</Card>
+				</div>
+			</div>
 			<section class="space-y-4" aria-labelledby="settings-connections">
 				<div>
 					<h2 id="settings-connections" class="text-lg font-semibold">Connections</h2>
@@ -445,12 +483,10 @@
 					</p>
 				</div>
 				<PhotoStorageSettings
-					{isBackingUp}
 					bind:syncInactivityMinutes
 					onSyncInactivityChange={saveSyncInterval}
 					onBackupNow={handleBackupNowClick}
 					onRestore={handleRestoreClick}
-					onDownloadBackup={handleBackup}
 				/>
 				<ModelProvidersCard domain="vlm" />
 				<ModelProvidersCard domain="llm" />
@@ -483,4 +519,4 @@
 			{/if}
 		{/await}
 	{/if}
-</FormLayout>
+</div>

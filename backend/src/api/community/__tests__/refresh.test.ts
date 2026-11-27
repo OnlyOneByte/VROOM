@@ -95,12 +95,12 @@ describe('community stats refresh against the database', () => {
   });
 
   test('the noise key is made once per scope, kept across runs, and never stored with the stats', async () => {
-    const first = repository.noiseKey('local');
+    const first = await repository.noiseKey('local');
     expect(first).toMatch(/^[0-9a-f]{64}$/);
     for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
     await refreshCommunityStats(repository, NOW);
-    expect(repository.noiseKey('local')).toBe(first);
-    expect(repository.noiseKey('other')).not.toBe(first);
+    expect(await repository.noiseKey('local')).toBe(first);
+    expect(await repository.noiseKey('other')).not.toBe(first);
     expect(JSON.stringify(db.sqlite.query('SELECT * FROM community_stats').all())).not.toContain(
       first
     );

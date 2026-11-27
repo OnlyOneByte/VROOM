@@ -55,7 +55,7 @@ async function vehiclesByReminder(ids: string[]): Promise<Map<string, string[]>>
   const map = new Map<string, string[]>();
   if (ids.length === 0) return map;
   const rows = await appContext()
-    .db.select()
+    .asyncDb.select()
     .from(reminderVehicles)
     .where(inArray(reminderVehicles.reminderId, ids));
   for (const row of rows)
@@ -65,7 +65,7 @@ async function vehiclesByReminder(ids: string[]): Promise<Map<string, string[]>>
 
 async function reminderEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
   const rows = await appContext()
-    .db.select()
+    .asyncDb.select()
     .from(reminders)
     .where(
       and(
@@ -94,7 +94,7 @@ async function reminderEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
 
 async function insuranceEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
   const rows = await appContext()
-    .db.select({ term: insuranceTerms, company: insurancePolicies.company })
+    .asyncDb.select({ term: insuranceTerms, company: insurancePolicies.company })
     .from(insuranceTerms)
     .innerJoin(insurancePolicies, eq(insuranceTerms.policyId, insurancePolicies.id))
     .where(
@@ -109,7 +109,7 @@ async function insuranceEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
   const covered = new Map<string, string[]>();
   if (termIds.length > 0) {
     const links = await appContext()
-      .db.select()
+      .asyncDb.select()
       .from(insuranceTermVehicles)
       .where(inArray(insuranceTermVehicles.termId, termIds));
     for (const l of links) covered.set(l.termId, [...(covered.get(l.termId) ?? []), l.vehicleId]);
@@ -176,7 +176,7 @@ export function paymentDates(
 
 async function loanEvents(ctx: FeedContext): Promise<CalendarEvent[]> {
   const rows = await appContext()
-    .db.select({ loan: vehicleFinancing })
+    .asyncDb.select({ loan: vehicleFinancing })
     .from(vehicleFinancing)
     .innerJoin(vehicles, eq(vehicleFinancing.vehicleId, vehicles.id))
     .where(and(eq(vehicles.userId, ctx.userId), eq(vehicleFinancing.isActive, true)));
@@ -210,7 +210,7 @@ export async function buildFeedEvents(
   now: Date = new Date()
 ): Promise<CalendarEvent[]> {
   const owned = await appContext()
-    .db.select({
+    .asyncDb.select({
       id: vehicles.id,
       nickname: vehicles.nickname,
       make: vehicles.make,
@@ -219,7 +219,7 @@ export async function buildFeedEvents(
     .from(vehicles)
     .where(eq(vehicles.userId, userId));
   const prefs = await appContext()
-    .db.select({ currency: userPreferences.currencyUnit })
+    .asyncDb.select({ currency: userPreferences.currencyUnit })
     .from(userPreferences)
     .where(eq(userPreferences.userId, userId))
     .get();

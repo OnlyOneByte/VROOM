@@ -1,4 +1,5 @@
 import { and, type Column, desc, eq, isNull } from 'drizzle-orm';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import {
   type BackfilledEntry,
@@ -33,22 +34,24 @@ function visibleExpenses(hideFinancials: boolean) {
   return hideFinancials ? hiddenFinancialsScope() : undefined;
 }
 
-function unattributed(db: AppDatabase, vehicleId: string, hideFinancials: boolean): Candidate[] {
-  const tripRows = db
+async function unattributed(
+  db: AsyncAppDatabase,
+  vehicleId: string,
+  hideFinancials: boolean
+): Promise<Candidate[]> {
+  const tripRows = await db
     .select({ id: trips.id, createdBy: trips.createdBy, at: trips.tripDate })
     .from(trips)
-    .where(and(eq(trips.vehicleId, vehicleId), isNull(trips.driverId)))
-    .all();
-  const readingRows = db
+    .where(and(eq(trips.vehicleId, vehicleId), isNull(trips.driverId)));
+  const readingRows = await db
     .select({
       id: odometerEntries.id,
       createdBy: odometerEntries.createdBy,
       at: odometerEntries.recordedAt,
     })
     .from(odometerEntries)
-    .where(and(eq(odometerEntries.vehicleId, vehicleId), isNull(odometerEntries.driverId)))
-    .all();
-  const expenseRows = db
+    .where(and(eq(odometerEntries.vehicleId, vehicleId), isNull(odometerEntries.driverId)));
+  const expenseRows = await db
     .select({ id: expenses.id, createdBy: expenses.createdBy, at: expenses.date })
     .from(expenses)
     .where(
@@ -57,8 +60,7 @@ function unattributed(db: AppDatabase, vehicleId: string, hideFinancials: boolea
         isNull(expenses.paidByDriverId),
         visibleExpenses(hideFinancials)
       )
-    )
-    .all();
+    );
   return [
     ...tripRows.map((r) => ({ ...r, kind: 'trip' as const })),
     ...readingRows.map((r) => ({ ...r, kind: 'reading' as const })),
@@ -66,41 +68,45 @@ function unattributed(db: AppDatabase, vehicleId: string, hideFinancials: boolea
   ];
 }
 
-function memberDrivers(db: AppDatabase, vehicleId: string): Map<string, string> {
-  const rows = db
+async function memberDrivers(db: AsyncAppDatabase, vehicleId: string) {
+  const rows = await db
     .select({ id: vehicleDrivers.id, userId: vehicleDrivers.userId })
     .from(vehicleDrivers)
-    .where(eq(vehicleDrivers.vehicleId, vehicleId))
-    .all();
+    .where(eq(vehicleDrivers.vehicleId, vehicleId));
   return new Map(rows.flatMap((r) => (r.userId ? [[r.userId, r.id] as const] : [])));
 }
 
-export function planBackfill(
-  db: AppDatabase,
+export async function planBackfill(
+  db: AsyncAppDatabase,
   vehicleId: string,
   request: BackfillRequest,
   hideFinancials: boolean
-): BackfilledEntry[] {
-  const candidates = unattributed(db, vehicleId, hideFinancials);
+): Promise<BackfilledEntry[]> {
+  const candidates = await unattributed(db, vehicleId, hideFinancials);
   if (request.mode === 'range') {
     return candidates
       .filter((c) => c.at.getTime() >= request.from && c.at.getTime() <= request.to)
       .map((c) => ({ kind: c.kind, id: c.id, driverId: request.driverId }));
   }
-  const owner = db
+  const ownerRow = await db
     .select({ userId: vehicles.userId })
     .from(vehicles)
     .where(eq(vehicles.id, vehicleId))
-    .get()?.userId;
-  const byUser = memberDrivers(db, vehicleId);
+    .get();
+  const owner = ownerRow?.userId;
+  const byUser = await memberDrivers(db, vehicleId);
   return candidates.flatMap((c) => {
     const driverId = byUser.get(c.createdBy ?? owner ?? '');
     return driverId ? [{ kind: c.kind, id: c.id, driverId }] : [];
   });
 }
 
-export function summarize(db: AppDatabase, vehicleId: string, entries: BackfilledEntry[]) {
-  const names = new Map(listDrivers(db, vehicleId).map((d) => [d.id, d.name]));
+export async function summarize(
+  db: AsyncAppDatabase,
+  vehicleId: string,
+  entries: BackfilledEntry[]
+) {
+  const names = new Map((await listDrivers(db, vehicleId)).map((d) => [d.id, d.name]));
   const count = (kind: Kind) => entries.filter((e) => e.kind === kind).length;
   const perDriver = new Map<string, number>();
   for (const entry of entries)
@@ -221,18 +227,17 @@ export function undoBackfill(
   });
 }
 
-export function recentBackfills(db: AppDatabase, vehicleId: string) {
-  return db
+export async function recentBackfills(db: AsyncAppDatabase, vehicleId: string) {
+  const batches = await db
     .select()
     .from(driverBackfills)
     .where(and(eq(driverBackfills.vehicleId, vehicleId), isNull(driverBackfills.undoneAt)))
     .orderBy(desc(driverBackfills.createdAt))
-    .limit(RECENT_BATCHES)
-    .all()
-    .map((batch) => ({
-      id: batch.id,
-      mode: batch.mode,
-      createdAt: batch.createdAt,
-      total: batch.entries.length,
-    }));
+    .limit(RECENT_BATCHES);
+  return batches.map((batch) => ({
+    id: batch.id,
+    mode: batch.mode,
+    createdAt: batch.createdAt,
+    total: batch.entries.length,
+  }));
 }

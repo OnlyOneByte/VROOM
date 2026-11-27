@@ -35,7 +35,7 @@ async function assertProvidersOwned(providerIds: string[], userId: string): Prom
   if (providerIds.length === 0) return;
 
   const ownedProviders = await appContext()
-    .db.select({ id: userProviders.id })
+    .asyncDb.select({ id: userProviders.id })
     .from(userProviders)
     .where(and(inArray(userProviders.id, providerIds), eq(userProviders.userId, userId)));
 
@@ -60,7 +60,7 @@ async function assertDefaultsOwned(
       throw new ValidationError('The built-in text reader is turned off on this server');
     }
     const owned = await appContext()
-      .db.select({ id: userProviders.id })
+      .asyncDb.select({ id: userProviders.id })
       .from(userProviders)
       .where(
         and(

@@ -53,8 +53,10 @@ describe('CommunityStatsCard', () => {
 
 	test('shows the consent copy, off by default and with no region', () => {
 		mount();
-		expect(screen.getByText('Community comparisons')).toBeInTheDocument();
-		expect(screen.getByText('Compare with other owners')).toBeInTheDocument();
+		expect(
+			screen.getByRole('heading', { level: 2, name: 'Community comparisons' })
+		).toBeInTheDocument();
+		expect(screen.getByText(/Share anonymous averages from your vehicles/)).toBeInTheDocument();
 		expect(
 			screen.getByText(
 				'Only averages and rounded group sizes for groups of about 30 or more people are ever shown, both with random noise added — never your own numbers.'

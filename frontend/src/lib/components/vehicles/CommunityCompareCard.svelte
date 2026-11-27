@@ -8,6 +8,7 @@
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import {
 		communityApi,
 		type CompareMetric,
@@ -246,9 +247,11 @@
 					See how {isOwner ? 'your' : 'this'}
 					{vehicle.model} compares with other owners on this server.
 				</p>
-				<Button href={`${resolve(routes.settings)}#community-comparisons`} variant="outline">
-					Turn on community stats
-				</Button>
+				{#if authStore.user?.demo !== true}
+					<Button href={`${resolve(routes.settings)}#community-comparisons`} variant="outline">
+						Turn on community stats
+					</Button>
+				{/if}
 			</div>
 		{:else}
 			{#if needsModel && isOwner && suggestion && !dismissed}

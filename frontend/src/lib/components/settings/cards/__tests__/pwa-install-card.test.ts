@@ -55,19 +55,19 @@ describe('PwaInstallCard', () => {
 		pwa.state.isStandalone = true;
 		await mount();
 		expect(screen.getByText(/You're using the installed app/)).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /Install VROOM/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
 	});
 
 	test('when the browser offers install it shows an Install button', async () => {
 		pwa.state.canInstall = true;
 		await mount();
-		expect(screen.getByRole('button', { name: 'Install VROOM' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: 'Install' })).toBeEnabled();
 	});
 
 	test('an accepted install switches to the installed message', async () => {
 		pwa.state.canInstall = true;
 		await mount();
-		await fireEvent.click(screen.getByRole('button', { name: 'Install VROOM' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Install' }));
 		await vi.advanceTimersByTimeAsync(0);
 
 		expect(pwa.promptInstall).toHaveBeenCalledTimes(1);
@@ -78,10 +78,10 @@ describe('PwaInstallCard', () => {
 		pwa.state.canInstall = true;
 		pwa.promptInstall.mockResolvedValue(false);
 		await mount();
-		await fireEvent.click(screen.getByRole('button', { name: 'Install VROOM' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Install' }));
 		await vi.advanceTimersByTimeAsync(0);
 
-		expect(screen.getByRole('button', { name: 'Install VROOM' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: 'Install' })).toBeEnabled();
 		expect(screen.queryByText(/installed app/)).toBeNull();
 	});
 
@@ -89,7 +89,7 @@ describe('PwaInstallCard', () => {
 		pwa.state.canInstall = true;
 		pwa.promptInstall.mockReturnValue(new Promise(() => {}));
 		await mount();
-		await fireEvent.click(screen.getByRole('button', { name: 'Install VROOM' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Install' }));
 		await vi.advanceTimersByTimeAsync(0);
 
 		expect(screen.getByRole('button', { name: /Installing/ })).toBeDisabled();
@@ -120,12 +120,12 @@ describe('PwaInstallCard', () => {
 
 	test('picks up an install prompt that arrives after mount', async () => {
 		await mount();
-		expect(screen.queryByRole('button', { name: 'Install VROOM' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
 
 		pwa.state.canInstall = true;
 		await vi.advanceTimersByTimeAsync(500);
 
-		expect(screen.getByRole('button', { name: 'Install VROOM' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Install' })).toBeInTheDocument();
 	});
 
 	test('picks up standalone mode that is detected after mount', async () => {
@@ -142,6 +142,6 @@ describe('PwaInstallCard', () => {
 		pwa.state.canInstall = true;
 		await vi.advanceTimersByTimeAsync(1000);
 
-		expect(screen.queryByRole('button', { name: 'Install VROOM' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
 	});
 });

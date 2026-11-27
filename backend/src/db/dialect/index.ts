@@ -55,10 +55,10 @@ export function typedParam(value: string | number, type: keyof typeof SQL_TYPES)
 }
 
 export interface RawQueryable {
-  all<T>(query: SQL): T[];
+  all<T>(query: SQL): T[] | Promise<T[]>;
 }
 
-export function rawAll<T>(db: RawQueryable, query: SQL): T[] {
+export async function rawAll<T>(db: RawQueryable, query: SQL): Promise<T[]> {
   return db.all<T>(query);
 }
 
