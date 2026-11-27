@@ -24,7 +24,7 @@ export interface ReceivedShare extends VehicleShare {
   sharedBy: string;
 }
 
-// Must match the partial unique index vehicle_shares_active_idx in db/schema.ts; changing either requires a migration.
+// Must match the partial unique index vehicle_shares_active_idx in db/sqlite/schema.ts; changing either requires a migration.
 export const ACTIVE_SHARE_STATUSES = ['pending', 'accepted'] as const;
 
 type ActiveShareStatus = (typeof ACTIVE_SHARE_STATUSES)[number];

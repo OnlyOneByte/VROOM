@@ -11,9 +11,15 @@ import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
 import { openAsyncDatabase } from './async-sqlite';
 import type { UPKEEP_QUERIES } from './dialect';
-import * as schema from './schema.js';
+import { ACTIVE_DIALECT } from './dialect/active';
+import * as schema from './sqlite/schema';
 
 function openDatabase(url: string) {
+  if (ACTIVE_DIALECT !== 'sqlite') {
+    throw new Error(
+      'DATABASE_URL names a Postgres database, which VROOM cannot connect to yet (#1635). Use a SQLite file path.'
+    );
+  }
   const dbDir = dirname(url);
   if (!existsSync(dbDir)) {
     mkdirSync(dbDir, { recursive: true });

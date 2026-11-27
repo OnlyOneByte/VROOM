@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { drizzle, type SqliteRemoteResult } from 'drizzle-orm/sqlite-proxy';
 import { UPKEEP_QUERIES } from './dialect';
-import * as schema from './schema';
+import * as schema from './sqlite/schema';
 
 const STATEMENT_CACHE_SIZE = 500;
 const TRANSACTION_CONTROL = /^(commit|end|rollback|release)\b/i;

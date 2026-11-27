@@ -21,7 +21,7 @@ import {
   SQLiteColumn as SQLiteColumnClass,
   type SQLiteTable,
 } from 'drizzle-orm/sqlite-core';
-import * as sqlite from '../schema';
+import * as sqlite from '../sqlite/schema';
 
 export const epochSeconds = customType<{ data: Date; driverData: number | string | bigint }>({
   dataType: () => 'bigint',
