@@ -70,8 +70,9 @@ describe('reminders of a shared car follow the share settings', () => {
     expect(put.status).toBe(404);
     const serviced = await editor.request('POST', `/api/v1/reminders/${RESTRICTED}/mark-serviced`);
     expect(serviced.status).toBe(404);
+    ctx.sqlite.run('UPDATE reminders SET created_by = ? WHERE id = ?', [editor.id, RESTRICTED]);
     const removed = await editor.request('DELETE', `/api/v1/reminders/${RESTRICTED}`);
-    expect(removed.status).toBeGreaterThanOrEqual(400);
+    expect(removed.status).toBe(404);
 
     const row = ctx.sqlite.query('SELECT name FROM reminders WHERE id = ?').get(RESTRICTED) as {
       name: string;
@@ -80,6 +81,41 @@ describe('reminders of a shared car follow the share settings', () => {
 
     const ok = await editor.request('PUT', `/api/v1/reminders/${RUNNING}`, { name: 'Changed' });
     expect(ok.status).toBe(200);
+  });
+
+  test('an editor without that access cannot turn a reminder into a hidden one or create one', async () => {
+    const moved = await editor.request('PUT', `/api/v1/reminders/${RUNNING}`, {
+      expenseCategory: 'financial',
+    });
+    expect(moved.status).toBe(404);
+    const row = ctx.sqlite
+      .query('SELECT expense_category AS category FROM reminders WHERE id = ?')
+      .get(RUNNING) as { category: string };
+    expect(row.category).toBe('maintenance');
+
+    const created = await editor.request('POST', '/api/v1/reminders', {
+      name: 'New',
+      type: 'expense',
+      frequency: 'monthly',
+      startDate: new Date(JUNE * 1000).toISOString(),
+      expenseCategory: 'financial',
+      expenseAmount: 50,
+      vehicleIds: [CAR],
+    });
+    expect(created.status).toBe(404);
+  });
+
+  test('a reminder on two shared cars stays hidden until the viewer has access on both', async () => {
+    const SECOND = 'srv-second';
+    seedCar(ctx, SECOND);
+    shareCar(ctx, SECOND, viewer, 'viewer');
+    ctx.sqlite.run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [
+      RESTRICTED,
+      SECOND,
+    ]);
+    overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
+    overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
+    expect(await listed(viewer.request)).toEqual([RUNNING]);
   });
 });
 

@@ -135,9 +135,14 @@ const fromReminderReadable: ResourceOf = async (c) => {
   return readable.length > 0 ? readable : all.slice(0, 1);
 };
 
+type ReminderScope = {
+  reminder: { userId: string; expenseCategory?: string | null };
+  vehicleIds: readonly string[];
+};
+
 async function mayTouchFinancialReminder(
   c: Context,
-  existing: ReminderWithVehicles,
+  existing: ReminderScope,
   mode: 'read' | 'write'
 ): Promise<boolean> {
   if (!isFinancialCategory(existing.reminder.expenseCategory)) return true;
@@ -149,7 +154,7 @@ async function mayTouchFinancialReminder(
   );
 }
 
-async function assertMayWriteReminder(c: Context, existing: ReminderWithVehicles): Promise<void> {
+async function assertMayWriteReminder(c: Context, existing: ReminderScope): Promise<void> {
   if (!(await mayTouchFinancialReminder(c, existing, 'write'))) throw new NotFoundError('Reminder');
 }
 
@@ -399,6 +404,10 @@ routes.post(
 
     const { vehicleIds, timeZone: _createTimeZone, ...reminderData } = data;
     const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
+    await assertMayWriteReminder(c, {
+      reminder: { userId: ownerId, expenseCategory: reminderData.expenseCategory },
+      vehicleIds,
+    });
     const mileage = await resolveMileageFields(reminderData, vehicleIds, ownerId);
     const scale = await repos().preferences.moneyScale(ownerId);
     const result = await repos().preferences.writeAtScale(ownerId, scale, () =>
@@ -528,6 +537,7 @@ routes.put(
       ...partialUpdate,
       vehicleIds: partialUpdate.vehicleIds ?? existing.vehicleIds,
     };
+    await assertMayWriteReminder(c, { reminder: merged, vehicleIds: merged.vehicleIds });
 
     assertMergedReminderValid(merged, partialUpdate);
 
