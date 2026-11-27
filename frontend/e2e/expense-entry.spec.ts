@@ -113,7 +113,7 @@ test.describe('Expense form', () => {
 			mileage: 46000
 		});
 
-		await expect(page.getByText('Expense added successfully')).toBeVisible();
+		await expect(page.getByText(/^Saved \$45\.50 for /)).toBeVisible();
 		await expect(page).toHaveURL(/\/expenses$/);
 	});
 
