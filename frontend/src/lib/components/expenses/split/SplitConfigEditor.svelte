@@ -21,9 +21,13 @@
 		return splitPercentageBasisPoints(allocations) === 10_000;
 	}
 
-	export function splitAmountsMatchTotal(allocations: Allocation[], totalAmount: number): boolean {
+	export function splitAmountsMatchTotal(
+		allocations: Allocation[],
+		totalAmount: number,
+		currency?: string
+	): boolean {
 		const sum = allocations.reduce((s, a) => s + (a.amount ?? 0), 0);
-		return toMinor(sum) === toMinor(totalAmount);
+		return toMinor(sum, currency) === toMinor(totalAmount, currency);
 	}
 </script>
 
@@ -52,6 +56,8 @@
 		onAllocationsChange
 	}: Props = $props();
 
+	const currency = $derived(vehicles[0]?.ownerCurrency);
+
 	function vehicleLabel(v: Vehicle): string {
 		return v.nickname || `${v.year} ${v.make} ${v.model}`;
 	}
@@ -59,12 +65,12 @@
 	let evenAmounts = $derived.by(() => {
 		const count = vehicles.length;
 		if (count === 0) return [];
-		const total = toMinor(totalAmount);
+		const total = toMinor(totalAmount, currency);
 		const base = Math.floor(total / count);
 		const remainder = total - base * count;
 		return vehicles.map((v, i) => ({
 			vehicleId: v.id,
-			amount: fromMinor(base + (i < remainder ? 1 : 0))
+			amount: fromMinor(base + (i < remainder ? 1 : 0), currency)
 		}));
 	});
 
@@ -73,8 +79,8 @@
 	let percentageSumLabel = $derived(`${formatNumber(percentageSumBasisPoints / 100, 2)}%`);
 
 	let absoluteError = $derived(
-		splitMethod === 'absolute' && !splitAmountsMatchTotal(allocations, totalAmount)
-			? `Sum (${formatCurrency(absoluteSum)}) must equal total (${formatCurrency(totalAmount)})`
+		splitMethod === 'absolute' && !splitAmountsMatchTotal(allocations, totalAmount, currency)
+			? `Sum (${formatCurrency(absoluteSum, currency)}) must equal total (${formatCurrency(totalAmount, currency)})`
 			: undefined
 	);
 
@@ -127,14 +133,14 @@
 				{#if splitMethod === 'even'}
 					{@const entry = evenAmounts.find(e => e.vehicleId === vehicle.id)}
 					<span class="font-medium text-muted-foreground">
-						{formatCurrency(entry?.amount ?? 0)}
+						{formatCurrency(entry?.amount ?? 0, currency)}
 					</span>
 				{:else if splitMethod === 'absolute'}
 					{@const alloc = allocations.find(a => a.vehicleId === vehicle.id)}
 					<div class="w-24">
 						<Input
 							type="number"
-							step={amountStep()}
+							step={amountStep(currency)}
 							min="0"
 							value={alloc?.amount?.toString() ?? ''}
 							oninput={e => {
@@ -171,10 +177,10 @@
 	<div class="flex items-center justify-between border-t border-border pt-2 text-sm">
 		<span class="font-medium text-foreground">Total</span>
 		{#if splitMethod === 'even'}
-			<span class="font-medium text-foreground">{formatCurrency(totalAmount)}</span>
+			<span class="font-medium text-foreground">{formatCurrency(totalAmount, currency)}</span>
 		{:else if splitMethod === 'absolute'}
 			<span class="font-medium {absoluteError ? 'text-destructive' : 'text-foreground'}">
-				{formatCurrency(absoluteSum)} / {formatCurrency(totalAmount)}
+				{formatCurrency(absoluteSum, currency)} / {formatCurrency(totalAmount, currency)}
 			</span>
 		{:else}
 			<span class="font-medium {percentageError ? 'text-destructive' : 'text-foreground'}">

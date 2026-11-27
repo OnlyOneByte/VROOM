@@ -108,6 +108,14 @@ describe('SplitConfigEditor: even split', () => {
 		}
 	});
 
+	test("a USD viewer splitting a JPY owner's shared cars gets whole yen", () => {
+		const yen = (v: Vehicle): Vehicle => ({ ...v, ownerCurrency: 'JPY' });
+		renderEditor('even', [], [yen(CAMRY), yen(RAV4), yen(CIVIC)]);
+		expect(rowText('2020 Toyota Camry')).toBe('2020 Toyota Camry ¥34');
+		expect(rowText('Hauler')).toBe('Hauler ¥33');
+		expect(rowText('2020 Honda Civic')).toBe('2020 Honda Civic ¥33');
+	});
+
 	test('splits an evenly divisible total exactly', () => {
 		renderEditor('even', [], [CAMRY, RAV4], 50);
 
