@@ -122,11 +122,10 @@ describe('other views of a shared car follow the same settings', () => {
       `/api/v1/analytics/fuel-advanced?vehicleId=${CAR}&startDate=1704067200&endDate=1735603200`
     );
     expect(res.status).toBe(200);
-    const body =
-      await json<DataEnvelope<{ monthlyCostHeatmap: Array<Record<string, unknown>> }>>(res);
+    const body = await json<DataEnvelope<{ monthlyCostHeatmap: Record<string, unknown>[] }>>(res);
     const months = body.data.monthlyCostHeatmap;
-    expect(months.some((row) => row['maintenance'] === 80)).toBe(true);
-    expect(months.every((row) => !row['financial'])).toBe(true);
+    expect(months.some((row) => row.maintenance === 80)).toBe(true);
+    expect(months.every((row) => !row.financial)).toBe(true);
   });
 
   test("a reminder's expenses leave out what the share hides", async () => {
