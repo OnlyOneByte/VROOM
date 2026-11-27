@@ -209,6 +209,7 @@ export function discardForLatest(id: string): void {
 
 function covers(entry: PendingEdit, expense: Expense): boolean {
 	if (expense.updatedAt === entry.before.updatedAt) return true;
+	if (entry.currentUpdatedAt && expense.updatedAt === entry.currentUpdatedAt) return true;
 	return entry.undo === true && expense.updatedAt === entry.undoneAt;
 }
 

@@ -331,6 +331,22 @@ describe('an edit refused because the expense changed elsewhere', () => {
 		await vi.waitFor(() => expect(editFailureStates([saved])).toHaveLength(1));
 	}
 
+	test('a list already showing the other change marks that row, and shows my edit once applied', async () => {
+		const theirs = { ...saved, amount: 45, updatedAt: elsewhere };
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(changedElsewhere());
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(editFailureStates([theirs])).toHaveLength(1));
+		expect(shownExpense(theirs)).toBe(theirs);
+
+		vi.mocked(expenseApi.updateExpense).mockResolvedValueOnce({
+			...changed,
+			updatedAt: '2026-11-20T12:05:01.000Z'
+		});
+		applyMyChanges('e1');
+		await vi.waitFor(() => expect(editFailureStates([theirs])).toEqual([]));
+		expect(shownExpense(theirs)).toMatchObject({ amount: 55, description: 'Shell' });
+	});
+
 	test('keeps the edit, marks the row and offers to apply it', async () => {
 		await conflicted();
 
