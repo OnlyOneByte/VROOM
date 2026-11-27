@@ -107,6 +107,7 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 
 import Page from '../+page.svelte';
 import { forgetRecentlySynced, rememberSynced } from '#lib/utils/sync/recently-synced.svelte.ts';
+import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 
 const VEHICLE = {
 	id: 'v1',
@@ -514,6 +515,49 @@ describe('vehicle detail page overview', () => {
 		expect([bars?.['x'], bars?.['y']]).toEqual(['value', 'label']);
 		const rows = bars?.['data'] as { key: string }[];
 		expect(rows.map(row => row.key)).toEqual(['maintenance', 'fuel']);
+	});
+
+	test('an expense still queued for this car counts in the category chart', async () => {
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		offlineExpenseQueue.current = [
+			{
+				id: 'offline-q',
+				clientId: 'c-q',
+				vehicleId: 'v1',
+				tags: [],
+				category: 'misc',
+				amount: 50,
+				date: '2026-11-26T12:00:00.000Z',
+				timestamp: 1,
+				synced: false,
+				version: '3.0'
+			},
+			{
+				id: 'offline-other',
+				clientId: 'c-other',
+				vehicleId: 'v2',
+				tags: [],
+				category: 'fuel',
+				amount: 999,
+				date: '2026-11-26T12:00:00.000Z',
+				timestamp: 2,
+				synced: false,
+				version: '3.0'
+			}
+		];
+		try {
+			await mount();
+			await openTab('Expenses');
+			await waitFor(() => expect(captured['categories']).toBeDefined());
+			const rows = captured['categories']?.['data'] as { key: string; value: number }[];
+			expect(rows.map(row => [row.key, row.value])).toEqual([
+				['maintenance', 1200],
+				['fuel', 300],
+				['misc', 50]
+			]);
+		} finally {
+			offlineExpenseQueue.current = [];
+		}
 	});
 
 	test('a category breakdown that totals zero draws no category chart', async () => {
