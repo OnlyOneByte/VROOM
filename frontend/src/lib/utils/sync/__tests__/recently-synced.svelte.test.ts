@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import type { OfflineExpense } from '#lib/utils/offline-storage.ts';
-import { forgetRecentlySynced, recentlySynced, rememberSynced } from '../recently-synced.svelte.ts';
+import {
+	forgetRecentlySynced,
+	forgetSyncedByClientId,
+	recentlySynced,
+	rememberSynced,
+	syncedExpenseByClientId
+} from '../recently-synced.svelte.ts';
 
 const entry = (id: string): OfflineExpense => ({
 	id,
@@ -42,5 +48,19 @@ describe('rows synced before the list page has loaded', () => {
 		expect(ids).toHaveLength(20);
 		expect(ids[0]).toBe('e24');
 		expect(ids).not.toContain('e4');
+	});
+
+	test('keep the server id, found by client id, and can be forgotten one at a time', () => {
+		rememberSynced({ ...entry('a'), serverId: 'srv-a' });
+		rememberSynced(entry('b'));
+
+		expect(syncedExpenseByClientId('c-a')).toMatchObject({ id: 'srv-a', amount: 12.34 });
+		expect(recentlySynced().map(row => row.id)).toEqual(['b', 'a']);
+		expect(syncedExpenseByClientId('c-b')).toBeUndefined();
+		expect(syncedExpenseByClientId('c-missing')).toBeUndefined();
+
+		forgetSyncedByClientId('c-a');
+		expect(syncedExpenseByClientId('c-a')).toBeUndefined();
+		expect(recentlySynced().map(row => row.id)).toEqual(['b']);
 	});
 });

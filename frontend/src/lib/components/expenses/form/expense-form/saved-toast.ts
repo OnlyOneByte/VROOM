@@ -4,6 +4,10 @@ import { expenseApi } from '#lib/services/expense-api.ts';
 import { loadOfflineExpenses, removeOfflineExpense } from '#lib/utils/offline-storage.ts';
 import { scheduleDelete, UNDO_WINDOW_MS } from '#lib/utils/pending-deletes.svelte.ts';
 import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+import {
+	forgetSyncedByClientId,
+	syncedExpenseByClientId
+} from '#lib/utils/sync/recently-synced.svelte.ts';
 import { formatCurrency, formatNumberUpTo } from '#lib/utils/formatters.ts';
 import { getElectricEfficiencyLabel, getFuelEfficiencyLabel } from '#lib/utils/units.ts';
 import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
@@ -67,6 +71,12 @@ export async function undoAdd(added: AddedExpense): Promise<void> {
 		if (local) removeOfflineExpense(local.id);
 		if (local && !local.synced && !local.serverId) {
 			appStore.addNotification({ type: 'success', message: 'Expense removed' });
+			return;
+		}
+		const synced = syncedExpenseByClientId(added.clientId);
+		if (synced) {
+			forgetSyncedByClientId(added.clientId);
+			scheduleDelete(synced);
 			return;
 		}
 		scheduleDelete(await expenseApi.createExpense(added.payload, added.clientId));
