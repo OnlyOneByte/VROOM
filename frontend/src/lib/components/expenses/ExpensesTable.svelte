@@ -257,6 +257,7 @@
 	<ExpenseDeleteDialog
 		bind:open={showDeleteModal}
 		expense={expenseToDelete}
+		vehicle={expenseToDelete ? vehicleMap.get(expenseToDelete.vehicleId) : null}
 		onConfirm={deleteExpense}
 	/>
 {/if}

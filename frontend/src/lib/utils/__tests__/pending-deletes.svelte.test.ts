@@ -38,12 +38,30 @@ function lastAction(): { label: string; onClick: () => void } {
 describe('deleting an expense waits 5 s for Undo', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
-		vi.clearAllMocks();
+		vi.resetAllMocks();
 		vi.mocked(expenseApi.deleteExpense).mockResolvedValue(undefined);
 	});
 	afterEach(() => {
 		resetPendingDeletes();
 		vi.useRealTimers();
+	});
+
+	test('both toasts name the expense, falling back to its category', async () => {
+		vi.mocked(expenseApi.deleteExpense).mockRejectedValueOnce(new ApiError('down', 500));
+		scheduleDelete(expense({ description: 'Car wash' }));
+		expect(appStore.addNotification).toHaveBeenLastCalledWith(
+			expect.objectContaining({ message: 'Deleted “Car wash”' })
+		);
+		await vi.advanceTimersByTimeAsync(UNDO_WINDOW_MS + 100);
+		expect(appStore.addNotification).toHaveBeenLastCalledWith(
+			expect.objectContaining({ message: 'Couldn’t delete “Car wash”', type: 'error' })
+		);
+
+		resetPendingDeletes();
+		scheduleDelete(expense({ id: 'e2' }));
+		expect(appStore.addNotification).toHaveBeenLastCalledWith(
+			expect.objectContaining({ message: 'Deleted “Fuel”' })
+		);
 	});
 
 	test('the row hides at once, and Undo brings it back without sending a DELETE', async () => {

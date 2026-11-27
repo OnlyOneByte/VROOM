@@ -949,6 +949,7 @@
 		isGroupEditMode={form.isGroupEditMode}
 		groupId={form.groupId}
 		originalExpense={form.originalExpense}
+		vehicle={form.vehicles.find(v => v.id === form.originalExpense?.vehicleId) ?? null}
 		onConfirm={() => deleteExpense(form)}
 	/>
 </FormLayout>

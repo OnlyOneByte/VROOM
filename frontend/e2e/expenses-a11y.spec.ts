@@ -192,7 +192,7 @@ test.describe('Expense list accessibility — compact layout', () => {
 		await del.focus();
 		await page.keyboard.press('Enter');
 
-		const dialog = page.getByRole('alertdialog', { name: 'Delete Expense' });
+		const dialog = page.getByRole('alertdialog', { name: 'Delete expense?' });
 		await expect(dialog).toBeVisible();
 		await expect(dialog.getByText('every vehicle')).toBeVisible();
 	});

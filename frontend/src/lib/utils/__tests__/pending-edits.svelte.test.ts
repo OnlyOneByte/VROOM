@@ -40,6 +40,8 @@ describe('editing an expense updates the row while the PUT runs', () => {
 	beforeEach(() => vi.resetAllMocks());
 	afterEach(() => resetPendingEdits());
 
+	const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+
 	function notices(): Record<string, unknown>[] {
 		return appStore.addNotification.mock.calls.map(([notice]) => notice as Record<string, unknown>);
 	}
@@ -158,13 +160,11 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
 
 		restore.resolve(restored);
-		await new Promise(resolve => setTimeout(resolve, 0));
+		await flush();
 		expect(shownExpense(landed)).toMatchObject({ amount: 40, description: 'Arco' });
 		expect(editedRows([landed]).after).toEqual([expect.objectContaining({ amount: 40 })]);
 		expect(shownExpense(restored)).toBe(restored);
 	});
-
-	const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 
 	test('a second Undo click on the fading toast changes nothing', async () => {
 		const landed = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
@@ -217,6 +217,10 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
 		second.resolve(secondLanded);
 		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(3));
+		expect(expenseApi.updateExpense).toHaveBeenLastCalledWith(
+			'e1',
+			expect.objectContaining({ amount: 40, description: 'Arco', category: 'fuel' })
+		);
 		await flush();
 		expect(shownExpense(secondLanded)).toMatchObject({ amount: 40, description: 'Arco' });
 	});
