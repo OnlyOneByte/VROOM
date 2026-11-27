@@ -46,6 +46,41 @@ describe('the built-in text reader engine', () => {
     expect(starts).toBe(1);
   });
 
+  test('a start that crashes inside the engine is tried once more, and the scan goes through', async () => {
+    let starts = 0;
+    setLocalOcrForTest({
+      createWorker: async () => {
+        starts++;
+        if (starts === 1) {
+          throw new OcrUnavailableError(
+            'The text reader failed to start: RuntimeError: Unreachable code should not be executed'
+          );
+        }
+        return fakeWorker(async () => 'TOTAL 52.81');
+      },
+    });
+    expect(await recognizeText(Buffer.from('a'))).toBe('TOTAL 52.81');
+    expect(await recognizeText(Buffer.from('b'))).toBe('TOTAL 52.81');
+    expect(starts).toBe(2);
+  });
+
+  test('two engine crashes in a row while starting turn scans off until a restart', async () => {
+    let starts = 0;
+    setLocalOcrForTest({
+      createWorker: () => {
+        starts++;
+        return Promise.reject(
+          new OcrUnavailableError(
+            'The text reader failed to start: RuntimeError: Unreachable code should not be executed'
+          )
+        );
+      },
+    });
+    await expect(recognizeText(Buffer.from('a'))).rejects.toBeInstanceOf(OcrUnavailableError);
+    await expect(recognizeText(Buffer.from('b'))).rejects.toBeInstanceOf(OcrUnavailableError);
+    expect(starts).toBe(2);
+  });
+
   test('a start that times out is not retried until a restart', async () => {
     let starts = 0;
     setLocalOcrForTest({

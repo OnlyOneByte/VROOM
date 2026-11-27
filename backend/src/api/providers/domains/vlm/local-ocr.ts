@@ -9,6 +9,7 @@ import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 const IDLE_STOP_MS = 60_000;
 export const LOCAL_OCR_MAX_WAITING = 8;
 const ENGINE_CRASH = /^RuntimeError\b/;
+const START_CRASH = /\bRuntimeError\b/;
 
 export const LOCAL_OCR_LANG_PATH = join(
   dirname(createRequire(import.meta.url).resolve('@tesseract.js-data/eng/package.json')),
@@ -73,12 +74,22 @@ function markStartBroken(reason: string): void {
   });
 }
 
+function startOnceMoreAfterACrash(): Promise<Worker> {
+  return workerFactory().catch((error: unknown) => {
+    if (!START_CRASH.test(String(error))) throw error;
+    logger.warn('The text reader crashed while starting; trying once more', {
+      error: String(error),
+    });
+    return workerFactory();
+  });
+}
+
 function startWorker(): Promise<Worker> {
   if (worker) return worker;
   if (startBroken) {
     return Promise.reject(new OcrUnavailableError('The text reader could not start'));
   }
-  const mine: Promise<Worker> = workerFactory().then(
+  const mine: Promise<Worker> = startOnceMoreAfterACrash().then(
     (started) => {
       (started as unknown as ThreadHandle).worker?.on?.('error', (error) => {
         logger.warn('Text recognition worker crashed', { error: String(error) });
