@@ -50,6 +50,17 @@ describe('charger type survives backup and restore', () => {
     expect(chargerTypes()).toEqual(['home', 'dc_fast', null]);
   });
 
+  test('restore turns an unknown charger type into none and keeps known ones', async () => {
+    await seedCharges();
+    ctx.sqlite.run("UPDATE expenses SET charger_type = 'garage' WHERE charger_type = 'dc_fast'");
+    const { backupService } = await import('../backup');
+    const { restoreService } = await import('../restore');
+    const zip = await backupService.exportAsZip(ctx.user.id);
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(chargerTypes()).toEqual(['home', null, null]);
+  });
+
   test('a Google Sheets mirror round-trips it', async () => {
     await seedCharges();
     const { FakeGoogleStore, makeFakeSheetsClients } = await import(

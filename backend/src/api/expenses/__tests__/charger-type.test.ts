@@ -161,6 +161,35 @@ describe('charger type on charging expenses', () => {
     ]);
   });
 
+  test('the price per kWh is in whole yen units for a yen account', async () => {
+    const settings = await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'JPY' });
+    expect(settings.status).toBe(200);
+    const add = (n: number, kwh: number, amount: number, chargerType: string) =>
+      create({
+        ...charge(chargerType),
+        date: `2024-06-0${n}T00:00:00.000Z`,
+        mileage: 1000 + n * 10,
+        volume: kwh,
+        expenseAmount: amount,
+      });
+    await add(1, 30, 600, 'home');
+    await add(2, 30, 500, 'home');
+    await add(3, 20, 900, 'dc_fast');
+
+    const start = Math.floor(Date.UTC(2024, 0, 1) / 1000);
+    const end = Math.floor(Date.UTC(2025, 0, 1) / 1000);
+    const res = await ctx.authed(
+      'GET',
+      `/api/v1/analytics/fuel-stats?startDate=${start}&endDate=${end}&timeZone=UTC`
+    );
+    type Bucket = { chargerType: string; pricePerEnergyUnit: number | null };
+    const body = await json<DataEnvelope<{ charging: { byChargerType: Bucket[] } }>>(res);
+    const [home, dcFast] = body.data.charging.byChargerType;
+    expect(home?.chargerType).toBe('home');
+    expect(home?.pricePerEnergyUnit).toBeCloseTo(1100 / 60, 6);
+    expect(dcFast).toEqual({ ...dcFast, chargerType: 'dc_fast', pricePerEnergyUnit: 45 });
+  });
+
   test('is never stored on a fill-up that is not a charge, whatever the request leaves out', async () => {
     const { fuelType: _noFuelType, ...withoutFuelType } = charge('home');
     expect((await create(withoutFuelType)).chargerType).toBeNull();
