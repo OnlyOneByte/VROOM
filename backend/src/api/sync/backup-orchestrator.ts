@@ -61,20 +61,22 @@ export function chosenProviders(
 
 type ConfigPatch = Record<string, Record<string, string | number | boolean | null>>;
 
-async function savePatchForCurrentProviders(userId: string, patch: ConfigPatch): Promise<void> {
-  const live = await loadProviderTypes(userId);
-  const providers = Object.fromEntries(Object.entries(patch).filter(([id]) => live.has(id)));
-  if (Object.keys(providers).length === 0) return;
-  const defaults = { ...NEW_PROVIDER_BACKUP_SETTINGS, enabled: false };
-  await repos().preferences.mergeJsonField(
-    userId,
-    'backupConfig',
-    { providers },
-    {
-      parent: 'providers',
-      entries: Object.fromEntries(Object.keys(providers).map((id) => [id, defaults])),
-    }
-  );
+function savePatchForCurrentProviders(userId: string, patch: ConfigPatch): Promise<void> {
+  return appContext().asyncDb.transaction(async () => {
+    const live = await loadProviderTypes(userId);
+    const providers = Object.fromEntries(Object.entries(patch).filter(([id]) => live.has(id)));
+    if (Object.keys(providers).length === 0) return;
+    const defaults = { ...NEW_PROVIDER_BACKUP_SETTINGS, enabled: false };
+    await repos().preferences.mergeJsonField(
+      userId,
+      'backupConfig',
+      { providers },
+      {
+        parent: 'providers',
+        entries: Object.fromEntries(Object.keys(providers).map((id) => [id, defaults])),
+      }
+    );
+  });
 }
 
 export function needsZipGeneration(
