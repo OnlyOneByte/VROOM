@@ -41,6 +41,7 @@ import {
   zValidator,
 } from '../../utils/validation';
 import {
+  assertMaySeeExpense,
   assertMayTouchFinancialExpense,
   requireVehicleAccess,
   resolveExpenseReadScope,
@@ -540,7 +541,7 @@ routes.get(
     if (!groupInfo) throw new NotFoundError('Split expense');
     for (const vehicleId of groupInfo.vehicleIds) {
       const access = await requireVehicleAccess(vehicleId, user.id, 'read');
-      assertMayTouchFinancialExpense(seesFinancials(access), groupInfo.sourceType);
+      assertMaySeeExpense(seesFinancials(access), groupInfo);
     }
 
     const scale = await repos().preferences.moneyScale(groupInfo.ownerId);
@@ -1010,7 +1011,7 @@ routes.get(
     const expense = await repos().expenses.findById(id);
     if (!expense) throw new NotFoundError('Expense');
     const access = await requireVehicleAccess(expense.vehicleId, user.id, 'read');
-    assertMayTouchFinancialExpense(seesFinancials(access), expense.sourceType);
+    assertMaySeeExpense(seesFinancials(access), expense);
     return c.json({
       success: true,
       data: hideDriverFields(

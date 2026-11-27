@@ -440,6 +440,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     ownerId: string;
     authors: (string | null)[];
     sourceType: string | null;
+    category: string;
   } | null> {
     const rows = await this.db
       .select({
@@ -447,6 +448,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         userId: expenses.userId,
         createdBy: expenses.createdBy,
         sourceType: expenses.sourceType,
+        category: expenses.category,
       })
       .from(expenses)
       .where(eq(expenses.groupId, groupId));
@@ -456,6 +458,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       ownerId: rows[0].userId,
       authors: [...new Set(rows.map((r) => r.createdBy))],
       sourceType: rows[0].sourceType,
+      category: rows[0].category,
     };
   }
 
