@@ -16,7 +16,14 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 		getVehicles: () =>
 			Promise.resolve([
 				{ id: 'civic', year: 2019, make: 'Honda', model: 'Civic' },
-				{ id: 'rav4', year: 2022, make: 'Toyota', model: 'RAV4', nickname: 'Daily Driver' }
+				{ id: 'rav4', year: 2022, make: 'Toyota', model: 'RAV4', nickname: 'Daily Driver' },
+				{
+					id: 'shared',
+					year: 2021,
+					make: 'Ford',
+					model: 'F-150',
+					sharedAccess: { seesFinancials: false }
+				}
 			])
 	}
 }));
@@ -101,7 +108,22 @@ describe('PerVehicleTab', () => {
 		expect(rates?.textContent).toMatch(/Running, last 12 months\s*\$0\.20\/mi/);
 	});
 
-	test('a shared car whose financials are hidden shows no loan amounts or wording', async () => {
+	test('a car shared with you shows its health and totals, not the owner-only overview', async () => {
+		api.getVehicleExpenses.mockResolvedValue({
+			expenseBreakdown: [
+				{ category: 'financial', amount: 900 },
+				{ category: 'fuel', amount: 40 }
+			]
+		});
+		render(PerVehicleTab, { preferredVehicleId: 'shared', hiddenFinancials: new Set(['shared']) });
+		expect(await screen.findByText(/2021 Ford F-150 is shared with you/)).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 2, name: 'Vehicle Health Score' })).toBeTruthy();
+		expect(api.query).not.toHaveBeenCalled();
+		const page = document.body.textContent ?? '';
+		expect(page).not.toMatch(/all time|\$0\b|Not enough data|Total cost of ownership|10,000/);
+	});
+
+	test('a car whose financials are hidden shows no loan amounts or wording', async () => {
 		render(PerVehicleTab, { preferredVehicleId: 'rav4', hiddenFinancials: new Set(['rav4']) });
 		const hero = await screen.findByRole('heading', { level: 2, name: /Daily Driver, all time/ });
 		expect(hero.textContent).toContain('$2,200');
@@ -123,13 +145,16 @@ describe('PerVehicleTab', () => {
 		expect(api.getVehicleTCO).toHaveBeenCalledTimes(1);
 	});
 
-	test('a lifetime query that failed is sent again on the next range change', async () => {
+	test('a failed query shows the error card, and Retry loads everything again', async () => {
 		api.query.mockImplementationOnce(() => Promise.reject(new Error('offline')));
-		const { rerender } = render(PerVehicleTab, { dateRange: RANGE, preferredVehicleId: 'rav4' });
-		await screen.findByRole('heading', { level: 2, name: /Daily Driver, all time/ });
+		render(PerVehicleTab, { dateRange: RANGE, preferredVehicleId: 'rav4' });
+		expect(await screen.findByText("Couldn't load vehicle analytics")).toBeTruthy();
+		expect(screen.queryByText(/all time/)).toBeNull();
 
-		await rerender({ dateRange: { ...RANGE, startDate: 150 }, preferredVehicleId: 'rav4' });
-		await waitFor(() => expect(lifetimeCalls()).toHaveLength(6));
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		const hero = await screen.findByRole('heading', { level: 2, name: /Daily Driver, all time/ });
+		expect(hero.textContent).toContain('$10,000');
+		expect(lifetimeCalls()).toHaveLength(6);
 		expect(api.getVehicleHealth).toHaveBeenCalledTimes(2);
 	});
 

@@ -82,13 +82,12 @@
 		}
 	}
 
-	function loadLifetime(vehicleId: string) {
+	function loadLifetime(vehicleId: string, owned: boolean) {
+		const queries = owned ? perVehicleRequests(vehicleId, dateRange).lifetime : [];
 		return Promise.all([
 			analyticsApi.getVehicleHealth(vehicleId),
 			analyticsApi.getVehicleTCO(vehicleId),
-			...perVehicleRequests(vehicleId, dateRange).lifetime.map(params =>
-				analyticsApi.query(params).catch(() => null)
-			)
+			...queries.map(params => analyticsApi.query(params))
 		]);
 	}
 
@@ -96,23 +95,22 @@
 
 	async function loadVehicleData(vehicleId: string) {
 		const current = ++request;
+		const owned = !vehicles.find(v => v.id === vehicleId)?.sharedAccess;
 		try {
 			isLoadingData = true;
 			if (lifetime?.key !== vehicleId) {
-				const entry = { key: vehicleId, data: loadLifetime(vehicleId) };
-				const drop = () => {
+				const entry = { key: vehicleId, data: loadLifetime(vehicleId, owned) };
+				entry.data.catch(() => {
 					if (lifetime === entry) lifetime = null;
-				};
-				entry.data.then(results => {
-					if (results.includes(null)) drop();
-				}, drop);
+				});
 				lifetime = entry;
 			}
+			const monthlyQuery = perVehicleRequests(vehicleId, dateRange).monthly;
 			const [[healthData, tcoData, categories, allIn, running], expensesData, months] =
 				await Promise.all([
 					lifetime.data,
 					analyticsApi.getVehicleExpenses(vehicleId, dateRange),
-					analyticsApi.query(perVehicleRequests(vehicleId, dateRange).monthly).catch(() => null)
+					owned ? analyticsApi.query(monthlyQuery) : null
 				]);
 			if (current !== request) return;
 			health = healthData;
@@ -286,6 +284,12 @@
 				message={error}
 				onRetry={() => selectedVehicleId && loadVehicleData(selectedVehicleId)}
 			/>
+		{:else if health && tco && expenses && selectedVehicle?.sharedAccess}
+			<p class="max-w-xl text-muted-foreground">
+				{carName(selectedVehicle)} is shared with you, so the monthly and category overview isn't available
+				for it yet. Here are its health score and the totals you can see.
+			</p>
+			{@render detail(health, 2)}
 		{:else if health && tco && expenses && selectedVehicle}
 			<section aria-label="{carName(selectedVehicle)} overview" class="space-y-8">
 				<div class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
@@ -398,69 +402,73 @@
 				title="More detail"
 				description="Health score, ownership totals and spending by category for the range"
 			>
-				<div class="space-y-4 md:space-y-6">
-					<Card.Root>
-						<Card.Header>
-							<Card.Title level={3}>Vehicle Health Score</Card.Title>
-							<Card.Description>{health.vehicleName}</Card.Description>
-						</Card.Header>
-						<Card.Content>
-							<div class="space-y-6">
-								<div class="flex items-center gap-4">
-									<div
-										class="flex h-20 w-20 items-center justify-center rounded-full {getScoreBgColor(
-											health.overallScore
-										)}"
-									>
-										<span class="text-3xl font-bold text-foreground">
-											{health.overallScore}
-										</span>
-									</div>
-									<div>
-										<p class="text-sm text-muted-foreground">Overall Score</p>
-										<p class="text-lg font-medium">
-											{getScoreLabel(health.overallScore)} · out of 100
-										</p>
-									</div>
-								</div>
-
-								<div class="grid gap-5 md:grid-cols-3">
-									{#each healthParts as part (part.label)}
-										<div class="space-y-2">
-											<div class="flex items-center justify-between">
-												<span class="text-sm font-medium">{part.label}</span>
-												<span class="text-sm font-bold">{part.score}/100</span>
-											</div>
-											<Progress value={part.score} max={100} class="h-2" />
-										</div>
-									{/each}
-								</div>
-							</div>
-						</Card.Content>
-					</Card.Root>
-
-					<StatCardGrid items={tcoSummaryItems} columns={4} />
-
-					{#if breakdownRows.length > 0}
-						<AppBarChart
-							level={3}
-							title="Spending by category"
-							description="All costs, {rangePhrase}"
-							data={breakdownRows}
-							x="value"
-							y="label"
-							orientation="horizontal"
-							series={breakdownSeries}
-							config={breakdownConfig}
-							height={Math.max(160, breakdownRows.length * 44)}
-							padding={{ top: 4, left: 112, bottom: 24, right: 16 }}
-							xAxisProps={{ format: (v: number) => formatCurrency(v, undefined, 0), ticks: 4 }}
-							yAxisFormat={v => String(v)}
-							tooltipFormat={v => formatCurrency(Number(v))}
-						/>
-					{/if}
-				</div>
+				{@render detail(health, 3)}
 			</ChartGroup>
 		{/if}
 	</div>
 {/if}
+
+{#snippet detail(health: VehicleHealthResponse, level: 2 | 3)}
+	<div class="space-y-4 md:space-y-6">
+		<Card.Root>
+			<Card.Header>
+				<Card.Title {level}>Vehicle Health Score</Card.Title>
+				<Card.Description>{health.vehicleName}</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<div class="space-y-6">
+					<div class="flex items-center gap-4">
+						<div
+							class="flex h-20 w-20 items-center justify-center rounded-full {getScoreBgColor(
+								health.overallScore
+							)}"
+						>
+							<span class="text-3xl font-bold text-foreground">
+								{health.overallScore}
+							</span>
+						</div>
+						<div>
+							<p class="text-sm text-muted-foreground">Overall Score</p>
+							<p class="text-lg font-medium">
+								{getScoreLabel(health.overallScore)} · out of 100
+							</p>
+						</div>
+					</div>
+
+					<div class="grid gap-5 md:grid-cols-3">
+						{#each healthParts as part (part.label)}
+							<div class="space-y-2">
+								<div class="flex items-center justify-between">
+									<span class="text-sm font-medium">{part.label}</span>
+									<span class="text-sm font-bold">{part.score}/100</span>
+								</div>
+								<Progress value={part.score} max={100} class="h-2" />
+							</div>
+						{/each}
+					</div>
+				</div>
+			</Card.Content>
+		</Card.Root>
+
+		<StatCardGrid items={tcoSummaryItems} columns={4} />
+
+		{#if breakdownRows.length > 0}
+			<AppBarChart
+				{level}
+				title="Spending by category"
+				description="All costs, {rangePhrase}"
+				data={breakdownRows}
+				x="value"
+				y="label"
+				orientation="horizontal"
+				series={breakdownSeries}
+				config={breakdownConfig}
+				height={Math.max(160, breakdownRows.length * 44)}
+				padding={{ top: 4, left: 112, bottom: 24, right: 16 }}
+				xAxisProps={{ format: (v: number) => formatCurrency(v, undefined, 0), ticks: 4 }}
+				yAxisFormat={v => String(v)}
+				tooltipFormat={v => formatCurrency(Number(v))}
+			/>
+		{/if}
+	</div>
+{/snippet}
