@@ -159,23 +159,24 @@
 	const editsFor = (
 		requestedAt: number | undefined,
 		counted: typeof backInView,
-		unknown: typeof backInView = () => false
+		unknown: typeof searchUnknown = () => false
 	) => {
 		const edits = summaryEdits(requestedAt, expenses);
 		const kept = edits.before.flatMap((was, i) => {
 			const now = edits.after[i];
-			return now && !unknown(was) ? [{ was, now }] : [];
+			return now && !unknown(was, now) ? [{ was, now }] : [];
 		});
 		return {
 			before: kept.map(({ was }) => was).filter(counted),
 			after: kept.map(({ now }) => now).filter(counted)
 		};
 	};
-	const searchUnknown = (row: Expense) =>
-		!!searchTerm.trim() &&
-		backInView(row) &&
-		!listedExpenseIds.has(row.id) &&
-		!matchesFilters(row, { search: searchTerm });
+	const matchesSearch = (row: Expense) => matchesFilters(row, { search: searchTerm });
+	const searchUnknown = (was: Expense, now: Expense) => {
+		if (!searchTerm.trim()) return false;
+		if (backInView(was)) return !listedExpenseIds.has(was.id) && !matchesSearch(was);
+		return backInView(now) && !matchesSearch(now);
+	};
 	const onSummaryCar = (row: Expense) =>
 		!isDeleteHidden(row) && (!selectedVehicleId || row.vehicleId === selectedVehicleId);
 	let shownSummary = $derived.by(() => {
