@@ -221,29 +221,45 @@ describe('UnitPreferencesCard', () => {
 		});
 
 		test.each([
-			['-1', 'Use a number like 0.67'],
-			['abc', 'Use a number like 0.67'],
-			['0x10', 'Use a number like 0.67'],
-			['1e3', 'Use a number like 0.67'],
-			['1,000', 'Leave out thousands separators'],
-			['100.000', 'Leave out thousands separators'],
-			['1000001', 'Use 1000000 or less']
-		])('"%s" is refused with "%s", announced and not saved', async (typed, message) => {
-			const onRateChange = vi.fn();
-			mount({ onRateChange });
+			['USD', '-1', 'Use a number like 0.67'],
+			['USD', 'abc', 'Use a number like 0.67'],
+			['USD', '0x10', 'Use a number like 0.67'],
+			['USD', '1e3', 'Use a number like 0.67'],
+			['USD', '1000001', 'Use 1000000 or less'],
+			['KRW', '1,000', 'Leave out thousands separators'],
+			['KRW', '100.000', 'Leave out thousands separators']
+		])(
+			'in %s, "%s" is refused with "%s", announced and not saved',
+			async (currencyUnit, typed, message) => {
+				const onRateChange = vi.fn();
+				mount({ currencyUnit, onRateChange });
 
-			await enter(typed);
+				await enter(typed);
 
-			expect(rate()).toHaveAttribute('aria-invalid', 'true');
-			expect(rate()).toHaveAccessibleDescription(new RegExp(message));
-			expect(screen.getByRole('alert')).toHaveTextContent(message);
-			expect(rate()).toHaveValue(typed);
-			expect(onRateChange).not.toHaveBeenCalled();
-		});
+				expect(rate()).toHaveAttribute('aria-invalid', 'true');
+				expect(rate()).toHaveAccessibleDescription(new RegExp(message));
+				expect(screen.getByRole('alert')).toHaveTextContent(message);
+				expect(rate()).toHaveValue(typed);
+				expect(onRateChange).not.toHaveBeenCalled();
+			}
+		);
+
+		test.each(['2.414', '4.828', '1,125', '.5', '5.', '0,670'])(
+			'in USD, "%s" is a plain decimal and saves',
+			async typed => {
+				const onRateChange = vi.fn();
+				mount({ onRateChange });
+
+				await enter(typed);
+
+				expect(rate()).not.toHaveAttribute('aria-invalid');
+				expect(onRateChange).toHaveBeenCalledOnce();
+			}
+		);
 
 		test('fixing a refused rate clears the error and saves it', async () => {
 			const onRateChange = vi.fn();
-			mount({ onRateChange });
+			mount({ currencyUnit: 'KRW', onRateChange });
 
 			await enter('1,000');
 			await enter('300');

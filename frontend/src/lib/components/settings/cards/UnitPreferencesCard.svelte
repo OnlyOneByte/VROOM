@@ -52,8 +52,11 @@
 
 	function rateProblem(text: string): string | null {
 		if (text === '') return null;
-		if (/^[1-9]\d{0,2}[.,]\d{3}$/.test(text)) return 'Leave out thousands separators';
-		if (!/^\d+(?:[.,]\d+)?$/.test(text)) return 'Use a number like 0.67';
+		const wholeCurrency = minorUnitScale(currencyUnit) === 1;
+		if (wholeCurrency && /^[1-9]\d{0,2}[.,]\d{3}$/.test(text)) {
+			return 'Leave out thousands separators';
+		}
+		if (!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(text)) return 'Use a number like 0.67';
 		if (Number(text.replace(',', '.')) > MAX_RATE) return 'Use 1000000 or less';
 		return null;
 	}
