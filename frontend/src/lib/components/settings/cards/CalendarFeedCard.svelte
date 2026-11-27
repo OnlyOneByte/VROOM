@@ -1,18 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { CalendarDays, Copy, LoaderCircle } from '@lucide/svelte';
+	import { Copy, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
-	import {
-		Card,
-		CardContent,
-		CardDescription,
-		CardHeader,
-		CardTitle
-	} from '#lib/components/ui/card/index.ts';
 	import {
 		calendarApi,
 		type CalendarFeedInfo,
@@ -123,109 +116,104 @@
 	}
 </script>
 
-<Card id="calendar-feed">
-	<CardHeader>
-		<div class="flex items-center gap-2">
-			<CalendarDays class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={3}>Calendar</CardTitle>
-		</div>
-		<CardDescription>
+<div id="calendar-feed" class="space-y-4 py-3">
+	<div>
+		<h3 class="font-medium">Calendar</h3>
+		<p class="text-sm text-muted-foreground">
 			See reminders, insurance renewals and loan payments in Google, Apple or Outlook Calendar.
-		</CardDescription>
-	</CardHeader>
-	<CardContent class="space-y-5">
-		{#if loading}
-			<div class="flex justify-center py-4">
-				<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
-			</div>
-		{:else if loadError}
-			<p class="text-sm text-destructive" role="alert">{loadError}</p>
-		{:else}
-			<div class="space-y-1">
-				{#each SWITCHES as item (item.key)}
-					<div class="flex min-h-10 items-center justify-between gap-4">
-						<Label for="calendar-{item.key}" class="text-sm font-medium">{item.label}</Label>
-						<Switch
-							id="calendar-{item.key}"
-							checked={options[item.key]}
-							onCheckedChange={v => void setOption(item.key, v)}
-							data-testid="calendar-{item.key}"
-						/>
-					</div>
-				{/each}
-				<p class="text-xs text-muted-foreground">
-					Anyone with the link can see what's in it, and calendar apps keep a copy on their own
-					servers. Vehicle names and amounts stay out unless you turn them on.
-				</p>
-			</div>
-
-			{#if link}
-				<div class="space-y-2" data-testid="calendar-link">
-					<Label for="calendar-url">Your private calendar link</Label>
-					<div class="flex gap-2">
-						<Input id="calendar-url" value={link} readonly class="min-w-0 font-mono text-xs" />
-						<Button variant="outline" class="h-11.5 shrink-0" onclick={copyLink}>
-							<Copy class="mr-1 h-4 w-4" />
-							Copy Link
-						</Button>
-					</div>
-					<p class="text-xs text-muted-foreground">
-						Shown once: copy it now. In Google Calendar, add it under Other calendars → From URL. In
-						Outlook, use Add calendar → Subscribe from web.
-					</p>
-					{#if webcal && onApple}
-						<Button
-							variant="outline"
-							class="h-10"
-							onclick={() => openInCalendarApp(webcal)}
-							data-testid="calendar-webcal"
-						>
-							Open in Apple Calendar
-						</Button>
-					{/if}
+		</p>
+	</div>
+	{#if loading}
+		<div class="flex justify-center py-4">
+			<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
+		</div>
+	{:else if loadError}
+		<p class="text-sm text-destructive" role="alert">{loadError}</p>
+	{:else}
+		<div class="space-y-1">
+			{#each SWITCHES as item (item.key)}
+				<div class="flex min-h-10 items-center justify-between gap-4">
+					<Label for="calendar-{item.key}" class="text-sm font-medium">{item.label}</Label>
+					<Switch
+						id="calendar-{item.key}"
+						checked={options[item.key]}
+						onCheckedChange={v => void setOption(item.key, v)}
+						data-testid="calendar-{item.key}"
+					/>
 				</div>
-			{/if}
+			{/each}
+			<p class="text-xs text-muted-foreground">
+				Anyone with the link can see what's in it, and calendar apps keep a copy on their own
+				servers. Vehicle names and amounts stay out unless you turn them on.
+			</p>
+		</div>
 
-			{#if feed}
-				<p class="text-sm text-muted-foreground" data-testid="calendar-status">
-					Link created {formatDate(feed.createdAt)} · {feed.lastUsedAt
-						? `last used ${formatDate(feed.lastUsedAt)}`
-						: 'not used yet'}
+		{#if link}
+			<div class="space-y-2" data-testid="calendar-link">
+				<Label for="calendar-url">Your private calendar link</Label>
+				<div class="flex gap-2">
+					<Input id="calendar-url" value={link} readonly class="min-w-0 font-mono text-xs" />
+					<Button variant="outline" class="h-11.5 shrink-0" onclick={copyLink}>
+						<Copy class="mr-1 h-4 w-4" />
+						Copy Link
+					</Button>
+				</div>
+				<p class="text-xs text-muted-foreground">
+					Shown once: copy it now. In Google Calendar, add it under Other calendars → From URL. In
+					Outlook, use Add calendar → Subscribe from web.
 				</p>
-				<div class="flex flex-wrap gap-2">
+				{#if webcal && onApple}
 					<Button
 						variant="outline"
 						class="h-10"
-						onclick={() => (confirmRotate = true)}
-						disabled={busy}
-						data-testid="calendar-rotate"
+						onclick={() => openInCalendarApp(webcal)}
+						data-testid="calendar-webcal"
 					>
-						Get a New Link
+						Open in Apple Calendar
 					</Button>
-					<Button
-						variant="outline"
-						class="h-10 text-destructive"
-						onclick={() => (confirmOff = true)}
-						disabled={busy}
-						data-testid="calendar-off"
-					>
-						Turn Off
-					</Button>
-				</div>
-			{:else}
-				<Button
-					class="h-10"
-					onclick={() => void createLink().catch(() => undefined)}
-					disabled={busy}
-					data-testid="calendar-create"
-				>
-					{#if busy}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
-					Create Link
-				</Button>
-			{/if}
+				{/if}
+			</div>
 		{/if}
-	</CardContent>
-</Card>
+
+		{#if feed}
+			<p class="text-sm text-muted-foreground" data-testid="calendar-status">
+				Link created {formatDate(feed.createdAt)} · {feed.lastUsedAt
+					? `last used ${formatDate(feed.lastUsedAt)}`
+					: 'not used yet'}
+			</p>
+			<div class="flex flex-wrap gap-2">
+				<Button
+					variant="outline"
+					class="h-10"
+					onclick={() => (confirmRotate = true)}
+					disabled={busy}
+					data-testid="calendar-rotate"
+				>
+					Get a New Link
+				</Button>
+				<Button
+					variant="outline"
+					class="h-10 text-destructive"
+					onclick={() => (confirmOff = true)}
+					disabled={busy}
+					data-testid="calendar-off"
+				>
+					Turn Off
+				</Button>
+			</div>
+		{:else}
+			<Button
+				class="h-10"
+				onclick={() => void createLink().catch(() => undefined)}
+				disabled={busy}
+				data-testid="calendar-create"
+			>
+				{#if busy}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
+				Create Link
+			</Button>
+		{/if}
+	{/if}
+</div>
 
 <ConfirmDialog
 	bind:open={confirmRotate}

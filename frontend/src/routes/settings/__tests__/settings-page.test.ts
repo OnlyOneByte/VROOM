@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { User, UserProviderInfo, UserSettings } from '#lib/types/index.ts';
 import { fakeSettingsState, settingsStoreFake } from './settings-store-fake.svelte.ts';
 import { toast } from 'svelte-sonner';
@@ -208,13 +208,26 @@ describe('Settings page loading', () => {
 		expect(screen.getByTestId('stub-model-llm')).toBeInTheDocument();
 	});
 
-	test('links to the profile with the user initials, name and email', async () => {
+	test('the Account section shows the name and email and links to the profile', async () => {
 		await mount();
-		const link = screen.getByRole('link');
-		expect(link).toHaveAttribute('href', '/profile');
-		expect(link).toHaveTextContent('AL');
-		expect(link).toHaveTextContent('Ada Lovelace');
-		expect(link).toHaveTextContent('ada@example.com');
+		const account = within(screen.getByRole('region', { name: 'Account' }));
+		expect(account.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile');
+		expect(account.getByText('Ada Lovelace')).toBeInTheDocument();
+		expect(account.getByText('ada@example.com')).toBeInTheDocument();
+	});
+
+	test('Sign out signs the user out, and a failure says so', async () => {
+		const logout = vi.spyOn(authStore, 'logout').mockResolvedValueOnce();
+		await mount();
+		await fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+		await settle();
+		expect(logout).toHaveBeenCalledOnce();
+
+		logout.mockRejectedValueOnce(new ApiError('down', 500));
+		await fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+		await settle();
+		expect(showError).toHaveBeenCalledWith(expect.stringContaining("Couldn't sign out"));
+		logout.mockRestore();
 	});
 
 	test('only someone who manages sign-up sees the Server link', async () => {
@@ -229,13 +242,19 @@ describe('Settings page loading', () => {
 		expect(screen.getByTestId('settings-server-link')).toHaveAttribute('href', '/settings/server');
 	});
 
-	test('the profile link falls back to generic text without a user', async () => {
+	test('the Account section falls back to generic text without a user', async () => {
 		authStore.clearUser();
 		await mount();
-		const link = screen.getByRole('link');
-		expect(link).toHaveTextContent('?');
-		expect(link).toHaveTextContent('User');
-		expect(link).toHaveTextContent('Account & profile settings');
+		const account = within(screen.getByRole('region', { name: 'Account' }));
+		expect(account.getByText('User')).toBeInTheDocument();
+		expect(account.queryByText(/@/)).toBeNull();
+	});
+
+	test('Your data holds the import tool and the one Export button', async () => {
+		await mount();
+		const data = screen.getByRole('region', { name: 'Your data' });
+		expect(data).toContainElement(screen.getByTestId('stub-migrate'));
+		expect(within(data).getByRole('button', { name: 'Export' })).toBeInTheDocument();
 	});
 
 	test('groups storage and both AI provider cards under one Connections section', async () => {
@@ -249,7 +268,7 @@ describe('Settings page loading', () => {
 		).toBeTruthy();
 		expect(section).toContainElement(screen.getByTestId('stub-model-vlm'));
 		expect(section).toContainElement(screen.getByTestId('stub-model-llm'));
-		expect(section).toContainElement(screen.getByRole('button', { name: 'stub download' }));
+		expect(screen.queryByRole('button', { name: 'stub download' })).toBeNull();
 	});
 });
 
@@ -698,7 +717,7 @@ describe('Settings page backups', () => {
 	test('a failed download explains why', async () => {
 		settingsStoreFake.downloadBackup.mockRejectedValue(new ApiError('zip stream broke', 500));
 		await mount();
-		await fireEvent.click(screen.getByRole('button', { name: 'stub download' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Export' }));
 		await settle();
 		expect(showError).toHaveBeenCalledWith(
 			`Couldn't download the backup. ${SERVER_FAILURE_MESSAGE}`

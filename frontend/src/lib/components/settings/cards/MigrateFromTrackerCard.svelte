@@ -1,17 +1,10 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { focusFirstButton } from '#lib/utils/focus.ts';
-	import { DatabaseZap, Upload, LoaderCircle, CircleCheck, CircleAlert } from '@lucide/svelte';
+	import { Upload, LoaderCircle, CircleCheck, CircleAlert } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
-	import {
-		Card,
-		CardContent,
-		CardDescription,
-		CardHeader,
-		CardTitle
-	} from '#lib/components/ui/card/index.ts';
 	import CategoryRemapPanel from '#lib/components/expenses/import-expenses/CategoryRemapPanel.svelte';
 	import { ImportExpensesForm } from '#lib/components/expenses/import-expenses/import-expenses-form.svelte';
 	import PreviewUpdatingOverlay, {
@@ -86,42 +79,42 @@
 	}
 </script>
 
-<Card>
-	<CardHeader>
-		<div class="flex items-center gap-2">
-			<DatabaseZap class="h-5 w-5 text-muted-foreground" />
-			<CardTitle>Migrate data from another tracker</CardTitle>
-		</div>
-		<CardDescription>
-			Moving from another app? Bring your whole history in one go. Export your data from the other
-			tracker, then import it here into one of your vehicles. This is a one-time bulk migration —
-			re-running it won't create duplicates.
-		</CardDescription>
-	</CardHeader>
-	<CardContent bind:ref={content}>
-		{#if isLoading}
-			<div class="flex items-center justify-center py-6" data-testid="migrate-loading">
-				<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
-			</div>
-		{:else if loadError}
-			<div class="space-y-3" data-testid="migrate-error">
-				<p class="text-sm text-destructive" role="alert">{loadError}</p>
-				<Button variant="outline" size="sm" class="h-10" onclick={retryVehicles}>Retry</Button>
-			</div>
-		{:else if vehicles.length === 0}
+<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3" bind:this={content}>
+	<div class="min-w-0">
+		<p class="font-medium">Import</p>
+		{#if loadError}
+			<p class="text-sm text-destructive" role="alert" data-testid="migrate-error">{loadError}</p>
+		{:else if !isLoading && vehicles.length === 0}
 			<p class="text-sm text-muted-foreground" data-testid="migrate-no-vehicle">
-				Add a vehicle first — migrated entries need a vehicle to belong to.
+				Add a vehicle first — imported entries need a vehicle to belong to.
 			</p>
 		{:else}
-			<div data-testid="migrate-card">
-				<Button variant="outline" class="h-10" onclick={openDialog} data-testid="migrate-open">
-					<Upload class="mr-2 h-4 w-4" />
-					Migrate from another tracker
-				</Button>
-			</div>
+			<p class="text-sm text-muted-foreground">
+				Your history from another tracker. Running it again won't create duplicates.
+			</p>
 		{/if}
-	</CardContent>
-</Card>
+	</div>
+	{#if isLoading}
+		<LoaderCircle
+			class="h-5 w-5 animate-spin text-muted-foreground"
+			aria-hidden="true"
+			data-testid="migrate-loading"
+		/>
+	{:else if loadError}
+		<Button variant="outline" class="h-10 rounded-full" onclick={retryVehicles}>Retry</Button>
+	{:else if vehicles.length > 0}
+		<div data-testid="migrate-card">
+			<Button
+				variant="outline"
+				class="h-10 rounded-full"
+				onclick={openDialog}
+				data-testid="migrate-open"
+			>
+				Import
+			</Button>
+		</div>
+	{/if}
+</div>
 
 <Dialog.Root bind:open={dialogOpen}>
 	<Dialog.Content class="sm:max-w-lg max-h-[90vh] overflow-y-auto">

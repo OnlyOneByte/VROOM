@@ -4,15 +4,7 @@
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import {
-		CircleAlert,
-		HardDrive,
-		Plus,
-		LoaderCircle,
-		Download,
-		Upload,
-		RefreshCw
-	} from '@lucide/svelte';
+	import { CircleAlert, HardDrive, Plus, LoaderCircle, Upload, RefreshCw } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -46,20 +38,16 @@
 	} from '#lib/types/index.ts';
 
 	interface Props {
-		isBackingUp?: boolean;
 		syncInactivityMinutes?: number;
 		onBackupNow?: () => void;
 		onRestore?: () => void;
-		onDownloadBackup?: () => void;
 		onSyncInactivityChange?: () => void;
 	}
 
 	let {
-		isBackingUp = false,
 		syncInactivityMinutes = $bindable(5),
 		onBackupNow,
 		onRestore,
-		onDownloadBackup,
 		onSyncInactivityChange
 	}: Props = $props();
 
@@ -382,20 +370,6 @@
 							Back Up Now
 						</Button>
 					{/if}
-					<Button
-						variant="outline"
-						onclick={() => onDownloadBackup?.()}
-						disabled={isBackingUp}
-						class="h-10 sm:flex-1"
-					>
-						{#if isBackingUp}
-							<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-							Downloading...
-						{:else}
-							<Download class="mr-2 h-4 w-4" />
-							Download Backup
-						{/if}
-					</Button>
 					<Button variant="outline" onclick={() => onRestore?.()} class="h-10 sm:flex-1">
 						<Upload class="mr-2 h-4 w-4" />
 						Restore
