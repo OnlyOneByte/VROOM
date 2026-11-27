@@ -2,7 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import { appStore } from '#lib/stores/app.svelte.ts';
 import { expenseApi } from '#lib/services/expense-api.ts';
 import type { Expense } from '#lib/types/index.ts';
-import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 import { UNDO_WINDOW_MS } from '#lib/utils/pending-deletes.svelte.ts';
 
@@ -12,20 +12,30 @@ interface PendingEdit {
 	before: Expense;
 	after: Expense;
 	payload: EditPayload;
-	status: 'saving' | 'saved' | 'failed';
+	status: 'saving' | 'saved' | 'failed' | 'conflict';
 	error?: string;
 	seq: number;
 	savedAt?: string;
 	undo?: boolean;
 	undoneAt?: string;
 	undoSeq?: number;
+	expected?: string | null;
+	currentUpdatedAt?: string | null;
 }
+
+export const EXPENSE_CHANGED_MESSAGE = 'This expense changed elsewhere';
 
 const toastId = (id: string) => `expense-edit-${id}`;
 
 const edits = new SvelteMap<string, PendingEdit>();
 const inFlight = new SvelteMap<string, Promise<void>>();
+const versions = new SvelteMap<string, string>();
 let nextSeq = 0;
+
+function noteVersion(id: string, updatedAt: string | undefined): void {
+	const known = versions.get(id);
+	if (updatedAt && (!known || updatedAt > known)) versions.set(id, updatedAt);
+}
 
 function settle(id: string, seq: number, change: Partial<PendingEdit>): boolean {
 	const entry = edits.get(id);
@@ -34,18 +44,54 @@ function settle(id: string, seq: number, change: Partial<PendingEdit>): boolean 
 	return true;
 }
 
+function changedElsewhere(error: unknown): { updatedAt: string | null } | null {
+	if (!(error instanceof ApiError) || error.code !== 'EXPENSE_CHANGED') return null;
+	const current = error.details?.['updatedAt'];
+	return { updatedAt: typeof current === 'string' ? current : null };
+}
+
+function reportConflict(id: string, seq: number, updatedAt: string | null): void {
+	if (
+		!settle(id, seq, {
+			status: 'conflict',
+			error: EXPENSE_CHANGED_MESSAGE,
+			currentUpdatedAt: updatedAt
+		})
+	)
+		return;
+	appStore.addNotification({
+		type: 'error',
+		message: EXPENSE_CHANGED_MESSAGE,
+		description: 'Reload to see the latest version, or apply your changes on top of it.',
+		toastId: toastId(id),
+		duration: Number.POSITIVE_INFINITY,
+		action: { label: 'Apply my changes', onClick: () => applyMyChanges(id) }
+	});
+}
+
 async function put(id: string, seq: number, payload: EditPayload): Promise<void> {
+	const sending = edits.get(id);
+	const unchecked = sending?.seq === seq && sending.expected === null;
+	const expectedUpdatedAt = unchecked ? undefined : versions.get(id);
 	try {
-		const saved: Expense | undefined = await expenseApi.updateExpense(id, payload);
+		const saved: Expense | undefined = await expenseApi.updateExpense(id, payload, {
+			expectedUpdatedAt
+		});
+		const stamp = saved?.updatedAt;
+		noteVersion(id, stamp);
 		const entry = edits.get(id);
 		if (!entry) return;
-		const stamp = saved?.updatedAt;
 		if (entry.seq === seq) {
 			edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
 		} else if (entry.undo && entry.undoSeq === seq && !entry.undoneAt && stamp) {
 			edits.set(id, { ...entry, undoneAt: stamp });
 		}
 	} catch (error) {
+		const conflict = changedElsewhere(error);
+		if (conflict) {
+			reportConflict(id, seq, conflict.updatedAt);
+			return;
+		}
 		const reason = userFacingErrorMessage(error);
 		if (!settle(id, seq, { status: 'failed', error: reason })) return;
 		appStore.addNotification({
@@ -81,6 +127,7 @@ export function scheduleEdit(
 		message: 'Expense updated successfully'
 	}
 ): void {
+	noteVersion(before.id, before.updatedAt);
 	edits.set(before.id, { before, after, payload, status: 'saving', seq: ++nextSeq });
 	appStore.addNotification({
 		type: 'success',
@@ -139,6 +186,27 @@ export function retryEdit(id: string): void {
 	send(id);
 }
 
+export function applyMyChanges(id: string): void {
+	const entry = edits.get(id);
+	if (entry?.status !== 'conflict') return;
+	appStore.dismissToast(toastId(id));
+	noteVersion(id, entry.currentUpdatedAt ?? undefined);
+	edits.set(id, {
+		...entry,
+		status: 'saving',
+		error: undefined,
+		seq: ++nextSeq,
+		expected: entry.currentUpdatedAt ? undefined : null
+	});
+	send(id);
+}
+
+export function discardForLatest(id: string): void {
+	appStore.dismissToast(toastId(id));
+	edits.delete(id);
+	versions.delete(id);
+}
+
 function covers(entry: PendingEdit, expense: Expense): boolean {
 	if (expense.updatedAt === entry.before.updatedAt) return true;
 	return entry.undo === true && expense.updatedAt === entry.undoneAt;
@@ -146,7 +214,7 @@ function covers(entry: PendingEdit, expense: Expense): boolean {
 
 function overlay(expense: Expense): PendingEdit | undefined {
 	const entry = edits.get(expense.id);
-	if (!entry || entry.status === 'failed') return undefined;
+	if (!entry || entry.status === 'failed' || entry.status === 'conflict') return undefined;
 	return covers(entry, expense) ? entry : undefined;
 }
 
@@ -172,8 +240,16 @@ export function editFailureStates(expenses: readonly Expense[]): [string, Pendin
 	const states: [string, PendingRowState][] = [];
 	for (const expense of expenses) {
 		const entry = edits.get(expense.id);
-		if (entry?.status === 'failed' && covers(entry, expense)) {
-			states.push([expense.id, { status: 'failed', kind: 'edit', error: entry.error ?? '' }]);
+		if ((entry?.status === 'failed' || entry?.status === 'conflict') && covers(entry, expense)) {
+			states.push([
+				expense.id,
+				{
+					status: 'failed',
+					kind: 'edit',
+					error: entry.error ?? '',
+					...(entry.status === 'conflict' && { conflict: true })
+				}
+			]);
 		}
 	}
 	return states;
@@ -182,4 +258,5 @@ export function editFailureStates(expenses: readonly Expense[]): [string, Pendin
 export function resetPendingEdits(): void {
 	edits.clear();
 	inFlight.clear();
+	versions.clear();
 }

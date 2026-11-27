@@ -63,7 +63,8 @@ describe('editing a financing payment', () => {
 		await vi.waitFor(() =>
 			expect(expenseApiMock.updateExpense).toHaveBeenLastCalledWith(
 				'e1',
-				expect.objectContaining({ sourceType: undefined, sourceId: undefined })
+				expect.objectContaining({ sourceType: undefined, sourceId: undefined }),
+				expect.anything()
 			)
 		);
 
@@ -74,7 +75,8 @@ describe('editing a financing payment', () => {
 		await vi.waitFor(() =>
 			expect(expenseApiMock.updateExpense).toHaveBeenLastCalledWith(
 				'e1',
-				expect.objectContaining({ sourceType: null, sourceId: null })
+				expect.objectContaining({ sourceType: null, sourceId: null }),
+				expect.anything()
 			)
 		);
 	});
