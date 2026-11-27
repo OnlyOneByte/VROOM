@@ -33,18 +33,18 @@ async function createReminder(over: Record<string, unknown>): Promise<string> {
   return body.data.reminder.id;
 }
 
-function nextDueMs(id: string): number | null {
-  const row = ctx.sqlite.query('SELECT next_due_date FROM reminders WHERE id = ?').get(id) as {
+async function nextDueMs(id: string): Promise<number | null> {
+  const row = (await ctx.sql.get('SELECT next_due_date FROM reminders WHERE id = ?', [id])) as {
     next_due_date: number | null;
   };
   return row.next_due_date === null ? null : row.next_due_date * 1000;
 }
 
-function notificationCount(id: string): number {
+async function notificationCount(id: string): Promise<number> {
   return (
-    ctx.sqlite
-      .query('SELECT COUNT(*) AS n FROM reminder_notifications WHERE reminder_id = ?')
-      .get(id) as { n: number }
+    (await ctx.sql.get('SELECT COUNT(*) AS n FROM reminder_notifications WHERE reminder_id = ?', [
+      id,
+    ])) as { n: number }
   ).n;
 }
 
@@ -67,17 +67,17 @@ describe('mark-serviced after the trigger already advanced the period', () => {
   test('keeps the next due date instead of skipping a period, and is idempotent', async () => {
     const id = await createReminder({});
     await trigger();
-    const afterTrigger = nextDueMs(id);
+    const afterTrigger = await nextDueMs(id);
     expect(afterTrigger).not.toBeNull();
     expect(afterTrigger as number).toBeGreaterThan(Date.now());
 
     expect((await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`)).status).toBe(200);
-    expect(nextDueMs(id), 'servicing the triggered period must not skip the next one').toBe(
+    expect(await nextDueMs(id), 'servicing the triggered period must not skip the next one').toBe(
       afterTrigger
     );
 
     expect((await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`)).status).toBe(200);
-    expect(nextDueMs(id), 'a second click is a no-op').toBe(afterTrigger);
+    expect(await nextDueMs(id), 'a second click is a no-op').toBe(afterTrigger);
   });
 });
 
@@ -88,10 +88,12 @@ describe('resuming a paused reminder', () => {
 
     const before = Date.now();
     await put(id, { isActive: true });
-    expect(nextDueMs(id) as number).toBeGreaterThanOrEqual(Math.floor(before / 1000) * 1000);
+    expect((await nextDueMs(id)) as number).toBeGreaterThanOrEqual(
+      Math.floor(before / 1000) * 1000
+    );
 
     await trigger();
-    expect(notificationCount(id), 'no catch-up notifications for the paused weeks').toBe(0);
+    expect(await notificationCount(id), 'no catch-up notifications for the paused weeks').toBe(0);
   });
 });
 
@@ -100,7 +102,7 @@ describe('editing the schedule recomputes the next due date', () => {
     const id = await createReminder({});
     await trigger();
     await put(id, { startDate: '2099-03-10T12:00:00.000Z' });
-    expect(nextDueMs(id)).toBe(Date.parse('2099-03-10T12:00:00.000Z'));
+    expect(await nextDueMs(id)).toBe(Date.parse('2099-03-10T12:00:00.000Z'));
   });
 
   test('a frequency change lands on the new schedule’s first occurrence from now', async () => {
@@ -109,7 +111,7 @@ describe('editing the schedule recomputes the next due date', () => {
     await trigger();
     const before = Date.now();
     await put(id, { frequency: 'yearly' });
-    expect(nextDueMs(id)).toBe(firstYearlyOnOrAfter(start, before));
+    expect(await nextDueMs(id)).toBe(firstYearlyOnOrAfter(start, before));
   });
 
   test('switching a mileage reminder to time mode does not backfill from the start date', async () => {
@@ -118,20 +120,20 @@ describe('editing the schedule recomputes the next due date', () => {
       intervalMileage: 5000,
       lastServiceOdometer: 1000,
     });
-    expect(nextDueMs(id)).toBeNull();
+    expect(await nextDueMs(id)).toBeNull();
 
     await put(id, { triggerMode: 'time' });
-    expect(nextDueMs(id) as number).toBeGreaterThan(Date.now() - 1000);
+    expect((await nextDueMs(id)) as number).toBeGreaterThan(Date.now() - 1000);
 
     await trigger();
-    expect(notificationCount(id)).toBe(0);
+    expect(await notificationCount(id)).toBe(0);
   });
 
   test('a frontend save with unchanged schedule fields keeps an early-serviced due date', async () => {
     const start = '2099-06-15T03:00:00.000Z';
     const id = await createReminder({ startDate: start, intervalValue: 1, intervalUnit: 'year' });
     expect((await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`)).status).toBe(200);
-    const serviced = nextDueMs(id);
+    const serviced = await nextDueMs(id);
     expect(serviced, 'early service moved past the first occurrence').toBeGreaterThan(
       Date.parse(start)
     );
@@ -147,8 +149,10 @@ describe('editing the schedule recomputes the next due date', () => {
       startDate: formStartDate,
     });
 
-    expect(nextDueMs(id), 'a recompute would move it back to the first occurrence').toBe(serviced);
-    const row = ctx.sqlite.query('SELECT start_date FROM reminders WHERE id = ?').get(id) as {
+    expect(await nextDueMs(id), 'a recompute would move it back to the first occurrence').toBe(
+      serviced
+    );
+    const row = (await ctx.sql.get('SELECT start_date FROM reminders WHERE id = ?', [id])) as {
       start_date: number;
     };
     expect(row.start_date * 1000, 'the stored start date is kept').toBe(Date.parse(start));
@@ -172,10 +176,10 @@ describe('isSameSubmittedDay', () => {
 });
 
 describe('a resumed or rescheduled reminder whose end date has passed', () => {
-  function isActive(id: string): boolean {
+  async function isActive(id: string): Promise<boolean> {
     return (
       (
-        ctx.sqlite.query('SELECT is_active FROM reminders WHERE id = ?').get(id) as {
+        (await ctx.sql.get('SELECT is_active FROM reminders WHERE id = ?', [id])) as {
           is_active: number;
         }
       ).is_active === 1
@@ -186,19 +190,19 @@ describe('a resumed or rescheduled reminder whose end date has passed', () => {
     const id = await createReminder({ frequency: 'weekly', endDate: '2025-01-01T12:00:00.000Z' });
     await put(id, { isActive: false });
     await put(id, { isActive: true });
-    expect(isActive(id)).toBe(false);
+    expect(await isActive(id)).toBe(false);
   });
 
   test('is switched off on a schedule change', async () => {
     const id = await createReminder({ frequency: 'weekly', endDate: '2025-01-01T12:00:00.000Z' });
     await put(id, { frequency: 'monthly' });
-    expect(isActive(id)).toBe(false);
+    expect(await isActive(id)).toBe(false);
   });
 
   test('stays on when the end date is still ahead', async () => {
     const id = await createReminder({ frequency: 'weekly', endDate: '2099-01-01T12:00:00.000Z' });
     await put(id, { isActive: false });
     await put(id, { isActive: true });
-    expect(isActive(id)).toBe(true);
+    expect(await isActive(id)).toBe(true);
   });
 });

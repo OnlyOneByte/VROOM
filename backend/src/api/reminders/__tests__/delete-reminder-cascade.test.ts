@@ -38,20 +38,20 @@ interface ExpenseRow {
   source_id: string | null;
 }
 
-function expensesByIds(ids: string[]): ExpenseRow[] {
+async function expensesByIds(ids: string[]): Promise<ExpenseRow[]> {
   if (ids.length === 0) return [];
   const placeholders = ids.map(() => '?').join(',');
-  return ctx.sqlite
-    .query(
-      `SELECT id, expense_amount, source_type, source_id FROM expenses WHERE id IN (${placeholders})`
-    )
-    .all(...ids) as ExpenseRow[];
+  return (await ctx.sql.all(
+    `SELECT id, expense_amount, source_type, source_id FROM expenses WHERE id IN (${placeholders})`,
+    [...ids]
+  )) as ExpenseRow[];
 }
 
-function materializedExpenseIds(reminderId: string): string[] {
-  const rows = ctx.sqlite
-    .query('SELECT id FROM expenses WHERE source_type = ? AND source_id = ?')
-    .all('reminder', reminderId) as Array<{ id: string }>;
+async function materializedExpenseIds(reminderId: string): Promise<string[]> {
+  const rows = (await ctx.sql.all(
+    'SELECT id FROM expenses WHERE source_type = ? AND source_id = ?',
+    ['reminder', reminderId]
+  )) as Array<{ id: string }>;
   return rows.map((r) => r.id);
 }
 
@@ -62,19 +62,19 @@ describe('reminder delete cascade', () => {
 
     const trigRes = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(trigRes.status).toBe(200);
-    const ids = materializedExpenseIds(reminderId);
+    const ids = await materializedExpenseIds(reminderId);
     expect(ids.length).toBeGreaterThanOrEqual(1);
     const countBefore = ids.length;
 
     const delRes = await ctx.authed('DELETE', `/api/v1/reminders/${reminderId}`);
     expect(delRes.status).toBe(200);
 
-    const remRow = ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(reminderId) as {
+    const remRow = (await ctx.sql.get('SELECT id FROM reminders WHERE id = ?', [reminderId])) as {
       id: string;
     } | null;
     expect(remRow).toBeNull();
 
-    const rows = expensesByIds(ids);
+    const rows = await expensesByIds(ids);
     expect(rows.length).toBe(countBefore);
     for (const r of rows) {
       expect(r.source_type).toBeNull();
@@ -82,7 +82,7 @@ describe('reminder delete cascade', () => {
       expect(r.expense_amount).toBe(12550);
     }
 
-    expect(materializedExpenseIds(reminderId)).toHaveLength(0);
+    expect(await materializedExpenseIds(reminderId)).toHaveLength(0);
   });
 
   test('deleting a non-expense (notification) reminder is a clean no-op on expenses', async () => {
@@ -101,7 +101,7 @@ describe('reminder delete cascade', () => {
     const delRes = await ctx.authed('DELETE', `/api/v1/reminders/${reminderId}`);
     expect(delRes.status).toBe(200);
 
-    expect(materializedExpenseIds(reminderId)).toHaveLength(0);
+    expect(await materializedExpenseIds(reminderId)).toHaveLength(0);
   });
 
   test('a failure clearing the source link fails the delete and keeps the reminder', async () => {
@@ -118,7 +118,7 @@ describe('reminder delete cascade', () => {
       spy.mockRestore();
     }
 
-    const remRow = ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(reminderId);
+    const remRow = await ctx.sql.get('SELECT id FROM reminders WHERE id = ?', [reminderId]);
     expect(remRow).not.toBeNull();
   });
 });

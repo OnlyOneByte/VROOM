@@ -31,10 +31,11 @@ async function createOverdueExpenseReminder(vehicleId: string): Promise<string> 
   return body.data.reminder.id;
 }
 
-function expenseCountForReminder(reminderId: string): number {
-  const row = ctx.sqlite
-    .query('SELECT COUNT(*) AS n FROM expenses WHERE source_type = ? AND source_id = ?')
-    .get('reminder', reminderId) as { n: number };
+async function expenseCountForReminder(reminderId: string): Promise<number> {
+  const row = (await ctx.sql.get(
+    'SELECT COUNT(*) AS n FROM expenses WHERE source_type = ? AND source_id = ?',
+    ['reminder', reminderId]
+  )) as { n: number };
   return row.n;
 }
 
@@ -44,36 +45,36 @@ describe('reminder-trigger idempotency (CAS on nextDueDate)', () => {
     const reminderId = await createOverdueExpenseReminder(vehicleId);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
-    const first = expenseCountForReminder(reminderId);
+    const first = await expenseCountForReminder(reminderId);
     expect(first).toBeGreaterThanOrEqual(1);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
     await ctx.authed('POST', '/api/v1/reminders/trigger');
-    expect(expenseCountForReminder(reminderId)).toBe(first);
+    expect(await expenseCountForReminder(reminderId)).toBe(first);
   });
 
   test('advanceNextDueDate ignores a stale expected date', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const reminderId = await createOverdueExpenseReminder(vehicleId);
 
-    const before = ctx.sqlite
-      .query('SELECT next_due_date FROM reminders WHERE id = ?')
-      .get(reminderId) as { next_due_date: number };
+    const before = (await ctx.sql.get('SELECT next_due_date FROM reminders WHERE id = ?', [
+      reminderId,
+    ])) as { next_due_date: number };
 
     const staleExpected = new Date(before.next_due_date * 1000 - 86_400_000);
     const newDate = new Date(before.next_due_date * 1000 + 999 * 86_400_000);
     await repos().reminders.advanceNextDueDate(reminderId, staleExpected, newDate);
 
-    const after = ctx.sqlite
-      .query('SELECT next_due_date FROM reminders WHERE id = ?')
-      .get(reminderId) as { next_due_date: number };
+    const after = (await ctx.sql.get('SELECT next_due_date FROM reminders WHERE id = ?', [
+      reminderId,
+    ])) as { next_due_date: number };
     expect(after.next_due_date).toBe(before.next_due_date);
 
     const correctExpected = new Date(before.next_due_date * 1000);
     await repos().reminders.advanceNextDueDate(reminderId, correctExpected, newDate);
-    const advanced = ctx.sqlite
-      .query('SELECT next_due_date FROM reminders WHERE id = ?')
-      .get(reminderId) as { next_due_date: number };
+    const advanced = (await ctx.sql.get('SELECT next_due_date FROM reminders WHERE id = ?', [
+      reminderId,
+    ])) as { next_due_date: number };
     expect(advanced.next_due_date).toBe(Math.floor(newDate.getTime() / 1000));
   });
 });

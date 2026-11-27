@@ -15,8 +15,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function reminderRow(id: string): { is_active: number } {
-  return ctx.sqlite.query('SELECT is_active FROM reminders WHERE id = ?').get(id) as {
+async function reminderRow(id: string): Promise<{ is_active: number }> {
+  return (await ctx.sql.get('SELECT is_active FROM reminders WHERE id = ?', [id])) as {
     is_active: number;
   };
 }
@@ -40,7 +40,7 @@ describe('fast-forward past the catch-up cap honors endDate', () => {
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(200);
 
-    expect(reminderRow(reminderId).is_active).toBe(0);
+    expect((await reminderRow(reminderId)).is_active).toBe(0);
   });
 
   test('a bounded reminder whose endDate lands in the period straddling now is deactivated, not advanced past it', async () => {
@@ -63,6 +63,6 @@ describe('fast-forward past the catch-up cap honors endDate', () => {
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(200);
 
-    expect(reminderRow(reminderId).is_active).toBe(0);
+    expect((await reminderRow(reminderId)).is_active).toBe(0);
   });
 });

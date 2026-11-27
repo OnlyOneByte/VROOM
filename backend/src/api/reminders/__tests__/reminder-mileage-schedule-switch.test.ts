@@ -27,12 +27,11 @@ interface StoredSchedule {
   interval_unit: string | null;
 }
 
-function storedSchedule(id: string): StoredSchedule {
-  return ctx.sqlite
-    .query(
-      'SELECT trigger_mode, next_due_date, interval_value, interval_unit FROM reminders WHERE id = ?'
-    )
-    .get(id) as StoredSchedule;
+async function storedSchedule(id: string): Promise<StoredSchedule> {
+  return (await ctx.sql.get(
+    'SELECT trigger_mode, next_due_date, interval_value, interval_unit FROM reminders WHERE id = ?',
+    [id]
+  )) as StoredSchedule;
 }
 
 async function createMileageOnlyCustom(): Promise<string> {
@@ -64,7 +63,7 @@ describe('a stored mileage-only reminder with a custom frequency and no interval
 
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('intervalValue');
-    expect(storedSchedule(id)).toEqual({
+    expect(await storedSchedule(id)).toEqual({
       trigger_mode: 'mileage',
       next_due_date: null,
       interval_value: null,
@@ -84,7 +83,7 @@ describe('a stored mileage-only reminder with a custom frequency and no interval
     });
 
     expect(res.status, await res.text()).toBe(200);
-    const saved = storedSchedule(id);
+    const saved = await storedSchedule(id);
     expect(saved).toMatchObject({
       trigger_mode: 'both',
       interval_value: 3,

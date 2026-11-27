@@ -135,10 +135,10 @@ describe('reminders HTTP routes', () => {
 
   test('PUT cannot attach a foreign vehicle via expenseSplitConfig alone (omitting vehicleIds)', async () => {
     const owned = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO users (id, email, display_name) VALUES ('u2', 'u2@example.com', 'U2')"
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('foreign-veh', 'u2', 'Foreign', 'Car', 2020)"
     );
     const created = await ctx.authed('POST', '/api/v1/reminders', {
@@ -167,9 +167,10 @@ describe('reminders HTTP routes', () => {
     expect(viaBoth.status).toBeGreaterThanOrEqual(400);
     expect(viaBoth.status).toBeLessThan(500);
 
-    const junction = ctx.sqlite
-      .query('SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?')
-      .all(id) as { vehicle_id: string }[];
+    const junction = (await ctx.sql.all(
+      'SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?',
+      [id]
+    )) as { vehicle_id: string }[];
     expect(junction.map((r) => r.vehicle_id)).toEqual([owned]);
   });
 
@@ -221,9 +222,10 @@ describe('reminders HTTP routes', () => {
     );
     expect(list.data[0].reminder.expenseSplitConfig).toEqual(split);
 
-    const stored = ctx.sqlite
-      .query('SELECT expense_amount, expense_split_config FROM reminders WHERE id = ?')
-      .get(id) as { expense_amount: number; expense_split_config: string };
+    const stored = (await ctx.sql.get(
+      'SELECT expense_amount, expense_split_config FROM reminders WHERE id = ?',
+      [id]
+    )) as { expense_amount: number; expense_split_config: string };
     expect(stored.expense_amount).toBe(10000);
     expect(JSON.parse(stored.expense_split_config).allocations).toEqual([
       { vehicleId: v1, amount: 6025 },

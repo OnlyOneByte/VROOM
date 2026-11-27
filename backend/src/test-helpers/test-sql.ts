@@ -9,11 +9,17 @@ export interface TestSql {
   all<T = Record<string, unknown>>(text: string, params?: readonly SqlParam[]): Promise<T[]>;
 }
 
-const PLACEHOLDER_OR_SKIPPED = /'(?:[^']|'')*'|"(?:[^"]|"")*"|--[^\n]*|\/\*[\s\S]*?\*\/|\?/g;
+const PLACEHOLDER_OR_SKIPPED =
+  /\b[Ee]'(?:[^'\\]|\\[\s\S]|'')*'|'(?:[^']|'')*'|"(?:[^"]|"")*"|\$(\w*)\$[\s\S]*?\$\1\$|--[^\n]*|\/\*[\s\S]*?\*\/|\?(\d*)/g;
 
 export function positionalPlaceholders(text: string): string {
-  let n = 0;
-  return text.replace(PLACEHOLDER_OR_SKIPPED, (match) => (match === '?' ? `$${++n}` : match));
+  let highest = 0;
+  return text.replace(PLACEHOLDER_OR_SKIPPED, (match, _tag, index: string | undefined) => {
+    if (!match.startsWith('?')) return match;
+    const n = index ? Number(index) : highest + 1;
+    highest = Math.max(highest, n);
+    return `$${n}`;
+  });
 }
 
 export function sqliteTestSql(db: Database): TestSql {

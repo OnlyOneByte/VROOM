@@ -55,16 +55,20 @@ async function trigger(): Promise<DataEnvelope<{ notifications: unknown[] }>> {
   return json<DataEnvelope<{ notifications: unknown[] }>>(res);
 }
 
-function seedTimeReminder(reminderId: string, vehicleId: string, name: string): void {
+async function seedTimeReminder(
+  reminderId: string,
+  vehicleId: string,
+  name: string
+): Promise<void> {
   const past = Math.floor(new Date('2024-01-01T00:00:00.000Z').getTime() / 1000);
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO reminders
        (id, user_id, name, type, action_mode, frequency, trigger_mode,
         start_date, next_due_date, is_active)
-     VALUES (?, ?, ?, 'notification', 'automatic', 'monthly', 'time', ?, ?, 1)`,
+     VALUES (?, ?, ?, 'notification', 'automatic', 'monthly', 'time', ?, ?, TRUE)`,
     [reminderId, ctx.user.id, name, past, past]
   );
-  ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
+  await ctx.sql.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
     reminderId,
     vehicleId,
   ]);
@@ -74,7 +78,7 @@ describe('trigger push hook', () => {
   test('a time-axis notification fires notifyUser with the reminder-derived payload', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     await subscribe();
-    seedTimeReminder('rp-time', vehicleId, 'Registration renewal');
+    await seedTimeReminder('rp-time', vehicleId, 'Registration renewal');
     const sender = recordingSender();
     setPushSenderForTest(sender);
 
@@ -92,7 +96,7 @@ describe('trigger push hook', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(ctx, vehicleId, 60200);
     await subscribe();
-    seedMileageReminder(ctx, 'rp-mi', vehicleId, 60000);
+    await seedMileageReminder(ctx, 'rp-mi', vehicleId, 60000);
     const sender = recordingSender();
     setPushSenderForTest(sender);
 
@@ -117,7 +121,7 @@ describe('trigger push hook', () => {
     });
     await addOdometerReading(ctx, vehicleId, 150200);
     await subscribe();
-    seedMileageReminder(ctx, 'rp-km', vehicleId, 150000);
+    await seedMileageReminder(ctx, 'rp-km', vehicleId, 150000);
     const sender = recordingSender();
     setPushSenderForTest(sender);
 
@@ -131,15 +135,15 @@ describe('trigger push hook', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(ctx, vehicleId, 60200);
     await subscribe();
-    seedMileageReminder(ctx, 'rp-boom', vehicleId, 60000);
+    await seedMileageReminder(ctx, 'rp-boom', vehicleId, 60000);
     setPushSenderForTest(recordingSender({ throwOnSend: true }));
 
     const body = await trigger();
     expect(body.data.notifications.length).toBeGreaterThanOrEqual(1);
 
-    const rows = ctx.sqlite
-      .query('SELECT id FROM reminder_notifications WHERE reminder_id = ?')
-      .all('rp-boom') as Array<{ id: string }>;
+    const rows = (await ctx.sql.all('SELECT id FROM reminder_notifications WHERE reminder_id = ?', [
+      'rp-boom',
+    ])) as Array<{ id: string }>;
     expect(rows.length).toBe(1);
   });
 
@@ -147,7 +151,7 @@ describe('trigger push hook', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(ctx, vehicleId, 34000);
     await subscribe();
-    seedMileageReminder(ctx, 'rp-none', vehicleId, 60000);
+    await seedMileageReminder(ctx, 'rp-none', vehicleId, 60000);
     const sender = recordingSender();
     setPushSenderForTest(sender);
 
