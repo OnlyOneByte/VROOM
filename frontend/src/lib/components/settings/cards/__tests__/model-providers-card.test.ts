@@ -127,16 +127,16 @@ describe('ModelProvidersCard', () => {
 			expect(scrollIntoView).not.toHaveBeenCalled();
 
 			finish([]);
-			await settle();
 
+			await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
 			const card = document.getElementById('assistant-providers');
-			expect(scrollIntoView).toHaveBeenCalledTimes(1);
 			expect(scrollIntoView.mock.contexts[0]).toBe(card);
 			expect(card).toHaveFocus();
 		});
 
 		test('without the hash, nothing scrolls', async () => {
 			render(ModelProvidersCard, { props: { domain: 'llm' } });
+			await screen.findByText('No assistant provider connected');
 			await settle();
 
 			expect(scrollIntoView).not.toHaveBeenCalled();
