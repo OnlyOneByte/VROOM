@@ -3,7 +3,7 @@ import { appContext } from '../app-context';
 import type { AsyncHandle } from '../db/async-sqlite';
 import { expenses, vehicleShares, vehicles } from '../db/schema';
 import { NotFoundError } from '../errors';
-import { resolverFor } from '../permissions/grants';
+import { resolverFor, vehicleResources } from '../permissions/grants';
 
 export type VehicleRole = 'owner' | 'editor' | 'viewer';
 export type VehicleAccessMode = 'read' | 'write' | 'owner';
@@ -14,7 +14,7 @@ export interface VehicleAccess {
   financials: { read: boolean; write: boolean };
 }
 
-const FINANCIAL_READS = ['vehicle.financing.read', 'vehicle.insurance.read'] as const;
+export const FINANCIAL_READS = ['vehicle.financing.read', 'vehicle.insurance.read'] as const;
 const FINANCIAL_WRITES = ['vehicle.financing.write', 'vehicle.insurance.write'] as const;
 
 async function memberFinancials(
@@ -103,7 +103,56 @@ export function ownedVehiclesScope(userId: string): SQL {
   return eq(vehicles.userId, userId);
 }
 
-const FINANCIAL_SOURCE_TYPES = ['financing', 'insurance_term'] as const;
+export interface ReadableVehicle {
+  vehicleId: string;
+  ownerId: string;
+  hideFinancials: boolean;
+  seesTrips: boolean;
+  seesDrivers: boolean;
+}
+
+async function memberVehicleIds(userId: string, db: AsyncHandle): Promise<string[]> {
+  const [owned, shared] = await Promise.all([
+    db.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.userId, userId)),
+    db
+      .select({ id: vehicleShares.vehicleId })
+      .from(vehicleShares)
+      .where(and(eq(vehicleShares.sharedWithId, userId), eq(vehicleShares.status, 'accepted'))),
+  ]);
+  return [...owned, ...shared].map((row) => row.id);
+}
+
+export async function readableVehicles(
+  userId: string,
+  vehicleIds?: readonly string[],
+  db: AsyncHandle = appContext().asyncDb
+): Promise<ReadableVehicle[]> {
+  const candidates = vehicleIds?.length ? vehicleIds : await memberVehicleIds(userId, db);
+  const members: Array<{ vehicleId: string; access: VehicleAccess }> = [];
+  for (const vehicleId of new Set(candidates)) {
+    const access = await resolveVehicleAccess(vehicleId, userId, db);
+    if (allowsMode(access, 'read')) members.push({ vehicleId, access });
+  }
+  const shared = members.filter((m) => m.access.role !== 'owner').map((m) => m.vehicleId);
+  const resolver = shared.length ? await resolverFor(userId, vehicleResources(shared), db) : null;
+  const readable: ReadableVehicle[] = [];
+  for (const { vehicleId, access } of members) {
+    const vehicle = { kind: 'vehicle' as const, vehicleId };
+    const can = (permission: string) =>
+      access.role === 'owner' || resolver?.can(permission, vehicle).allow === true;
+    if (!can('vehicle.expense.read')) continue;
+    readable.push({
+      vehicleId,
+      ownerId: access.ownerId,
+      hideFinancials: !seesFinancials(access),
+      seesTrips: can('vehicle.trip.read'),
+      seesDrivers: can('vehicle.driver.record') || can('vehicle.driver_stats.read'),
+    });
+  }
+  return readable;
+}
+
+export const FINANCIAL_SOURCE_TYPES = ['financing', 'insurance_term'] as const;
 
 export function seesFinancials(access: VehicleAccess): boolean {
   return access.financials.read;
@@ -126,8 +175,24 @@ function isFinancialSource(sourceType: string | null | undefined): boolean {
   return (FINANCIAL_SOURCE_TYPES as readonly (string | null | undefined)[]).includes(sourceType);
 }
 
+export const FINANCIAL_CATEGORIES = ['financial'] as const;
+
 export function hiddenFinancialsScope(): SQL {
-  return sql`(${isNull(expenses.sourceType)} or ${notInArray(expenses.sourceType, [...FINANCIAL_SOURCE_TYPES])})`;
+  return sql`((${isNull(expenses.sourceType)} or ${notInArray(expenses.sourceType, [...FINANCIAL_SOURCE_TYPES])}) and ${notInArray(expenses.category, [...FINANCIAL_CATEGORIES])})`;
+}
+
+export function isFinancialExpense(expense: { sourceType: string | null; category: string }) {
+  return (
+    isFinancialSource(expense.sourceType) ||
+    (FINANCIAL_CATEGORIES as readonly string[]).includes(expense.category)
+  );
+}
+
+export function assertMaySeeExpense(
+  seesFinancialRecords: boolean,
+  expense: { sourceType: string | null; category: string }
+): void {
+  if (!seesFinancialRecords && isFinancialExpense(expense)) throw new NotFoundError('Expense');
 }
 
 export function assertMayTouchFinancialExpense(

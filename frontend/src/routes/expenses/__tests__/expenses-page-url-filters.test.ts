@@ -328,3 +328,140 @@ describe('/expenses after an Undo of a move off the filtered car', () => {
 		}
 	});
 });
+
+describe('/expenses month totals with an edit in flight', () => {
+	const before = {
+		id: 'e1',
+		vehicleId: 'v1',
+		userId: 'u1',
+		category: 'fuel',
+		amount: 10,
+		date: '2026-01-15T12:00:00.000Z',
+		tags: [],
+		createdAt: '2026-01-01T00:00:00.000Z',
+		updatedAt: '2026-01-01T00:00:00.000Z'
+	} as unknown as Expense;
+	const after = { ...before, amount: 25 };
+	const saved = { ...after, updatedAt: '2026-01-01T00:00:01.000Z' };
+	const listed = (row: Expense) => ({
+		data: [row],
+		pagination: { totalCount: 1, limit: 20, offset: 0, hasMore: false }
+	});
+	const january = () => (tableProps['monthTotals'] as ReadonlyMap<string, number>).get('2026-01');
+
+	test('month totals loaded before the save keep the edit once a re-sorted list holds the saved row', async () => {
+		getAllExpenses.mockResolvedValue(listed(before));
+		getMonthlyTotals.mockResolvedValue([{ month: '2026-01', amount: 30, count: 2 }]);
+		updateExpense.mockResolvedValueOnce(saved);
+		try {
+			openAt('');
+			await waitFor(() => expect(january()).toBe(30));
+
+			scheduleEdit(before, after, { amount: 25 } as never);
+			await waitFor(() => expect(january()).toBe(45));
+
+			getAllExpenses.mockResolvedValue(listed(saved));
+			(tableProps['onSortChange'] as (by: string, dir: string) => void)('amount', 'desc');
+			await waitFor(() => expect(getAllExpenses).toHaveBeenCalledTimes(2));
+			await new Promise(resolve => setTimeout(resolve, 0));
+
+			expect(getMonthlyTotals).toHaveBeenCalledTimes(1);
+			expect(january()).toBe(45);
+		} finally {
+			resetPendingEdits();
+		}
+	});
+
+	test('month totals reloaded after the save are not changed again while the list still holds the old row', async () => {
+		getAllExpenses.mockResolvedValue(listed(before));
+		getMonthlyTotals.mockResolvedValue([{ month: '2026-01', amount: 30, count: 2 }]);
+		updateExpense.mockResolvedValueOnce(saved);
+		try {
+			openAt('');
+			await waitFor(() => expect(january()).toBe(30));
+			scheduleEdit(before, after, { amount: 25 } as never);
+			await waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(1));
+			await new Promise(resolve => setTimeout(resolve, 0));
+
+			getAllExpenses.mockRejectedValueOnce(new Error('Network down'));
+			getMonthlyTotals.mockResolvedValue([{ month: '2026-01', amount: 45, count: 2 }]);
+			(tableProps['onCategoryChange'] as (category: string) => void)('');
+			await waitFor(() => expect(getMonthlyTotals).toHaveBeenCalledTimes(2));
+			await new Promise(resolve => setTimeout(resolve, 0));
+
+			expect(january()).toBe(45);
+		} finally {
+			resetPendingEdits();
+		}
+	});
+
+	test('with a search the page cannot check, an edited row paged away is never counted twice', async () => {
+		const other = { ...before, id: 'e2', amount: 20 } as Expense;
+		getAllExpenses.mockResolvedValue(listed(before));
+		getMonthlyTotals.mockResolvedValue([{ month: '2026-01', amount: 30, count: 2 }]);
+		updateExpense.mockResolvedValueOnce(saved);
+		try {
+			openAt('?q=camry');
+			await waitFor(() => expect(january()).toBe(30));
+			scheduleEdit(before, after, { amount: 25 } as never);
+			await waitFor(() => expect(january()).toBe(45));
+
+			getAllExpenses.mockResolvedValue({
+				data: [other],
+				pagination: { totalCount: 21, limit: 20, offset: 20, hasMore: false }
+			});
+			(tableProps['onPageChange'] as (offset: number) => void)(20);
+			await waitFor(() => expect(getAllExpenses).toHaveBeenCalledTimes(2));
+			await new Promise(resolve => setTimeout(resolve, 0));
+
+			expect(january()).toBe(30);
+		} finally {
+			resetPendingEdits();
+		}
+	});
+});
+
+describe('/expenses month totals after an Undo brings an expense back into a searched view', () => {
+	const moved = {
+		id: 'e1',
+		vehicleId: 'v1',
+		userId: 'u1',
+		category: 'fuel',
+		amount: 10,
+		date: '2026-01-15T12:00:00.000Z',
+		description: 'Arco',
+		tags: [],
+		createdAt: '2026-01-01T00:00:00.000Z',
+		updatedAt: '2026-01-01T00:00:00.000Z'
+	} as unknown as Expense;
+	const january = () => (tableProps['monthTotals'] as ReadonlyMap<string, number>).get('2026-01');
+
+	async function undoWhileSearching(search: string): Promise<number | undefined> {
+		updateExpense
+			.mockResolvedValueOnce({ ...moved, vehicleId: 'v2', updatedAt: '2026-01-01T00:00:01.000Z' })
+			.mockReturnValueOnce(new Promise(() => {}));
+		getMonthlyTotals.mockResolvedValue([{ month: '2026-01', amount: 30, count: 2 }]);
+		try {
+			scheduleEdit(moved, { ...moved, vehicleId: 'v2' }, { vehicleId: 'v2' } as never);
+			await waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(1));
+			await new Promise(resolve => setTimeout(resolve, 0));
+			openAt(`?vehicleId=v1&q=${search}`);
+			await waitFor(() => expect(january()).toBe(30));
+
+			undoEdit('e1');
+			await waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(2));
+			await new Promise(resolve => setTimeout(resolve, 0));
+			return january();
+		} finally {
+			resetPendingEdits();
+		}
+	}
+
+	test('an expense that does not match the search is not added back to the month totals', async () => {
+		expect(await undoWhileSearching('shell')).toBe(30);
+	});
+
+	test('an expense that matches the search is added back to the month totals', async () => {
+		expect(await undoWhileSearching('arco')).toBe(40);
+	});
+});

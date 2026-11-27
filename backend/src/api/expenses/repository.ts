@@ -39,7 +39,7 @@ import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
-import { hiddenFinancialsScope } from '../../utils/vehicle-access';
+import { FINANCIAL_CATEGORIES, hiddenFinancialsScope } from '../../utils/vehicle-access';
 import { expenseSplitService } from './split-service';
 import { latestOf, nextUpdatedAt, nextUpdatedAtFor } from './updated-at';
 import {
@@ -334,7 +334,7 @@ export interface ExpenseSummary {
   costBuckets: CostBuckets;
 }
 
-export const OWNERSHIP_CATEGORIES = ['financial'] as const;
+export const OWNERSHIP_CATEGORIES = FINANCIAL_CATEGORIES;
 
 export interface CostBucketTotals {
   ownershipTotal: number;
@@ -440,6 +440,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     ownerId: string;
     authors: (string | null)[];
     sourceType: string | null;
+    category: string;
   } | null> {
     const rows = await this.db
       .select({
@@ -447,6 +448,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
         userId: expenses.userId,
         createdBy: expenses.createdBy,
         sourceType: expenses.sourceType,
+        category: expenses.category,
       })
       .from(expenses)
       .where(eq(expenses.groupId, groupId));
@@ -456,6 +458,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       ownerId: rows[0].userId,
       authors: [...new Set(rows.map((r) => r.createdBy))],
       sourceType: rows[0].sourceType,
+      category: rows[0].category,
     };
   }
 

@@ -1753,7 +1753,8 @@ export class AnalyticsRepository {
     userId: string,
     range: DateRange,
     vehicles?: string | VehicleFilter,
-    timeZone?: string
+    timeZone?: string,
+    hideFinancials = false
   ): Promise<FuelAdvancedData> {
     const filter = toVehicleFilter(vehicles);
     try {
@@ -1761,7 +1762,7 @@ export class AnalyticsRepository {
         [
           this.queryVehicleNameMap(userId, filter),
           this.queryFuelExpenses(userId, range, filter),
-          this.queryAllExpenses(userId, range, filter),
+          this.queryAllExpenses(userId, range, filter, hideFinancials),
           this.getUserUnits(userId),
           this.getAllVehicleUnits(userId),
         ]
