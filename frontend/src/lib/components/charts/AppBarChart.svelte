@@ -204,6 +204,8 @@
 	let resolvedPadding = $derived(
 		padding ?? (seriesLayout === 'stack' ? { ...CHART_PADDING, top: 16 } : CHART_PADDING)
 	);
+	const NARROW_PLOT = 480;
+	let narrow = $derived(plotWidth > 0 && plotWidth < NARROW_PLOT);
 	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
 	let yTicks = $derived(
 		distinctYTicks(yAxisFormat, height - resolvedPadding.top - resolvedPadding.bottom)
@@ -211,7 +213,7 @@
 </script>
 
 {#snippet edgeTickLabel({ props }: { props: TextProps })}
-	<EdgeTickLabel {props} />
+	<EdgeTickLabel {props} clearGutter />
 {/snippet}
 
 <ChartCard
@@ -290,7 +292,7 @@
 								style="stroke: var(--muted-foreground); stroke-width: 1.5px"
 								data-reference-line
 							/>
-							{#if vertical}
+							{#if vertical && !narrow}
 								<Text
 									x={chart.width}
 									y={chart.yScale(line.value) - 6}
@@ -329,7 +331,7 @@
 		</div>
 	</ChartPlot>
 	{#snippet legend()}
-		{#if !vertical && referenceLines.length > 0}
+		{#if (!vertical || narrow) && referenceLines.length > 0}
 			<ul class="mt-3 flex flex-wrap justify-center gap-3" aria-label="Reference lines">
 				{#each referenceLines as line, i (`${i}-${line.label}`)}
 					<li class="flex items-center gap-1.5 text-xs text-muted-foreground">

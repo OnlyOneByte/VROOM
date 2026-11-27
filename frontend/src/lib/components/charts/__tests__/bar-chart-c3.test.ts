@@ -157,6 +157,27 @@ describe('C3 bar columns', () => {
 		expect(screen.getByRole('img').getAttribute('aria-label')).toContain('Avg: $311.00.');
 	});
 
+	test('on a narrow plot the reference line is named under the chart, not over the bars', async () => {
+		vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+		vi.stubGlobal(
+			'ResizeObserver',
+			class {
+				constructor(private readonly cb: (entries: unknown[], observer: unknown) => void) {}
+				observe(target: Element) {
+					queueMicrotask(() => this.cb([{ target, contentRect: { width: 300 } }], this));
+				}
+				unobserve() {}
+				disconnect() {}
+			}
+		);
+		await mount({ ...SINGLE, plotWidth: 300, referenceLines: [{ value: 311, label: 'Avg' }] });
+		await settle();
+		expect(seen.rules[0]).toMatchObject({ y: 311, dashArray: '4 4' });
+		expect(seen.texts.filter(t => t['value'] === 'Avg $311')).toHaveLength(0);
+		expect(screen.getByRole('list', { name: 'Reference lines' })).toHaveTextContent('Avg: $311.00');
+		vi.restoreAllMocks();
+	});
+
 	test('a stack rounds only the top segment that has a value', async () => {
 		await mount({
 			...SINGLE,
