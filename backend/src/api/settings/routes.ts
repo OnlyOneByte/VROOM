@@ -305,7 +305,7 @@ routes.put('/', authorize(ownAccount), async (c) => {
       (await repos().preferences.mergeLiveBackupProviders(
         user.id,
         clientBackupConfigPatch(existingSettings.backupConfig, backupConfig)
-      )) ?? updatedSettings;
+      )) ?? (await repos().preferences.getOrCreate(user.id));
   }
 
   return c.json({

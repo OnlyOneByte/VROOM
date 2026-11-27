@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  json,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 
@@ -105,5 +110,35 @@ describe('Writers of backup settings leave nothing behind for a provider removed
     });
 
     expect(savedEntry()).toBeUndefined();
+  });
+
+  test('a settings save whose only provider was removed mid-save answers with what is stored', async () => {
+    await seedProvider({ enabled: false, folderPath: 'Backups', retentionCount: 10 });
+    const { repos } = await import('../../../app-context');
+    const preferences = repos().preferences;
+    const update = preferences.update.bind(preferences);
+    preferences.update = async (...args) => {
+      preferences.update = update;
+      const row = await update(...args);
+      const removed = await ctx.authed('DELETE', `/api/v1/providers/${PROVIDER}`);
+      expect(removed.status).toBe(204);
+      return row;
+    };
+
+    let body: { data?: { backupConfig?: { providers?: Record<string, unknown> } } } = {};
+    try {
+      const res = await ctx.authed('PUT', '/api/v1/settings', {
+        backupConfig: {
+          providers: { [PROVIDER]: { enabled: true, folderPath: 'Mine', retentionCount: 3 } },
+        },
+      });
+      expect(res.status).toBe(200);
+      body = await json(res);
+    } finally {
+      preferences.update = update;
+    }
+
+    expect(savedEntry()).toBeUndefined();
+    expect(body.data?.backupConfig?.providers?.[PROVIDER]).toBeUndefined();
   });
 });
