@@ -42,7 +42,9 @@ async function saveFromVehicle(page: Page) {
 
 async function reopenOnceSynced(page: Page, answered: Promise<void>) {
 	await answered;
-	await expect(page.getByText('Up to date').first()).toBeVisible();
+	await expect(
+		page.getByRole('button', { name: /^Sync status: (Synced|Up to date)$/ }).first()
+	).toBeVisible();
 	await page.getByRole('link', { name: 'Garage' }).first().click();
 	await expect(page).toHaveURL(/\/vehicles$/);
 	await page
