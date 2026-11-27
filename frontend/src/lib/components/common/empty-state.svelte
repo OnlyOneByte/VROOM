@@ -7,7 +7,7 @@
 		title: Snippet;
 		description: Snippet;
 		action?: Snippet;
-		level?: 2 | 3 | 4;
+		level?: 2 | 3 | 4 | 5;
 		class?: string;
 	}
 

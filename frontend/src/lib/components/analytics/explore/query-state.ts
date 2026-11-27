@@ -182,15 +182,25 @@ export function exploreRequest(
 
 export const queryCache = new Map<string, AnalyticsQueryResponse>();
 
-let prefetched: { key: string; pending: Promise<AnalyticsQueryResponse> } | null = null;
+let prefetched: {
+	key: string;
+	pending: Promise<AnalyticsQueryResponse>;
+	controller: AbortController;
+} | null = null;
 
 export function prefetchExplore(params: ReturnType<typeof exploreRequest>): void {
 	const key = JSON.stringify(params);
-	prefetched = null;
+	cancelPrefetch();
 	if (queryCache.has(key)) return;
-	const pending = analyticsApi.query(params);
+	const controller = new AbortController();
+	const pending = analyticsApi.query(params, { signal: controller.signal });
 	pending.catch(() => {});
-	prefetched = { key, pending };
+	prefetched = { key, pending, controller };
+}
+
+export function cancelPrefetch(): void {
+	prefetched?.controller.abort();
+	prefetched = null;
 }
 
 export function takePrefetched(key: string): Promise<AnalyticsQueryResponse> | undefined {

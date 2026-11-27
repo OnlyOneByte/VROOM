@@ -62,7 +62,7 @@
 
 	let placeholderHeight = $derived(height ?? 300);
 	let placeholderLabel = $derived(textAlternative ?? table?.summary);
-	let stateLevel = $derived(level === 2 ? (3 as const) : (4 as const));
+	let stateLevel = $derived((level + 1) as 3 | 4 | 5);
 
 	// LayerChart measures 0x0 in hidden containers; gate rendering on visibility.
 	let gate = createVisibilityWatch();
