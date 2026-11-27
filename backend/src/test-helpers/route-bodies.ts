@@ -139,11 +139,21 @@ export function writeRouteCalls(vehicleId: string, memberId: string): Record<str
     'PATCH /api/v1/roles/:id': { body: { name: 'Sweep' } },
     'PUT /api/v1/roles/:id/permissions': { body: { permissions: [] } },
     'POST /api/v1/role-assignments': {
-      body: { userId: 'sweep-nobody', roleId: 'builtin_viewer', scopeId: vehicleId },
+      body: { userId: memberId, roleId: 'builtin_viewer', scopeId: vehicleId },
     },
     'DELETE /api/v1/role-assignments': {
-      path: `/api/v1/role-assignments?userId=sweep-nobody&roleId=builtin_viewer&scopeId=${vehicleId}`,
+      path: `/api/v1/role-assignments?userId=${memberId}&roleId=builtin_viewer&scopeId=${vehicleId}`,
     },
+    'DELETE /api/v1/auth/accounts/:id': { path: `/api/v1/auth/accounts/${vehicleId}-auth` },
+    'GET /api/v1/photos/:entityType/:entityId': { path: `/api/v1/photos/vehicle/${vehicleId}` },
+    'GET /api/v1/photos/:entityType/:entityId/:photoId/thumbnail': {
+      path: `/api/v1/photos/vehicle/${vehicleId}/${vehicleId}-2/thumbnail`,
+    },
+    'DELETE /api/v1/photos/:entityType/:entityId/:photoId': {
+      path: `/api/v1/photos/vehicle/${vehicleId}/${vehicleId}-2`,
+    },
+    'POST /api/v1/shares/:id/accept': { path: `/api/v1/shares/${vehicleId}-accept/accept` },
+    'POST /api/v1/shares/:id/decline': { path: `/api/v1/shares/${vehicleId}-decline/decline` },
     'DELETE /api/v1/overrides': {
       path: `/api/v1/overrides?userId=${memberId}&scope=vehicle&scopeId=${vehicleId}&permission=vehicle.read`,
     },

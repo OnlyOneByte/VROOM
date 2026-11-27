@@ -1,7 +1,12 @@
 import { describe, expect, setSystemTime, test } from 'bun:test';
 import { type Context, Hono } from 'hono';
 import { CONFIG } from '../../config';
-import { concurrencyLimiter, rateLimiter, trackedRateLimitKeys } from '../rate-limit';
+import {
+  concurrencyLimiter,
+  heavyJobLimiter,
+  rateLimiter,
+  trackedRateLimitKeys,
+} from '../rate-limit';
 
 interface RateLimitErrorBody {
   success: boolean;
@@ -142,5 +147,23 @@ describe('concurrency limiter', () => {
     const { app } = gatedApp(1);
     expect((await app.request('/fail')).status).toBe(500);
     expect((await app.request('/fail')).status).toBe(500);
+  });
+
+  test('with rate limiting turned off, a heavy job route still answers', async () => {
+    const config = CONFIG as { disableRateLimit: boolean };
+    const app = new Hono();
+    app.use('*', async (c, next) => {
+      c.set('user', { id: 'u' } as never);
+      await next();
+    });
+    app.post('/import', heavyJobLimiter, (c) => c.json({ ok: true }, 201));
+    config.disableRateLimit = true;
+    try {
+      const res = await app.request('/import', { method: 'POST' });
+      expect(res.status).toBe(201);
+      expect(await res.json()).toEqual({ ok: true });
+    } finally {
+      config.disableRateLimit = false;
+    }
   });
 });

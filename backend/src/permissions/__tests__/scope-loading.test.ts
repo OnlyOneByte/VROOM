@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { Hono } from 'hono';
 import { setPushSenderForTest } from '../../api/push/push-service';
+import { CONFIG } from '../../config';
 import { ScopeNotLoadedError } from '../../errors';
 import { errorHandler } from '../../middleware';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../../test-helpers/http-client';
 import { type Members, seedCar, seedMembers } from '../../test-helpers/members';
 import { type SweepCall, sendSweepCall, writeRouteCalls } from '../../test-helpers/route-bodies';
+import { seedSweepRecords } from '../../test-helpers/sweep-records';
 import { logger } from '../../utils/logger';
 import { loadResolver, requestResolver } from '../grants';
 import {
@@ -76,13 +78,22 @@ const VEHICLE_ID = 'sweep-car';
 
 const METHOD_ORDER = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
+const VEHICLE_DELETE = 'DELETE /api/v1/vehicles/:id';
+
+const sweepRank = (key: string): [number, number, number] => {
+  const [method = '', path = ''] = key.split(' ');
+  const methodRank = METHOD_ORDER.indexOf(method);
+  if (method !== 'DELETE') return [methodRank, 0, 0];
+  return [methodRank, key === VEHICLE_DELETE ? 1 : 0, -path.split('/').length];
+};
+
 const SWEPT_KEYS = Object.entries(ROUTE_PERMISSIONS)
   .filter(([, rule]) => !isPublicRule(rule))
   .map(([key]) => key)
-  .sort(
-    (a, b) =>
-      METHOD_ORDER.indexOf(a.split(' ')[0] ?? '') - METHOD_ORDER.indexOf(b.split(' ')[0] ?? '')
-  );
+  .sort((a, b) => {
+    const [ra, rb] = [sweepRank(a), sweepRank(b)];
+    return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2];
+  });
 
 const isWrite = (method: string) => method !== 'GET' && method !== 'DELETE';
 
@@ -96,6 +107,12 @@ const HANDLER_PRECONDITIONS: Record<string, string> = {
 };
 
 const quietPush = { send: async () => ({ kind: 'ok' as const }) };
+
+const config = CONFIG as { disableRateLimit: boolean };
+const rateLimitsWere = config.disableRateLimit;
+const rateLimitsOff = (off: boolean) => {
+  config.disableRateLimit = off || rateLimitsWere;
+};
 
 function sweepRequests(
   memberId: string
@@ -120,7 +137,9 @@ async function inputOutcome(key: string, res: Response): Promise<string | 'preco
 async function seedSweepCar(ctx: TestApp): Promise<Members> {
   seedCar(ctx, VEHICLE_ID);
   ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 1 WHERE id = ?', [VEHICLE_ID]);
-  return seedMembers(ctx, VEHICLE_ID, 'sweep');
+  const members = await seedMembers(ctx, VEHICLE_ID, 'sweep');
+  seedSweepRecords(ctx, VEHICLE_ID, members.stranger.id);
+  return members;
 }
 
 describe('the sweep sends each route with a body one it accepts', () => {
@@ -131,9 +150,11 @@ describe('the sweep sends each route with a body one it accepts', () => {
     ctx = await createTestApp();
     members = await seedSweepCar(ctx);
     setPushSenderForTest(quietPush);
+    rateLimitsOff(true);
   }, SETUP_TIMEOUT_MS);
   afterEach(() => {
     setPushSenderForTest(null);
+    rateLimitsOff(false);
     ctx.close();
   });
 
@@ -159,6 +180,16 @@ describe('the sweep sends each route with a body one it accepts', () => {
     expect(refused).toEqual([]);
     expect([...preconditionsHit].sort()).toEqual(Object.keys(HANDLER_PRECONDITIONS).sort());
   }, 120_000);
+
+  test('in sweep order, the owner finds the record behind every path id', async () => {
+    const missing: string[] = [];
+    for (const [key, method, path, call] of sweepRequests(members.editor.id)) {
+      const { cookie } = await requestAs(ctx, ctx.user.id);
+      const res = await sendSweepCall(ctx.app, cookie, method, path, call ?? {});
+      if (res.status === 404) missing.push(`${key} -> ${(await res.text()).slice(0, 120)}`);
+    }
+    expect(missing).toEqual([]);
+  }, 120_000);
 });
 
 describe('every mapped route loads the scopes it checks', () => {
@@ -169,9 +200,11 @@ describe('every mapped route loads the scopes it checks', () => {
     ctx = await createTestApp();
     members = await seedSweepCar(ctx);
     setPushSenderForTest(quietPush);
+    rateLimitsOff(true);
   }, SETUP_TIMEOUT_MS);
   afterEach(() => {
     setPushSenderForTest(null);
+    rateLimitsOff(false);
     ctx.close();
   });
 
