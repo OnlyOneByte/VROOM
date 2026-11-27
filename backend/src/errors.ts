@@ -107,7 +107,7 @@ export class DatabaseError extends AppError {
 
 export class ScopeNotLoadedError extends AppError {
   constructor(scope: string) {
-    super(`Permission scope not loaded before it was checked: ${scope}`, 500, false);
+    super('A permission check ran before its scope was loaded', 500, false, { scope });
   }
 }
 

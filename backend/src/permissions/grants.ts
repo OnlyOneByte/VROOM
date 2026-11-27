@@ -424,13 +424,20 @@ export function vehicleResources(vehicleIds: Iterable<string>): Resource[] {
   return [...vehicleIds].map((vehicleId) => ({ kind: 'vehicle', vehicleId }));
 }
 
+const creating = new WeakMap<Context, Promise<LoadingResolver>>();
+
 export async function loadResolver(
   c: Context,
   resources: readonly Resource[]
 ): Promise<LoadingResolver> {
   let resolver = c.get('resolver');
   if (!resolver) {
-    resolver = await loadingResolverFor(c.get('user').id);
+    let pending = creating.get(c);
+    if (!pending) {
+      pending = loadingResolverFor(c.get('user').id);
+      creating.set(c, pending);
+    }
+    resolver = await pending;
     c.set('resolver', resolver);
   }
   await resolver.load(resources);

@@ -177,7 +177,11 @@ another car, a reminder's other cars) calls `loadResolver` with those vehicles f
 server scope is loaded with any load. Outside a request, `resolverFor(userId, resources)`
 loads and returns a resolver. `src/permissions/__tests__/scope-loading.test.ts` sends a
 request to every route in the permission route map as the owner, an editor, a viewer and a
-stranger, and fails on any `ScopeNotLoadedError`. Three places still use the synchronous
+stranger, and fails on any `ScopeNotLoadedError`. Its requests carry a placeholder id and a
+minimal body, so they reach `authorize()` and the code before validation; checks deeper in a
+handler are covered by that route's own tests, which fail on the same 500. The 500 response
+carries a generic message, and the unloaded scope goes only to the server log. Three places
+still use the synchronous
 resolver, `syncResolverFor`, until part C: the role-manager count inside
 `keepingARoleManager`'s transaction, `vehiclePeople` in the roles routes, and
 `isNetworkAdmin` in `src/utils/outbound-url.ts`, which provider construction calls

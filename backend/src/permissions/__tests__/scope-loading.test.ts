@@ -9,7 +9,7 @@ import {
   type TestApp,
 } from '../../test-helpers/http-client';
 import { type Members, seedCar, seedMembers } from '../../test-helpers/members';
-import { requestResolver } from '../grants';
+import { loadResolver, requestResolver } from '../grants';
 import {
   type AsyncGrantSource,
   createLoadingResolver,
@@ -56,7 +56,9 @@ describe('a resolver that loads before it checks', () => {
     });
     const res = await app.request('/unloaded');
     expect(res.status).toBe(500);
-    expect(await res.text()).toContain('ScopeNotLoadedError');
+    const body = await res.text();
+    expect(body).toContain('ScopeNotLoadedError');
+    expect(body).not.toContain(CAR.kind === 'vehicle' ? CAR.vehicleId : '');
   });
 });
 
@@ -109,6 +111,23 @@ describe('every mapped route loads the scopes it checks', () => {
     }
     return raised;
   }
+
+  test('two loads racing on a fresh request share one resolver', async () => {
+    const car: Resource = { kind: 'vehicle', vehicleId: VEHICLE_ID };
+    const app = new Hono();
+    app.onError(errorHandler);
+    app.use('*', async (c, next) => {
+      c.set('user', { id: ctx.user.id } as never);
+      await next();
+    });
+    app.get('/race', async (c) => {
+      await Promise.all([loadResolver(c, [car]), loadResolver(c, [SERVER])]);
+      return c.json({ allowed: requestResolver(c).can('vehicle.read', car).allow });
+    });
+    const res = await app.request('/race');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ allowed: true });
+  });
 
   test('as the owner', async () => {
     expect(await sweepAs(ctx.user.id)).toEqual([]);
