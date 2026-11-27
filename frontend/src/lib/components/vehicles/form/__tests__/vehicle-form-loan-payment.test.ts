@@ -78,7 +78,7 @@ describe('VehicleForm loan payment on edit', () => {
 	test('hides the recalculated preview while the loan terms are unchanged', async () => {
 		render(VehicleForm, { props: { vehicleId: 'v1' } });
 		await screen.findByDisplayValue('Bank of America');
-		expect(screen.queryByText('Updated Loan Calculation Preview')).toBeNull();
+		expect(screen.queryByText('Updated loan calculation preview')).toBeNull();
 	});
 
 	test('recomputes the payment when the loan terms change', async () => {
@@ -86,7 +86,7 @@ describe('VehicleForm loan payment on edit', () => {
 			await fireEvent.input(screen.getByLabelText(/Original loan amount/), {
 				target: { value: '30000' }
 			});
-			await screen.findByText('Updated Loan Calculation Preview');
+			await screen.findByText('Updated loan calculation preview');
 		});
 		expect(saved.paymentAmount).toBe(559.29);
 	});
@@ -94,7 +94,7 @@ describe('VehicleForm loan payment on edit', () => {
 	test('splits the principal evenly when the APR is 0%', async () => {
 		const saved = await saveEditedVehicle(async () => {
 			await fireEvent.input(screen.getByLabelText(/APR/), { target: { value: '0' } });
-			await screen.findByText('Updated Loan Calculation Preview');
+			await screen.findByText('Updated loan calculation preview');
 		});
 		expect(saved.paymentAmount).toBe(333.33);
 	});

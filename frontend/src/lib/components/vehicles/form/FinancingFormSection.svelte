@@ -358,28 +358,28 @@
 							<div class="flex items-center gap-2">
 								<Calculator class="h-4 w-4 text-primary" />
 								<CardTitle class="text-base">
-									{isEditMode ? 'Updated ' : ''}Loan Calculation Preview
+									{isEditMode ? 'Updated loan calculation preview' : 'Loan calculation preview'}
 								</CardTitle>
 							</div>
 						</CardHeader>
 						<CardContent>
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
 								<div>
-									<p class="text-muted-foreground font-medium">Monthly Payment</p>
+									<p class="text-muted-foreground font-medium">Monthly payment</p>
 									<p class="font-semibold text-lg">
 										{formatCurrency(amortizationPreview.monthlyPayment)}
 									</p>
 								</div>
 								<div>
-									<p class="text-muted-foreground font-medium">Total Interest</p>
+									<p class="text-muted-foreground font-medium">Total interest</p>
 									<p class="font-semibold">{formatCurrency(amortizationPreview.totalInterest)}</p>
 								</div>
 								<div>
-									<p class="text-muted-foreground font-medium">Total Payments</p>
+									<p class="text-muted-foreground font-medium">Total payments</p>
 									<p class="font-semibold">{formatCurrency(amortizationPreview.totalPayments)}</p>
 								</div>
 								<div>
-									<p class="text-muted-foreground font-medium">Payoff Date</p>
+									<p class="text-muted-foreground font-medium">Payoff date</p>
 									<p class="font-semibold">
 										{formatPayoffDate(amortizationPreview.payoffDate)}
 									</p>
@@ -389,10 +389,6 @@
 					</Card>
 				{/if}
 			</div>
-		{:else}
-			<p class="text-muted-foreground text-center py-8">
-				This vehicle is owned outright with no financing or lease.
-			</p>
 		{/if}
 	</CardContent>
 </Card>

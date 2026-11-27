@@ -807,7 +807,7 @@ describe('VehicleForm financing on edit', () => {
 			excessMileageFee: 0.25
 		});
 
-		expect(screen.getByRole('radio', { name: 'Lease' }).matches(':checked')).toBeTruthy();
+		expect(screen.getByRole('radio', { name: 'Lease' })).toBeChecked();
 		expect(input('residualValue').value).toBe('15000');
 		await submitUpdate();
 
@@ -866,11 +866,10 @@ describe('VehicleForm financing on edit', () => {
 	test('an inactive loan opens as Own and saves no financing', async () => {
 		await renderEditWithFinancing({ ...LOAN, isActive: false });
 
-		expect(
-			screen
-				.getByRole('switch', { name: 'This car has a loan or lease' })
-				.getAttribute('aria-checked') === 'false'
-		).toBeTruthy();
+		expect(screen.getByRole('switch', { name: 'This car has a loan or lease' })).toHaveAttribute(
+			'aria-checked',
+			'false'
+		);
 		expect(document.getElementById('provider')).toBeNull();
 		await submitUpdate();
 
@@ -882,11 +881,10 @@ describe('VehicleForm financing on edit', () => {
 	test('an active record of type own opens as Own', async () => {
 		await renderEditWithFinancing({ ...LOAN, financingType: 'own' });
 
-		expect(
-			screen
-				.getByRole('switch', { name: 'This car has a loan or lease' })
-				.getAttribute('aria-checked') === 'false'
-		).toBeTruthy();
+		expect(screen.getByRole('switch', { name: 'This car has a loan or lease' })).toHaveAttribute(
+			'aria-checked',
+			'false'
+		);
 		expect(document.getElementById('provider')).toBeNull();
 	});
 

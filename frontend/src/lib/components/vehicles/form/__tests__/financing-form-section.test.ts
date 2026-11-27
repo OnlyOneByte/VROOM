@@ -108,6 +108,7 @@ describe('FinancingFormSection ownership', () => {
 		);
 		expect(screen.queryByRole('group', { name: 'Which one?' })).toBeNull();
 		expect(screen.queryByLabelText(/Lender|Leasing company/)).toBeNull();
+		expect(screen.queryByText(/owned outright/)).toBeNull();
 	});
 
 	test('a financed vehicle asks for the lender, loan amount and APR but no lease terms', () => {
@@ -303,7 +304,10 @@ describe('FinancingFormSection validation errors', () => {
 describe('FinancingFormSection loan preview', () => {
 	test('previews the payment, interest, total and payoff month for a new loan', () => {
 		mount({ amortizationPreview: PREVIEW });
-		expect(screen.getByText('Loan Calculation Preview')).toBeTruthy();
+		expect(screen.getByText('Loan calculation preview')).toBeTruthy();
+		for (const label of ['Monthly payment', 'Total interest', 'Total payments', 'Payoff date']) {
+			expect(screen.getByText(label, { selector: 'p' })).toBeInTheDocument();
+		}
 		expect(screen.getByText('$386.66')).toBeTruthy();
 		expect(screen.getByText('$3,199.60')).toBeTruthy();
 		expect(screen.getByText('$23,199.60')).toBeTruthy();
@@ -312,13 +316,13 @@ describe('FinancingFormSection loan preview', () => {
 
 	test('labels the preview as updated when editing', () => {
 		mount({ amortizationPreview: PREVIEW, isEditMode: true });
-		expect(screen.getByText('Updated Loan Calculation Preview')).toBeTruthy();
+		expect(screen.getByText('Updated loan calculation preview')).toBeTruthy();
 		expect(screen.getByLabelText(/^Original loan amount/)).toBeTruthy();
 	});
 
 	test('a lease never shows the loan preview', () => {
 		mount({ ownershipType: 'lease', amortizationPreview: PREVIEW });
-		expect(screen.queryByText(/Loan Calculation Preview/)).toBeNull();
+		expect(screen.queryByText(/loan calculation preview/i)).toBeNull();
 	});
 
 	test('formats the preview in the user currency', () => {
