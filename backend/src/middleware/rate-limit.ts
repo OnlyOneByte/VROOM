@@ -108,7 +108,10 @@ export function concurrencyLimiter(config: ConcurrencyLimitConfig) {
   const inFlight = new Map<string, number>();
   const code = config.status === 503 ? 'SERVER_BUSY' : 'RATE_LIMIT_EXCEEDED';
   return async (c: Context, next: Next) => {
-    if (CONFIG.disableRateLimit) return next();
+    if (CONFIG.disableRateLimit) {
+      await next();
+      return;
+    }
     const key = config.keyGenerator(c);
     const running = inFlight.get(key) ?? 0;
     if (running >= config.limit) {
