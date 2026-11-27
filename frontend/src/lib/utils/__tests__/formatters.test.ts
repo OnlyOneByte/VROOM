@@ -239,16 +239,16 @@ describe('locale and currency decimals', () => {
 		expect(currentLocale()).toBe('en-US');
 	});
 
-	test("reads each currency's decimal places from Intl", () => {
+	test("reads each currency's decimal places from the pinned no-decimals list", () => {
 		expect(currencyFractionDigits('USD')).toBe(2);
 		expect(currencyFractionDigits('JPY')).toBe(0);
-		expect(currencyFractionDigits('BHD')).toBe(3);
+		expect(currencyFractionDigits('HUF')).toBe(0);
 	});
 
 	test('the amount input step follows the currency', () => {
 		expect(amountStep('USD')).toBe('0.01');
 		expect(amountStep('JPY')).toBe('1');
-		expect(amountStep('BHD')).toBe('0.001');
+		expect(amountStep('IDR')).toBe('1');
 	});
 });
 
@@ -297,7 +297,7 @@ describe('amountPlaceholder and formatBytes', () => {
 	test("the amount placeholder has the currency's decimal places", () => {
 		expect(amountPlaceholder('USD')).toBe('0.00');
 		expect(amountPlaceholder('JPY')).toBe('0');
-		expect(amountPlaceholder('BHD')).toBe('0.000');
+		expect(amountPlaceholder('HUF')).toBe('0');
 	});
 
 	test('file sizes read in B, KB or MB with one decimal', () => {
@@ -337,5 +337,31 @@ describe('minor units', () => {
 			expect(toMinor(1234.4, code)).toBe(1234);
 			expect(fromMinor(1234, code)).toBe(1234);
 		}
+	});
+
+	test('input digits come from the pinned list even where the browser says 2 (Safari)', () => {
+		const real = Intl.NumberFormat.prototype.resolvedOptions;
+		const spy = vi
+			.spyOn(Intl.NumberFormat.prototype, 'resolvedOptions')
+			.mockImplementation(function (this: Intl.NumberFormat) {
+				return { ...real.call(this), minimumFractionDigits: 2, maximumFractionDigits: 2 };
+			});
+		try {
+			expect(currencyFractionDigits('HUF')).toBe(0);
+			expect(amountStep('HUF')).toBe('1');
+			expect(amountPlaceholder('IDR')).toBe('0');
+			expect(toAmountInput(1234, 'HUF')).toBe('1234');
+			expect(currencyFractionDigits('USD')).toBe(2);
+			expect(amountStep('USD')).toBe('0.01');
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	test('formats no-decimal currencies without decimals and others with two', () => {
+		expect(formatCurrency(1234.4, 'HUF')).not.toMatch(/[.,]\d{2}\D*$/);
+		expect(formatCurrency(1234, 'JPY')).toBe('¥1,234');
+		expect(formatCurrency(12.5, 'USD')).toBe('$12.50');
+		expect(formatCurrency(12.5, 'USD', 0)).toBe('$13');
 	});
 });

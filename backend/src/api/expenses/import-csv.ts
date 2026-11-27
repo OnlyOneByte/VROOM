@@ -3,8 +3,9 @@ import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
 import { EXPENSE_CATEGORIES, isElectricFuelType } from '../../db/types';
+import { ValidationError } from '../../errors';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
-import { dollarsToCents, hasAtMostTwoDecimals } from '../../utils/money';
+import { dollarsToCents, hasAtMostTwoDecimals, parsedToMinor } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
 import {
   DATE_OUT_OF_RANGE_MESSAGE,
@@ -267,11 +268,25 @@ export const importCsvSchema = z.object({
   timeZone: z.string().max(64).refine(isValidTimeZone, 'Unknown time zone').optional(),
 });
 
+function fitsCurrency(
+  parsed: { expense: ImportableExpense },
+  scale: number
+): { expense: ImportableExpense } | { error: string } {
+  try {
+    parsedToMinor(parsed.expense.expenseAmount, scale);
+    return parsed;
+  } catch (err) {
+    if (err instanceof ValidationError) return { error: err.message };
+    throw err;
+  }
+}
+
 export function buildImportPlan(
   csv: string,
   vehicles: ImportVehicle[],
   rowErrors: ReadonlyMap<number, string> = new Map(),
-  timeZone?: string
+  timeZone?: string,
+  scale = 100
 ): ImportPlan {
   let records: Record<string, string>[];
   try {
@@ -317,7 +332,8 @@ export function buildImportPlan(
       date: denormalizeCsvCell((record.date ?? '').trim()),
     };
     const preError = rowErrors.get(i);
-    const result = preError ? { error: preError } : parseRow(record, vehicleByName, timeZone);
+    const parsed = preError ? { error: preError } : parseRow(record, vehicleByName, timeZone);
+    const result = 'error' in parsed ? parsed : fitsCurrency(parsed, scale);
     const rowNum = i + 2;
     if ('error' in result) {
       return { row: rowNum, status: 'error' as const, message: result.error, raw };
