@@ -44,6 +44,14 @@ const getVehicles = vi.hoisted(() =>
 				model: 'Golf',
 				ownerCurrency: 'EUR',
 				sharedAccess: { seesFinancials: true }
+			},
+			{
+				id: 'yen',
+				year: 2016,
+				make: 'Mazda',
+				model: 'Demio',
+				ownerCurrency: 'JPY',
+				sharedAccess: { seesFinancials: true }
 			}
 		])
 	)
@@ -178,6 +186,29 @@ describe('PerVehicleTab', () => {
 		expect(screen.getByRole('heading', { level: 2, name: 'Vehicle Health Score' })).toBeTruthy();
 		expect(api.query).not.toHaveBeenCalled();
 		expect(document.body.textContent ?? '').not.toMatch(/all time|\$0(?![.\d])|Not enough data/);
+	});
+
+	test("a shared car's totals are in its owner's currency", async () => {
+		render(PerVehicleTab, { preferredVehicleId: 'euro' });
+		await screen.findByText(/2017 VW Golf is shared with you and kept in EUR/);
+		const page = document.body.textContent ?? '';
+		expect(page).toContain('€10,000.00');
+		expect(page).toContain('€300.00');
+		expect(page).not.toMatch(/\$10,000|\$300/);
+	});
+
+	test("a shared car's totals use its owner's currency's minor units", async () => {
+		api.getVehicleTCO.mockResolvedValue({
+			totalCost: 1234567,
+			costPerDistance: 12,
+			costPerMonth: 30000,
+			totalDistance: 11000
+		});
+		render(PerVehicleTab, { preferredVehicleId: 'yen' });
+		await screen.findByText(/2016 Mazda Demio is shared with you and kept in JPY/);
+		const page = document.body.textContent ?? '';
+		expect(page).toMatch(/¥1,234,567(?![.\d])/);
+		expect(page).toMatch(/¥30,000(?![.\d])/);
 	});
 
 	test('a car shared with full access shows its ownership totals and financial spend', async () => {

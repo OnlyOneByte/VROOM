@@ -162,6 +162,9 @@
 	});
 
 	let selectedVehicle = $derived(vehicles.find(v => v.id === selectedVehicleId));
+	let money = $derived(
+		inOtherCurrency(selectedVehicle) ? selectedVehicle?.ownerCurrency : undefined
+	);
 	const carName = (v: Vehicle) => v.nickname || `${v.year} ${v.make} ${v.model}`;
 
 	let units = $derived(selectedVehicle?.unitPreferences ?? settingsStore.unitPreferences);
@@ -233,15 +236,15 @@
 	let tcoSummaryItems = $derived.by(() => {
 		if (!tco) return [];
 		const ownership = [
-			{ label: 'Total cost of ownership', value: formatCurrency(tco.totalCost) },
+			{ label: 'Total cost of ownership', value: formatCurrency(tco.totalCost, money) },
 			{
 				label: `Ownership cost per ${distWord}`,
-				value: tco.costPerDistance != null ? formatCurrency(tco.costPerDistance) : 'N/A'
+				value: tco.costPerDistance != null ? formatCurrency(tco.costPerDistance, money) : 'N/A'
 			}
 		];
 		return [
 			...(hideFinancial ? [] : ownership),
-			{ label: 'Cost per month', value: formatCurrency(tco.costPerMonth) },
+			{ label: 'Cost per month', value: formatCurrency(tco.costPerMonth, money) },
 			{
 				label: `Total ${distLongLabel.toLowerCase()}`,
 				value: formatNumberUpTo(tco.totalDistance, 1)
@@ -313,7 +316,7 @@
 					<div class="space-y-2">
 						<HeroFigure
 							label="{carName(selectedVehicle)}, all time"
-							value={formatCurrency(hero?.total ?? 0, undefined, 0)}
+							value={formatCurrency(hero?.total ?? 0, money, 0)}
 						/>
 						{#if hero?.top || hero?.running != null}
 							<p class="max-w-md text-muted-foreground">
@@ -321,7 +324,7 @@
 								{#if hero.running != null}
 									Running costs were
 									<strong class="text-foreground">
-										{formatCurrency(hero.running, undefined, 0)}
+										{formatCurrency(hero.running, money, 0)}
 									</strong>.
 								{/if}
 							</p>
@@ -345,7 +348,7 @@
 											></span>
 										</span>
 										<span class="font-semibold tabular-nums">
-											{formatCurrency(row.value, undefined, 0)}
+											{formatCurrency(row.value, money, 0)}
 										</span>
 									</li>
 								{/each}
@@ -378,8 +381,8 @@
 								? [{ value: monthAverage, label: 'Monthly average' }]
 								: []}
 							xAxisProps={{ ticks: monthTicks, format: (v: unknown) => String(v) }}
-							yAxisFormat={v => formatCurrency(v, undefined, 0)}
-							tooltipFormat={v => formatCurrency(Number(v))}
+							yAxisFormat={v => formatCurrency(v, money, 0)}
+							tooltipFormat={v => formatCurrency(Number(v), money)}
 							tooltipLabelFormat={v => String(v)}
 						/>
 					{/if}
@@ -391,7 +394,7 @@
 									<dt class="text-muted-foreground">{rate.label}</dt>
 									<dd class="font-semibold tabular-nums">
 										{rate.value != null
-											? `${formatCurrency(rate.value, undefined, 2)}/${distShort}`
+											? `${formatCurrency(rate.value, money, 2)}/${distShort}`
 											: 'Not enough data'}
 									</dd>
 								</div>
@@ -485,9 +488,9 @@
 				config={breakdownConfig}
 				height={Math.max(160, breakdownRows.length * 44)}
 				padding={{ top: 4, left: 112, bottom: 24, right: 16 }}
-				xAxisProps={{ format: (v: number) => formatCurrency(v, undefined, 0), ticks: 4 }}
+				xAxisProps={{ format: (v: number) => formatCurrency(v, money, 0), ticks: 4 }}
 				yAxisFormat={v => String(v)}
-				tooltipFormat={v => formatCurrency(Number(v))}
+				tooltipFormat={v => formatCurrency(Number(v), money)}
 			/>
 		{/if}
 	</div>
