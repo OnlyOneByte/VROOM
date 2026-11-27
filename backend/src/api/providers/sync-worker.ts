@@ -22,10 +22,7 @@ export interface SyncWorkerDeps {
     'findPendingOrFailed' | 'findActiveByPhoto' | 'updateStatus'
   >;
   photoRepository: Pick<AppContext['repos']['photos'], 'findById'>;
-  registry: Pick<
-    typeof storageProviderRegistry,
-    'getProviderInternal' | 'resolveProviderFolderPath'
-  >;
+  registry: Pick<typeof storageProviderRegistry, 'getProvider' | 'resolveProviderFolderPath'>;
 }
 
 function defaultDeps(): SyncWorkerDeps {
@@ -163,14 +160,16 @@ export async function processBatch(deps: SyncWorkerDeps = defaultDeps()): Promis
 
 async function getCachedProvider(
   providerId: string,
+  ownerId: string,
   cache: Map<string, StorageProvider>,
   registry: SyncWorkerDeps['registry']
 ): Promise<StorageProvider> {
-  const cached = cache.get(providerId);
+  const key = `${ownerId}:${providerId}`;
+  const cached = cache.get(key);
   if (cached) return cached;
 
-  const provider = await registry.getProviderInternal(providerId);
-  cache.set(providerId, provider);
+  const provider = await registry.getProvider(providerId, ownerId);
+  cache.set(key, provider);
   return provider;
 }
 
@@ -237,6 +236,7 @@ async function processSingleRef(
   try {
     const sourceProvider = await getCachedProvider(
       sourceRef.providerId,
+      photo.userId,
       providerCache,
       deps.registry
     );
@@ -257,7 +257,11 @@ async function processSingleRef(
 
     if (category) {
       try {
-        pathHint = await deps.registry.resolveProviderFolderPath(ref.providerId, category);
+        pathHint = await deps.registry.resolveProviderFolderPath(
+          ref.providerId,
+          photo.userId,
+          category
+        );
       } catch (error) {
         logger.warn('Sync worker: folder path lookup failed, uploading without a path hint', {
           refId: ref.id,
@@ -269,7 +273,12 @@ async function processSingleRef(
       }
     }
 
-    const targetProvider = await getCachedProvider(ref.providerId, providerCache, deps.registry);
+    const targetProvider = await getCachedProvider(
+      ref.providerId,
+      photo.userId,
+      providerCache,
+      deps.registry
+    );
     const uploadResult = await withHealth(
       ref.providerId,
       withTimeout(

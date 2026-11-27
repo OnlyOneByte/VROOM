@@ -98,7 +98,7 @@ describe('the photo sync worker records what it learns about a provider', () => 
           Promise.resolve({ id: 'photo-1', entityType: 'vehicle', fileName: 'a.jpg' } as Photo),
       },
       registry: {
-        getProviderInternal: () => Promise.resolve(provider),
+        getProvider: () => Promise.resolve(provider),
         resolveProviderFolderPath: () => Promise.resolve(''),
       },
     } as unknown as SyncWorkerDeps;

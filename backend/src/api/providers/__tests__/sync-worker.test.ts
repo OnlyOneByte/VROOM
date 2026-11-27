@@ -50,7 +50,7 @@ function makeDeps(): SyncWorkerDeps {
       findById: mockFindById,
     },
     registry: {
-      getProviderInternal: mockGetProvider,
+      getProvider: mockGetProvider,
       resolveProviderFolderPath: mockResolveFolderPath,
     },
   } as unknown as SyncWorkerDeps;
