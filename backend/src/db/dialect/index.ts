@@ -1,4 +1,4 @@
-import { type Column, type SQL, type SQLWrapper, sql } from 'drizzle-orm';
+import { type Column, is, Name, SQL, type SQLWrapper, sql } from 'drizzle-orm';
 import { ACTIVE_DIALECT, type DialectName } from './active';
 
 const SQL_TYPES = {
@@ -73,30 +73,48 @@ const sqliteSql: DialectSql = {
 const utc = (column: Column) => sql`(to_timestamp(${column}) AT TIME ZONE 'UTC')`;
 const jsonb = (value: SQLWrapper) => sql`(${value})::jsonb`;
 
-let nextAlias = 0;
+type NextAlias = () => Name;
 
-function bindOnce(value: SQL, use: (bound: SQL) => SQL): SQL {
-  const alias = sql.identifier(`jv${nextAlias++}`);
-  return sql`(SELECT ${use(sql`${alias}.m`)} FROM (SELECT ${value} AS m OFFSET 0) AS ${alias})`;
+const ALIAS = /^jv(\d+)$/;
+
+function highestAlias(chunk: unknown): number {
+  if (is(chunk, SQL)) return Math.max(-1, ...chunk.queryChunks.map(highestAlias));
+  if (is(chunk, Name)) return Number(ALIAS.exec(chunk.value)?.[1] ?? -1);
+  return -1;
+}
+
+function aliasesAfter(...inputs: unknown[]): NextAlias {
+  let next = Math.max(-1, ...inputs.map(highestAlias)) + 1;
+  return () => sql.identifier(`jv${next++}`);
+}
+
+function bindOnce(value: SQL, use: (bound: SQL) => SQL, alias: NextAlias): SQL {
+  const name = alias();
+  return sql`(SELECT ${use(sql`${name}.m`)} FROM (SELECT ${value} AS m OFFSET 0) AS ${name})`;
 }
 
 const objectOr = (m: SQL) =>
   sql`(CASE WHEN jsonb_typeof(${m}) = 'object' THEN ${m} ELSE '{}'::jsonb END)`;
 
-const asObject = (value: SQL) => bindOnce(value, objectOr);
+const asObject = (value: SQL, alias: NextAlias) => bindOnce(value, objectOr, alias);
 
-function pgMergePatch(target: SQL, patch: Record<string, unknown>): SQL {
+function pgMergePatch(target: SQL, patch: Record<string, unknown>, alias: NextAlias): SQL {
   return Object.entries(patch).reduce(
     (merged, [key, value]) =>
-      bindOnce(merged, (m) => {
-        const name = sql`${key}::text`;
-        if (value === null) return sql`(${m} - ${name})`;
-        if (isPlainObject(value)) {
-          return sql`(${m} || jsonb_build_object(${name}, ${pgMergePatch(sql`(${m} -> ${name})`, value)}))`;
-        }
-        return sql`(${m} || jsonb_build_object(${name}, ${JSON.stringify(value)}::jsonb))`;
-      }),
-    asObject(target)
+      bindOnce(
+        merged,
+        (m) => {
+          const name = sql`${key}::text`;
+          if (value === null) return sql`(${m} - ${name})`;
+          if (isPlainObject(value)) {
+            const child = pgMergePatch(sql`(${m} -> ${name})`, value, alias);
+            return sql`(${m} || jsonb_build_object(${name}, ${child}))`;
+          }
+          return sql`(${m} || jsonb_build_object(${name}, ${JSON.stringify(value)}::jsonb))`;
+        },
+        alias
+      ),
+    asObject(target, alias)
   );
 }
 
@@ -106,19 +124,27 @@ function pgAddMissing(
   entries: Record<string, Record<string, unknown>>
 ): SQL {
   const key = sql`${checkedParent(parent)}::text`;
+  const alias = aliasesAfter(object);
   const original = (entry: string) =>
     sql`(jsonb_typeof(${jsonb(object)} -> ${key}) = 'object' AND (${jsonb(object)} -> ${key}) ? ${entry}::text)`;
   return Object.entries(entries).reduce(
     (merged, [entry, value]) =>
-      bindOnce(merged, (m) =>
-        bindOnce(objectOr(sql`(${m} -> ${key})`), (p) => {
-          const kept = objectOr(sql`(${p} -> ${entry}::text)`);
-          const added = sql`${JSON.stringify(value)}::jsonb`;
-          const next = sql`(CASE WHEN ${original(entry)} THEN ${kept} ELSE ${added} END)`;
-          return sql`(${m} || jsonb_build_object(${key}, ${p} || jsonb_build_object(${entry}::text, ${next})))`;
-        })
+      bindOnce(
+        merged,
+        (m) =>
+          bindOnce(
+            objectOr(sql`(${m} -> ${key})`),
+            (p) => {
+              const kept = objectOr(sql`(${p} -> ${entry}::text)`);
+              const added = sql`${JSON.stringify(value)}::jsonb`;
+              const next = sql`(CASE WHEN ${original(entry)} THEN ${kept} ELSE ${added} END)`;
+              return sql`(${m} || jsonb_build_object(${key}, ${p} || jsonb_build_object(${entry}::text, ${next})))`;
+            },
+            alias
+          ),
+        alias
       ),
-    asObject(sql`coalesce(${jsonb(object)}, '{}'::jsonb)`)
+    asObject(sql`coalesce(${jsonb(object)}, '{}'::jsonb)`, alias)
   );
 }
 
@@ -139,7 +165,8 @@ const pgSql: DialectSql = {
   },
   typedParam: (value, type) =>
     sql`CAST(${checkedParam(value, type)} AS ${sql.raw(SQL_TYPES.pg[type])})`,
-  jsonMergePatch: (object, patch) => pgMergePatch(sql`${jsonb(object)}`, patch),
+  jsonMergePatch: (object, patch) =>
+    pgMergePatch(sql`${jsonb(object)}`, patch, aliasesAfter(object)),
   jsonAddMissingEntries: pgAddMissing,
 };
 
@@ -230,11 +257,12 @@ export function isDriverError(err: unknown): boolean {
 
 export function looksLikeDriverError(err: unknown): boolean {
   if (isDriverError(err)) return true;
-  if (!(err instanceof Error)) return false;
-  const code = (err as Error & { code?: unknown }).code;
-  return (
-    err.message.includes('SQLITE_') || (typeof code === 'string' && code.startsWith('ERR_POSTGRES'))
-  );
+  for (let e: unknown = err; e instanceof Error; e = e.cause) {
+    const code = (e as Error & { code?: unknown }).code;
+    if (e.message.includes('SQLITE_')) return true;
+    if (typeof code === 'string' && code.startsWith('ERR_POSTGRES')) return true;
+  }
+  return false;
 }
 
 export function classifyDbError(err: unknown): DbErrorKind | null {

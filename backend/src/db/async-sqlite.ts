@@ -6,14 +6,14 @@ import { UPKEEP_QUERIES } from './dialect';
 import * as schema from './sqlite/schema';
 
 const STATEMENT_CACHE_SIZE = 500;
-const TRANSACTION_CONTROL = /^(commit|end|rollback|release)\b/i;
-const OPENING = /^(begin|savepoint)\b/i;
+export const TRANSACTION_CONTROL = /^(commit|end|rollback|release)\b/i;
+export const OPENING = /^(begin|savepoint)\b/i;
 const BEGIN = /^begin\b/i;
 const ROLLBACK = /^rollback\b/i;
 const LEADING_WHITESPACE_SEMICOLONS_AND_COMMENTS =
   /^(?:[\s;]+|--[^\n]*(?:\n|$)|\/\*[\s\S]*?(?:\*\/|$))*/;
 
-function statementHead(query: string): string {
+export function statementHead(query: string): string {
   return query.replace(LEADING_WHITESPACE_SEMICOLONS_AND_COMMENTS, '');
 }
 const GUARDED_METHODS = ['prepare', 'query', 'run', 'exec', 'transaction'] as const;
@@ -72,7 +72,7 @@ export function reportLateQueries(listener: ((error: TransactionEndedError) => v
   lateQueryListener = listener;
 }
 
-function lateQuery(): TransactionEndedError {
+export function lateQuery(): TransactionEndedError {
   const error = new TransactionEndedError();
   lateQueryListener?.(error);
   return error;
@@ -98,7 +98,7 @@ export class SyncQueryInAsyncTransactionError extends Error {
   }
 }
 
-const insideAny = new AsyncLocalStorage<boolean>();
+export const insideAny = new AsyncLocalStorage<boolean>();
 
 export function inAsyncTransaction(): boolean {
   return insideAny.getStore() === true;

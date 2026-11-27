@@ -11,7 +11,7 @@ import * as pgSchema from '../../pg/schema';
 import * as active from '../../schema';
 import * as sqliteSchema from '../../sqlite/schema';
 import { ACTIVE_DIALECT, dialectFromUrl } from '../active';
-import { classifyDbError, DIALECT_SQL, type DialectSql } from '../index';
+import { classifyDbError, DIALECT_SQL, type DialectSql, looksLikeDriverError } from '../index';
 
 const liteProbe = sqliteTable('probe', {
   id: text('id'),
@@ -194,6 +194,37 @@ describe('each Postgres dialect helper gives the same result as its SQLite twin'
       lastBackupAt: '2024-06-01',
     });
   }, 30_000);
+
+  test('the same JSON update gives the same SQL text, and nesting a merge in a merge still works', async () => {
+    const render = () =>
+      new PgDialect().sqlToQuery(
+        DIALECT_SQL.pg.jsonMergePatch(pgProbe.prefs, { a: { b: 1 }, c: null })
+      ).sql;
+    expect(render()).toBe(render());
+    const twice = (d: DialectSql, t: Probe) =>
+      d.jsonMergePatch(d.jsonMergePatch(t.prefs, { b: { d: 4 } }), { b: { e: 5 }, a: null });
+    const [onLite, onPg] = await both(
+      (d, t) => sql`SELECT ${t.id} AS id, ${twice(d, t)} AS merged FROM probe ORDER BY id`
+    );
+    expect(normalize(onPg, ['merged'])).toEqual(normalize(onLite, ['merged']));
+    expect(normalize(onLite, ['merged'])[0]).toEqual({
+      id: 'r1',
+      merged: { b: { c: { k: 1 }, d: 4, e: 5 } },
+    });
+  });
+});
+
+describe('a wrapped Bun.sql error', () => {
+  test('without a SQLSTATE still counts as a driver error through the cause chain', () => {
+    const closed = Object.assign(new Error('Connection closed'), {
+      code: 'ERR_POSTGRES_CONNECTION_CLOSED',
+    });
+    const wrapped = new Error('Failed query: select 1', { cause: closed });
+    expect(looksLikeDriverError(wrapped)).toBe(true);
+    expect(looksLikeDriverError(new Error('Failed query', { cause: new Error('EPIPE') }))).toBe(
+      false
+    );
+  });
 });
 
 describe('database errors are classified the same on both drivers', () => {
