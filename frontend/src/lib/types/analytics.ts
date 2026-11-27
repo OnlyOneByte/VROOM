@@ -16,6 +16,14 @@ export interface QuickStatsResponse {
 	units: UnitsMetadata;
 }
 
+export interface VehicleFuelTotals {
+	vehicleId: string;
+	vehicleName: string;
+	count: number;
+	volume: number;
+	cost: number;
+}
+
 export interface FuelStatsResponse {
 	fillups: {
 		currentYear: number;
@@ -59,7 +67,15 @@ export interface FuelStatsResponse {
 		avgPerMonth: number | null;
 	};
 	monthlyConsumption: Array<{ month: string; efficiency: number | null; volume: number }>;
-	gasPriceHistory: Array<{ date: string; month: string; fuelType: string; pricePerVolume: number }>;
+	gasPriceHistory: Array<{
+		date: string;
+		month: string;
+		fuelType: string;
+		pricePerVolume: number;
+		volume?: number;
+	}>;
+	fillupsByVehicle?: VehicleFuelTotals[];
+	chargingByVehicle?: VehicleFuelTotals[];
 	fillupCostByVehicle: Array<{
 		month: string;
 		vehicleId: string;
