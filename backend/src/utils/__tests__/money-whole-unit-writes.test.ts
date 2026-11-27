@@ -20,6 +20,10 @@ describe('edits compare like units when the currency has no decimals', () => {
       totalAmount: 1200,
     });
     const legs = (await json<DataEnvelope<{ siblings: { id: string }[] }>>(split)).data.siblings;
+    const stored = app()
+      .sqlite.query('SELECT expense_amount AS amount FROM expenses WHERE id = ?')
+      .get(legs[0]?.id ?? '') as { amount: number };
+    expect(stored.amount).toBe(600);
     const res = await app().authed('PUT', `/api/v1/expenses/${legs[0]?.id}`, {
       expenseAmount: 600,
       description: 'new',

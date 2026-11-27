@@ -264,13 +264,13 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     expectedCurrentDueDate: Date,
     nextDueDate: Date,
     lastTriggeredAt: Date
-  ): Promise<boolean> {
-    const claimed = await tx
+  ): Promise<Reminder | null> {
+    const [claimed] = await tx
       .update(reminders)
       .set({ nextDueDate, lastTriggeredAt, updatedAt: new Date() })
       .where(and(eq(reminders.id, id), eq(reminders.nextDueDate, expectedCurrentDueDate)))
-      .returning({ id: reminders.id });
-    return claimed.length > 0;
+      .returning();
+    return claimed ?? null;
   }
 
   async deactivate(id: string, userId: string): Promise<void> {
@@ -314,29 +314,31 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     userId: string,
     deletedVehicleId: string
   ): Promise<number> {
-    const rows = await this.db
-      .select({ id: reminders.id, expenseSplitConfig: reminders.expenseSplitConfig })
-      .from(reminders)
-      .where(and(eq(reminders.userId, userId), isNotNull(reminders.expenseSplitConfig)));
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ id: reminders.id, expenseSplitConfig: reminders.expenseSplitConfig })
+        .from(reminders)
+        .where(and(eq(reminders.userId, userId), isNotNull(reminders.expenseSplitConfig)));
 
-    let changed = 0;
-    for (const row of rows) {
-      const config = row.expenseSplitConfig;
-      if (!config) continue;
-      const pruned = pruneVehicleFromSplitConfig(config, deletedVehicleId);
-      if (pruned === config) continue;
-      const absoluteTotal = absoluteTotalAfterPrune(config, deletedVehicleId);
-      await this.db
-        .update(reminders)
-        .set({
-          expenseSplitConfig: pruned,
-          ...(absoluteTotal === null ? {} : { expenseAmount: absoluteTotal }),
-          updatedAt: new Date(),
-        })
-        .where(and(eq(reminders.id, row.id), eq(reminders.userId, userId)));
-      changed++;
-    }
-    return changed;
+      let changed = 0;
+      for (const row of rows) {
+        const config = row.expenseSplitConfig;
+        if (!config) continue;
+        const pruned = pruneVehicleFromSplitConfig(config, deletedVehicleId);
+        if (pruned === config) continue;
+        const absoluteTotal = absoluteTotalAfterPrune(config, deletedVehicleId);
+        await tx
+          .update(reminders)
+          .set({
+            expenseSplitConfig: pruned,
+            ...(absoluteTotal === null ? {} : { expenseAmount: absoluteTotal }),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(reminders.id, row.id), eq(reminders.userId, userId)));
+        changed++;
+      }
+      return changed;
+    });
   }
 
   async markServiced(

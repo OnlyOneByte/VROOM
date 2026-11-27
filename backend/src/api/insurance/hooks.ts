@@ -214,6 +214,11 @@ export async function updateTermExpenses(
 
   const { termId, vehicleIds, userId } = params;
   const totalCost = effectiveTermCost(params);
+  if (scale !== undefined && (await repos().preferences.moneyScale(userId)) !== scale) {
+    throw new ConflictError(
+      'The currency changed while this was being saved. Reload and try again'
+    );
+  }
 
   const deleted = await deleteTermExpenses(termId, userId);
   if (deleted > 0) {
@@ -225,6 +230,7 @@ export async function updateTermExpenses(
   try {
     await materializeTermExpenses(params, totalCost, scale);
   } catch (error) {
+    if (error instanceof ConflictError) throw error;
     logger.error('Failed to recreate insurance expenses for term update', {
       termId,
       deleted,
