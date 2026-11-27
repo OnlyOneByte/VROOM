@@ -311,14 +311,12 @@ import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach } from 'bun:test';
 import { createId } from '@paralleldrive/cuid2';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
-import type { AppDatabase } from '../../../db/connection';
-import * as schema from '../../../db/schema';
+import { type AsyncAppDatabase, openAsyncDatabase } from '../../../db/async-sqlite';
 import { expenses } from '../../../db/schema';
 
 let sqliteDb: Database;
-let db: AppDatabase;
+let db: AsyncAppDatabase;
 
 const USER_ID = 'test-user-1';
 const VEHICLE_IDS = ['v-1', 'v-2', 'v-3', 'v-4', 'v-5'];
@@ -341,7 +339,7 @@ beforeEach(() => {
   for (const m of migrations) {
     applyMigration(sqliteDb, m);
   }
-  db = drizzle(sqliteDb, { schema });
+  db = openAsyncDatabase(sqliteDb).db;
   seedDbTestData();
 });
 

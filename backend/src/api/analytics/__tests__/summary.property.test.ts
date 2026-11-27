@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
   createTestDb,
@@ -29,7 +30,7 @@ describe('Summary data equivalence', () => {
         async (targetYear, vehiclesArr) => {
           const testDb: TestDb = createTestDb();
           try {
-            const repo = new AnalyticsRepository(testDb.drizzle);
+            const repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 
             const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
             seedUser(testDb.sqlite, user);

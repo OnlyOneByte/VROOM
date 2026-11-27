@@ -151,8 +151,8 @@ describe('getVlmProvider / resolveModelSettings dispatch by provider type', () =
     } as any;
   }
 
-  test('resolveModelSettings decrypts the api key + reads model/baseUrl', () => {
-    const s = resolveModelSettings(vlmRow(), 'VLM');
+  test('resolveModelSettings decrypts the api key + reads model/baseUrl', async () => {
+    const s = await resolveModelSettings(vlmRow(), 'VLM');
     expect(s).toMatchObject({
       apiKey: 'sk-x',
       model: 'gpt-4o-mini',
@@ -160,22 +160,22 @@ describe('getVlmProvider / resolveModelSettings dispatch by provider type', () =
     });
   });
 
-  test('resolveModelSettings throws when the model is missing (defense-in-depth vs a restored bad row)', () => {
-    expect(() => resolveModelSettings(vlmRow({ config: { baseUrl: 'https://x' } }), 'VLM')).toThrow(
-      /VLM provider config is missing a model name/
-    );
+  test('resolveModelSettings throws when the model is missing (defense-in-depth vs a restored bad row)', async () => {
+    await expect(
+      resolveModelSettings(vlmRow({ config: { baseUrl: 'https://x' } }), 'VLM')
+    ).rejects.toThrow(/VLM provider config is missing a model name/);
   });
 
-  test('getVlmProvider throws on an unknown/non-VLM provider type', () => {
-    expect(() => getVlmProvider(vlmRow({ providerType: 's3' }))).toThrow(
+  test('getVlmProvider throws on an unknown/non-VLM provider type', async () => {
+    await expect(getVlmProvider(vlmRow({ providerType: 's3' }))).rejects.toThrow(
       /Unsupported VLM provider type/
     );
   });
 
-  test('getVlmProvider returns a live adapter for every model provider type', () => {
-    expect(getVlmProvider(vlmRow({ providerType: 'openai-compatible' }))).toBeDefined();
+  test('getVlmProvider returns a live adapter for every model provider type', async () => {
+    expect(await getVlmProvider(vlmRow({ providerType: 'openai-compatible' }))).toBeDefined();
     expect(
-      getVlmProvider(
+      await getVlmProvider(
         vlmRow({
           providerType: 'ollama',
           credentials: {},
@@ -184,10 +184,14 @@ describe('getVlmProvider / resolveModelSettings dispatch by provider type', () =
       )
     ).toBeDefined();
     expect(
-      getVlmProvider(vlmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } }))
+      await getVlmProvider(
+        vlmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } })
+      )
     ).toBeDefined();
     expect(
-      getVlmProvider(vlmRow({ providerType: 'gemini', config: { model: 'gemini-1.5-flash' } }))
+      await getVlmProvider(
+        vlmRow({ providerType: 'gemini', config: { model: 'gemini-1.5-flash' } })
+      )
     ).toBeDefined();
   });
 });

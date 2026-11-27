@@ -1,10 +1,11 @@
-import { afterAll, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setLocalOcrForTest } from '../../api/providers/domains/vlm/local-ocr';
 import { parseExtraction, type ReceiptDraft } from '../../api/providers/domains/vlm/prompt';
 import type { VlmProvider } from '../../api/providers/domains/vlm/vlm-provider';
 import { outboundResolver } from '../../utils/outbound-url';
+import { spyOnGuarded } from '../transaction-guard';
 
 const FIXTURES = join(import.meta.dir, 'fixtures');
 
@@ -51,8 +52,8 @@ export function describeOcrContract(
       run(
         `reads ${file} into a draft without any outbound request${flaky}`,
         async () => {
-          const fetchSpy = spyOn(globalThis, 'fetch');
-          const lookupSpy = spyOn(outboundResolver, 'lookup');
+          const fetchSpy = spyOnGuarded(globalThis, 'fetch');
+          const lookupSpy = spyOnGuarded(outboundResolver, 'lookup');
           try {
             const raw = await create().extractReceipt({
               data: readFileSync(join(FIXTURES, file)),

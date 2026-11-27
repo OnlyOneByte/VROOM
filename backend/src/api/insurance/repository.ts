@@ -1,7 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
-import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
 import {
   insurancePolicies,
@@ -10,7 +9,6 @@ import {
   insuranceTermVehicles,
   nextInsuranceTermVehiclePosition,
 } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
@@ -84,22 +82,17 @@ function ownedPolicy(policyId: string, userId: string) {
 }
 
 export class InsurancePolicyRepository {
-  private db: AsyncAppDatabase;
+  constructor(private db: AsyncAppDatabase) {}
 
-  constructor(private syncDb: AppDatabase) {
-    this.db = openAsyncDatabase(syncDb.$client).db;
-  }
-
-  // bun:sqlite: an async transaction callback autocommits each write, which could leave partial coverage.
-  private insertJunctionRowsSync(
-    tx: DrizzleTransaction,
+  private async insertJunctionRows(
+    tx: AsyncHandle,
     termId: string,
     vehicleIds: string[]
-  ): void {
+  ): Promise<void> {
     for (const vehicleId of vehicleIds) {
-      tx.insert(insuranceTermVehicles)
-        .values({ termId, vehicleId, position: nextInsuranceTermVehiclePosition })
-        .run();
+      await tx
+        .insert(insuranceTermVehicles)
+        .values({ termId, vehicleId, position: nextInsuranceTermVehiclePosition });
     }
   }
 
@@ -173,15 +166,15 @@ export class InsurancePolicyRepository {
   async create(data: CreatePolicyData, userId: string): Promise<InsurancePolicyWithVehicles> {
     try {
       const allVehicleIds = [...new Set(data.terms.flatMap((t) => t.vehicleCoverage.vehicleIds))];
-      await requireVehiclesAccess(allVehicleIds, userId, 'owner', this.db);
 
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Policy creation requires sequential steps within a transaction
-      return this.syncDb.transaction((tx) => {
+      return await this.db.transaction(async (tx) => {
+        await requireVehiclesAccess(allVehicleIds, userId, 'owner', tx);
         const policyId = createId();
         const now = new Date();
         const isActive = data.isActive !== false;
 
-        const policy = tx
+        const [policy] = await tx
           .insert(insurancePolicies)
           .values({
             id: policyId,
@@ -192,15 +185,15 @@ export class InsurancePolicyRepository {
             createdAt: now,
             updatedAt: now,
           })
-          .returning()
-          .get();
+          .returning();
+        if (!policy) throw new Error('Policy insert returned no row');
 
         const insertedTerms: InsuranceTerm[] = [];
         const termCoverage: TermCoverageRow[] = [];
 
         for (const term of data.terms) {
           const termId = createId();
-          const insertedTerm = tx
+          const [insertedTerm] = await tx
             .insert(insuranceTerms)
             .values({
               id: termId,
@@ -221,12 +214,12 @@ export class InsurancePolicyRepository {
               createdAt: now,
               updatedAt: now,
             })
-            .returning()
-            .get();
+            .returning();
+          if (!insertedTerm) throw new Error('Term insert returned no row');
 
           insertedTerms.push(insertedTerm);
 
-          this.insertJunctionRowsSync(tx, termId, term.vehicleCoverage.vehicleIds);
+          await this.insertJunctionRows(tx, termId, term.vehicleCoverage.vehicleIds);
           for (const vid of term.vehicleCoverage.vehicleIds) {
             termCoverage.push({ termId, vehicleId: vid });
           }
@@ -300,7 +293,7 @@ export class InsurancePolicyRepository {
     userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
-      const updated = await this.syncDb.transaction(async (tx) => {
+      const updated = await this.db.transaction(async (tx) => {
         const existing = await tx
           .select()
           .from(insurancePolicies)
@@ -338,7 +331,7 @@ export class InsurancePolicyRepository {
 
   async delete(id: string, userId: string): Promise<void> {
     try {
-      await this.syncDb.transaction(async (tx) => {
+      await this.db.transaction(async (tx) => {
         const existing = await tx
           .select()
           .from(insurancePolicies)
@@ -367,50 +360,46 @@ export class InsurancePolicyRepository {
     userId: string
   ): Promise<InsurancePolicyWithVehicles & { newTermId: string }> {
     try {
-      await requireVehiclesAccess(term.vehicleCoverage.vehicleIds, userId, 'owner', this.db);
-
       const termId = createId();
-      this.syncDb.transaction((tx) => {
-        const existing = tx
+      await this.db.transaction(async (tx) => {
+        await requireVehiclesAccess(term.vehicleCoverage.vehicleIds, userId, 'owner', tx);
+        const existing = await tx
           .select()
           .from(insurancePolicies)
           .where(ownedPolicy(policyId, userId))
-          .limit(1)
-          .all();
+          .limit(1);
 
         if (existing.length === 0) {
           throw new NotFoundError('Insurance policy');
         }
 
         const now = new Date();
-        tx.insert(insuranceTerms)
-          .values({
-            id: termId,
-            policyId,
-            startDate: term.startDate,
-            endDate: term.endDate,
-            policyNumber: term.policyNumber ?? null,
-            coverageDescription: term.coverageDescription ?? null,
-            deductibleAmount: term.deductibleAmount ?? null,
-            coverageLimit: term.coverageLimit ?? null,
-            agentName: term.agentName ?? null,
-            agentPhone: term.agentPhone ?? null,
-            agentEmail: term.agentEmail ?? null,
-            totalCost: term.totalCost ?? null,
-            monthlyCost: term.monthlyCost ?? null,
-            premiumFrequency: term.premiumFrequency ?? null,
-            paymentAmount: term.paymentAmount ?? null,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .run();
+        await tx.insert(insuranceTerms).values({
+          id: termId,
+          policyId,
+          startDate: term.startDate,
+          endDate: term.endDate,
+          policyNumber: term.policyNumber ?? null,
+          coverageDescription: term.coverageDescription ?? null,
+          deductibleAmount: term.deductibleAmount ?? null,
+          coverageLimit: term.coverageLimit ?? null,
+          agentName: term.agentName ?? null,
+          agentPhone: term.agentPhone ?? null,
+          agentEmail: term.agentEmail ?? null,
+          totalCost: term.totalCost ?? null,
+          monthlyCost: term.monthlyCost ?? null,
+          premiumFrequency: term.premiumFrequency ?? null,
+          paymentAmount: term.paymentAmount ?? null,
+          createdAt: now,
+          updatedAt: now,
+        });
 
-        this.insertJunctionRowsSync(tx, termId, term.vehicleCoverage.vehicleIds);
+        await this.insertJunctionRows(tx, termId, term.vehicleCoverage.vehicleIds);
 
-        tx.update(insurancePolicies)
+        await tx
+          .update(insurancePolicies)
           .set({ updatedAt: now })
-          .where(eq(insurancePolicies.id, policyId))
-          .run();
+          .where(eq(insurancePolicies.id, policyId));
       });
 
       const updatedPolicy = await this.db
@@ -440,29 +429,26 @@ export class InsurancePolicyRepository {
   ): Promise<InsurancePolicyWithVehicles> {
     try {
       const { vehicleCoverage, ...termFields } = updates;
-      if (vehicleCoverage) {
-        await requireVehiclesAccess(vehicleCoverage.vehicleIds, userId, 'owner', this.db);
-      }
-
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Term update requires field-by-field mapping and junction management
-      this.syncDb.transaction((tx) => {
-        const existing = tx
+      await this.db.transaction(async (tx) => {
+        if (vehicleCoverage) {
+          await requireVehiclesAccess(vehicleCoverage.vehicleIds, userId, 'owner', tx);
+        }
+        const existing = await tx
           .select()
           .from(insurancePolicies)
           .where(ownedPolicy(policyId, userId))
-          .limit(1)
-          .all();
+          .limit(1);
 
         if (existing.length === 0) {
           throw new NotFoundError('Insurance policy');
         }
 
-        const termRows = tx
+        const termRows = await tx
           .select()
           .from(insuranceTerms)
           .where(and(eq(insuranceTerms.id, termId), eq(insuranceTerms.policyId, policyId)))
-          .limit(1)
-          .all();
+          .limit(1);
 
         const storedTerm = termRows[0];
         if (!storedTerm) {
@@ -495,17 +481,17 @@ export class InsurancePolicyRepository {
         if (termFields.paymentAmount !== undefined)
           setFields.paymentAmount = termFields.paymentAmount;
 
-        tx.update(insuranceTerms).set(setFields).where(eq(insuranceTerms.id, termId)).run();
+        await tx.update(insuranceTerms).set(setFields).where(eq(insuranceTerms.id, termId));
 
         if (vehicleCoverage) {
-          tx.delete(insuranceTermVehicles).where(eq(insuranceTermVehicles.termId, termId)).run();
-          this.insertJunctionRowsSync(tx, termId, vehicleCoverage.vehicleIds);
+          await tx.delete(insuranceTermVehicles).where(eq(insuranceTermVehicles.termId, termId));
+          await this.insertJunctionRows(tx, termId, vehicleCoverage.vehicleIds);
         }
 
-        tx.update(insurancePolicies)
+        await tx
+          .update(insurancePolicies)
           .set({ updatedAt: new Date() })
-          .where(eq(insurancePolicies.id, policyId))
-          .run();
+          .where(eq(insurancePolicies.id, policyId));
       });
 
       const updatedPolicy = await this.db
@@ -534,7 +520,7 @@ export class InsurancePolicyRepository {
     userId: string
   ): Promise<InsurancePolicyWithVehicles> {
     try {
-      const updatedPolicy = await this.syncDb.transaction(async (tx) => {
+      const updatedPolicy = await this.db.transaction(async (tx) => {
         const existing = await tx
           .select()
           .from(insurancePolicies)

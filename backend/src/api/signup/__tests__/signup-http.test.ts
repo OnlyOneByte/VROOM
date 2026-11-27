@@ -20,6 +20,10 @@ let signupConfig: { mode?: string; allowedDomains?: string };
 let adminConfig: { adminEmails: string[] };
 let admin: RequestFn;
 
+async function asyncDb() {
+  return (await import('../../../app-context')).appContext().asyncDb;
+}
+
 let identity = 0;
 function signUp(email: string) {
   identity++;
@@ -80,8 +84,7 @@ beforeEach(async () => {
   signupConfig = CONFIG.signup as typeof signupConfig;
   adminConfig = CONFIG as typeof adminConfig;
   const { assignServerRole } = await import('../../../permissions/grants');
-  const { getDb } = await import('../../../db/connection');
-  assignServerRole(getDb(), ctx.user.id, 'admin');
+  await assignServerRole(await asyncDb(), ctx.user.id, 'admin');
   admin = ctx.authed;
 }, SETUP_TIMEOUT_MS);
 
@@ -196,11 +199,9 @@ describe('sign-up modes', () => {
 
 describe('a server with no admin', () => {
   let ensureServerAdmin: typeof import('../store').ensureServerAdmin;
-  let db: ReturnType<typeof import('../../../db/connection').getDb>;
 
   beforeEach(async () => {
     ({ ensureServerAdmin } = await import('../store'));
-    db = (await import('../../../db/connection')).getDb();
     ctx.sqlite.run('DELETE FROM users');
     for (const [id, created, disabled, pending] of [
       ['disabled', 1, 1, null],
@@ -216,26 +217,26 @@ describe('a server with no admin', () => {
     }
   });
 
-  test('gets its oldest active, dated account as admin at startup, once', () => {
-    expect(ensureServerAdmin(db)).toBe('oldest');
-    expect(ensureServerAdmin(db)).toBeNull();
+  test('gets its oldest active, dated account as admin at startup, once', async () => {
+    expect(await (await asyncDb()).transaction((tx) => ensureServerAdmin(tx))).toBe('oldest');
+    expect(await (await asyncDb()).transaction((tx) => ensureServerAdmin(tx))).toBeNull();
     expect(serverRoles('oldest')).toEqual(['builtin_admin']);
   });
 
-  test('does not pick a new admin after the admin is later removed', () => {
-    expect(ensureServerAdmin(db)).toBe('oldest');
+  test('does not pick a new admin after the admin is later removed', async () => {
+    expect(await (await asyncDb()).transaction((tx) => ensureServerAdmin(tx))).toBe('oldest');
     ctx.sqlite.run('DELETE FROM role_assignments');
-    expect(ensureServerAdmin(db)).toBeNull();
+    expect(await (await asyncDb()).transaction((tx) => ensureServerAdmin(tx))).toBeNull();
     expect(serverRoles('newer')).toEqual([]);
   });
 
-  test('with ADMIN_EMAILS set, gets only a listed account as admin', () => {
+  test('with ADMIN_EMAILS set, gets only a listed account as admin', async () => {
     adminConfig.adminEmails = ['newer@example.com', 'disabled@example.com'];
-    expect(ensureServerAdmin(db)).toBe('newer');
+    expect(await (await asyncDb()).transaction((tx) => ensureServerAdmin(tx))).toBe('newer');
     ctx.sqlite.run('DELETE FROM role_assignments');
     ctx.sqlite.run('UPDATE server_settings SET admin_assigned_at = NULL');
     adminConfig.adminEmails = ['nobody@example.com'];
-    expect(ensureServerAdmin(db)).toBeNull();
+    expect(await (await asyncDb()).transaction((tx) => ensureServerAdmin(tx))).toBeNull();
   });
 });
 
@@ -358,11 +359,10 @@ describe('server invites', () => {
 describe('admin routes', () => {
   test('a member without server.signup.manage is refused every one', async () => {
     const { assignServerRole } = await import('../../../permissions/grants');
-    const { getDb } = await import('../../../db/connection');
     ctx.sqlite.run(
       "INSERT INTO users (id, email, display_name) VALUES ('m1', 'm1@example.com', 'M')"
     );
-    assignServerRole(getDb(), 'm1', 'member');
+    await assignServerRole(await asyncDb(), 'm1', 'member');
     const member = (await requestAs(ctx, 'm1')).request;
     for (const [method, path, body] of [
       ['GET', '/api/v1/admin/signup'],
@@ -405,14 +405,14 @@ describe('private provider targets', () => {
     const { privateEndpointPolicy } = await import('../../../utils/outbound-url');
     for (const mode of SIGNUP_MODES) {
       setMode(mode);
-      expect(privateEndpointPolicy().allowAll, mode).toBe(true);
+      expect((await privateEndpointPolicy()).allowAll, mode).toBe(true);
     }
     ctx.sqlite.run(
       "INSERT INTO users (id, email, display_name) VALUES ('u2', 'u2@example.com', 'U2')"
     );
     for (const mode of SIGNUP_MODES) {
       setMode(mode);
-      expect(privateEndpointPolicy().allowAll, mode).toBe(false);
+      expect((await privateEndpointPolicy()).allowAll, mode).toBe(false);
     }
   });
 });

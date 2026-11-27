@@ -55,6 +55,7 @@ import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-cat
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
 import { carShareAccess } from '../drivers/attribution';
 import { carShareRoutes, driverRoutes } from '../drivers/routes';
+import { nextUpdatedAtFor } from '../expenses/updated-at';
 import { withComputedBalance } from '../financing/repository';
 import { deleteAllPhotosForEntity, deletePhotosForEntities } from '../photos/photo-service';
 import { vehiclePeople } from '../roles/routes';
@@ -359,11 +360,13 @@ routes.post('/', zValidator('json', createVehicleSchema), authorize(ownAccount),
 
   const ownerCurrency = (await repos().preferences.currencies([user.id]))(user.id);
   const scale = minorUnitScale(ownerCurrency);
-  const createdVehicle = await repos().vehicles.create({
-    ...vehicleFromApi(vehicleData, scale),
-    unitPreferences,
-    userId: user.id,
-  });
+  const createdVehicle = await repos().preferences.writeAtScale(user.id, scale, () =>
+    repos().vehicles.create({
+      ...vehicleFromApi(vehicleData, scale),
+      unitPreferences,
+      userId: user.id,
+    })
+  );
 
   const response: ApiResponse<typeof createdVehicle & { ownerCurrency: string }> = {
     success: true,
@@ -480,11 +483,13 @@ routes.put(
     const ownerId = existingVehicle.userId;
     const ownerCurrency = (await repos().preferences.currencies([ownerId]))(ownerId);
     const scale = minorUnitScale(ownerCurrency);
-    const updatedVehicle = await repos().vehicles.update(id, {
-      ...vehicleFromApi(restUpdateData, scale),
-      ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
-      ...(renamedWithoutCatalogModel(existingVehicle, updateData) && { catalogModelId: null }),
-    });
+    const updatedVehicle = await repos().preferences.writeAtScale(ownerId, scale, () =>
+      repos().vehicles.update(id, {
+        ...vehicleFromApi(restUpdateData, scale),
+        ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
+        ...(renamedWithoutCatalogModel(existingVehicle, updateData) && { catalogModelId: null }),
+      })
+    );
 
     return c.json({
       success: true,
@@ -519,14 +524,17 @@ async function shrinkSplitGroupsToSurvivingLegs(userId: string, groupIds: string
   const db = appContext().asyncDb;
   // SQLite caps bound parameters, and inArray binds one per id: keep batches small.
   for (const batch of chunk(groupIds)) {
-    await db
-      .update(expenses)
-      .set({
-        groupTotal: sql`(SELECT sum(legs.expense_amount) FROM ${expenses} AS legs
-          WHERE legs.group_id = ${expenses.groupId} AND legs.user_id = ${expenses.userId})`,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(expenses.userId, userId), inArray(expenses.groupId, batch)));
+    const legs = and(eq(expenses.userId, userId), inArray(expenses.groupId, batch));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(expenses)
+        .set({
+          groupTotal: sql`(SELECT sum(legs.expense_amount) FROM ${expenses} AS legs
+            WHERE legs.group_id = ${expenses.groupId} AND legs.user_id = ${expenses.userId})`,
+          updatedAt: await nextUpdatedAtFor(tx, legs),
+        })
+        .where(legs);
+    });
   }
 }
 

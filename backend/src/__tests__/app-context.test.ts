@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { appContext, createAppContext } from '../app-context';
 import { applyMigrationsUpTo, loadMigrations } from '../db/__tests__/migration-helpers';
-import { getDb, transaction } from '../db/connection';
+import { openAsyncDatabase } from '../db/async-sqlite';
+import { getDb } from '../db/connection';
 import * as schema from '../db/schema';
 
 function isolatedDb() {
@@ -53,12 +54,12 @@ describe('the app context', () => {
 
   test('is built once, on the configured database', () => {
     expect(appContext()).toBe(appContext());
-    expect(appContext().db).toBe(getDb());
+    expect(appContext().asyncDb).toBe(openAsyncDatabase(getDb().$client).db);
   });
 
   test('its repositories write to the database they were given, transactions included', async () => {
     const db = isolatedDb();
-    const created = await createAppContext(db).repos.reminders.createWithVehicles(
+    const created = await createAppContext(db.$client).repos.reminders.createWithVehicles(
       {
         userId: 'ctx-user',
         name: 'Registration',
@@ -72,14 +73,5 @@ describe('the app context', () => {
     );
     expect(created.vehicleIds).toEqual(['ctx-vehicle']);
     expect(db.$client.query('SELECT count(*) AS n FROM reminder_vehicles').get()).toEqual({ n: 1 });
-  });
-
-  test('transaction() runs on the database it is handed', async () => {
-    const db = isolatedDb();
-    const ids = await transaction(
-      (tx) => tx.select({ id: schema.vehicles.id }).from(schema.vehicles).all(),
-      db
-    );
-    expect(ids).toEqual([{ id: 'ctx-vehicle' }]);
   });
 });

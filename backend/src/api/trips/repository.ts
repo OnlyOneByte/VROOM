@@ -1,8 +1,7 @@
 import { and, asc, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
-import type { AsyncAppDatabase } from '../../db/async-sqlite';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import type { NewTrip, Trip } from '../../db/schema';
 import { trips, vehicles } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
 import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
 import { BaseRepository } from '../../utils/repository';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
@@ -37,7 +36,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
   }
 
   // Odometer dedup key: do not remove the linked odometer entry while this returns > 0.
-  findOtherAtOdometerKey(
+  async findOtherAtOdometerKey(
     args: {
       excludeTripId: string;
       vehicleId: string;
@@ -46,10 +45,10 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       tripDate: Date;
       timeZone?: string;
     },
-    db: DrizzleTransaction
-  ): string | null {
+    db: AsyncHandle
+  ): Promise<string | null> {
     const { dayStart, nextDay } = localDayWindow(args.tripDate, args.timeZone);
-    const result = db
+    const result = await db
       .select({ id: trips.id })
       .from(trips)
       .where(

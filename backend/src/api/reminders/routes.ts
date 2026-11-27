@@ -376,15 +376,17 @@ routes.post(
     const { ownerId } = await requireReminderVehiclesWrite(vehicleIds, user.id);
     const mileage = await resolveMileageFields(reminderData, vehicleIds, ownerId);
     const scale = await repos().preferences.moneyScale(ownerId);
-    const result = await repos().reminders.createWithVehicles(
-      {
-        ...reminderFromApi(reminderData, scale),
-        userId: ownerId,
-        createdBy: ownerId === user.id ? null : user.id,
-        nextDueDate: reminderData.triggerMode === 'mileage' ? null : reminderData.startDate,
-        ...mileage,
-      },
-      vehicleIds
+    const result = await repos().preferences.writeAtScale(ownerId, scale, () =>
+      repos().reminders.createWithVehicles(
+        {
+          ...reminderFromApi(reminderData, scale),
+          userId: ownerId,
+          createdBy: ownerId === user.id ? null : user.id,
+          nextDueDate: reminderData.triggerMode === 'mileage' ? null : reminderData.startDate,
+          ...mileage,
+        },
+        vehicleIds
+      )
     );
 
     return c.json(
@@ -470,9 +472,10 @@ routes.put(
     const existing = await repos().reminders.findByIdWithVehicles(id);
     if (!existing) throw new NotFoundError('Reminder');
     const { ownerId } = await requireExistingReminderWrite(existing, user.id);
+    const scale = await repos().preferences.moneyScale(ownerId);
     const partialUpdate = reminderFromApi(
       keepStoredDatesOnSameDay(c.req.valid('json'), existing.reminder),
-      await repos().preferences.moneyScale(ownerId)
+      scale
     );
 
     if (partialUpdate.vehicleIds) {
@@ -523,11 +526,8 @@ routes.put(
       rescheduledFields(existing.reminder, reminderFields, merged, timeZone)
     );
 
-    const result = await repos().reminders.updateWithVehicles(
-      id,
-      ownerId,
-      updateFields,
-      mergedVehicleIds
+    const result = await repos().preferences.writeAtScale(ownerId, scale, () =>
+      repos().reminders.updateWithVehicles(id, ownerId, updateFields, mergedVehicleIds)
     );
 
     return c.json({

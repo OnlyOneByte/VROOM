@@ -7,7 +7,6 @@ import { sessions, users } from '../../db/schema';
 import { seedGarage } from '../../db/seed';
 import { assignServerRole } from '../../permissions/grants';
 import { DEMO_ROLE_KEY } from '../../permissions/roles';
-import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
 import { DEMO_USER_ID } from './demo-account';
 import { DEMO_SESSION_PREFIX, demoSessionExpiresAt, setSessionCookie } from './utils';
@@ -23,27 +22,17 @@ export function isDemoAvailable(): boolean {
 }
 
 export async function prepareDemoGarage(): Promise<void> {
-  const { db, asyncDb } = appContext();
+  const { asyncDb } = appContext();
   demoReady = false;
   await asyncDb.delete(users).where(eq(users.id, DEMO_USER_ID));
   if (!CONFIG.demo.enabled) return;
-  try {
-    await asyncDb
+  await asyncDb.transaction(async (tx) => {
+    await tx
       .insert(users)
       .values({ id: DEMO_USER_ID, email: DEMO_USER_EMAIL, displayName: 'Demo Garage' });
-    assignServerRole(db, DEMO_USER_ID, DEMO_ROLE_KEY);
+    await assignServerRole(tx, DEMO_USER_ID, DEMO_ROLE_KEY);
     await seedGarage(DEMO_USER_ID);
-  } catch (error) {
-    await asyncDb
-      .delete(users)
-      .where(eq(users.id, DEMO_USER_ID))
-      .catch((cleanupError: unknown) =>
-        logger.error('Could not remove the partly seeded demo garage', {
-          message: extractErrorMessage(cleanupError),
-        })
-      );
-    throw error;
-  }
+  });
   demoReady = true;
   logger.info('Demo garage is ready');
 }

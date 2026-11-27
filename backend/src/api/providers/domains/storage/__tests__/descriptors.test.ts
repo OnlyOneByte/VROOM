@@ -21,13 +21,13 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 describe('storage provider descriptors', () => {
-  test('a new type registered only in STORAGE_PROVIDERS is built by the registry', () => {
+  test('a new type registered only in STORAGE_PROVIDERS is built by the registry', async () => {
     const instance = new FakeStorageProvider();
     const providers = STORAGE_PROVIDERS as unknown as Record<string, StorageProviderDescriptor>;
     providers.webdav = { ...STORAGE_PROVIDERS.fake, label: 'WebDAV', create: () => instance };
     try {
       const row = { id: 'p-webdav', providerType: 'webdav', credentials: '', config: null };
-      const built = getStorageProviderRegistry().createProviderInstance(
+      const built = await getStorageProviderRegistry().createProviderInstance(
         row as unknown as UserProvider
       );
       expect(built).toBe(instance);
@@ -36,11 +36,11 @@ describe('storage provider descriptors', () => {
     }
   });
 
-  test('an unknown type is still refused', () => {
+  test('an unknown type is still refused', async () => {
     const row = { id: 'p-x', providerType: 'dropbox', credentials: '', config: null };
-    expect(() =>
+    await expect(
       getStorageProviderRegistry().createProviderInstance(row as unknown as UserProvider)
-    ).toThrow('Unsupported provider type: dropbox');
+    ).rejects.toThrow('Unsupported provider type: dropbox');
   });
 
   test('Google Photos can be created once a Google account is connected for it', async () => {

@@ -54,7 +54,7 @@ try {
   process.exit(1);
 }
 
-for (const warning of adminEmailWarnings(CONFIG.adminEmails)) logger.warn(warning);
+for (const warning of await adminEmailWarnings(CONFIG.adminEmails)) logger.warn(warning);
 
 await discoverOidc();
 

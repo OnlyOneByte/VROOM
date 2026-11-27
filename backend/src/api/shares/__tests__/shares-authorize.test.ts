@@ -97,6 +97,12 @@ describe('share management cannot be used to escalate', () => {
     expect((await invite(m.viewer.request, 'h@example.com')).status).toBe(201);
   });
 
+  test('a manager cannot change their own share even to a level they hold', async () => {
+    const res = await m.coOwner.request('PUT', shareOf(m.coOwner), { level: 'viewer' });
+    expect(res.status).toBe(403);
+    expect(await res.text()).toContain("You can't change your own access");
+  });
+
   test('an owner-set deny limits what a co-owner can hand out', async () => {
     overrideOn(ctx, CAR, m.coOwner, 'vehicle.expense.write', 'deny');
     const asEditor = await m.coOwner.request('POST', '/api/v1/shares', {

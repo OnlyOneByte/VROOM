@@ -136,9 +136,9 @@ function normalizeRows(rows: unknown[], ordered: boolean): string[] {
 }
 
 async function captureWorkload(userId: string): Promise<Captured[]> {
-  const queries = new AnalyticsQueryRepository(db);
-  const insights = new AnalyticsInsightsRepository(db, queries);
-  const odometer = new OdometerRepository(db);
+  const queries = new AnalyticsQueryRepository(openAsyncDatabase(db.$client).db);
+  const insights = new AnalyticsInsightsRepository(openAsyncDatabase(db.$client).db, queries);
+  const odometer = new OdometerRepository(openAsyncDatabase(db.$client).db);
   const base: AnalyticsQuery = {
     metric: 'cost',
     interval: 'month',

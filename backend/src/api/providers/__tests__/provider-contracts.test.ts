@@ -140,7 +140,7 @@ describe('storage descriptor features hold for every type', () => {
 
   test('a ZIP backup runs only when the provider ZIP flag is on', async () => {
     const fake = new FakeStorageProvider();
-    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockReturnValue(
+    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockResolvedValue(
       fake
     );
     try {
@@ -293,17 +293,15 @@ describe('a stored config is checked when the provider is resolved', () => {
     } as UserProvider;
   }
 
-  test('a storage row whose config breaks the schema fails at resolve, not on first use', () => {
+  test('a storage row whose config breaks the schema fails at resolve, not on first use', async () => {
     const previous = config.allowFakeStorageProvider;
     config.allowFakeStorageProvider = true;
     try {
       const registry = getStorageProviderRegistry();
-      expect(() =>
+      await expect(
         registry.createProviderInstance(row({ config: { providerRootPath: 'a/../b' } }))
-      ).toThrow('Path traversal not allowed');
-      expect(() =>
-        registry.createProviderInstance(row({ config: { legacyFolderId: 'kept' } }))
-      ).not.toThrow();
+      ).rejects.toThrow('Path traversal not allowed');
+      await registry.createProviderInstance(row({ config: { legacyFolderId: 'kept' } }));
     } finally {
       config.allowFakeStorageProvider = previous;
     }
@@ -322,7 +320,7 @@ describe('a stored config is checked when the provider is resolved', () => {
         }),
         config: cfg,
       });
-    expect(() => getLlmProvider(modelRow({ model: 'claude', baseUrl: 42 }))).toThrow();
-    expect(() => getLlmProvider(modelRow({ model: 'claude', legacy: true }))).not.toThrow();
+    await expect(getLlmProvider(modelRow({ model: 'claude', baseUrl: 42 }))).rejects.toThrow();
+    await getLlmProvider(modelRow({ model: 'claude', legacy: true }));
   });
 });

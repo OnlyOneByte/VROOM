@@ -1,12 +1,12 @@
 import { createId } from '@paralleldrive/cuid2';
 import { desc, eq } from 'drizzle-orm';
 import { addGuestDriver, ownDriverId, setCarShare } from '../api/drivers/repository';
+import { nextUpdatedAtFor } from '../api/expenses/updated-at';
 import { createTermExpenses } from '../api/insurance/hooks';
+import { appContext } from '../app-context';
 import { assignServerRole } from '../permissions/grants';
 import { logger } from '../utils/logger';
 import { dollarsToCents } from '../utils/money';
-import { openAsyncDatabase } from './async-sqlite';
-import { getDb } from './connection.js';
 import {
   expenses,
   insuranceClaims,
@@ -25,6 +25,10 @@ import {
   vehicleFinancing,
   vehicles,
 } from './schema.js';
+
+function seedDb() {
+  return appContext().asyncDb;
+}
 
 function daysAgo(days: number): Date {
   const now = new Date();
@@ -132,17 +136,11 @@ function loanPayments(loan: VehicleFinancing, pattern: DrivingPattern): NewExpen
 }
 
 async function shareWeekendCar(pattern: DrivingPattern): Promise<void> {
-  const db = getDb();
+  const db = seedDb();
   const { vehicleId, userId } = pattern;
-  const asyncDb = openAsyncDatabase(db.$client).db;
-  setCarShare(db, vehicleId, true);
-  const owner = await ownDriverId(asyncDb, vehicleId, userId);
-  const jamie = await addGuestDriver(
-    asyncDb,
-    vehicleId,
-    { name: 'Jamie', color: 'chart-3' },
-    userId
-  );
+  await setCarShare(db, vehicleId, true);
+  const owner = await ownDriverId(db, vehicleId, userId);
+  const jamie = await addGuestDriver(db, vehicleId, { name: 'Jamie', color: 'chart-3' }, userId);
   const rows = await db
     .select({ id: expenses.id, category: expenses.category })
     .from(expenses)
@@ -151,13 +149,19 @@ async function shareWeekendCar(pattern: DrivingPattern): Promise<void> {
   let fillUp = 0;
   for (const row of rows) {
     const payer = row.category === 'fuel' && fillUp++ % 3 !== 0 ? jamie : owner;
-    await db.update(expenses).set({ paidByDriverId: payer }).where(eq(expenses.id, row.id));
+    const target = eq(expenses.id, row.id);
+    const updatedAt = await nextUpdatedAtFor(db, target);
+    await db.update(expenses).set({ paidByDriverId: payer, updatedAt }).where(target);
   }
   await db.update(trips).set({ driverId: jamie }).where(eq(trips.vehicleId, vehicleId));
 }
 
-export async function seedDatabase() {
-  const db = getDb();
+export function seedDatabase(): Promise<void> {
+  return seedDb().transaction(() => seedSampleAccount());
+}
+
+async function seedSampleAccount() {
+  const db = seedDb();
   try {
     logger.info('Seeding database with sample data...');
 
@@ -169,7 +173,7 @@ export async function seedDatabase() {
       })
       .returning();
 
-    assignServerRole(db, sampleUser.id, 'member');
+    await assignServerRole(db, sampleUser.id, 'member');
     logger.info('Created sample user', { userId: sampleUser.id });
 
     await db.insert(userProviders).values({
@@ -190,8 +194,12 @@ export async function seedDatabase() {
   }
 }
 
-export async function seedGarage(userId: string) {
-  const db = getDb();
+export function seedGarage(userId: string): Promise<void> {
+  return seedDb().transaction(() => seedGarageRows(userId));
+}
+
+async function seedGarageRows(userId: string) {
+  const db = seedDb();
   try {
     await db.insert(userPreferences).values({
       userId,

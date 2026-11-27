@@ -1,6 +1,5 @@
 import { and, type Column, desc, eq, isNull } from 'drizzle-orm';
-import type { AsyncAppDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import {
   type BackfilledEntry,
   driverBackfills,
@@ -12,14 +11,14 @@ import {
 } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
-import { listDrivers } from './repository';
+import { nextUpdatedAtFor } from '../expenses/updated-at';
+import { carShareEnabled, listDrivers } from './repository';
 
 export type BackfillRequest =
   | { mode: 'logged' }
   | { mode: 'range'; driverId: string; from: number; to: number };
 
 type Kind = BackfilledEntry['kind'];
-type Tx = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
 interface Candidate {
   kind: Kind;
@@ -124,74 +123,91 @@ export async function summarize(
   };
 }
 
-function setDriver(
-  tx: Tx,
+async function setDriver(
+  tx: AsyncHandle,
+  vehicleId: string,
   entry: BackfilledEntry,
   from: string | null,
   to: string | null,
   hideFinancials: boolean
-): boolean {
+): Promise<boolean> {
   const match = (column: Column) => (from === null ? isNull(column) : eq(column, from));
   if (entry.kind === 'trip') {
-    return (
-      tx
-        .update(trips)
-        .set({ driverId: to })
-        .where(and(eq(trips.id, entry.id), match(trips.driverId)))
-        .returning({ id: trips.id })
-        .all().length > 0
-    );
+    const rows = await tx
+      .update(trips)
+      .set({ driverId: to })
+      .where(and(eq(trips.id, entry.id), eq(trips.vehicleId, vehicleId), match(trips.driverId)))
+      .returning({ id: trips.id });
+    return rows.length > 0;
   }
   if (entry.kind === 'reading') {
-    return (
-      tx
-        .update(odometerEntries)
-        .set({ driverId: to })
-        .where(and(eq(odometerEntries.id, entry.id), match(odometerEntries.driverId)))
-        .returning({ id: odometerEntries.id })
-        .all().length > 0
-    );
-  }
-  return (
-    tx
-      .update(expenses)
-      .set({ paidByDriverId: to })
+    const rows = await tx
+      .update(odometerEntries)
+      .set({ driverId: to })
       .where(
         and(
-          eq(expenses.id, entry.id),
-          match(expenses.paidByDriverId),
-          visibleExpenses(hideFinancials)
+          eq(odometerEntries.id, entry.id),
+          eq(odometerEntries.vehicleId, vehicleId),
+          match(odometerEntries.driverId)
         )
       )
-      .returning({ id: expenses.id })
-      .all().length > 0
+      .returning({ id: odometerEntries.id });
+    return rows.length > 0;
+  }
+  const target = and(
+    eq(expenses.id, entry.id),
+    eq(expenses.vehicleId, vehicleId),
+    match(expenses.paidByDriverId),
+    visibleExpenses(hideFinancials)
   );
+  const rows = await tx
+    .update(expenses)
+    .set({ paidByDriverId: to, updatedAt: await nextUpdatedAtFor(tx, target) })
+    .where(target)
+    .returning({ id: expenses.id });
+  return rows.length > 0;
+}
+
+async function requireCarShareIn(tx: AsyncHandle, vehicleId: string): Promise<void> {
+  if (!(await carShareEnabled(tx, vehicleId))) throw new NotFoundError('Car sharing');
+}
+
+async function driverIds(tx: AsyncHandle, vehicleId: string): Promise<Set<string>> {
+  const rows = await tx
+    .select({ id: vehicleDrivers.id })
+    .from(vehicleDrivers)
+    .where(eq(vehicleDrivers.vehicleId, vehicleId));
+  return new Set(rows.map((row) => row.id));
 }
 
 export function applyBackfill(
-  db: AppDatabase,
+  asyncDb: AsyncAppDatabase,
   vehicleId: string,
   mode: BackfillRequest['mode'],
   planned: BackfilledEntry[],
   userId: string,
   hideFinancials: boolean
-): { batchId: string | null; entries: BackfilledEntry[] } {
-  return db.transaction((tx) => {
-    const applied = planned.filter((entry) =>
-      setDriver(tx, entry, null, entry.driverId, hideFinancials)
-    );
+): Promise<{ batchId: string | null; entries: BackfilledEntry[] }> {
+  return asyncDb.transaction(async (tx) => {
+    await requireCarShareIn(tx, vehicleId);
+    const drivers = await driverIds(tx, vehicleId);
+    const applied: BackfilledEntry[] = [];
+    for (const entry of planned.filter((e) => drivers.has(e.driverId))) {
+      if (await setDriver(tx, vehicleId, entry, null, entry.driverId, hideFinancials))
+        applied.push(entry);
+    }
     if (applied.length === 0) return { batchId: null, entries: applied };
-    const batch = tx
+    const [batch] = await tx
       .insert(driverBackfills)
       .values({ vehicleId, mode, entries: applied, createdBy: userId })
-      .returning({ id: driverBackfills.id })
-      .get();
+      .returning({ id: driverBackfills.id });
+    if (!batch) throw new Error('Backfill insert returned no row');
     return { batchId: batch.id, entries: applied };
   });
 }
 
-function stillPaidBy(tx: Tx, entry: BackfilledEntry): boolean {
-  const row = tx
+async function stillPaidBy(tx: AsyncHandle, entry: BackfilledEntry): Promise<boolean> {
+  const row = await tx
     .select({ payer: expenses.paidByDriverId })
     .from(expenses)
     .where(eq(expenses.id, entry.id))
@@ -200,13 +216,14 @@ function stillPaidBy(tx: Tx, entry: BackfilledEntry): boolean {
 }
 
 export function undoBackfill(
-  db: AppDatabase,
+  asyncDb: AsyncAppDatabase,
   vehicleId: string,
   batchId: string,
   hideFinancials: boolean
-): number {
-  return db.transaction((tx) => {
-    const batch = tx
+): Promise<number> {
+  return asyncDb.transaction(async (tx) => {
+    await requireCarShareIn(tx, vehicleId);
+    const batch = await tx
       .select()
       .from(driverBackfills)
       .where(and(eq(driverBackfills.id, batchId), eq(driverBackfills.vehicleId, vehicleId)))
@@ -215,14 +232,14 @@ export function undoBackfill(
     const kept: BackfilledEntry[] = [];
     let reverted = 0;
     for (const entry of batch.entries) {
-      if (setDriver(tx, entry, entry.driverId, null, hideFinancials)) reverted++;
-      else if (hideFinancials && entry.kind === 'expense' && stillPaidBy(tx, entry))
+      if (await setDriver(tx, vehicleId, entry, entry.driverId, null, hideFinancials)) reverted++;
+      else if (hideFinancials && entry.kind === 'expense' && (await stillPaidBy(tx, entry)))
         kept.push(entry);
     }
-    tx.update(driverBackfills)
+    await tx
+      .update(driverBackfills)
       .set(kept.length > 0 ? { entries: kept } : { undoneAt: new Date() })
-      .where(eq(driverBackfills.id, batchId))
-      .run();
+      .where(eq(driverBackfills.id, batchId));
     return reverted;
   });
 }

@@ -43,7 +43,7 @@ async function installCountingProvider(): Promise<void> {
 
   const { getStorageProviderRegistry } = await import('../../providers/domains/storage/registry');
   const registry = getStorageProviderRegistry();
-  registry.createProviderInstance = () => counting;
+  registry.createProviderInstance = async () => counting;
   restoreRegistry = () => {
     Reflect.deleteProperty(registry, 'createProviderInstance');
   };

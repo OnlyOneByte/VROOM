@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import type { AppDatabase } from '../../../db/connection';
 import type { NewExpense } from '../../../db/schema';
 import * as schema from '../../../db/schema';
@@ -32,7 +33,7 @@ beforeEach(() => {
   sqliteDb.run('PRAGMA foreign_keys = ON');
   for (const m of loadMigrations()) applyMigration(sqliteDb, m);
   db = drizzle(sqliteDb, { schema });
-  repo = new ExpenseRepository(db);
+  repo = new ExpenseRepository(openAsyncDatabase(db.$client).db);
   seed();
 });
 
@@ -120,6 +121,25 @@ describe('createIdempotent replay scoping', () => {
     ).rejects.toThrow(ConflictError);
     expect(await repo.findReplay('scope-1', USER_A, VEHICLE_A)).not.toBeNull();
     await expect(repo.findReplay('scope-1', USER_A, 'veh-a2')).rejects.toThrow(ConflictError);
+    expect(countRows()).toBe(1);
+  });
+});
+
+describe('concurrent writes check the odometer against each other', () => {
+  test('of two readings that conflict, sent at once, the second is refused', async () => {
+    const check = (mileage: number, date: Date) => ({
+      vehicleId: VEHICLE_A,
+      mileage,
+      date,
+      timeZone: 'UTC',
+    });
+    const earlier = new Date('2026-01-10T12:00:00Z');
+    const later = new Date('2026-01-20T12:00:00Z');
+    const results = await Promise.allSettled([
+      repo.createIdempotent(expenseInput({ date: earlier, mileage: 5000 }), check(5000, earlier)),
+      repo.createIdempotent(expenseInput({ date: later, mileage: 4000 }), check(4000, later)),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
     expect(countRows()).toBe(1);
   });
 });

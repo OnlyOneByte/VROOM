@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../../types';
 import { convertDistance, convertEfficiency } from '../../../utils/unit-conversions';
 import type { CrossVehicleData } from '../repository';
@@ -165,7 +166,7 @@ const TEST_YEAR = 2024;
 
 beforeEach(() => {
   testDb = createTestDb();
-  repo = new AnalyticsRepository(testDb.drizzle);
+  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 });
 
 afterEach(() => {
@@ -175,7 +176,7 @@ afterEach(() => {
 function resetDb(): void {
   testDb.sqlite.close();
   testDb = createTestDb();
-  repo = new AnalyticsRepository(testDb.drizzle);
+  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
 }
 
 describe('Cross-vehicle analytics conversion', () => {

@@ -80,6 +80,31 @@ describe('PendingSyncNote', () => {
 		expect(screen.queryByRole('link')).toBeNull();
 	});
 
+	test('an edit conflict offers Apply my changes only with write access, and Reload either way', () => {
+		const conflict = {
+			status: 'failed',
+			kind: 'edit',
+			error: 'This expense changed elsewhere',
+			conflict: true
+		} as const;
+		const writer = render(PendingSyncNote, { props: { ...props, pending: conflict } });
+		expect(screen.getByRole('button', { name: 'Apply my changes to $40.00 Arco' })).toBeVisible();
+		writer.unmount();
+
+		const reader = render(PendingSyncNote, {
+			props: { ...props, pending: conflict, canWrite: false }
+		});
+		expect(screen.getByText('This expense changed elsewhere')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Apply my changes/ })).toBeNull();
+		expect(
+			screen.getByRole('button', { name: 'Reload $40.00 Arco without my changes' })
+		).toBeVisible();
+		reader.unmount();
+
+		render(PendingSyncNote, { props: { ...props, pending: { ...conflict, editable: false } } });
+		expect(screen.queryByRole('button', { name: /Apply my changes/ })).toBeNull();
+	});
+
 	test('Discard asks first, then removes the entry from this device', async () => {
 		render(PendingSyncNote, {
 			props: { ...props, pending: { status: 'failed', error: 'Mileage too low', editable: true } }

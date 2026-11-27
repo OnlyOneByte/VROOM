@@ -260,7 +260,7 @@ routes.put('/', authorize(ownAccount), async (c) => {
   };
   const { currencyUnit } = preferenceUpdates;
   let updatedSettings = currencyUnit
-    ? updatePreferencesWithCurrency(appContext().db, user.id, {
+    ? await updatePreferencesWithCurrency(appContext().asyncDb, user.id, {
         ...preferenceUpdates,
         currencyUnit,
       })

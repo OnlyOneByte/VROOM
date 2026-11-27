@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import * as schema from '../../../db/schema';
 import {
   AnalyticsInsightsRepository,
@@ -97,8 +98,8 @@ function trip(vehicleId: string, iso: string, start: number, distance: number, p
 beforeEach(() => {
   testDb = createTestDb();
   repo = new AnalyticsInsightsRepository(
-    testDb.drizzle,
-    new AnalyticsQueryRepository(testDb.drizzle)
+    openAsyncDatabase(testDb.drizzle.$client).db,
+    new AnalyticsQueryRepository(openAsyncDatabase(testDb.drizzle.$client).db)
   );
   seedUser(testDb.sqlite, OWNER);
   seedVehicle(testDb.sqlite, CAMRY);
@@ -426,7 +427,10 @@ describe('insights performance guard', () => {
     applyMigrationsUpTo(sqlite, migrations, migrations.length - 1);
     const db = drizzle(sqlite, { schema });
     seedPerfFleet(sqlite);
-    const perf = new AnalyticsInsightsRepository(db, new AnalyticsQueryRepository(db));
+    const perf = new AnalyticsInsightsRepository(
+      openAsyncDatabase(db.$client).db,
+      new AnalyticsQueryRepository(openAsyncDatabase(db.$client).db)
+    );
     const end = PERF_START + PERF_SPAN;
     const query = { start: end - 365 * 86_400, end, timeZone: 'UTC' };
     await perf.insights('perf', query);

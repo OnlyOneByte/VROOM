@@ -441,6 +441,22 @@ export async function removeOrphanedPhotos(userId: string): Promise<OrphanRemova
 }
 
 // Photos have no FK to their entity, so children must be deleted explicitly here.
+export async function storedPhotoObjects(
+  entityType: string,
+  entityIds: string[]
+): Promise<PhotoRef[]> {
+  if (entityIds.length === 0) return [];
+  const entityPhotos = await repos().photos.findByEntities(entityType, entityIds);
+  if (entityPhotos.length === 0) return [];
+  return repos().photoRefs.findAllByPhotos(entityPhotos.map((p) => p.id));
+}
+
+export async function deleteStoredPhotoObjects(refs: PhotoRef[], userId: string): Promise<void> {
+  for (const [providerId, providerRefs] of groupActiveRefsByProvider(refs)) {
+    await deleteObjectsFromProvider(providerId, providerRefs, userId);
+  }
+}
+
 export async function deletePhotosForEntities(
   entityType: string,
   entityIds: string[],

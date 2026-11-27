@@ -113,7 +113,7 @@ function seedFleet(): void {
 
 beforeEach(() => {
   testDb = createTestDb();
-  repo = new AnalyticsQueryRepository(testDb.drizzle);
+  repo = new AnalyticsQueryRepository(openAsyncDatabase(testDb.drizzle.$client).db);
   seedUser(testDb.sqlite, OWNER);
   seedUser(testDb.sqlite, STRANGER);
   seedVehicle(testDb.sqlite, CAMRY);
@@ -126,7 +126,7 @@ afterEach(() => testDb.sqlite.close());
 describe('GET /analytics/query matches the existing summary aggregations', () => {
   test('monthly totals and category splits equal the Cross-Vehicle and heatmap numbers', async () => {
     seedFleet();
-    const legacy = new AnalyticsRepository(testDb.drizzle);
+    const legacy = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
     const cross = await legacy.getCrossVehicle(OWNER.id, RANGE);
     const advanced = await legacy.getFuelAdvanced(OWNER.id, RANGE);
 
@@ -158,7 +158,7 @@ describe('GET /analytics/query matches the existing summary aggregations', () =>
 
   test('cost per distance and pooled efficiency equal the quick stats', async () => {
     seedFleet();
-    const legacy = new AnalyticsRepository(testDb.drizzle);
+    const legacy = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
     const summary = await legacy.getSummary(OWNER.id, RANGE);
 
     const perDistance = await repo.query(
@@ -452,7 +452,9 @@ describe('same-day fill-ups pair by odometer', () => {
       );
       expect(efficiency.totals.value).toBeCloseTo(30, 9);
 
-      const summary = await new AnalyticsRepository(testDb.drizzle).getSummary(OWNER.id, RANGE);
+      const summary = await new AnalyticsRepository(
+        openAsyncDatabase(testDb.drizzle.$client).db
+      ).getSummary(OWNER.id, RANGE);
       expect(summary.quickStats.avgEfficiency).toBeCloseTo(30, 9);
     });
   }
@@ -748,7 +750,7 @@ describe('splits, compare and shape', () => {
     expect(result.totals.distance).toBe(1_000);
     expect(result.totals.value).toBe(1_000);
 
-    const legacy = new AnalyticsRepository(testDb.drizzle);
+    const legacy = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
     const window = { start: seconds('2025-02-01T00:00:00Z'), end: seconds('2025-05-01T00:00:00Z') };
     const summary = await legacy.getSummary(OWNER.id, window);
     const perDistance = await repo.query(
@@ -962,7 +964,7 @@ describe('performance guard', () => {
       logger: { logQuery: () => statements++ },
     });
     seedPerfFleet(sqlite);
-    const perfRepo = new AnalyticsQueryRepository(db);
+    const perfRepo = new AnalyticsQueryRepository(openAsyncDatabase(db.$client).db);
     const query = baseQuery({
       groupBy: 'category',
       start: PERF_START + PERF_SPAN - 2 * 365 * 86_400,

@@ -1,11 +1,9 @@
 import { and, count, desc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { repos } from '../../app-context';
-import { openAsyncDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import { rawAll, sqlFalse } from '../../db/dialect';
 import type { NewOdometerEntry, OdometerEntry } from '../../db/schema';
 import { odometerEntries } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
@@ -66,33 +64,34 @@ export async function readingCheck(
 }
 
 export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdometerEntry> {
-  constructor(private syncDb: AppDatabase) {
-    super(openAsyncDatabase(syncDb.$client).db, odometerEntries);
+  constructor(db: AsyncAppDatabase) {
+    super(db, odometerEntries);
   }
 
   async createChecked(
     data: NewOdometerEntry,
-    check: (tx: DrizzleTransaction) => void
+    check: (tx: AsyncHandle) => Promise<void>
   ): Promise<OdometerEntry> {
-    return this.syncDb.transaction((tx) => {
-      check(tx);
-      return tx.insert(odometerEntries).values(data).returning().get();
+    return this.db.transaction(async (tx) => {
+      await check(tx);
+      const [created] = await tx.insert(odometerEntries).values(data).returning();
+      if (!created) throw new Error('Odometer insert returned no row');
+      return created;
     });
   }
 
   async updateChecked(
     id: string,
     data: Partial<NewOdometerEntry>,
-    check: (tx: DrizzleTransaction) => void
+    check: (tx: AsyncHandle) => Promise<void>
   ): Promise<OdometerEntry> {
-    return this.syncDb.transaction((tx) => {
-      check(tx);
-      const updated = tx
+    return this.db.transaction(async (tx) => {
+      await check(tx);
+      const [updated] = await tx
         .update(odometerEntries)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(odometerEntries.id, id))
-        .returning()
-        .get();
+        .returning();
       if (!updated) throw new NotFoundError('Odometer entry');
       return updated;
     });
@@ -102,7 +101,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     return this.findIdsByColumn(odometerEntries.vehicleId, vehicleId);
   }
 
-  createFromTrip(
+  async createFromTrip(
     entry: {
       tripId: string;
       vehicleId: string;
@@ -114,16 +113,17 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       createdBy?: string | null;
       driverId?: string | null;
     },
-    db: AppDatabase | DrizzleTransaction = this.syncDb
-  ): OdometerEntry | null {
+    db: AsyncHandle = this.db
+  ): Promise<OdometerEntry | null> {
     const sameReading = this.sameReadingWhere(entry);
-    const existing = db
+    const existing = await db
       .select({ id: odometerEntries.id })
       .from(odometerEntries)
       .where(sameReading)
       .get();
     if (existing) {
-      db.update(odometerEntries)
+      await db
+        .update(odometerEntries)
         .set({ sourceTripId: entry.tripId })
         .where(
           and(
@@ -131,12 +131,11 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
             isNotNull(odometerEntries.sourceTripId),
             sql`NOT EXISTS (SELECT 1 FROM trips WHERE trips.id = ${odometerEntries.sourceTripId})`
           )
-        )
-        .run();
+        );
       return null;
     }
 
-    return db
+    const [created] = await db
       .insert(odometerEntries)
       .values({
         vehicleId: entry.vehicleId,
@@ -148,63 +147,61 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         note: entry.note ?? OdometerRepository.TRIP_PROVENANCE_NOTE,
         sourceTripId: entry.tripId,
       })
-      .returning()
-      .get();
+      .returning();
+    return created ?? null;
   }
 
   static readonly TRIP_PROVENANCE_NOTE = 'From trip';
 
-  deleteLinkedTripEntry(
+  async deleteLinkedTripEntry(
     entry: LinkedTripEntryKey,
-    db: AppDatabase | DrizzleTransaction = this.syncDb
-  ): string[] {
-    const removed = db
+    db: AsyncHandle = this.db
+  ): Promise<string[]> {
+    const removed = await db
       .delete(odometerEntries)
       .where(this.linkedTripEntryWhere(entry))
-      .returning({ id: odometerEntries.id })
-      .all();
+      .returning({ id: odometerEntries.id });
     return removed.map((row) => row.id);
   }
 
-  moveLinkedTripEntry(
+  async moveLinkedTripEntry(
     from: LinkedTripEntryKey,
     to: { odometer: number; recordedAt: Date },
-    db: AppDatabase | DrizzleTransaction = this.syncDb
-  ): string | null {
-    const linked = db
+    db: AsyncHandle = this.db
+  ): Promise<string | null> {
+    const linked = await db
       .select({ id: odometerEntries.id })
       .from(odometerEntries)
-      .where(this.linkedTripEntryWhere(from))
-      .all();
+      .where(this.linkedTripEntryWhere(from));
     const [only] = linked;
     if (!only || linked.length !== 1) return null;
-    const target = db
+    const target = await db
       .select({ id: odometerEntries.id })
       .from(odometerEntries)
       .where(and(this.sameReadingWhere({ ...from, ...to }), ne(odometerEntries.id, only.id)))
       .get();
     if (target) return null;
-    db.update(odometerEntries)
+    await db
+      .update(odometerEntries)
       .set({
         odometer: to.odometer,
         recordedAt: to.recordedAt,
         sourceTripId: from.tripId,
         updatedAt: new Date(),
       })
-      .where(eq(odometerEntries.id, only.id))
-      .run();
+      .where(eq(odometerEntries.id, only.id));
     return only.id;
   }
 
-  handOverLinkedTripEntry(
+  async handOverLinkedTripEntry(
     entry: LinkedTripEntryKey,
     toTripId: string,
-    db: AppDatabase | DrizzleTransaction = this.syncDb
-  ): void {
-    db.update(odometerEntries)
+    db: AsyncHandle = this.db
+  ): Promise<void> {
+    await db
+      .update(odometerEntries)
       .set({ sourceTripId: toTripId })
-      .where(this.linkedTripEntryWhere(entry))
-      .run();
+      .where(this.linkedTripEntryWhere(entry));
   }
 
   private sameReadingWhere(entry: LinkedTripEntryKey) {
@@ -249,7 +246,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   ): Promise<{ data: OdometerEntry[]; totalCount: number }> {
     const where = and(eq(odometerEntries.vehicleId, vehicleId), eq(odometerEntries.userId, userId));
 
-    const data = await this.syncDb
+    const data = await this.db
       .select()
       .from(odometerEntries)
       .where(where)
@@ -257,10 +254,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       .limit(limit)
       .offset(offset);
 
-    const [result] = await this.syncDb
-      .select({ count: count() })
-      .from(odometerEntries)
-      .where(where);
+    const [result] = await this.db.select({ count: count() }).from(odometerEntries).where(where);
 
     return { data, totalCount: result?.count ?? 0 };
   }
@@ -289,7 +283,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
         source_id: string;
         note: string | null;
       }>(
-        this.syncDb,
+        this.db,
         sql`
         SELECT mileage AS odometer, date AS recorded_at, 'expense' AS source, id AS source_id, NULL AS note
         FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL ${visibleExpenses}
@@ -302,7 +296,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       );
 
       const [countResult] = await rawAll<{ total: number }>(
-        this.syncDb,
+        this.db,
         sql`
         SELECT (
           (SELECT COUNT(*) FROM expenses WHERE ${this.vehicleScope(vehicleId, userId)} AND mileage IS NOT NULL ${visibleExpenses}) +
@@ -334,7 +328,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
   async getCurrentOdometer(vehicleId: string, userId: string): Promise<number | null> {
     try {
       const [row] = await rawAll<{ current: number | null }>(
-        this.syncDb,
+        this.db,
         sql`
         SELECT MAX(odometer) AS current FROM (
           SELECT mileage AS odometer FROM expenses

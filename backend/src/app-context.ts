@@ -1,3 +1,4 @@
+import type { Database } from 'bun:sqlite';
 import { AnalyticsInsightsRepository } from './api/analytics/insights';
 import { AnalyticsQueryRepository } from './api/analytics/query-repository';
 import { AnalyticsRepository } from './api/analytics/repository';
@@ -18,31 +19,30 @@ import { VehicleShareRepository } from './api/shares/repository';
 import { TripRepository } from './api/trips/repository';
 import { VehicleRepository } from './api/vehicles/repository';
 import { openAsyncDatabase } from './db/async-sqlite';
-import { type AppDatabase, getDb } from './db/connection';
+import { getDb } from './db/connection';
 
-export function createAppContext(db: AppDatabase) {
-  const analyticsQuery = new AnalyticsQueryRepository(db);
-  const asyncDb = openAsyncDatabase(db.$client).db;
+export function createAppContext(sqlite: Database) {
+  const asyncDb = openAsyncDatabase(sqlite).db;
+  const analyticsQuery = new AnalyticsQueryRepository(asyncDb);
   return {
-    db,
     asyncDb,
     lucia: createLucia(asyncDb),
     repos: {
-      analytics: new AnalyticsRepository(db),
-      analyticsInsights: new AnalyticsInsightsRepository(db, analyticsQuery),
+      analytics: new AnalyticsRepository(asyncDb),
+      analyticsInsights: new AnalyticsInsightsRepository(asyncDb, analyticsQuery),
       analyticsQuery,
       authProviders: new AuthProviderRepository(asyncDb),
-      communityStats: new CommunityStatsRepository(db),
-      expenses: new ExpenseRepository(db),
+      communityStats: new CommunityStatsRepository(asyncDb),
+      expenses: new ExpenseRepository(asyncDb),
       financing: new FinancingRepository(asyncDb),
       insuranceClaims: new InsuranceClaimRepository(asyncDb),
-      insurancePolicies: new InsurancePolicyRepository(db),
-      odometer: new OdometerRepository(db),
+      insurancePolicies: new InsurancePolicyRepository(asyncDb),
+      odometer: new OdometerRepository(asyncDb),
       photoRefs: new PhotoRefRepository(asyncDb),
-      photos: new PhotoRepository(db),
+      photos: new PhotoRepository(asyncDb),
       preferences: new PreferencesRepository(asyncDb),
       pushSubscriptions: new PushSubscriptionRepository(asyncDb),
-      reminders: new ReminderRepository(db),
+      reminders: new ReminderRepository(asyncDb),
       syncState: new SyncStateRepository(asyncDb),
       trips: new TripRepository(asyncDb),
       vehicles: new VehicleRepository(asyncDb),
@@ -56,7 +56,7 @@ export type AppContext = ReturnType<typeof createAppContext>;
 let current: AppContext | null = null;
 
 export function appContext(): AppContext {
-  current ??= createAppContext(getDb());
+  current ??= createAppContext(getDb().$client);
   return current;
 }
 

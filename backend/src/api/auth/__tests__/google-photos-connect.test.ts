@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { CONFIG } from '../../../config';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
+import { spyOnGuarded } from '../../../test-helpers/transaction-guard';
 import { consumePending, getPendingEmail } from '../../../utils/pending-credentials';
 
 let ctx: TestApp;
@@ -42,7 +43,7 @@ function googleGrants(scopes: string[]): void {
       hasScopes: () => true,
       scopes: () => scopes,
     } as unknown as Awaited<ReturnType<typeof googleStorageClient.validateAuthorizationCode>>),
-    spyOn(globalThis, 'fetch').mockResolvedValue(
+    spyOnGuarded(globalThis, 'fetch').mockResolvedValue(
       Response.json({ email: 'me@example.com', email_verified: true })
     )
   );

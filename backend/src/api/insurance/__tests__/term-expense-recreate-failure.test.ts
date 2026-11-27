@@ -53,9 +53,26 @@ async function seedCostedTerm(): Promise<{ policyId: string; termId: string }> {
   return { policyId: body.data.id, termId: termId as string };
 }
 
+function attachReceipt(termId: string): void {
+  const premium = premiumRows(termId)[0]?.id ?? '';
+  ctx.sqlite.run(
+    `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
+     VALUES ('premium-receipt', ?, 'expense', ?, 'r.jpg', 'image/jpeg', 1)`,
+    [ctx.user.id, premium]
+  );
+}
+
+const receiptCount = () =>
+  (
+    ctx.sqlite.query("SELECT COUNT(*) AS n FROM photos WHERE id = 'premium-receipt'").get() as {
+      n: number;
+    }
+  ).n;
+
 describe('insurance term update premium recreate failure', () => {
   test('reports the failure instead of answering 200', async () => {
     const { policyId, termId } = await seedCostedTerm();
+    attachReceipt(termId);
     const spy = spyOn(repos().expenses, 'createSplitExpense').mockImplementation(() => {
       throw new Error('forced recreate failure');
     });
@@ -66,10 +83,13 @@ describe('insurance term update premium recreate failure', () => {
       });
       const body = await json<{ success: boolean; error?: { message: string } }>(res);
 
-      expect(premiumRows(termId).length, 'the old premium row was deleted').toBe(0);
+      const rows = premiumRows(termId);
+      expect(rows.length, 'the old premium row is kept when the recreate fails').toBe(1);
+      expect(rows[0]?.expense_amount).toBe(120_000);
       expect(res.status, JSON.stringify(body)).toBe(500);
       expect(body.success).toBe(false);
-      expect(body.error?.message).toContain('premium expense could not be recreated');
+      expect(body.error?.message).toContain('premium expense could not be updated');
+      expect(receiptCount(), 'the kept premium keeps its photo').toBe(1);
     } finally {
       spy.mockRestore();
     }
@@ -85,5 +105,31 @@ describe('insurance term update premium recreate failure', () => {
     const rows = premiumRows(termId);
     expect(rows.length).toBe(1);
     expect(rows[0]?.expense_amount).toBe(150_000);
+  });
+
+  test('a currency change during the update keeps the old premium and its photo', async () => {
+    const { policyId, termId } = await seedCostedTerm();
+    attachReceipt(termId);
+    const preferences = repos().preferences;
+    const read = preferences.moneyScale.bind(preferences);
+    let calls = 0;
+    const spy = spyOn(preferences, 'moneyScale').mockImplementation(async (userId: string) => {
+      calls++;
+      return calls === 3 ? 1 : read(userId);
+    });
+    try {
+      const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
+        totalCost: 1500,
+      });
+      expect(res.status).toBe(409);
+    } finally {
+      spy.mockRestore();
+    }
+    const saved = ctx.sqlite
+      .query('SELECT total_cost AS t FROM insurance_terms WHERE id = ?')
+      .get(termId) as { t: number };
+    expect(saved.t, 'the term itself was saved before the premium step').toBe(150_000);
+    expect(premiumRows(termId).map((r) => r.expense_amount)).toEqual([120_000]);
+    expect(receiptCount()).toBe(1);
   });
 });

@@ -39,7 +39,7 @@ describe('getExpense (backend→frontend transform)', () => {
 	test('maps expenseAmount→amount and GETs the id path', async () => {
 		get.mockResolvedValueOnce(backendExpense({ expenseAmount: 99.9 }));
 		const result = await expenseApi.getExpense('e1');
-		expect(get).toHaveBeenCalledWith('/expenses/e1');
+		expect(get).toHaveBeenCalledWith('/expenses/e1', undefined);
 		expect(result.amount).toBe(99.9);
 		expect(result.id).toBe('e1');
 	});
@@ -149,6 +149,19 @@ describe('createExpense / updateExpense (frontend→backend transform + isEdit)'
 		const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 		expect(post.mock.calls[0]?.[1]).toMatchObject({ timeZone: zone });
 		expect(put.mock.calls[0]?.[1]).toMatchObject({ timeZone: zone });
+	});
+
+	test('updateExpense sends expectedUpdatedAt only when one is given', async () => {
+		put.mockResolvedValue(backendExpense());
+		const expense = { vehicleId: 'v1', category: 'fuel' as const, amount: 50 };
+		await expenseApi.updateExpense('e1', expense, {
+			expectedUpdatedAt: '2026-11-20T12:00:00.000Z'
+		});
+		await expenseApi.updateExpense('e1', expense);
+		expect(put.mock.calls[0]?.[1]).toMatchObject({
+			expectedUpdatedAt: '2026-11-20T12:00:00.000Z'
+		});
+		expect(put.mock.calls[1]?.[1]).not.toHaveProperty('expectedUpdatedAt');
 	});
 });
 

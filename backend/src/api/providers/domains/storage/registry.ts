@@ -12,6 +12,7 @@ import { decrypt, secretContextOf } from '../../../../utils/encryption';
 import {
   ALLOW_PRIVATE,
   assertSafeOutboundUrl,
+  type PrivateEndpointPolicy,
   privateEndpointPolicyFor,
 } from '../../../../utils/outbound-url';
 import { joinStoragePath, storagePathSchema } from '../../../../utils/paths';
@@ -74,7 +75,7 @@ function buildGooglePhotosProvider(
 function buildS3Provider(
   credentials: Record<string, unknown>,
   config: unknown,
-  ownerId: string
+  outbound: PrivateEndpointPolicy
 ): StorageProvider {
   const accessKeyId = credentials.accessKeyId;
   const secretAccessKey = credentials.secretAccessKey;
@@ -85,7 +86,6 @@ function buildS3Provider(
   if (!s3Config?.endpoint || !s3Config?.bucket || !s3Config?.region) {
     throw new ValidationError('Invalid S3 config: missing endpoint, bucket, or region');
   }
-  const outbound = privateEndpointPolicyFor(ownerId);
   assertSafeOutboundUrl(s3Config.endpoint, 'S3 endpoint', outbound);
   return new S3CompatProvider(
     { accessKeyId, secretAccessKey },
@@ -136,6 +136,7 @@ export interface StorageProviderInput {
   ownerId: string;
   credentials: Record<string, unknown>;
   config: Record<string, unknown> | null;
+  outbound: PrivateEndpointPolicy;
 }
 
 export interface StorageFeatures {
@@ -252,7 +253,7 @@ export const STORAGE_PROVIDERS = {
       },
     ],
     connect: 'form',
-    create: ({ credentials, config, ownerId }) => buildS3Provider(credentials, config, ownerId),
+    create: ({ credentials, config, outbound }) => buildS3Provider(credentials, config, outbound),
     features: {
       photoOnly: false,
       backupSheets: false,
@@ -339,7 +340,7 @@ export class StorageProviderRegistry {
       throw new ValidationError('Storage provider is turned off');
     }
 
-    const provider = this.createProviderInstance(providerRow);
+    const provider = await this.createProviderInstance(providerRow);
     const folderPath = this.resolveFolderPath(providerRow, storageConfig, providerId, category);
 
     return { provider, providerId, folderPath };
@@ -360,7 +361,7 @@ export class StorageProviderRegistry {
       const providerRow = await this.findOwnedProvider(providerId, userId);
       if (!providerRow || providerRow.status === 'disabled') continue;
 
-      const provider = this.createProviderInstance(providerRow);
+      const provider = await this.createProviderInstance(providerRow);
       const folderPath = this.resolveFolderPath(providerRow, storageConfig, providerId, category);
 
       results.push({ provider, providerId, folderPath });
@@ -397,7 +398,7 @@ export class StorageProviderRegistry {
     return this.resolveFolderPath(providerRow, storageConfig, providerId, category);
   }
 
-  createProviderInstance(row: UserProvider): StorageProvider {
+  async createProviderInstance(row: UserProvider): Promise<StorageProvider> {
     const descriptor = storageProviderDescriptor(row.providerType);
     if (!descriptor) {
       throw new ValidationError(`Unsupported provider type: ${row.providerType}`);
@@ -407,7 +408,13 @@ export class StorageProviderRegistry {
         ? {}
         : (JSON.parse(decrypt(row.credentials, secretContextOf(row))) as Record<string, unknown>);
     const config = row.config as Record<string, unknown> | null;
-    const provider = descriptor.create({ id: row.id, ownerId: row.userId, credentials, config });
+    const provider = descriptor.create({
+      id: row.id,
+      ownerId: row.userId,
+      credentials,
+      config,
+      outbound: await privateEndpointPolicyFor(row.userId),
+    });
     validateProviderConfig(descriptor, config, Object.keys(config ?? {}));
     return provider;
   }

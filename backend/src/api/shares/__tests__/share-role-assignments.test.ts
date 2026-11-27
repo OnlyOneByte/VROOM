@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { getDb } from '../../../db/connection';
+import { appContext } from '../../../app-context';
 import { builtInRoleId, grantShareRole } from '../../../permissions/grants';
 import {
   createTestApp,
@@ -22,7 +22,7 @@ describe('accepting a share sets the built-in role from its level', () => {
   test('a leftover Editor assignment is replaced when a Viewer share is accepted', async () => {
     const vehicleId = await seedVehicle(ctx);
     const invitee = await createInvitee(ctx, 'stale-editor');
-    grantShareRole(getDb(), {
+    await grantShareRole(appContext().asyncDb, {
       vehicleId,
       sharedWithId: invitee.id,
       level: 'editor',

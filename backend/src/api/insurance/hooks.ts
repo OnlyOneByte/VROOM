@@ -1,10 +1,14 @@
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { AppError, ValidationError } from '../../errors';
+import { AppError, ConflictError, ValidationError } from '../../errors';
 import { termBillingMonths } from '../../utils/calculations';
 import { logger } from '../../utils/logger';
 import { formatNumberForMessage } from '../../utils/money';
-import { deletePhotosForEntities } from '../photos/photo-service';
+import {
+  deletePhotosForEntities,
+  deleteStoredPhotoObjects,
+  storedPhotoObjects,
+} from '../photos/photo-service';
 import type { MonthlyPricedTerm, TermCoverageRow } from './repository';
 
 export function vehicleIdsForTerm(
@@ -111,14 +115,10 @@ export function assertTermPremiumWithinCap(
   }
 }
 
-async function materializeTermExpenses(
-  params: TermExpenseParams,
-  totalCost: number
-): Promise<void> {
+function createPremiumExpenses(params: TermExpenseParams, totalCost: number) {
   const { termId, vehicleIds, startDate, policyNumber, userId } = params;
   const description = policyNumber ? `Insurance premium — ${policyNumber}` : 'Insurance premium';
-
-  await repos().expenses.createSplitExpense(
+  return repos().expenses.createSplitExpense(
     {
       splitConfig: { method: 'even', vehicleIds },
       category: 'financial',
@@ -131,22 +131,36 @@ async function materializeTermExpenses(
     },
     { ownerId: userId, createdBy: null }
   );
+}
 
+function atScale<T>(userId: string, scale: number | undefined, write: () => Promise<T>) {
+  return scale === undefined
+    ? appContext().asyncDb.transaction(write)
+    : repos().preferences.writeAtScale(userId, scale, write);
+}
+
+async function materializeTermExpenses(
+  params: TermExpenseParams,
+  totalCost: number,
+  scale?: number
+): Promise<void> {
+  await atScale(params.userId, scale, () => createPremiumExpenses(params, totalCost));
   logger.info('Auto-created insurance expenses for term', {
-    termId,
-    vehicleCount: vehicleIds.length,
+    termId: params.termId,
+    vehicleCount: params.vehicleIds.length,
     totalCost,
   });
 }
 
-export async function createTermExpenses(params: TermExpenseParams): Promise<void> {
+export async function createTermExpenses(params: TermExpenseParams, scale?: number): Promise<void> {
   const totalCost = effectiveTermCost(params);
 
   if (totalCost <= 0 || params.vehicleIds.length === 0) return;
 
   try {
-    await materializeTermExpenses(params, totalCost);
+    await materializeTermExpenses(params, totalCost, scale);
   } catch (error) {
+    if (error instanceof ConflictError) throw error;
     logger.error('Failed to auto-create insurance expenses', {
       termId: params.termId,
       error: error instanceof Error ? error.message : String(error),
@@ -194,10 +208,10 @@ async function termExpensesInSync(params: TermExpenseParams): Promise<boolean> {
   return expectsExpenses === linked.length > 0;
 }
 
-// Delete and recreate are not atomic: a failed recreate must throw rather than silently drop the premium.
 export async function updateTermExpenses(
   params: TermExpenseParams,
-  previous?: TermExpenseParams
+  previous?: TermExpenseParams,
+  scale?: number
 ): Promise<void> {
   if (
     previous &&
@@ -209,26 +223,30 @@ export async function updateTermExpenses(
 
   const { termId, vehicleIds, userId } = params;
   const totalCost = effectiveTermCost(params);
-
-  const deleted = await deleteTermExpenses(termId, userId);
-  if (deleted > 0) {
-    logger.info('Deleted old insurance expenses for term update', { termId, deleted });
-  }
-
-  if (totalCost <= 0 || vehicleIds.length === 0) return;
+  const linked = await repos().expenses.findBySource('insurance_term', termId, userId);
+  const photoObjects = await storedPhotoObjects(
+    'expense',
+    linked.map((expense) => expense.id)
+  );
 
   try {
-    await materializeTermExpenses(params, totalCost);
+    const deleted = await atScale(userId, scale, async () => {
+      const removed = await repos().expenses.deleteBySource('insurance_term', termId, userId);
+      if (totalCost > 0 && vehicleIds.length > 0) await createPremiumExpenses(params, totalCost);
+      return removed;
+    });
+    logger.info('Replaced insurance expenses for term update', { termId, deleted });
   } catch (error) {
-    logger.error('Failed to recreate insurance expenses for term update', {
+    if (error instanceof ConflictError) throw error;
+    logger.error('Failed to replace insurance expenses for term update', {
       termId,
-      deleted,
       error: error instanceof Error ? error.message : String(error),
     });
     throw new AppError(
-      'The insurance term was saved, but its premium expense could not be recreated. ' +
+      'The insurance term was saved, but its premium expense could not be updated. ' +
         'Re-save the term to retry.',
       500
     );
   }
+  await deleteStoredPhotoObjects(photoObjects, userId);
 }

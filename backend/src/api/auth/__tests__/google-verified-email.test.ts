@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
+import { spyOnGuarded } from '../../../test-helpers/transaction-guard';
 
 let ctx: TestApp;
 let googleAuthProvider: typeof import('../providers/google').googleAuthProvider;
@@ -20,7 +21,7 @@ afterEach(() => {
 
 function userinfoReturns(body: Record<string, unknown>): void {
   spies.push(
-    spyOn(globalThis, 'fetch').mockResolvedValue(
+    spyOnGuarded(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } })
     )
   );

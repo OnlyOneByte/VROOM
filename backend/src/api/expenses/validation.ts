@@ -211,10 +211,17 @@ export const createSplitExpenseSchema = z
     }
   });
 
+export const expectedUpdatedAtSchema = z
+  .string()
+  .datetime({ offset: true, message: 'expectedUpdatedAt must be an ISO date-time' })
+  .transform((value) => new Date(value))
+  .optional();
+
 export const updateSplitSchema = z
   .object({
     splitConfig: splitConfigSchema,
     totalAmount: centsAmount.optional(),
+    expectedUpdatedAt: expectedUpdatedAtSchema,
   })
   .superRefine((data, ctx) => {
     refineSplitConfig(data, ctx);
