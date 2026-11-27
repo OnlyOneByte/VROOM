@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { addSessionCookie, mockApi } from './support/mock-api';
 
 async function holdPut(page: Page, answer: 'ok' | 'fail') {
@@ -20,8 +20,19 @@ async function holdPut(page: Page, answer: 'ok' | 'fail') {
 	return state;
 }
 
-async function editOilChangeAmount(page: Page) {
-	await page.setViewportSize({ width: 1280, height: 800 });
+async function isOnTop(page: Page, target: Locator) {
+	const box = await target.boundingBox();
+	if (!box) return false;
+	const x = box.x + box.width / 2;
+	const y = box.y + box.height / 2;
+	return target.evaluate(
+		(el, [px, py]) => el.contains(document.elementFromPoint(px!, py!)),
+		[x, y]
+	);
+}
+
+async function editOilChangeAmount(page: Page, viewport = { width: 1280, height: 800 }) {
+	await page.setViewportSize(viewport);
 	await page.goto('/expenses/expense-maint/edit?returnTo=/expenses');
 	await page.getByLabel('Amount *').fill('120.00');
 	await page.getByRole('button', { name: 'Save changes' }).click();
@@ -60,5 +71,32 @@ test.describe('Editing an expense does not wait for the server', () => {
 
 		await row.getByRole('button', { name: /^Retry saving changes/ }).click();
 		await expect.poll(() => put.sent).toBe(2);
+	});
+
+	test('at 375, the Add button covers neither Retry nor Edit on a failed row, even at the end of the list', async ({
+		page
+	}) => {
+		await holdPut(page, 'fail');
+
+		await editOilChangeAmount(page, { width: 375, height: 600 });
+
+		const row = page.getByTestId('expense-row').filter({ hasText: 'Oil change' });
+		await expect(row.getByText(/^Changes not saved:/)).toBeVisible({ timeout: 10_000 });
+		await expect(page.getByTestId('expense-row').last()).toContainText('Oil change');
+		await page.getByRole('button', { name: 'Close toast' }).click();
+		await expect(page.getByText("Your changes to the expense weren't saved")).toHaveCount(0);
+		await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+
+		const add = page
+			.getByRole('navigation', { name: 'Main' })
+			.getByRole('link', { name: 'Add expense' });
+		const addTop = (await add.locator('span').first().boundingBox())!.y;
+		const pageEnd = (await page.locator('#main > div > :last-child').last().boundingBox())!;
+		expect(pageEnd.y + pageEnd.height).toBeLessThanOrEqual(addTop);
+
+		expect(await isOnTop(page, row.getByRole('link', { name: /^Edit / }))).toBe(true);
+		expect(await isOnTop(page, row.getByRole('button', { name: /^Retry saving changes/ }))).toBe(
+			true
+		);
 	});
 });
