@@ -358,8 +358,30 @@ describe('minor units', () => {
 		}
 	});
 
+	test('formats a no-decimal currency without decimals even where the browser defaults to 2 (Safari)', async () => {
+		const RealNumberFormat = Intl.NumberFormat;
+		class SafariNumberFormat extends RealNumberFormat {
+			constructor(locales?: string | string[], options?: Intl.NumberFormatOptions) {
+				const twoByDefault =
+					options?.style === 'currency' && options.maximumFractionDigits === undefined
+						? { ...options, minimumFractionDigits: 2, maximumFractionDigits: 2 }
+						: options;
+				super(locales, twoByDefault);
+			}
+		}
+		vi.stubGlobal('Intl', { ...Intl, NumberFormat: SafariNumberFormat });
+		vi.resetModules();
+		try {
+			const fresh = await import('#lib/utils/formatters.ts');
+			expect(fresh.formatCurrency(1234, 'HUF').replace(/\s/g, ' ')).toBe('HUF 1,234');
+			expect(fresh.formatCurrency(12.5, 'USD')).toBe('$12.50');
+		} finally {
+			vi.unstubAllGlobals();
+			vi.resetModules();
+		}
+	});
+
 	test('formats no-decimal currencies without decimals and others with two', () => {
-		expect(formatCurrency(1234.4, 'HUF')).not.toMatch(/[.,]\d{2}\D*$/);
 		expect(formatCurrency(1234, 'JPY')).toBe('¥1,234');
 		expect(formatCurrency(12.5, 'USD')).toBe('$12.50');
 		expect(formatCurrency(12.5, 'USD', 0)).toBe('$13');

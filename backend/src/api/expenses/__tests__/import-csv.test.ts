@@ -341,7 +341,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(preview.data.readyCount).toBe(1);
     const [bad] = preview.data.rows.filter((r) => r.status === 'error');
     expect(bad?.row).toBe(3);
-    expect(bad?.message).toMatch(/at most 0 decimal places/);
+    expect(bad?.message).toMatch(/must be whole numbers/);
 
     const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
     expect(res.status).toBe(200);

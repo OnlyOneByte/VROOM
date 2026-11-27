@@ -40,7 +40,7 @@ function dateTimeFormat(options: Intl.DateTimeFormatOptions): Intl.DateTimeForma
 }
 
 export function currencyFractionDigits(currency?: string): number {
-	return NO_DECIMAL_CURRENCIES.has(userCurrency(currency)) ? 0 : 2;
+	return Math.log10(minorUnitScale(currency));
 }
 
 export function amountStep(currency?: string): string {
