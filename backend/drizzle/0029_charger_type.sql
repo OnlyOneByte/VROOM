@@ -1,0 +1,1 @@
+ALTER TABLE `expenses` ADD `charger_type` text;

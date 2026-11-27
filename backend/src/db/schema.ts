@@ -11,7 +11,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 import type { BackupConfig, ProviderDefaults, StorageConfig, UnitPreferences } from '../types';
 import { DEFAULT_BACKUP_CONFIG, DEFAULT_STORAGE_CONFIG, DEFAULT_UNIT_PREFERENCES } from '../types';
-import type { SplitConfig } from './types';
+import { CHARGER_TYPES, type SplitConfig } from './types';
 
 export const users = sqliteTable(
   'users',
@@ -278,6 +278,7 @@ export const expenses = sqliteTable(
     expenseAmount: integer('expense_amount').notNull(),
     volume: real('volume'),
     fuelType: text('fuel_type'),
+    chargerType: text('charger_type', { enum: CHARGER_TYPES }),
     missedFillup: integer('missed_fillup', { mode: 'boolean' }).notNull().default(false),
     userId: text('user_id')
       .notNull()

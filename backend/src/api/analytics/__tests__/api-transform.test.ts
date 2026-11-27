@@ -127,6 +127,22 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
         priceHistory: [
           { date: '2024-01-05', month: '2024-01', fuelType: 'Level 2 (AC)', pricePerVolume: 30 },
         ],
+        byChargerType: [
+          {
+            chargerType: 'home',
+            sessions: 3,
+            energy: 45,
+            energyShare: 0.75,
+            pricePerEnergyUnit: 14,
+          },
+          {
+            chargerType: 'unspecified',
+            sessions: 1,
+            energy: 15,
+            energyShare: 0.25,
+            pricePerEnergyUnit: null,
+          },
+        ],
       },
     } as FuelStatsData;
     const r = fuelStatsToApi(d, 100);
@@ -149,6 +165,8 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
     expect(r.chargingByVehicle).toEqual([
       { vehicleId: 'v2', vehicleName: 'E', count: 4, volume: 60, cost: 36 },
     ]);
+    expect(r.charging.byChargerType.map((t) => t.pricePerEnergyUnit)).toEqual([0.14, null]);
+    expect(r.charging.byChargerType[0]?.energy).toBe(45);
     expect(r.fillupCostByVehicle[0].avgCost).toBe(50);
     expect(r.costPerDistance[0].costPerDistance).toBe(0.15);
     expect(r.volume.currentYear).toBe(100);

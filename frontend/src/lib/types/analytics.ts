@@ -1,5 +1,5 @@
 import type { UnitsMetadata } from './settings.js';
-import type { ExpenseCategory } from './expense.js';
+import type { ChargerType, ExpenseCategory } from './expense.js';
 
 export interface FuelEfficiencyPoint {
 	date: string;
@@ -109,6 +109,13 @@ export interface FuelStatsResponse {
 		};
 		averageCost: { perSession: number | null; perEnergyUnit: number | null };
 		priceHistory: Array<{ date: string; month: string; fuelType: string; pricePerVolume: number }>;
+		byChargerType: Array<{
+			chargerType: ChargerType | 'unspecified';
+			sessions: number;
+			energy: number;
+			energyShare: number;
+			pricePerEnergyUnit: number | null;
+		}>;
 	};
 	units?: UnitsMetadata;
 }

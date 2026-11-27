@@ -1,5 +1,6 @@
 import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 import type { ExpenseCategory } from '#lib/types/index.ts';
+import { isElectricFuelType } from '#lib/utils/units.ts';
 import { hasMileageEntry } from '../expense-form-validation';
 import type { ExpenseFormData } from './expense-form-data';
 
@@ -22,6 +23,7 @@ export function buildExpenseData(form: ExpenseFormData, ctx: ExpensePayloadConte
 		volume: isFuel && form.volume ? parseFloat(form.volume) : undefined,
 		charge: isFuel && form.charge ? parseFloat(form.charge) : undefined,
 		fuelType: (isFuel && form.fuelType) || undefined,
+		chargerType: (isFuel && isElectricFuelType(form.fuelType) && form.chargerType) || null,
 		description: form.description || undefined,
 		location: form.location || undefined,
 		currency: ctx.currency,

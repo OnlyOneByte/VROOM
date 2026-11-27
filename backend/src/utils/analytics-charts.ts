@@ -1,4 +1,10 @@
-import { EXPENSE_CATEGORIES, type ExpenseCategory, isElectricFuelType } from '../db/types';
+import {
+  CHARGER_TYPES,
+  type ChargerType,
+  EXPENSE_CATEGORIES,
+  type ExpenseCategory,
+  isElectricFuelType,
+} from '../db/types';
 import {
   MAX_VALID_MI_KWH,
   MAX_VALID_MPG,
@@ -72,6 +78,7 @@ export interface FuelExpenseRow {
   mileage: number | null;
   volume: number | null;
   fuelType: string | null;
+  chargerType?: string | null;
   missedFillup: boolean;
   expenseAmount: number;
   vehicleId: string;
@@ -82,6 +89,43 @@ export const isFillup = (r: Pick<FuelExpenseRow, 'volume' | 'fuelType'>): boolea
 
 export const isChargeSession = (r: Pick<FuelExpenseRow, 'volume' | 'fuelType'>): boolean =>
   r.volume != null && r.volume > 0 && isElectricFuelType(r.fuelType);
+
+export type ChargerTypeBucket = ChargerType | 'unspecified';
+
+export interface ChargerTypeTotals {
+  chargerType: ChargerTypeBucket;
+  sessions: number;
+  energy: number;
+  energyShare: number;
+  pricePerEnergyUnit: number | null;
+}
+
+export function buildChargingByChargerType(
+  sessions: Pick<FuelExpenseRow, 'volume' | 'chargerType' | 'expenseAmount'>[]
+): ChargerTypeTotals[] {
+  const buckets: ChargerTypeBucket[] = [...CHARGER_TYPES, 'unspecified'];
+  const known = new Set<string>(CHARGER_TYPES);
+  const totalEnergy = sessions.reduce((sum, r) => sum + (r.volume ?? 0), 0);
+  return buckets.flatMap((chargerType) => {
+    const rows = sessions.filter((r) =>
+      chargerType === 'unspecified'
+        ? !r.chargerType || !known.has(r.chargerType)
+        : r.chargerType === chargerType
+    );
+    if (rows.length === 0) return [];
+    const energy = rows.reduce((sum, r) => sum + (r.volume ?? 0), 0);
+    const cost = rows.reduce((sum, r) => sum + r.expenseAmount, 0);
+    return [
+      {
+        chargerType,
+        sessions: rows.length,
+        energy,
+        energyShare: totalEnergy > 0 ? energy / totalEnergy : 0,
+        pricePerEnergyUnit: energy > 0 && cost > 0 ? cost / energy : null,
+      },
+    ];
+  });
+}
 
 export interface GeneralExpenseRow {
   id: string;
