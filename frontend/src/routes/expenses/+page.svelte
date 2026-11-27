@@ -159,14 +159,23 @@
 	const editsFor = (
 		requestedAt: number | undefined,
 		counted: typeof backInView,
-		countedBefore: typeof backInView = counted
+		unknown: typeof backInView = () => false
 	) => {
 		const edits = summaryEdits(requestedAt, expenses);
-		return { before: edits.before.filter(countedBefore), after: edits.after.filter(counted) };
+		const kept = edits.before.flatMap((was, i) => {
+			const now = edits.after[i];
+			return now && !unknown(was) ? [{ was, now }] : [];
+		});
+		return {
+			before: kept.map(({ was }) => was).filter(counted),
+			after: kept.map(({ now }) => now).filter(counted)
+		};
 	};
-	const searchedBefore = (row: Expense) =>
+	const searchUnknown = (row: Expense) =>
+		!!searchTerm.trim() &&
 		backInView(row) &&
-		(listedExpenseIds.has(row.id) || matchesFilters(row, { search: searchTerm }));
+		!listedExpenseIds.has(row.id) &&
+		!matchesFilters(row, { search: searchTerm });
 	const onSummaryCar = (row: Expense) =>
 		!isDeleteHidden(row) && (!selectedVehicleId || row.vehicleId === selectedVehicleId);
 	let shownSummary = $derived.by(() => {
@@ -603,7 +612,7 @@
 
 	let vehicleById = $derived(new Map(vehicles.map(v => [v.id, v])));
 	let shownMonthTotals = $derived.by(() => {
-		const edited = editsFor(monthTotalsRequestedAt, backInView, searchedBefore);
+		const edited = editsFor(monthTotalsRequestedAt, backInView, searchUnknown);
 		const withQueued = withPendingByMonth(
 			monthTotals,
 			pending.saving.filter(row => matchesFilters(row, pendingFilters))

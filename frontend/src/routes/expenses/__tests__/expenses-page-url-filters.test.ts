@@ -394,4 +394,29 @@ describe('/expenses month totals with an edit in flight', () => {
 			resetPendingEdits();
 		}
 	});
+
+	test('with a search the page cannot check, an edited row paged away is never counted twice', async () => {
+		const other = { ...before, id: 'e2', amount: 20 } as Expense;
+		getAllExpenses.mockResolvedValue(listed(before));
+		getMonthlyTotals.mockResolvedValue([{ month: '2026-01', amount: 30, count: 2 }]);
+		updateExpense.mockResolvedValueOnce(saved);
+		try {
+			openAt('?q=camry');
+			await waitFor(() => expect(january()).toBe(30));
+			scheduleEdit(before, after, { amount: 25 } as never);
+			await waitFor(() => expect(january()).toBe(45));
+
+			getAllExpenses.mockResolvedValue({
+				data: [other],
+				pagination: { totalCount: 21, limit: 20, offset: 20, hasMore: false }
+			});
+			(tableProps['onPageChange'] as (offset: number) => void)(20);
+			await waitFor(() => expect(getAllExpenses).toHaveBeenCalledTimes(2));
+			await new Promise(resolve => setTimeout(resolve, 0));
+
+			expect(january()).toBe(30);
+		} finally {
+			resetPendingEdits();
+		}
+	});
 });
