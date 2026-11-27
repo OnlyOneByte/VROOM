@@ -78,6 +78,7 @@ export class ExpenseSplitService {
       sourceId?: string;
       createdBy?: string | null;
       payerFor?: (vehicleId: string) => string | null;
+      updatedAt?: Date;
     }
   ): Promise<Expense[]> {
     const siblings: Expense[] = [];
@@ -100,6 +101,7 @@ export class ExpenseSplitService {
         sourceType: params.sourceType ?? null,
         sourceId: params.sourceId ?? null,
         paidByDriverId: params.payerFor?.(allocation.vehicleId) ?? null,
+        ...(params.updatedAt ? { updatedAt: params.updatedAt } : {}),
       };
 
       const [inserted] = await tx.insert(expenses).values(newExpense).returning();
@@ -119,6 +121,7 @@ export class ExpenseSplitService {
       groupTotal: number;
       allocations: Array<{ vehicleId: string; amount: number }>;
       createdBy: string | null;
+      updatedAt: Date;
     }
   ): Promise<Expense[]> {
     const [template] = params.existing;
@@ -135,7 +138,7 @@ export class ExpenseSplitService {
         eq(expenses.groupId, params.groupId),
         eq(expenses.userId, template.userId)
       );
-    const updatedAt = new Date();
+    const { updatedAt } = params;
     const legs: Expense[] = [];
     for (const allocation of params.allocations) {
       const match = unmatchedByVehicle.get(allocation.vehicleId)?.shift();
@@ -153,6 +156,7 @@ export class ExpenseSplitService {
           description: template.description ?? undefined,
           sourceType: template.sourceType ?? undefined,
           sourceId: template.sourceId ?? undefined,
+          updatedAt,
         });
         legs.push(...created);
         continue;

@@ -128,6 +128,16 @@ need; don't reshape a repository to qualify.
 - `idempotency({ required })` replays a cached 2xx JSON body per `Idempotency-Key`
   (`sync/routes.ts`); a non-JSON 2xx is intentionally left uncached.
 
+### Stale-write check (expenses)
+- `PUT /api/v1/expenses/:id` and `PUT /api/v1/expenses/split/:id` take an optional
+  `expectedUpdatedAt`: the ISO `updatedAt` the client last saw (for a split, the latest
+  `updatedAt` among its legs).
+- If it is set and the stored value differs, the server writes nothing and answers **409** with
+  code `EXPENSE_CHANGED` and `details.updatedAt` (the current value). If it is not set, the update
+  behaves as before, so imports and older clients are unaffected.
+- `updated_at` is stored in whole seconds, so every update moves it forward by at least one
+  second. Two writes inside one second therefore never share a value.
+
 ### Ownership & Authorization
 - Every route checks access *before* the repository call. Don't delegate it downstream.
   - A vehicle id goes through `requireVehicleAccess(vehicleId, userId, 'read' | 'write' | 'owner')`

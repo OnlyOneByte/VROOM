@@ -72,6 +72,7 @@ import {
 import {
   clearFuelFieldsIfNotFuel,
   createSplitExpenseSchema,
+  expectedUpdatedAtSchema,
   MILEAGE_NOT_POSITIVE_MESSAGE,
   type OdometerCheck,
   type SplitConfig,
@@ -212,6 +213,7 @@ const updateExpenseSchema = createExpenseSchemaBase
     sourceType: z.literal('financing').nullable().optional(),
     sourceId: z.string().min(1).nullable().optional(),
     timeZone: timeZoneSchema,
+    expectedUpdatedAt: expectedUpdatedAtSchema,
   })
   // Zod refinements do not survive .partial().
   .refine(
@@ -498,7 +500,12 @@ routes.put(
 
     const scale = await repos().preferences.moneyScale(groupInfo.ownerId);
     const siblings = await repos().preferences.writeAtScale(groupInfo.ownerId, scale, () =>
-      repos().expenses.updateSplitExpense(id, splitFromApi(data, scale), groupInfo.ownerId)
+      repos().expenses.updateSplitExpense(
+        id,
+        splitFromApi(data, scale),
+        groupInfo.ownerId,
+        data.expectedUpdatedAt
+      )
     );
     const first = siblings[0];
     if (!first?.groupId || first.groupTotal == null || !first.splitMethod) {
@@ -1027,7 +1034,7 @@ routes.put(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const { timeZone, ...body } = c.req.valid('json');
+    const { timeZone, expectedUpdatedAt, ...body } = c.req.valid('json');
 
     const existingExpense = await repos().expenses.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
@@ -1087,7 +1094,7 @@ routes.put(
     const updatedExpense = await repos().preferences.writeAtScale(
       existingExpense.userId,
       scale,
-      () => repos().expenses.update(id, normalizedUpdate, odometer)
+      () => repos().expenses.update(id, normalizedUpdate, odometer, expectedUpdatedAt)
     );
 
     if (updatedExpense.mileage != null) {
