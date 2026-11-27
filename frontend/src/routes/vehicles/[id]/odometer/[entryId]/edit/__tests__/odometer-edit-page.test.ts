@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { signInAsDemo } from '../../../../../../../test-utils/demo-user';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { OdometerEntry, PaginatedResponse, Photo } from '#lib/types/index.ts';
@@ -626,5 +627,21 @@ describe('edit odometer reading photos', () => {
 		expect(screen.getByAltText('p1.jpg')).toBeInTheDocument();
 		expect(deleteEntry).not.toHaveBeenCalled();
 		expect(update).not.toHaveBeenCalled();
+	});
+});
+
+describe('odometer edit page in the demo', () => {
+	test('the form has no Delete button', async () => {
+		getEntry.mockResolvedValue(entry());
+		const signOut = signInAsDemo();
+		try {
+			mount();
+			await settle();
+
+			expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+		} finally {
+			signOut();
+		}
 	});
 });

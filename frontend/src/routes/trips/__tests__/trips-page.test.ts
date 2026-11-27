@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { signInAsDemo } from '../../../test-utils/demo-user';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { PaginatedResponse, Trip, TripSummary, Vehicle } from '#lib/types/index.ts';
 import type { TripListFilters } from '#lib/services/trip-api.ts';
@@ -370,5 +371,21 @@ describe('trips page delete', () => {
 			'true'
 		);
 		expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+	});
+});
+
+describe('trips page in the demo', () => {
+	test('a trip keeps Edit but has no Delete', async () => {
+		list.mockResolvedValue(tripPage([trip({ id: 't5' })]));
+		const signOut = signInAsDemo();
+		try {
+			render(Page);
+			await settle();
+
+			expect(screen.getByRole('button', { name: 'Edit trip' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Delete trip' })).toBeNull();
+		} finally {
+			signOut();
+		}
 	});
 });
