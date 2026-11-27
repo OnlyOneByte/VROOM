@@ -174,7 +174,7 @@ describe('POST /providers/:id/test works for every capability', () => {
   test(`storage: a provider that fails ${FAILURES_BEFORE_ERROR} checks in a row turns error, and a passing check brings it back`, async () => {
     const fake = new FakeStorageProvider();
     const health = spyOn(fake, 'healthCheck').mockResolvedValue(false);
-    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockReturnValue(
+    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockResolvedValue(
       fake
     );
     try {
@@ -213,7 +213,7 @@ describe('POST /providers/:id/test works for every capability', () => {
 
   test('a turned-off provider keeps its status whatever the check says', async () => {
     seedStorage('s-off', 'disabled');
-    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockReturnValue(
+    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockResolvedValue(
       new FakeStorageProvider()
     );
     try {
@@ -246,7 +246,7 @@ describe('POST /providers/:id/test works for every capability', () => {
     spyOn(fake, 'healthCheck').mockRejectedValue(
       credentialFailureOf(Object.assign(new Error('bad key'), { name: 'InvalidAccessKeyId' }))
     );
-    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockReturnValue(
+    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockResolvedValue(
       fake
     );
     try {

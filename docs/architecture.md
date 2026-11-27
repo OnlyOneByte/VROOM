@@ -184,9 +184,13 @@ The same holds for reads that look like one snapshot: a backup (`createBackup` i
 between two of their reads on either handle. A true snapshot needs a read transaction, which
 part C can add.
 
-What part C still has to move: the insurance, community and photo transactions, settings, and the
-synchronous checks that provider construction calls in `src/utils/outbound-url.ts`
-(`isNetworkAdmin`, `hasSecondAccount`, `adminEmailWarnings`) (C3); and the restore path, a
+Provider construction resolves its private-network policy on the async session:
+`privateEndpointPolicyFor` in `src/utils/outbound-url.ts` is async, so building a storage
+provider (`createProviderInstance`) and resolving model settings (`resolveModelSettings`) are
+async too, and the provider create and photo backfill transactions run on the async session.
+
+What part C still has to move: the insurance, community and photo transactions, and settings
+(C3); and the restore path, a
 read transaction for backups, the key-rotation script, and demo and sample seeding (C4).
 Restore keeps a sync copy of the share-role change, `changeShareRoleInSyncTransaction`, until
 C4 moves it.
@@ -205,9 +209,9 @@ request to every route in the permission route map as the owner, an editor, a vi
 stranger, and fails on any `ScopeNotLoadedError`. Its requests carry a placeholder id and a
 minimal body, so they reach `authorize()` and the code before validation; checks deeper in a
 handler are covered by that route's own tests, which fail on the same 500. The 500 response
-carries a generic message, and the unloaded scope goes only to the server log. One place
-still uses the synchronous resolver, `syncResolverFor`, until part C3: `isNetworkAdmin` in
-`src/utils/outbound-url.ts`, which provider construction calls synchronously.
+carries a generic message, and the unloaded scope goes only to the server log. No production
+code uses the synchronous resolver, `syncResolverFor`, any more; tests still use it until C5
+removes it.
 
 One ordering rule holds the migration together: sync queries must be gone before the first
 async transaction ships, because a sync query issued while an async transaction is open runs

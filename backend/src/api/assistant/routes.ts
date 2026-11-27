@@ -48,7 +48,7 @@ routes.post(
     const user = c.get('user');
     const body = c.req.valid('json');
     const providerRow = await resolveProvider(user.id, 'ai.llm');
-    const provider = getLlmProvider(providerRow);
+    const provider = await getLlmProvider(providerRow);
     const history: ChatMessage[] = (body.history ?? []).map((m) => ({
       role: m.role,
       content: m.content,

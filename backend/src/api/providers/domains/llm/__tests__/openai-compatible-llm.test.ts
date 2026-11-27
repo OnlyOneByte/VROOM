@@ -289,25 +289,25 @@ describe('getLlmProvider / resolveModelSettings dispatch by provider type', () =
     } as any;
   }
 
-  test('resolveModelSettings decrypts the api key + reads model/baseUrl', () => {
-    const s = resolveModelSettings(llmRow(), 'LLM');
+  test('resolveModelSettings decrypts the api key + reads model/baseUrl', async () => {
+    const s = await resolveModelSettings(llmRow(), 'LLM');
     expect(s.apiKey).toBe('sk-x');
     expect(s.model).toBe('gpt-4o');
     expect(s.baseUrl).toBe('https://api.openai.com/v1');
   });
 
-  test('resolveModelSettings throws when the model is missing (defense-in-depth vs a restored bad row)', () => {
-    expect(() => resolveModelSettings(llmRow({ config: { baseUrl: 'https://x' } }), 'LLM')).toThrow(
-      /LLM provider config is missing a model name/
-    );
+  test('resolveModelSettings throws when the model is missing (defense-in-depth vs a restored bad row)', async () => {
+    await expect(
+      resolveModelSettings(llmRow({ config: { baseUrl: 'https://x' } }), 'LLM')
+    ).rejects.toThrow(/LLM provider config is missing a model name/);
   });
 
-  test('getLlmProvider returns a live adapter for openai-compatible and ollama', () => {
-    expect(getLlmProvider(llmRow({ providerType: 'openai-compatible' }))).toBeInstanceOf(
+  test('getLlmProvider returns a live adapter for openai-compatible and ollama', async () => {
+    expect(await getLlmProvider(llmRow({ providerType: 'openai-compatible' }))).toBeInstanceOf(
       OpenAiCompatibleLlmProvider
     );
     expect(
-      getLlmProvider(
+      await getLlmProvider(
         llmRow({
           providerType: 'ollama',
           credentials: {},
@@ -317,27 +317,29 @@ describe('getLlmProvider / resolveModelSettings dispatch by provider type', () =
     ).toBeInstanceOf(OpenAiCompatibleLlmProvider);
   });
 
-  test('getLlmProvider returns a live adapter for anthropic and gemini', () => {
+  test('getLlmProvider returns a live adapter for anthropic and gemini', async () => {
     expect(
-      getLlmProvider(llmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } }))
+      await getLlmProvider(
+        llmRow({ providerType: 'anthropic', config: { model: 'claude-3-5-sonnet' } })
+      )
     ).toBeDefined();
     expect(
-      getLlmProvider(llmRow({ providerType: 'gemini', config: { model: 'gemini-1.5-pro' } }))
+      await getLlmProvider(llmRow({ providerType: 'gemini', config: { model: 'gemini-1.5-pro' } }))
     ).toBeDefined();
   });
 
-  test('getLlmProvider names the LLM domain when a required field is missing', () => {
-    expect(() =>
+  test('getLlmProvider names the LLM domain when a required field is missing', async () => {
+    await expect(
       getLlmProvider(llmRow({ providerType: 'ollama', config: { model: 'llama3.1' } }))
-    ).toThrow(/Ollama LLM requires a base URL/);
-    expect(() =>
+    ).rejects.toThrow(/Ollama LLM requires a base URL/);
+    await expect(
       getLlmProvider(
         llmRow({ providerType: 'anthropic', credentials: {}, config: { model: 'claude' } })
       )
-    ).toThrow(/Anthropic LLM requires an API key/);
+    ).rejects.toThrow(/Anthropic LLM requires an API key/);
   });
 
-  test('getLlmProvider throws on an unknown/non-LLM provider type', () => {
-    expect(() => getLlmProvider(llmRow({ providerType: 's3' }))).toThrow(/Unsupported LLM/);
+  test('getLlmProvider throws on an unknown/non-LLM provider type', async () => {
+    await expect(getLlmProvider(llmRow({ providerType: 's3' }))).rejects.toThrow(/Unsupported LLM/);
   });
 });

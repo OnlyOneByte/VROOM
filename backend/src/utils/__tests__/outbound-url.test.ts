@@ -211,7 +211,7 @@ describe('fetchOutbound', () => {
       'https://models.example.com/v1/chat',
       { method: 'POST', headers: { a: 'b' } },
       'LLM',
-      privateEndpointPolicy()
+      await privateEndpointPolicy()
     );
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe('https://93.184.215.14/v1/chat');
@@ -228,7 +228,7 @@ describe('fetchOutbound', () => {
       'https://s3.example.com:9000/photos',
       { method: 'GET' },
       'S3 endpoint',
-      privateEndpointPolicy()
+      await privateEndpointPolicy()
     );
     expect(calls[0]?.url).toBe('https://[2606:4700::1111]:9000/photos');
     expect(calls[0]?.init.tls?.serverName).toBe('s3.example.com');
@@ -241,7 +241,7 @@ describe('fetchOutbound', () => {
       'https://93.184.215.14/v1',
       { method: 'GET' },
       'LLM',
-      privateEndpointPolicy()
+      await privateEndpointPolicy()
     );
     expect(calls[0]?.url).toBe('https://93.184.215.14/v1');
     expect(calls[0]?.init.tls).toBeUndefined();
@@ -266,7 +266,7 @@ describe('fetchOutbound', () => {
       'https://s3.example.com/b',
       { method: 'GET' },
       'S3',
-      privateEndpointPolicy()
+      await privateEndpointPolicy()
     );
     expect(await res.text()).toBe('ok');
     expect(urls).toEqual(['https://93.184.215.14/b', 'https://93.184.215.15/b']);
@@ -281,7 +281,7 @@ describe('fetchOutbound', () => {
         'https://models.example.com/v1',
         { method: 'POST' },
         'LLM',
-        privateEndpointPolicy()
+        await privateEndpointPolicy()
       )
     ).rejects.toThrow('ECONNRESET');
     expect(urls).toHaveLength(1);
@@ -292,7 +292,12 @@ describe('fetchOutbound', () => {
     outboundResolver.connectUrl = urlForAddress;
     const urls = failingFetch(['FailedToOpenSocket', 'ConnectionRefused']);
     await expect(
-      fetchOutbound('https://s3.example.com/', { method: 'GET' }, 'S3', privateEndpointPolicy())
+      fetchOutbound(
+        'https://s3.example.com/',
+        { method: 'GET' },
+        'S3',
+        await privateEndpointPolicy()
+      )
     ).rejects.toThrow('ConnectionRefused');
     expect(urls).toHaveLength(2);
   });
@@ -301,7 +306,12 @@ describe('fetchOutbound', () => {
     outboundResolver.lookup = async () => ['fd00:ec2::254'];
     const calls = captureFetch();
     await expect(
-      fetchOutbound('https://s3.example.com/', { method: 'GET' }, 'S3', privateEndpointPolicy())
+      fetchOutbound(
+        'https://s3.example.com/',
+        { method: 'GET' },
+        'S3',
+        await privateEndpointPolicy()
+      )
     ).rejects.toThrow(ValidationError);
     expect(calls).toHaveLength(0);
   });
@@ -401,7 +411,7 @@ describe('private endpoint policy', () => {
           'https://files.example.com/',
           { method: 'GET' },
           'S3',
-          privateEndpointPolicy()
+          await privateEndpointPolicy()
         )
       ).rejects.toThrow(ValidationError);
     });
@@ -418,7 +428,7 @@ describe('private endpoint policy', () => {
       'https://files.example.com/',
       { method: 'GET' },
       'S3',
-      privateEndpointPolicy()
+      await privateEndpointPolicy()
     );
     expect(res.status).toBe(302);
     expect(seen).toHaveLength(1);

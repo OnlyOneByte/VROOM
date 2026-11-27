@@ -81,7 +81,7 @@ routes.get(
     const vlmRow = await resolveProvider(user.id, 'ai.vision');
 
     const photosService = photosServiceBuilder(photosRow);
-    const vlmProvider = getVlmProvider(vlmRow);
+    const vlmProvider = await getVlmProvider(vlmRow);
     const deps: StageDeps = {
       listReceiptPhotos: (max) => photosService.listReceiptPhotos(max),
       downloadPhoto: (id) => photosService.download(id),

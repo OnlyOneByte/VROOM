@@ -126,9 +126,11 @@ describe('bun run providers:rotate-key', () => {
     const all = await getDb().select().from(userProviders);
     const byId = new Map(all.map((row) => [row.id, row]));
 
-    expect(storageProviderRegistry.createProviderInstance(byId.get('a-s3') as never)).toBeDefined();
+    expect(
+      await storageProviderRegistry.createProviderInstance(byId.get('a-s3') as never)
+    ).toBeDefined();
     expect(decryptRefreshToken(byId.get('b-drive') as never)).toBe('rt');
-    expect(resolveModelSettings(byId.get('c-llm') as never, 'LLM').apiKey).toBe('sk-llm');
+    expect((await resolveModelSettings(byId.get('c-llm') as never, 'LLM')).apiKey).toBe('sk-llm');
   });
 
   test('a row no configured key can read is reported and left as it was', async () => {

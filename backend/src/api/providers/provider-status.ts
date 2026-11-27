@@ -82,10 +82,12 @@ export function healthCodeOf(error: unknown): HealthCode {
 
 async function runCheck(row: UserProvider): Promise<HealthResult> {
   if (row.domain === 'storage') {
-    const healthy = await getStorageProviderRegistry().createProviderInstance(row).healthCheck();
+    const healthy = await (
+      await getStorageProviderRegistry().createProviderInstance(row)
+    ).healthCheck();
     return healthy ? { ok: true, message: 'Connected' } : healthFailure('unreachable');
   }
-  const settings = resolveModelSettings(row, row.domain === 'llm' ? 'LLM' : 'VLM');
+  const settings = await resolveModelSettings(row, row.domain === 'llm' ? 'LLM' : 'VLM');
   const descriptor = Object.hasOwn(LLM_PROVIDERS, row.providerType)
     ? LLM_PROVIDERS[row.providerType as keyof typeof LLM_PROVIDERS]
     : undefined;

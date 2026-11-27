@@ -6,7 +6,7 @@ import { appContext } from '../app-context';
 import { CONFIG } from '../config';
 import { users } from '../db/schema';
 import { ValidationError } from '../errors';
-import { syncResolverFor } from '../permissions/grants';
+import { resolverFor } from '../permissions/grants';
 
 type AddressClass = 'public' | 'private' | 'forbidden';
 
@@ -204,18 +204,20 @@ export function parsePrivateEndpointPolicy(allow: string, block: boolean): Priva
 
 let cachedPolicy: { key: string; policy: PrivateEndpointPolicy } | null = null;
 
-function hasSecondAccount(): boolean {
-  const row = appContext()
-    .db.select({ accounts: count() })
+async function hasSecondAccount(): Promise<boolean> {
+  const row = await appContext()
+    .asyncDb.select({ accounts: count() })
     .from(users)
     .where(ne(users.id, DEMO_USER_ID))
     .get();
   return (row?.accounts ?? 0) > 1;
 }
 
-export function privateEndpointPolicy(): PrivateEndpointPolicy {
+export async function privateEndpointPolicy(): Promise<PrivateEndpointPolicy> {
   const { allow, block } = CONFIG.privateProviderEndpoints;
-  if (!block && allow.trim() === '') return hasSecondAccount() ? BLOCK_PRIVATE : ALLOW_PRIVATE;
+  if (!block && allow.trim() === '') {
+    return (await hasSecondAccount()) ? BLOCK_PRIVATE : ALLOW_PRIVATE;
+  }
   const key = `${block}|${allow}`;
   if (cachedPolicy?.key !== key) {
     cachedPolicy = { key, policy: parsePrivateEndpointPolicy(allow, block) };
@@ -225,26 +227,27 @@ export function privateEndpointPolicy(): PrivateEndpointPolicy {
 
 export const PRIVATE_NETWORK_PERMISSION = 'server.private_network.use';
 
-export function isNetworkAdmin(userId: string): boolean {
-  const db = appContext().db;
-  const email = db
-    .select({ email: users.email })
+export async function isNetworkAdmin(userId: string): Promise<boolean> {
+  const row = await appContext()
+    .asyncDb.select({ email: users.email })
     .from(users)
     .where(eq(users.id, userId))
-    .get()?.email;
-  if (email && CONFIG.adminEmails.includes(email.toLowerCase())) return true;
-  return syncResolverFor(db, userId).can(PRIVATE_NETWORK_PERMISSION, { kind: 'server' }).allow;
+    .get();
+  if (row?.email && CONFIG.adminEmails.includes(row.email.toLowerCase())) return true;
+  const server = { kind: 'server' } as const;
+  const resolver = await resolverFor(userId, [server]);
+  return resolver.can(PRIVATE_NETWORK_PERMISSION, server).allow;
 }
 
 const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-export function adminEmailWarnings(adminEmails: readonly string[]): string[] {
+export async function adminEmailWarnings(adminEmails: readonly string[]): Promise<string[]> {
   if (adminEmails.length === 0) return [];
   const warnings = adminEmails
     .filter((email) => !EMAIL_SHAPE.test(email))
     .map((email) => `ADMIN_EMAILS entry "${email}" is not an email address, so it matches nobody`);
-  const listedAccount = appContext()
-    .db.select({ id: users.id })
+  const listedAccount = await appContext()
+    .asyncDb.select({ id: users.id })
     .from(users)
     .where(
       and(
@@ -263,11 +266,11 @@ export function adminEmailWarnings(adminEmails: readonly string[]): string[] {
   return warnings;
 }
 
-export function privateEndpointPolicyFor(ownerId: string): PrivateEndpointPolicy {
+export async function privateEndpointPolicyFor(ownerId: string): Promise<PrivateEndpointPolicy> {
   const { allow, block } = CONFIG.privateProviderEndpoints;
   if (block) return BLOCK_PRIVATE;
   if (CONFIG.adminEmails.length === 0) return privateEndpointPolicy();
-  if (!isNetworkAdmin(ownerId)) return BLOCK_PRIVATE;
+  if (!(await isNetworkAdmin(ownerId))) return BLOCK_PRIVATE;
   return allow.trim() === '' ? ALLOW_PRIVATE : privateEndpointPolicy();
 }
 

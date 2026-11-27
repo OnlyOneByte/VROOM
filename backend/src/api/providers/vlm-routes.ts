@@ -63,7 +63,7 @@ routes.post('/parse', receiptScanLimiter, scansAtOnce, authorize(ownAccount), as
     throw new PayloadTooLargeError('Receipt image exceeds the 8MB limit');
   }
 
-  const provider = getVlmProvider(providerRow);
+  const provider = await getVlmProvider(providerRow);
   let raw: Awaited<ReturnType<typeof provider.extractReceipt>>;
   try {
     raw = await provider.extractReceipt({ data: bytes, mimeType: file.type });

@@ -90,7 +90,6 @@
   "backend/src/api/providers/routes.ts: JSON merge patch, not read-modify-write, so concurrent writes to sibling providers are not clobbered.",
   "backend/src/api/providers/routes.ts: Scope by userId too so the write stays tenant-safe if the ownership check moves.",
   "backend/src/api/providers/routes.ts: Server-written keys (accountEmail, albumId) are not sent by forms; a wholesale replace would drop them.",
-  "backend/src/api/providers/routes.ts: bun:sqlite transactions must be synchronous.",
   "backend/src/api/providers/services/google-photos-service.ts: Google Photos '=d' suffix returns the original bytes, not a resized rendition.",
   "backend/src/api/providers/services/google-photos-service.ts: Library API upload is a raw bytes POST, so this uses fetch rather than the googleapis SDK.",
   "backend/src/api/providers/services/google-photos-service.ts: Listing needs the app-created-data scope; it returns only items VROOM uploaded.",

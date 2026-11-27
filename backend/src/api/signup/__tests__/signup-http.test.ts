@@ -405,14 +405,14 @@ describe('private provider targets', () => {
     const { privateEndpointPolicy } = await import('../../../utils/outbound-url');
     for (const mode of SIGNUP_MODES) {
       setMode(mode);
-      expect(privateEndpointPolicy().allowAll, mode).toBe(true);
+      expect((await privateEndpointPolicy()).allowAll, mode).toBe(true);
     }
     ctx.sqlite.run(
       "INSERT INTO users (id, email, display_name) VALUES ('u2', 'u2@example.com', 'U2')"
     );
     for (const mode of SIGNUP_MODES) {
       setMode(mode);
-      expect(privateEndpointPolicy().allowAll, mode).toBe(false);
+      expect((await privateEndpointPolicy()).allowAll, mode).toBe(false);
     }
   });
 });
