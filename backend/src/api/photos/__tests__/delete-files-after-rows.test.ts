@@ -69,6 +69,23 @@ interface DeletePath {
   failRows: () => { mockRestore: () => void };
 }
 
+async function createPolicy(): Promise<string> {
+  const vehicleId = await seedVehicle(ctx, { nickname: 'Insured' });
+  const res = await ctx.authed('POST', '/api/v1/insurance', {
+    company: 'Acme Mutual',
+    terms: [
+      {
+        startDate: '2024-01-01T00:00:00.000Z',
+        endDate: '2025-01-01T00:00:00.000Z',
+        totalCost: 1200,
+        vehicleCoverage: { vehicleIds: [vehicleId] },
+      },
+    ],
+  });
+  expect(res.status).toBeLessThan(300);
+  return (await json<DataEnvelope<{ id: string }>>(res)).data.id;
+}
+
 const paths: DeletePath[] = [
   {
     name: 'an expense',
@@ -118,20 +135,7 @@ const paths: DeletePath[] = [
   {
     name: 'an insurance policy',
     setup: async () => {
-      const vehicleId = await seedVehicle(ctx, { nickname: 'Insured' });
-      const res = await ctx.authed('POST', '/api/v1/insurance', {
-        company: 'Acme Mutual',
-        terms: [
-          {
-            startDate: '2024-01-01T00:00:00.000Z',
-            endDate: '2025-01-01T00:00:00.000Z',
-            totalCost: 1200,
-            vehicleCoverage: { vehicleIds: [vehicleId] },
-          },
-        ],
-      });
-      expect(res.status).toBeLessThan(300);
-      const policyId = (await json<DataEnvelope<{ id: string }>>(res)).data.id;
+      const policyId = await createPolicy();
       attachPhoto('insurance_policy', policyId, 'pol');
       return { url: `/api/v1/insurance/${policyId}`, photos: 1 };
     },
@@ -163,4 +167,67 @@ describe('deleting something with photos', () => {
       expect(deletedFiles).toHaveLength(photos);
     });
   }
+});
+
+describe('deleting one photo', () => {
+  async function expenseWithTwoPhotos(): Promise<string> {
+    const id = await createExpense(await seedVehicle(ctx, { nickname: 'Car' }));
+    attachPhoto('expense', id, 'a');
+    attachPhoto('expense', id, 'b');
+    ctx.sqlite.run(`UPDATE photos SET is_cover = 1 WHERE id = 'a'`);
+    return id;
+  }
+
+  const failures = [
+    { step: 'the row delete', target: 'delete' as const },
+    { step: 'the new cover', target: 'setCoverPhoto' as const },
+  ];
+  for (const { step, target } of failures) {
+    test(`a failure in ${step} keeps the photo and its stored file`, async () => {
+      const id = await expenseWithTwoPhotos();
+      const spy = spyOn(repos().photos, target).mockRejectedValue(new Error('forced failure'));
+      try {
+        const res = await ctx.authed('DELETE', `/api/v1/photos/expense/${id}/a`);
+        expect(res.status).toBeGreaterThanOrEqual(500);
+      } finally {
+        spy.mockRestore();
+      }
+      expect(photoRows()).toBe(2);
+      expect(deletedFiles, 'no stored file is deleted while its row stays').toEqual([]);
+    });
+  }
+
+  test('a delete removes the row and its stored file, then moves the cover', async () => {
+    const id = await expenseWithTwoPhotos();
+    const res = await ctx.authed('DELETE', `/api/v1/photos/expense/${id}/a`);
+    expect(res.status).toBe(204);
+    expect(photoRows()).toBe(1);
+    expect(deletedFiles).toEqual(['photos/a.jpg']);
+    const cover = ctx.sqlite.query(`SELECT is_cover AS c FROM photos WHERE id = 'b'`).get();
+    expect(cover).toEqual({ c: 1 });
+  });
+});
+
+describe('deleting a claim', () => {
+  test('a claim from another policy is refused before any photo row is touched', async () => {
+    const [policyA, policyB] = [await createPolicy(), await createPolicy()];
+    const res = await ctx.authed('POST', `/api/v1/insurance/${policyB}/claims`, {
+      claimDate: '2024-03-01T00:00:00.000Z',
+      claimType: 'collision',
+    });
+    expect(res.status).toBe(201);
+    const claimId = (await json<DataEnvelope<{ id: string }>>(res)).data.id;
+    attachPhoto('insurance_claim', claimId, 'c');
+
+    const photoDeletes = spyOn(repos().photos, 'deleteByEntities');
+    try {
+      const del = await ctx.authed('DELETE', `/api/v1/insurance/${policyA}/claims/${claimId}`);
+      expect(del.status).toBe(404);
+      expect(photoDeletes).not.toHaveBeenCalled();
+    } finally {
+      photoDeletes.mockRestore();
+    }
+    expect(photoRows()).toBe(1);
+    expect(deletedFiles).toEqual([]);
+  });
 });

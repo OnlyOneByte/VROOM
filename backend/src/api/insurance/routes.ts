@@ -460,7 +460,10 @@ routes.delete(
     await validateInsuranceOwnership(id, user.id);
     await deleteWithPhotos(
       user.id,
-      async () => [{ entityType: 'insurance_claim', entityIds: [claimId] }],
+      async () => {
+        await repos().insuranceClaims.findById(id, claimId);
+        return [{ entityType: 'insurance_claim', entityIds: [claimId] }];
+      },
       () => repos().insuranceClaims.delete(id, claimId)
     );
     return c.json({ success: true, message: 'Claim deleted successfully' });
