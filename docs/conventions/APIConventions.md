@@ -51,12 +51,12 @@ export { routes };
 
 ```typescript
 import { and, desc, eq } from 'drizzle-orm';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { type Entity, entityTable, type NewEntity } from '../../db/schema';
 import { BaseRepository } from '../../utils/repository';
 
 export class EntityRepository extends BaseRepository<Entity, NewEntity> {
-  constructor(db: AppDatabase) {
+  constructor(db: AsyncAppDatabase) {
     super(db, entityTable);
   }
 
@@ -76,7 +76,7 @@ holding one, `export default new …Repository(...)`, or one inside a top-level 
 `this.db.transaction(async (tx) => …)` so it runs on the injected session.
 
 `BaseRepository` supplies `findById`/`create`/`update`/`delete` (the last two throw
-`NotFoundError` on a missing row). Take `AppDatabase`, never `BunSQLiteDatabase` — the alias
+`NotFoundError` on a missing row). Take `AsyncAppDatabase`, never a driver type — the alias
 is the seam for a future non-SQLite dialect.
 
 Extending it is the default, not a requirement: 8 repositories do. Its signature is

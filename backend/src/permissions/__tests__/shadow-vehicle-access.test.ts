@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { getDb } from '../../db/connection';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../test-helpers/http-client';
 import { createInvitee } from '../../test-helpers/invitee';
 import { seedVehicle } from '../../test-helpers/seed';

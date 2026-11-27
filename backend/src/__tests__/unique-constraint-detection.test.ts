@@ -45,6 +45,14 @@ describe('isUniqueConstraintError', () => {
 });
 
 describe('handleDatabaseError', () => {
+  test('maps a non-unique driver failure to a generic DatabaseError without the driver text', () => {
+    const mapped = handleDatabaseError(
+      Object.assign(new Error('disk I/O error'), { code: 'SQLITE_IOERR' })
+    );
+    expect(mapped).toBeInstanceOf(DatabaseError);
+    expect(mapped.message).toBe('A database error occurred');
+  });
+
   test('maps a unique violation to a conflict', () => {
     expect(handleDatabaseError(sqliteError("INSERT INTO t VALUES ('b', 'a@x')"))).toBeInstanceOf(
       ConflictError

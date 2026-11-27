@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import AdmZip from 'adm-zip';
 import { appContext } from '../../../app-context';
-import { getDb } from '../../../db/connection';
 import {
   assignServerRole,
   builtInRoleId,

@@ -3,7 +3,6 @@ import { Hono } from 'hono';
 import { DEMO_USER_ID } from '../../api/auth/demo-account';
 import { app } from '../../app';
 import { appContext } from '../../app-context';
-import { getDb } from '../../db/connection';
 import type { AppError } from '../../errors';
 import { createTestApp, requestAs } from '../../test-helpers/http-client';
 import { assignServerRole, resolverFor } from '../grants';

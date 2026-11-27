@@ -7,8 +7,9 @@ const SRC_ROOT = join(import.meta.dir, '..');
 const SYNC_HANDLE_MARKERS: [name: string, pattern: RegExp][] = [
   ['the sync Drizzle driver', /drizzle-orm\/bun-sqlite/],
   ['a bun:sqlite value import', /import\s+(?!type\b)[^;]*from\s+'bun:sqlite'/],
+  ['a dynamic bun:sqlite load', /\b(?:import|require)\(\s*'bun:sqlite'\s*\)/],
   ['the sync database type', /\bAppDatabase\b/],
-  ['getDb()', /\bgetDb\(/],
+  ['getDb()', /\bgetDb\b/],
   ['the raw connection', /\.\$client\b/],
   [
     'a sync handle on the app context',
@@ -73,6 +74,9 @@ describe('only src/db/ touches the synchronous database', () => {
     expect(flagged('await appContext().asyncDb.select().from(users).get();')).toBe(0);
     expect(flagged('// getDb() in a comment')).toBe(0);
     expect(flagged('createAppContext(getDb().$client);', 'app-context.ts')).toBe(0);
+    expect(flagged("import { getDb as openDb } from '../db/connection';")).toBe(1);
+    expect(flagged("const { Database } = await import('bun:sqlite');")).toBe(1);
+    expect(flagged("const sqlite = require('bun:sqlite');")).toBe(1);
   });
 
   test('the restore service, the biggest transaction in the app, runs on the async session', () => {
