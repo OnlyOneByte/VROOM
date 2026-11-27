@@ -22,7 +22,7 @@ import {
 import { logger } from '../../utils/logger';
 import { zonedMidnight, zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { canonicalScale, convertDistance, convertVolume } from '../../utils/unit-conversions';
-import { ownedVehiclesScope } from '../../utils/vehicle-access';
+import type { ReadableVehicle } from '../../utils/vehicle-access';
 import { listDrivers } from '../drivers/repository';
 import { OWNERSHIP_CATEGORIES } from '../expenses/repository';
 import {
@@ -32,6 +32,7 @@ import {
   type TripLane,
   tripLane,
 } from './annotations';
+import { ownedRowsOf, ownedScope } from './vehicle-scope';
 
 export const QUERY_METRICS = [
   'cost',
@@ -188,6 +189,7 @@ interface PeriodRows {
 interface QueryContext {
   query: AnalyticsQuery;
   userId: string;
+  readable: ReadableVehicle[];
   timeZone: string;
   categories: ExpenseCategory[];
   vehicleIds: string[];
@@ -555,15 +557,13 @@ function keyFilter(groupBy: QueryGroupBy, keys: string[]): SQL | null {
 }
 
 function itemsWhere(
-  userId: string,
-  vehicleIds: string[],
+  readable: ReadableVehicle[],
   categories: ExpenseCategory[],
   query: BucketItemsQuery,
   groupBy: QueryGroupBy
 ): SQL {
   const conditions: SQL[] = [
-    sql`e.user_id = ${userId}`,
-    sql`e.vehicle_id IN (${inList(vehicleIds)})`,
+    ownedRowsOf('e', readable, { expenses: true }),
     sql`e.category IN (${inList(categories)})`,
     sql`e.date >= ${query.start}`,
     sql`e.date < ${query.end}`,
@@ -583,9 +583,13 @@ export class AnalyticsQueryRepository {
     this.db = db;
   }
 
-  async query(userId: string, query: AnalyticsQuery): Promise<AnalyticsQueryResult> {
+  async query(
+    userId: string,
+    query: AnalyticsQuery,
+    readable?: ReadableVehicle[]
+  ): Promise<AnalyticsQueryResult> {
     try {
-      return await this.run(userId, query);
+      return await this.run(userId, query, readable ?? (await this.ownedOnly(userId, query)));
     } catch (error) {
       if (error instanceof ValidationError) throw error;
       logger.error('Failed to run analytics query', {
@@ -597,11 +601,31 @@ export class AnalyticsQueryRepository {
     }
   }
 
-  private async run(userId: string, query: AnalyticsQuery): Promise<AnalyticsQueryResult> {
+  private async ownedOnly(
+    userId: string,
+    query: { vehicleIds?: string[] }
+  ): Promise<ReadableVehicle[]> {
+    const conditions: SQL[] = [eq(vehicles.userId, userId)];
+    if (query.vehicleIds?.length) conditions.push(inArray(vehicles.id, query.vehicleIds));
+    const rows = await this.db
+      .select({ id: vehicles.id })
+      .from(vehicles)
+      .where(and(...conditions));
+    return ownedScope(
+      userId,
+      rows.map((row) => row.id)
+    );
+  }
+
+  private async run(
+    userId: string,
+    query: AnalyticsQuery,
+    readable: ReadableVehicle[]
+  ): Promise<AnalyticsQueryResult> {
     if (!isValidQueryCombination(query.metric, query.groupBy)) {
       throw new ValidationError(`metric=${query.metric} cannot be grouped by ${query.groupBy}`);
     }
-    const { ctx, currency, range, prior } = await this.loadContext(userId, query);
+    const { ctx, currency, range, prior } = await this.loadContext(userId, query, readable);
     const rows = await this.aggregate(ctx);
     const primary = this.shapePeriod(ctx, 0, range, rows[0]);
     const comparePeriod = prior && rows[1] ? this.shapePeriod(ctx, 1, prior, rows[1]) : null;
@@ -621,7 +645,7 @@ export class AnalyticsQueryRepository {
     const wanted = ctx.query.annotations ?? [];
     if (wanted.length === 0) return {};
     const scope = {
-      userId: ctx.userId,
+      readable: ctx.readable,
       vehicleIds: ctx.vehicleIds,
       names: new Map([...ctx.vehicleInfo].map(([id, v]) => [id, v.name])),
       ...range,
@@ -642,7 +666,7 @@ export class AnalyticsQueryRepository {
     };
   }
 
-  private async loadContext(userId: string, query: AnalyticsQuery) {
+  private async loadContext(userId: string, query: AnalyticsQuery, wanted: ReadableVehicle[]) {
     const timeZone = query.timeZone ?? 'UTC';
     const [prefsRows, vehicleRows] = await Promise.all([
       this.db
@@ -653,7 +677,7 @@ export class AnalyticsQueryRepository {
         .from(userPreferences)
         .where(eq(userPreferences.userId, userId))
         .limit(1),
-      this.selectVehicles(userId, query.vehicleIds),
+      this.selectVehicles(wanted),
     ]);
     const prefs = prefsRows[0];
     const userUnits = parseUnitPreferences(prefs?.unitPreferences) ?? {
@@ -679,12 +703,14 @@ export class AnalyticsQueryRepository {
       ? { start: shifted[0]?.start ?? start, end: shifted.at(-1)?.end ?? start }
       : null;
 
+    const readable = wanted.filter((v) => vehicleInfo.has(v.vehicleId));
     const ctx: QueryContext = {
       query,
       userId,
+      readable,
       timeZone,
       categories: effectiveCategories(query),
-      vehicleIds: [...vehicleInfo.keys()],
+      vehicleIds: readable.map((v) => v.vehicleId),
       vehicleInfo,
       userUnits,
       periods,
@@ -705,12 +731,13 @@ export class AnalyticsQueryRepository {
     return names;
   }
 
-  private selectVehicles(userId: string, vehicleIds: string[] | undefined) {
-    const conditions: SQL[] = [ownedVehiclesScope(userId)];
-    if (vehicleIds?.length) conditions.push(inArray(vehicles.id, vehicleIds));
-    return this.db
+  private async selectVehicles(readable: ReadableVehicle[]) {
+    if (readable.length === 0) return [];
+    const owners = new Map(readable.map((v) => [v.vehicleId, v.ownerId]));
+    const rows = await this.db
       .select({
         id: vehicles.id,
+        ownerId: vehicles.userId,
         make: vehicles.make,
         model: vehicles.model,
         year: vehicles.year,
@@ -718,10 +745,11 @@ export class AnalyticsQueryRepository {
         unitPreferences: vehicles.unitPreferences,
         earliest: sql<
           number | null
-        >`(SELECT MIN(x.date) FROM expenses x WHERE x.vehicle_id = vehicles.id AND x.user_id = ${userId})`,
+        >`(SELECT MIN(x.date) FROM expenses x WHERE x.vehicle_id = vehicles.id AND ${ownedRowsOf('x', readable, { expenses: true })})`,
       })
       .from(vehicles)
-      .where(and(...conditions));
+      .where(inArray(vehicles.id, [...owners.keys()]));
+    return rows.filter((row) => owners.get(row.id) === row.ownerId);
   }
 
   private async aggregate(ctx: QueryContext): Promise<PeriodRows[]> {
@@ -743,9 +771,13 @@ export class AnalyticsQueryRepository {
     return usesFuelRows(ctx.query) ? this.fuelAggregate(ctx) : this.expenseAggregate(ctx);
   }
 
-  async items(userId: string, query: BucketItemsQuery): Promise<BucketItems> {
+  async items(
+    userId: string,
+    query: BucketItemsQuery,
+    readable?: ReadableVehicle[]
+  ): Promise<BucketItems> {
     try {
-      return await this.loadItems(userId, query);
+      return await this.loadItems(query, readable ?? (await this.ownedOnly(userId, query)));
     } catch (error) {
       logger.error('Failed to load bucket items', {
         userId,
@@ -755,13 +787,17 @@ export class AnalyticsQueryRepository {
     }
   }
 
-  private async loadItems(userId: string, query: BucketItemsQuery): Promise<BucketItems> {
+  private async loadItems(
+    query: BucketItemsQuery,
+    wanted: ReadableVehicle[]
+  ): Promise<BucketItems> {
     const groupBy = query.groupBy ?? 'none';
     const keys = query.keys;
-    const owned = await this.selectVehicles(userId, query.vehicleIds);
-    const names = new Map(owned.map((v) => [v.id, vehicleName(v)]));
-    const vehicleIds = [...names.keys()].filter(
-      (id) => groupBy !== 'vehicle' || !keys || keys.includes(id)
+    const found = await this.selectVehicles(wanted);
+    const names = new Map(found.map((v) => [v.id, vehicleName(v)]));
+    const readable = wanted.filter(
+      (v) =>
+        names.has(v.vehicleId) && (groupBy !== 'vehicle' || !keys || keys.includes(v.vehicleId))
     );
     const categories = effectiveCategories({
       metric: query.metric ?? 'cost',
@@ -780,9 +816,9 @@ export class AnalyticsQueryRepository {
       others: null,
       categories,
     };
-    if (vehicleIds.length === 0 || categories.length === 0) return empty;
+    if (readable.length === 0 || categories.length === 0) return empty;
 
-    const where = itemsWhere(userId, vehicleIds, categories, query, groupBy);
+    const where = itemsWhere(readable, categories, query, groupBy);
     const limit = query.limit ?? 8;
     const [totals] = await rawAll<{
       total: number | null;
@@ -838,7 +874,7 @@ export class AnalyticsQueryRepository {
   }
 
   private scope(ctx: QueryContext): SQL {
-    return sql`e.user_id = ${ctx.userId} AND e.vehicle_id IN (${inList(ctx.vehicleIds)}) AND e.category IN (${inList(ctx.categories)})`;
+    return sql`${ownedRowsOf('e', ctx.readable, { expenses: true })} AND e.category IN (${inList(ctx.categories)})`;
   }
 
   private expenseAggregate(ctx: QueryContext): Promise<AggregateRow[]> {
@@ -930,12 +966,12 @@ export class AnalyticsQueryRepository {
       raw AS (
         SELECT b.period, b.idx, e.vehicle_id, e.date, e.id, e.mileage
         FROM b CROSS JOIN expenses e
-        WHERE e.date >= b.t0 AND e.date < b.t1 AND e.user_id = ${ctx.userId} AND e.vehicle_id IN (${inList(ctx.vehicleIds)})
+        WHERE e.date >= b.t0 AND e.date < b.t1 AND ${ownedRowsOf('e', ctx.readable, { expenses: true })}
           AND e.mileage IS NOT NULL
         UNION ALL
         SELECT p.period, -2 AS idx, vu.vehicle_id, p.t0 - 1 AS date, '' AS id,
           (SELECT x.mileage FROM expenses x
-            WHERE x.user_id = ${ctx.userId} AND x.vehicle_id = vu.vehicle_id
+            WHERE ${ownedRowsOf('x', ctx.readable, { expenses: true })} AND x.vehicle_id = vu.vehicle_id
               AND x.mileage IS NOT NULL AND x.date < p.t0
             ORDER BY x.date DESC, x.mileage DESC, x.id DESC LIMIT 1) AS mileage
         FROM p CROSS JOIN vu
