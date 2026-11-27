@@ -49,6 +49,7 @@
 	} from '#lib/utils/sync/pending-rows.ts';
 	import { editedRows } from '#lib/utils/pending-edits.svelte.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
+	import { recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
@@ -126,6 +127,7 @@
 	let pageSize = $state(20);
 	let totalCount = $state(0);
 	let isLoadingPage = $state(false);
+	let expensesFetched = $state(false);
 	let hasLoadedExpensesTab = $state(false);
 	let expensesLoadError = $state<string | null>(null);
 	let expenseSortBy = $state<'date' | 'amount'>('date');
@@ -308,8 +310,13 @@
 		if (!hasLoadedExpensesTab) return inRecent;
 		return new Set(expenses.map(expense => expense.id).filter(id => inRecent.has(id)));
 	});
+	let syncedRows = $derived(
+		recentlySynced().filter(
+			row => row.vehicleId === vehicleId && !pending.rows.some(p => p.id === row.id)
+		)
+	);
 	let pendingTabRows = $derived(
-		pending.rows.filter(row =>
+		(expensesFetched ? pending.rows : [...pending.rows, ...syncedRows]).filter(row =>
 			matchesFilters(row, {
 				categories: expenseCategoryFilter.split(',').filter(Boolean),
 				startDate: filters.startDate,
@@ -322,7 +329,7 @@
 	let tabExpenses = $derived(currentOffset === 0 ? [...pendingTabRows, ...expenses] : expenses);
 
 	let recentExpenses = $derived(
-		[...pending.rows, ...recentList].slice(0, 3).map(expense => {
+		[...pending.rows, ...(recentSettled ? recentList : syncedRows)].slice(0, 3).map(expense => {
 			const sync = pending.states.get(expense.id);
 			return {
 				id: expense.id,
@@ -588,6 +595,7 @@
 			expensesLoadError = userFacingErrorMessage(error);
 		} finally {
 			isLoadingPage = false;
+			expensesFetched = true;
 		}
 	}
 
@@ -987,11 +995,11 @@
 							{#if attentionSettled}
 								<NeedsAttentionCard title="Next up" items={nextUp} />
 							{/if}
-							{#if showOverviewBody && recentSettled && recentExpenses.length > 0}
+							{#if showOverviewBody && recentExpenses.length > 0}
 								<RecentActivityCard
 									title="Recent expenses"
 									expenses={recentExpenses}
-									totalCount={recentTotal + pending.saving.length}
+									totalCount={recentSettled ? recentTotal + pending.saving.length : undefined}
 									onSeeAll={seeAllExpenses}
 								/>
 							{/if}
@@ -1137,7 +1145,7 @@
 								<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
 									<CardFull.Title>
 										All Expenses ({totalCount +
-											pendingTabRows.filter(row => pending.states.get(row.id)?.status === 'saving')
+											pendingTabRows.filter(row => pending.states.get(row.id)?.status !== 'failed')
 												.length -
 											expenses.filter(isDeleteHidden).length})
 									</CardFull.Title>
