@@ -222,7 +222,9 @@ describe('trips page list', () => {
 		render(Page);
 		await settle();
 
-		expect(screen.queryByRole('link', { name: /Set a mileage rate/ })).toBeNull();
+		const card = screen.getByTestId('trip-summary-card');
+		expect(within(card).getByText('Business mileage value')).toBeInTheDocument();
+		expect(within(card).queryByRole('link', { name: /Set a mileage rate/ })).toBeNull();
 	});
 
 	test('a mixed-unit fleet keeps the fraction of its converted totals', async () => {

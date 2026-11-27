@@ -3,6 +3,7 @@
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import Segmented from '#lib/components/common/Segmented.svelte';
 	import { Input } from '#lib/components/ui/input/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import { CURRENCIES } from '#lib/constants/currencies.ts';
 	import { currencyLabel, getCurrencySymbol, minorUnitScale } from '#lib/utils/formatters.ts';
 	import { landOn } from '#lib/utils/focus.ts';
@@ -47,14 +48,21 @@
 		}
 	});
 
+	const MAX_RATE = 1_000_000;
+
+	function rateProblem(text: string): string | null {
+		if (text === '') return null;
+		if (/^[1-9]\d{0,2}[.,]\d{3}$/.test(text)) return 'Leave out thousands separators';
+		if (!/^\d+(?:[.,]\d+)?$/.test(text)) return 'Use a number like 0.67';
+		if (Number(text.replace(',', '.')) > MAX_RATE) return 'Use 1000000 or less';
+		return null;
+	}
+
 	function commitRate() {
-		const text = rateDraft.trim().replace(',', '.');
-		const value = text === '' ? 0 : Number(text);
-		if (!Number.isFinite(value) || value < 0) {
-			rateError = 'Use 0 or more';
-			return;
-		}
-		rateError = null;
+		const text = rateDraft.trim();
+		rateError = rateProblem(text);
+		if (rateError) return;
+		const value = text === '' ? 0 : Number(text.replace(',', '.'));
 		if (value === businessMileageRate) return;
 		businessMileageRate = value;
 		onRateChange?.();
@@ -188,7 +196,7 @@
 						onchange={commitRate}
 					/>
 					{#if rateError}
-						<p id="{RATE_ANCHOR}-error" class="text-sm text-destructive">{rateError}</p>
+						<FormFieldError id="{RATE_ANCHOR}-error">{rateError}</FormFieldError>
 					{/if}
 				</div>
 			</div>

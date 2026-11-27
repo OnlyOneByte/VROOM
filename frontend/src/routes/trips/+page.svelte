@@ -151,7 +151,7 @@
 					{#snippet meta()}
 						<a
 							href="{resolve(routes.settings)}#business-mileage-rate"
-							class="inline-flex min-h-10 items-center font-medium text-accent-ink underline-offset-4 hover:underline sm:min-h-0"
+							class="inline-flex min-h-10 items-center rounded-sm font-medium text-accent-ink underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:min-h-0"
 						>
 							Set a mileage rate to see what it’s worth
 						</a>

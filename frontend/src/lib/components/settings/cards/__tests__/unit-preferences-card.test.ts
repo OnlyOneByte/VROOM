@@ -220,20 +220,37 @@ describe('UnitPreferencesCard', () => {
 			expect(rate()).not.toHaveAttribute('aria-invalid');
 		});
 
-		test('a negative or non-numeric rate is refused with a message and not saved', async () => {
+		test.each([
+			['-1', 'Use a number like 0.67'],
+			['abc', 'Use a number like 0.67'],
+			['0x10', 'Use a number like 0.67'],
+			['1e3', 'Use a number like 0.67'],
+			['1,000', 'Leave out thousands separators'],
+			['100.000', 'Leave out thousands separators'],
+			['1000001', 'Use 1000000 or less']
+		])('"%s" is refused with "%s", announced and not saved', async (typed, message) => {
 			const onRateChange = vi.fn();
 			mount({ onRateChange });
 
-			await enter('-1');
+			await enter(typed);
+
 			expect(rate()).toHaveAttribute('aria-invalid', 'true');
-			expect(rate()).toHaveAccessibleDescription(/Use 0 or more/);
-
-			await enter('abc');
+			expect(rate()).toHaveAccessibleDescription(new RegExp(message));
+			expect(screen.getByRole('alert')).toHaveTextContent(message);
+			expect(rate()).toHaveValue(typed);
 			expect(onRateChange).not.toHaveBeenCalled();
+		});
 
+		test('fixing a refused rate clears the error and saves it', async () => {
+			const onRateChange = vi.fn();
+			mount({ onRateChange });
+
+			await enter('1,000');
 			await enter('300');
+
 			expect(onRateChange).toHaveBeenCalledOnce();
 			expect(rate()).not.toHaveAttribute('aria-invalid');
+			expect(screen.queryByRole('alert')).toBeNull();
 		});
 
 		test('the #business-mileage-rate link lands on the field and focuses it', () => {

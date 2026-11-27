@@ -210,7 +210,7 @@ const updateSettingsSchema = baseSettingsSchema
     backupConfig: backupConfigSchema.optional(),
     providerDefaults: providerDefaultsSchema.optional(),
     themePreference: z.string().min(1).max(64).optional(),
-    businessMileageRate: z.number().min(0).optional(),
+    businessMileageRate: z.number().min(0).max(1_000_000).optional(),
     communityStatsOptIn: z.boolean().optional(),
     communityRegion: communityRegionSchema.nullable().optional(),
   })
