@@ -12,7 +12,7 @@
 
 <div class="mx-auto w-full max-w-3xl px-5 py-8 sm:px-8 sm:py-12">
 	<div class="mb-8">
-		<PageHeader {title} description="Last updated: {updated}">
+		<PageHeader {title} eyebrow="Last updated: {updated}">
 			{#snippet back()}
 				<Button
 					variant="ghost"
