@@ -15,6 +15,7 @@ import {
 } from '../../api/analytics/query-repository';
 import { OdometerRepository } from '../../api/odometer/repository';
 import { createTestApp } from '../../test-helpers/http-client';
+import { openAsyncDatabase } from '../async-sqlite';
 import { getDb } from '../connection';
 import * as schema from '../schema';
 import { seedGarage } from '../seed';
@@ -42,17 +43,23 @@ interface Captured {
 
 async function capture(label: string, run: () => Promise<unknown>): Promise<Captured[]> {
   const target = db as unknown as { all: (query: SQL) => unknown[] };
+  const asyncTarget = openAsyncDatabase(db.$client).db as unknown as {
+    all: (query: SQL) => Promise<unknown[]>;
+  };
   const original = target.all.bind(target);
+  const asyncOriginal = asyncTarget.all.bind(asyncTarget);
   const out: Captured[] = [];
-  target.all = (query: SQL) => {
-    const rows = original(query);
+  const record = (query: SQL, rows: unknown[]) => {
     out.push({ label: `${label} #${out.length + 1}`, query, rows });
     return rows;
   };
+  target.all = (query: SQL) => record(query, original(query));
+  asyncTarget.all = async (query: SQL) => record(query, await asyncOriginal(query));
   try {
     await run();
   } finally {
     target.all = original;
+    asyncTarget.all = asyncOriginal;
   }
   return out;
 }

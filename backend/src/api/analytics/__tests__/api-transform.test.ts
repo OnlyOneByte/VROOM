@@ -101,8 +101,16 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
       distance: { totalDistance: 1000, avgPerDay: 30, avgPerMonth: 900 },
       monthlyConsumption: [{ month: '2024-01', efficiency: 28, volume: 40 }],
       gasPriceHistory: [
-        { date: '2024-01-01', month: '2024-01', fuelType: 'regular', pricePerVolume: 350 },
+        {
+          date: '2024-01-01',
+          month: '2024-01',
+          fuelType: 'regular',
+          pricePerVolume: 350,
+          volume: 12.5,
+        },
       ],
+      fillupsByVehicle: [{ vehicleId: 'v1', vehicleName: 'C', count: 3, volume: 36, cost: 13500 }],
+      chargingByVehicle: [{ vehicleId: 'v2', vehicleName: 'E', count: 4, volume: 60, cost: 3600 }],
       fillupCostByVehicle: [{ month: '2024-01', vehicleId: 'v1', vehicleName: 'C', avgCost: 5000 }],
       odometerProgression: [
         { month: '2024-01', vehicleId: 'v1', vehicleName: 'C', mileage: 42000 },
@@ -134,6 +142,13 @@ describe('analytics api-transform: money cents→dollars, non-money untouched', 
     });
     expect(r.gasPriceHistory[0].pricePerVolume).toBe(3.5);
     expect(r.gasPriceHistory[0].month).toBe('2024-01');
+    expect(r.gasPriceHistory[0].volume).toBe(12.5);
+    expect(r.fillupsByVehicle).toEqual([
+      { vehicleId: 'v1', vehicleName: 'C', count: 3, volume: 36, cost: 135 },
+    ]);
+    expect(r.chargingByVehicle).toEqual([
+      { vehicleId: 'v2', vehicleName: 'E', count: 4, volume: 60, cost: 36 },
+    ]);
     expect(r.fillupCostByVehicle[0].avgCost).toBe(50);
     expect(r.costPerDistance[0].costPerDistance).toBe(0.15);
     expect(r.volume.currentYear).toBe(100);

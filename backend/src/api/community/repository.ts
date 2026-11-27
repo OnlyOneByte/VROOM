@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq, getTableColumns, gte, inArray, lte, min, or } from 'drizzle-orm';
+import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import {
   type CommunityStat,
@@ -55,7 +56,11 @@ const VEHICLE_COLUMNS = {
 export type Contribution = 'opted_out' | 'awaiting_refresh' | 'included';
 
 export class CommunityStatsRepository {
-  constructor(private db: AppDatabase) {}
+  private db: AsyncAppDatabase;
+
+  constructor(private syncDb: AppDatabase) {
+    this.db = openAsyncDatabase(syncDb.$client).db;
+  }
 
   async loadOptedIn(windowStart: Date, windowEnd: Date): Promise<CommunityInput> {
     const owners = await this.db
@@ -281,14 +286,14 @@ export class CommunityStatsRepository {
     return byVehicle;
   }
 
-  noiseKey(scope: string): string {
+  async noiseKey(scope: string): Promise<string> {
     const fresh = randomBytes(32).toString('hex');
-    this.db
+    await this.db
       .insert(communityNoiseKeys)
       .values({ scope, noiseKey: fresh })
       .onConflictDoNothing()
       .run();
-    const row = this.db
+    const row = await this.db
       .select({ noiseKey: communityNoiseKeys.noiseKey })
       .from(communityNoiseKeys)
       .where(eq(communityNoiseKeys.scope, scope))
@@ -306,7 +311,7 @@ export class CommunityStatsRepository {
   }
 
   replaceScope(scope: string, rows: NewCommunityStat[], refreshedAt: Date): void {
-    this.db.transaction((tx) => {
+    this.syncDb.transaction((tx) => {
       tx.delete(communityStats).where(eq(communityStats.scope, scope)).run();
       const perInsert = rowsPerInsert(Object.keys(getTableColumns(communityStats)).length);
       for (const batch of chunk(rows, perInsert)) {

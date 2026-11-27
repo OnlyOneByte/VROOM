@@ -4,6 +4,7 @@ import type { SQL } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import * as schema from '../../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../../db/types';
 import { ValidationError } from '../../../errors';
@@ -1123,7 +1124,9 @@ describe('bucket items for drill-down', () => {
 
 describe('bucketed queries read expenses by date range, never the whole history', () => {
   async function plansFor(run: () => Promise<unknown>): Promise<string[]> {
-    const db = testDb.drizzle as unknown as { all: (query: SQL) => unknown[] };
+    const db = openAsyncDatabase(testDb.sqlite).db as unknown as {
+      all: (query: SQL) => Promise<unknown[]>;
+    };
     const original = db.all.bind(db);
     const queries: SQL[] = [];
     db.all = (query: SQL) => {

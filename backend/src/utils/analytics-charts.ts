@@ -331,24 +331,56 @@ export function computeMpgAndCostPerMile(
   return { mpgValues, costPerMileValues };
 }
 
+const DEFAULT_GAS_FUEL_TYPE = '87 (Regular)';
+
 export function buildGasPriceHistory(
   rows: FuelExpenseRow[],
   include: (r: FuelExpenseRow) => boolean = isFillup,
   toUserVolume: (value: number, vehicleId: string) => number = (value) => value,
   calendar: Calendar = UTC_CALENDAR
-): Array<{ date: string; month: string; fuelType: string; pricePerVolume: number }> {
+): Array<{
+  date: string;
+  month: string;
+  fuelType: string;
+  pricePerVolume: number;
+  volume: number;
+}> {
   return rows.flatMap((r) => {
     const d = normalizeDate(r.date);
     if (!d || !include(r) || r.expenseAmount <= 0) return [];
+    const volume = toUserVolume(r.volume as number, r.vehicleId);
     return [
       {
         date: d.toISOString(),
         month: toMonthKey(d, calendar),
-        fuelType: r.fuelType ?? 'Regular',
-        pricePerVolume: r.expenseAmount / toUserVolume(r.volume as number, r.vehicleId),
+        fuelType: r.fuelType ?? DEFAULT_GAS_FUEL_TYPE,
+        pricePerVolume: r.expenseAmount / volume,
+        volume,
       },
     ];
   });
+}
+
+export function buildTotalsByVehicle(
+  rows: FuelExpenseRow[],
+  vehicleNameMap: Map<string, string>,
+  include: (r: FuelExpenseRow) => boolean,
+  toUserVolume: (value: number, vehicleId: string) => number = (value) => value
+): Array<{ vehicleId: string; vehicleName: string; count: number; volume: number; cost: number }> {
+  const map = new Map<string, { count: number; volume: number; cost: number }>();
+  for (const row of rows) {
+    if (!include(row)) continue;
+    const entry = map.get(row.vehicleId) ?? { count: 0, volume: 0, cost: 0 };
+    entry.count++;
+    entry.volume += toUserVolume(row.volume as number, row.vehicleId);
+    entry.cost += row.expenseAmount;
+    map.set(row.vehicleId, entry);
+  }
+  return Array.from(map, ([vehicleId, t]) => ({
+    vehicleId,
+    vehicleName: vehicleNameMap.get(vehicleId) ?? 'Unknown',
+    ...t,
+  })).sort((a, b) => b.count - a.count || a.vehicleName.localeCompare(b.vehicleName));
 }
 
 export function buildFillupCostByVehicle(

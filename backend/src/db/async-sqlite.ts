@@ -32,14 +32,32 @@ function refuseRawControl(target: object, dialect: Dialect, currentSession: () =
         if (OPENING.test(text) || TRANSACTION_CONTROL.test(text)) {
           throw new RawTransactionControlError();
         }
-        const pinned = Object.create(target, { session: { value: currentSession() } });
+        const session = currentSession();
+        const pinned = Object.create(target, {
+          session: { value: name === 'all' || name === 'get' ? named(session) : session },
+        });
         return original.call(pinned, query);
       },
     });
   }
 }
 
-type Method = 'run' | 'all' | 'values' | 'get';
+type Method = 'run' | 'all' | 'values' | 'get' | 'namedAll' | 'namedGet';
+type RawClient = (query: string, params: unknown[], method: Method) => Promise<unknown>;
+
+function named(session: object): object {
+  const { client } = session as { client: RawClient };
+  return Object.create(session, {
+    client: {
+      value: (query: string, params: unknown[], method: Method) =>
+        client(
+          query,
+          params,
+          method === 'all' ? 'namedAll' : method === 'get' ? 'namedGet' : method
+        ),
+    },
+  });
+}
 
 export class TransactionEndedError extends Error {
   constructor() {
@@ -141,6 +159,10 @@ function createAsyncDatabase(sqlite: Database) {
     try {
       const statement = prepare(query);
       if (method === 'run') return { rows: [], ...statement.run(...(params as never[])) };
+      if (method === 'namedAll') return { rows: statement.all(...(params as never[])) };
+      if (method === 'namedGet') {
+        return { rows: (statement.get(...(params as never[])) ?? undefined) as never };
+      }
       const rows = statement.values(...(params as never[]));
       return { rows: method === 'get' ? rows[0] : rows };
     } finally {

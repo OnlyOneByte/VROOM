@@ -12,7 +12,7 @@ import {
   type SQL,
   sql,
 } from 'drizzle-orm';
-import { openAsyncDatabase } from '../../db/async-sqlite';
+import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import { countNum, sqlFalse, sumNum } from '../../db/dialect';
 import {
@@ -38,6 +38,7 @@ import {
   buildMaintenanceTimeline,
   buildMonthlyCostHeatmap,
   buildMonthlyExpenseTrends,
+  buildTotalsByVehicle,
   buildVehicleExpenseBreakdown,
   buildVehicleMaintenanceCosts,
   buildVehicleRadar,
@@ -168,6 +169,8 @@ interface FleetUnitConverter extends RadarUnitConverters {
 
 const identity = (value: number) => value;
 
+type VehicleFuelTotals = ReturnType<typeof buildTotalsByVehicle>[number];
+
 interface EfficiencyTotals {
   distance: number;
   energy: number;
@@ -255,7 +258,10 @@ export interface FuelStatsData {
     month: string;
     fuelType: string;
     pricePerVolume: number;
+    volume: number;
   }>;
+  fillupsByVehicle: VehicleFuelTotals[];
+  chargingByVehicle: VehicleFuelTotals[];
   fillupCostByVehicle: Array<{
     month: string;
     vehicleId: string;
@@ -448,7 +454,11 @@ export class AnalyticsRepository {
   private static readonly VEHICLE_NAME_CACHE_TTL = 5_000;
   private static readonly VEHICLE_NAME_CACHE_MAX_SIZE = 100;
 
-  constructor(private db: AppDatabase) {}
+  private db: AsyncAppDatabase;
+
+  constructor(syncDb: AppDatabase) {
+    this.db = openAsyncDatabase(syncDb.$client).db;
+  }
 
   private getCachedVehicleNames(cacheKey: string, now: number): Map<string, string> | undefined {
     const cached = this.vehicleNameCache.get(cacheKey);
@@ -990,7 +1000,7 @@ export class AnalyticsRepository {
     financingRows: Array<{ id: string; isActive: boolean }>,
     timeZone: string | undefined
   ): Promise<Map<string, number>> {
-    return new FinancingRepository(openAsyncDatabase(this.db.$client).db).computeBalances(
+    return new FinancingRepository(this.db).computeBalances(
       financingRows.filter((fin) => fin.isActive).map((fin) => fin.id),
       timeZone
     );
@@ -1650,6 +1660,8 @@ export class AnalyticsRepository {
       distance,
       monthlyConsumption: this.buildMonthlyConsumption(fuelRowsByVehicle, convert),
       gasPriceHistory: buildGasPriceHistory(fuelRows, isFillup, convert.volume, convert.calendar),
+      fillupsByVehicle: buildTotalsByVehicle(fuelRows, vehicleNameMap, isFillup, convert.volume),
+      chargingByVehicle: buildTotalsByVehicle(fuelRows, vehicleNameMap, isChargeSession),
       fillupCostByVehicle: buildFillupCostByVehicle(fuelRows, vehicleNameMap, convert.calendar),
       odometerProgression: this.buildOdometerProgression(
         fuelRows,

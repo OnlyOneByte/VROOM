@@ -371,7 +371,7 @@ export async function refreshCommunityStats(
   const result = aggregate(input.vehicles, {
     now,
     minGroup: CONFIG.communityStats.minGroup,
-    noiseKey: repository.noiseKey(LOCAL_SCOPE),
+    noiseKey: await repository.noiseKey(LOCAL_SCOPE),
     uniform,
   });
   repository.replaceScope(LOCAL_SCOPE, result.rows, now);

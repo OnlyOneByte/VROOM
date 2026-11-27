@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, notExists, or } from 'drizzle-orm';
+import { type AsyncAppDatabase, openAsyncDatabase } from '../../db/async-sqlite';
 import type { AppDatabase } from '../../db/connection';
 import { countNum } from '../../db/dialect';
 import {
@@ -24,7 +25,11 @@ export const PHOTO_ENTITY_TABLES = {
 } as const;
 
 export class PhotoRepository {
-  constructor(private db: AppDatabase) {}
+  private db: AsyncAppDatabase;
+
+  constructor(private syncDb: AppDatabase) {
+    this.db = openAsyncDatabase(syncDb.$client).db;
+  }
 
   async findByUser(userId: string, entityType?: string): Promise<Photo[]> {
     const conditions = [eq(photos.userId, userId)];
@@ -114,7 +119,7 @@ export class PhotoRepository {
 
   async setCoverPhoto(entityType: string, entityId: string, photoId: string): Promise<Photo> {
     // Must use the instance db: the module-level transaction() helper ignores the injected connection.
-    return this.db.transaction(async (tx) => {
+    return this.syncDb.transaction(async (tx) => {
       // bun:sqlite does not roll back a write when a later statement throws in an async transaction; validate first.
       const target = await tx
         .select({ id: photos.id })

@@ -1,6 +1,5 @@
 import { and, asc, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
 import type { AsyncAppDatabase } from '../../db/async-sqlite';
-import type { AppDatabase } from '../../db/connection';
 import type { NewTrip, Trip } from '../../db/schema';
 import { trips, vehicles } from '../../db/schema';
 import type { DrizzleTransaction } from '../../db/types';
@@ -47,7 +46,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       tripDate: Date;
       timeZone?: string;
     },
-    db: AppDatabase | DrizzleTransaction
+    db: DrizzleTransaction
   ): string | null {
     const { dayStart, nextDay } = localDayWindow(args.tripDate, args.timeZone);
     const result = db

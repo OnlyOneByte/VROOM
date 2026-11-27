@@ -45,6 +45,8 @@ export function fuelStatsToApi(d: FuelStatsData, scale: number): FuelStatsData {
       },
     },
     gasPriceHistory: d.gasPriceHistory.map((g) => ({ ...g, pricePerVolume: c(g.pricePerVolume) })),
+    fillupsByVehicle: d.fillupsByVehicle.map((v) => ({ ...v, cost: c(v.cost) })),
+    chargingByVehicle: d.chargingByVehicle.map((v) => ({ ...v, cost: c(v.cost) })),
     fillupCostByVehicle: d.fillupCostByVehicle.map((f) => ({ ...f, avgCost: c(f.avgCost) })),
     costPerDistance: d.costPerDistance.map((r) => ({
       ...r,
