@@ -372,6 +372,30 @@ export function movedBackRows(
 		.map(({ before }) => before);
 }
 
+function summaryHolds(entry: PendingEdit, requestedAt: number): Expense | undefined {
+	if (entry.status === 'failed' || entry.status === 'conflict') return undefined;
+	if (entry.undo) return loadedWhileMoved(entry, requestedAt) ? entry.undid : undefined;
+	const landedAt = entry.status === 'saved' ? entry.landedAt : undefined;
+	return landedAt !== undefined && requestedAt >= landedAt ? undefined : entry.before;
+}
+
+export function summaryEdits(requestedAt: number | undefined): {
+	before: Expense[];
+	after: Expense[];
+} {
+	const before: Expense[] = [];
+	const after: Expense[] = [];
+	if (requestedAt === undefined) return { before, after };
+	for (const entry of edits.values()) {
+		const held = summaryHolds(entry, requestedAt);
+		if (held) {
+			before.push(held);
+			after.push(entry.after);
+		}
+	}
+	return { before, after };
+}
+
 export function stillInView<T extends Expense>(listed: T, inView: (shown: T) => boolean): boolean {
 	return !overlay(withLatest(listed)) || inView(shownExpense(listed));
 }

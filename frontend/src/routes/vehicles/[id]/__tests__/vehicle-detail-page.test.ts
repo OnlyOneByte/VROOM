@@ -728,6 +728,121 @@ describe('vehicle detail page tabs', () => {
 		}
 	});
 
+	test('a list answered after the Undo was saved keeps an expense that sorts onto a later page off page 1', async () => {
+		const newer = Array.from({ length: 20 }, (_, i) => ({
+			...EXPENSE,
+			id: `n${i}`,
+			date: `2024-06-${String(20 - i).padStart(2, '0')}T12:00:00.000Z`
+		})) as Expense[];
+		getExpensesByVehicle.mockResolvedValue({
+			data: newer.slice(0, 19),
+			pagination: { totalCount: 19, limit: 20, offset: 0, hasMore: false }
+		});
+		let restore: (value: unknown) => void = () => {};
+		updateExpense
+			.mockResolvedValueOnce({ ...EXPENSE, vehicleId: 'v2', updatedAt: '2024-03-15T12:00:01.000Z' })
+			.mockReturnValueOnce(new Promise(resolve => (restore = resolve)));
+		try {
+			scheduleEdit(EXPENSE, { ...EXPENSE, vehicleId: 'v2' }, {
+				vehicleId: 'v2',
+				category: 'fuel',
+				amount: 45.5
+			} as never);
+			await settle();
+			await mount();
+			await openTab('Expenses');
+			await waitFor(() => expect(captured['table']).toBeDefined());
+			const listedIds = () =>
+				(captured['table']?.['expenses'] as Expense[]).map(expense => expense.id);
+
+			undoEdit('e1');
+			await settle();
+			expect(listedIds()[0]).toBe('e1');
+			getExpensesByVehicle.mockResolvedValue({
+				data: newer,
+				pagination: { totalCount: 21, limit: 20, offset: 0, hasMore: true }
+			});
+			(captured['table']?.['onSortChange'] as (by: string, dir: string) => void)('date', 'desc');
+			await settle();
+			const newerIds = newer.map(expense => expense.id);
+			expect(listedIds()).toEqual(newerIds);
+
+			restore({ ...EXPENSE, updatedAt: '2024-03-15T12:00:02.000Z' });
+			await settle();
+			expect(listedIds()).toEqual(newerIds);
+		} finally {
+			resetPendingEdits();
+		}
+	});
+
+	test('the category chart counts an edited expense once when the summary reloads after the save but the tab still holds the old row', async () => {
+		const breakdown = (fuel: number, maintenance: number) =>
+			({
+				...DATA_SUMMARY,
+				categoryBreakdown: [
+					{ category: 'fuel', amount: fuel, count: 2 },
+					{ category: 'maintenance', amount: maintenance, count: 1 }
+				]
+			}) as unknown as ExpenseSummary;
+		getExpenseSummary
+			.mockResolvedValueOnce(breakdown(300, 1200))
+			.mockResolvedValue(breakdown(254.5, 1245.5));
+		updateExpense.mockResolvedValueOnce({
+			...EXPENSE,
+			category: 'maintenance',
+			updatedAt: '2024-03-15T12:00:01.000Z'
+		});
+		const chart = () =>
+			(captured['categories']?.['data'] as { key: string; value: number }[]).map(row => [
+				row.key,
+				row.value
+			]);
+		try {
+			await mount();
+			await openTab('Expenses');
+			await waitFor(() => expect(captured['categories']).toBeDefined());
+
+			scheduleEdit(EXPENSE, { ...EXPENSE, category: 'maintenance' }, {
+				vehicleId: 'v1',
+				category: 'maintenance',
+				amount: 45.5
+			} as never);
+			await settle();
+			expect(chart()).toEqual([
+				['maintenance', 1245.5],
+				['fuel', 254.5]
+			]);
+
+			getExpensesByVehicle.mockReturnValueOnce(new Promise(() => {}));
+			offlineExpenseQueue.current = [
+				{
+					id: 'offline-q',
+					clientId: 'c-q',
+					vehicleId: 'v1',
+					tags: [],
+					category: 'misc',
+					amount: 50,
+					date: '2026-11-26T12:00:00.000Z',
+					timestamp: 1,
+					synced: false,
+					version: '3.0'
+				}
+			];
+			await settle();
+			offlineExpenseQueue.current = [];
+			await settle();
+
+			expect(getExpenseSummary).toHaveBeenCalledTimes(2);
+			expect(chart()).toEqual([
+				['maintenance', 1245.5],
+				['fuel', 254.5]
+			]);
+		} finally {
+			offlineExpenseQueue.current = [];
+			resetPendingEdits();
+		}
+	});
+
 	test('a retry after a failed first load shows the loading state again, not "no expenses"', async () => {
 		let answer: (value: unknown) => void = () => {};
 		getExpensesByVehicle

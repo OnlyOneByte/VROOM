@@ -74,6 +74,22 @@ export function matchesFilters(expense: Expense, filters: PendingRowFilters): bo
 	);
 }
 
+export interface ListedPage {
+	rows: readonly Expense[];
+	totalCount: number;
+	sortBy: 'date' | 'amount';
+	sortDir: 'asc' | 'desc';
+}
+
+export function fitsFirstPage(row: Expense, page: ListedPage): boolean {
+	const last = page.rows.at(-1);
+	if (!last || page.rows.length >= page.totalCount) return true;
+	const key = (expense: Expense) =>
+		page.sortBy === 'amount' ? expense.amount : Date.parse(expense.date);
+	const order = Math.sign(key(row) - key(last)) || (row.id < last.id ? -1 : 1);
+	return page.sortDir === 'asc' ? order < 0 : order > 0;
+}
+
 export function withPendingInSummary(
 	summary: ExpenseSummary | null,
 	rows: readonly Expense[],

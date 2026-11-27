@@ -46,9 +46,11 @@
 	import ExpenseTagFilter from '#lib/components/expenses/ExpenseTagFilter.svelte';
 	import OfflineExpenseCards from '#lib/components/expenses/OfflineExpenseCards.svelte';
 	import {
+		fitsFirstPage,
 		matchesFilters,
 		withPendingByMonth,
-		withPendingInSummary
+		withPendingInSummary,
+		type ListedPage
 	} from '#lib/utils/sync/pending-rows.ts';
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { forgetRecentlySynced, recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
@@ -79,6 +81,10 @@
 	let summary = $state<ExpenseSummary | null>(null);
 	let summaryRequestedAt = $state<number | undefined>();
 	let listRequestedAt = $state<number | undefined>();
+	let listOrder = $state<Pick<ListedPage, 'sortBy' | 'sortDir'>>({
+		sortBy: 'date',
+		sortDir: 'desc'
+	});
 
 	let currentOffset = $state(0);
 	let pageSize = $state(20);
@@ -142,7 +148,10 @@
 		currentOffset === 0
 			? movedBackRows(
 					listedExpenseIds,
-					row => backInView(row) && matchesFilters(row, pendingFilters),
+					row =>
+						backInView(row) &&
+						matchesFilters(row, pendingFilters) &&
+						fitsFirstPage(row, { rows: expenses, totalCount, ...listOrder }),
 					listRequestedAt
 				)
 			: []
@@ -345,8 +354,16 @@
 	}
 	let pageError = $state<{ message: string; offset: number } | null>(null);
 
-	function applyPage(pageResult: PaginatedResponse<Expense>, offset: number, filtered: boolean) {
+	function applyPage(
+		pageResult: PaginatedResponse<Expense>,
+		params: ReturnType<typeof buildListParams>,
+		requestedAt: number,
+		filtered: boolean
+	) {
+		const { offset } = params;
 		expenses = pageResult.data;
+		listRequestedAt = requestedAt;
+		listOrder = { sortBy: params.sortBy, sortDir: params.sortDir };
 		totalCount = pageResult.pagination.totalCount;
 		totalCountFiltered = filtered;
 		currentOffset = offset;
@@ -369,11 +386,12 @@
 		const isCurrentSummary = nextSummaryRequest();
 		const filtered = filtersActive;
 		const requestedAt = Date.now();
+		const params = buildListParams(offset);
 		isLoadingPage = true;
 		void loadMonthTotals(keepMonthTotals);
 		try {
 			const [pageResult, summaryResult] = await Promise.allSettled([
-				expenseApi.getAllExpenses(buildListParams(offset)),
+				expenseApi.getAllExpenses(params),
 				expenseApi.getExpenseSummary(buildSummaryParams())
 			]);
 			if (throwOnFailure) {
@@ -384,8 +402,7 @@
 			const listReported = isCurrentList();
 			if (listReported) {
 				if (pageResult.status === 'fulfilled') {
-					applyPage(pageResult.value, offset, filtered);
-					listRequestedAt = requestedAt;
+					applyPage(pageResult.value, params, requestedAt, filtered);
 				} else failPage(pageResult.reason, offset);
 			}
 			if (isCurrentSummary()) {
@@ -408,10 +425,12 @@
 	async function fetchPage(offset: number) {
 		const isCurrent = nextListRequest();
 		const filtered = filtersActive;
+		const requestedAt = Date.now();
+		const params = buildListParams(offset);
 		isLoadingPage = true;
 		try {
-			const pageResult = await expenseApi.getAllExpenses(buildListParams(offset));
-			if (isCurrent()) applyPage(pageResult, offset, filtered);
+			const pageResult = await expenseApi.getAllExpenses(params);
+			if (isCurrent()) applyPage(pageResult, params, requestedAt, filtered);
 		} catch (error) {
 			if (isCurrent()) failPage(error, offset);
 		} finally {

@@ -22,6 +22,7 @@ import {
 	shownExpense,
 	movedBackRows,
 	stillInView,
+	summaryEdits,
 	undoEdit
 } from '../pending-edits.svelte.ts';
 
@@ -814,6 +815,19 @@ describe('an Undo of an edit that moved an expense out of the view', () => {
 		expect(movedBackRows(new Set(), onV1, undefined)).toEqual([]);
 	});
 
+	test('a summary requested while the move was on the server trades the moved copy for the restored one', async () => {
+		const moved = { ...saved, vehicleId: 'v2' };
+		const restore = await moveThenUndo();
+		expect(summaryEdits(500)).toEqual({ before: [], after: [] });
+		expect(summaryEdits(2000)).toEqual({ before: [moved], after: [saved] });
+
+		vi.setSystemTime(4000);
+		restore.resolve({ ...saved, updatedAt: '2026-11-20T12:00:02.000Z' });
+		await flush();
+		expect(summaryEdits(2000)).toEqual({ before: [moved], after: [saved] });
+		expect(summaryEdits(5000)).toEqual({ before: [], after: [] });
+	});
+
 	test('does not bring back an edit that never left the view', async () => {
 		vi.mocked(expenseApi.updateExpense).mockResolvedValue(saved);
 		vi.setSystemTime(1000);
@@ -821,5 +835,42 @@ describe('an Undo of an edit that moved an expense out of the view', () => {
 		await flush();
 		undoEdit('e1');
 		expect(movedBackRows(new Set(), onV1, 2000)).toEqual([]);
+	});
+});
+
+describe('which edits a summary still needs applied', () => {
+	beforeEach(() => {
+		vi.resetAllMocks();
+		vi.useFakeTimers({ toFake: ['Date'] });
+	});
+	afterEach(() => {
+		resetPendingEdits();
+		vi.useRealTimers();
+	});
+
+	const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+
+	test('a summary from before the save landed gets the edit, one from after it does not', async () => {
+		const put = deferred();
+		vi.mocked(expenseApi.updateExpense).mockReturnValueOnce(put.promise);
+		vi.setSystemTime(1000);
+		scheduleEdit(saved, changed, payload);
+		expect(summaryEdits(500)).toEqual({ before: [saved], after: [changed] });
+		expect(summaryEdits(1500)).toEqual({ before: [saved], after: [changed] });
+
+		vi.setSystemTime(2000);
+		put.resolve({ ...changed, updatedAt: '2026-11-20T12:00:01.000Z' });
+		await flush();
+		expect(summaryEdits(1500)).toEqual({ before: [saved], after: [changed] });
+		expect(summaryEdits(2000)).toEqual({ before: [], after: [] });
+		expect(summaryEdits(undefined)).toEqual({ before: [], after: [] });
+	});
+
+	test('a failed save leaves every summary as the server has it', async () => {
+		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('down', 500));
+		vi.setSystemTime(1000);
+		scheduleEdit(saved, changed, payload);
+		await flush();
+		expect(summaryEdits(500)).toEqual({ before: [], after: [] });
 	});
 });
