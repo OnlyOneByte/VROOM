@@ -331,7 +331,7 @@ export function computeMpgAndCostPerMile(
   return { mpgValues, costPerMileValues };
 }
 
-export const DEFAULT_GAS_FUEL_TYPE = '87 (Regular)';
+const DEFAULT_GAS_FUEL_TYPE = '87 (Regular)';
 
 export function buildGasPriceHistory(
   rows: FuelExpenseRow[],
