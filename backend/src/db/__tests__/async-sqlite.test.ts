@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { alias } from 'drizzle-orm/sqlite-core';
 import {
   openAsyncDatabase,
   RawTransactionControlError,
@@ -449,6 +450,59 @@ begin`,
     expect(rawOuter).toEqual({ n: 3 });
     expect(await db.values(sql`select count(*) as n from users`)).toEqual([[3]]);
     expect(await db.get(sql`select 1 as n from users where id = 'none'`)).toBeUndefined();
+  });
+
+  test('builder rows map by position when joined tables share column names', async () => {
+    const { db, transaction } = setup();
+    const { vehicles } = schema;
+    const owner = alias(users, 'owner');
+    await db.insert(users).values([user('u1'), user('u2')]);
+    await db.insert(vehicles).values([
+      { id: 'v1', userId: 'u1', make: 'Mazda', model: 'MX-5', year: 2020 },
+      { id: 'v2', userId: 'u2', make: 'Honda', model: 'Fit', year: 2015 },
+    ]);
+    const joined = () =>
+      db
+        .select()
+        .from(vehicles)
+        .innerJoin(users, eq(users.id, vehicles.userId))
+        .where(eq(vehicles.id, 'v1'));
+    const expectJoined = (rows: Awaited<ReturnType<typeof joined>>) => {
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.vehicles.id).toBe('v1');
+      expect(rows[0]?.vehicles.year).toBe(2020);
+      expect(rows[0]?.vehicles.trackFuel).toBe(true);
+      expect(rows[0]?.users.id).toBe('u1');
+      expect(rows[0]?.users.email).toBe('u1@test.com');
+    };
+    expectJoined(await joined());
+    expectJoined(await transaction(async () => joined()));
+    expect(
+      await db
+        .select({ vehicleId: vehicles.id, userId: users.id, id: sql<string>`${users.id}` })
+        .from(vehicles)
+        .innerJoin(users, eq(users.id, vehicles.userId))
+        .orderBy(vehicles.id)
+    ).toEqual([
+      { vehicleId: 'v1', userId: 'u1', id: 'u1' },
+      { vehicleId: 'v2', userId: 'u2', id: 'u2' },
+    ]);
+    expect(
+      await db
+        .select({ a: users.id, b: owner.id })
+        .from(users)
+        .innerJoin(owner, sql`${owner.id} <> ${users.id}`)
+        .where(eq(users.id, 'u1'))
+        .get()
+    ).toEqual({ a: 'u1', b: 'u2' });
+    expect(await db.query.vehicles.findFirst({ where: eq(vehicles.id, 'v2') })).toMatchObject({
+      id: 'v2',
+      userId: 'u2',
+      year: 2015,
+    });
+    expect(
+      await db.all(sql`select v.id, u.id from vehicles v join users u on u.id = v.user_id`)
+    ).toHaveLength(2);
   });
 
   test('a query built inside a transaction and run after it ended is refused', async () => {
