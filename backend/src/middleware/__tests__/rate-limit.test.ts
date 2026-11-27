@@ -13,6 +13,8 @@ interface RateLimitErrorBody {
   error: { code: string; message: string; details?: { retryAfter?: number } };
 }
 
+const freshKey = (name: string) => `${name}-${crypto.randomUUID()}`;
+
 function makeApp(opts: { windowMs: number; limit: number; key: string }) {
   const app = new Hono();
   app.use(
@@ -33,7 +35,7 @@ test('precondition: rate limiting is ACTIVE in the test process (not the E2E opt
 
 describe('rate-limit middleware — window + limit', () => {
   test('requests up to the limit pass; the one over returns 429 with the documented headers', async () => {
-    const app = makeApp({ windowMs: 60_000, limit: 3, key: 'k-limit' });
+    const app = makeApp({ windowMs: 60_000, limit: 3, key: freshKey('k-limit') });
     for (let i = 0; i < 3; i++) {
       const res = await app.request('/ping');
       expect(res.status).toBe(200);
@@ -47,7 +49,7 @@ describe('rate-limit middleware — window + limit', () => {
   });
 
   test('a 429 body carries RATE_LIMIT_EXCEEDED + a retryAfter detail', async () => {
-    const app = makeApp({ windowMs: 60_000, limit: 1, key: 'k-body' });
+    const app = makeApp({ windowMs: 60_000, limit: 1, key: freshKey('k-body') });
     expect((await app.request('/ping')).status).toBe(200);
     const blocked = await app.request('/ping');
     expect(blocked.status).toBe(429);
@@ -58,15 +60,15 @@ describe('rate-limit middleware — window + limit', () => {
   });
 
   test('the key generator isolates callers — one key exhausting does not 429 another', async () => {
-    const a = makeApp({ windowMs: 60_000, limit: 1, key: 'k-userA' });
-    const b = makeApp({ windowMs: 60_000, limit: 1, key: 'k-userB' });
+    const a = makeApp({ windowMs: 60_000, limit: 1, key: freshKey('k-userA') });
+    const b = makeApp({ windowMs: 60_000, limit: 1, key: freshKey('k-userB') });
     expect((await a.request('/ping')).status).toBe(200);
     expect((await a.request('/ping')).status).toBe(429);
     expect((await b.request('/ping')).status).toBe(200);
   });
 
   test('once the window elapses, a fresh window opens and requests pass again', async () => {
-    const app = makeApp({ windowMs: 1000, limit: 1, key: 'k-reset' });
+    const app = makeApp({ windowMs: 1000, limit: 1, key: freshKey('k-reset') });
     try {
       setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
       expect((await app.request('/ping')).status).toBe(200);
@@ -86,18 +88,19 @@ describe('rate-limit middleware — bounded store', () => {
     const previous = limits.maxTrackedKeys;
     limits.maxTrackedKeys = 3;
     try {
+      const keys = ['a', 'b', 'c', 'd', 'e'].map((name) => freshKey(`cap-${name}`));
       let key = '';
       const app = new Hono();
       app.use('*', rateLimiter({ windowMs: 60_000, limit: 1, keyGenerator: () => key }));
       app.get('/ping', (c: Context) => c.json({ ok: true }));
-      for (const next of ['cap-a', 'cap-b', 'cap-c', 'cap-d', 'cap-e']) {
+      for (const next of keys) {
         key = next;
         expect((await app.request('/ping')).status).toBe(200);
       }
       expect(trackedRateLimitKeys()).toBe(limits.maxTrackedKeys);
-      key = 'cap-e';
+      key = keys[4] ?? '';
       expect((await app.request('/ping')).status).toBe(429);
-      key = 'cap-a';
+      key = keys[0] ?? '';
       expect((await app.request('/ping')).status).toBe(200);
     } finally {
       limits.maxTrackedKeys = previous;
@@ -157,13 +160,14 @@ describe('concurrency limiter', () => {
       await next();
     });
     app.post('/import', heavyJobLimiter, (c) => c.json({ ok: true }, 201));
+    const previous = config.disableRateLimit;
     config.disableRateLimit = true;
     try {
       const res = await app.request('/import', { method: 'POST' });
       expect(res.status).toBe(201);
       expect(await res.json()).toEqual({ ok: true });
     } finally {
-      config.disableRateLimit = false;
+      config.disableRateLimit = previous;
     }
   });
 });
