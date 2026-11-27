@@ -684,9 +684,6 @@
 					: 'space-y-6'}
 		>
 			{@render createHeader()}
-			{#if demo && !quickActions}
-				<DemoSaveNote id={null} class="lg:hidden short:hidden" />
-			{/if}
 
 			<form
 				bind:this={formEl}
