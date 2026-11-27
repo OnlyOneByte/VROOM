@@ -29,7 +29,10 @@ export const errorHandler: ErrorHandler = (err, c) => {
   if (isAppError(err) && err.statusCode < 500) {
     logger.warn('Client error', { message: err.message, statusCode: err.statusCode });
   } else {
-    logger.error('Server error', { error: err });
+    logger.error('Server error', {
+      error: err,
+      details: isAppError(err) ? err.details : undefined,
+    });
   }
 
   if (err instanceof ZodError) {

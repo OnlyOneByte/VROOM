@@ -9,6 +9,7 @@ import {
   type TestApp,
 } from '../../test-helpers/http-client';
 import { type Members, seedCar, seedMembers } from '../../test-helpers/members';
+import { logger } from '../../utils/logger';
 import { loadResolver, requestResolver } from '../grants';
 import {
   type AsyncGrantSource,
@@ -50,15 +51,22 @@ describe('a resolver that loads before it checks', () => {
       c.set('user', { id: 'u' } as never);
       await next();
     });
-    app.get('/unloaded', (c) => {
+    app.get('/unloaded', async (c) => {
+      const resolver = createLoadingResolver({ userId: 'u', disabled: false }, ownerSource);
+      await resolver.load([SERVER]);
+      c.set('resolver', resolver);
       const decision = requestResolver(c).can('vehicle.read', CAR);
       return c.json({ allowed: decision.allow });
     });
+    const logged = spyOn(logger, 'error');
     const res = await app.request('/unloaded');
+    const logs = JSON.stringify(logged.mock.calls);
+    logged.mockRestore();
     expect(res.status).toBe(500);
     const body = await res.text();
     expect(body).toContain('ScopeNotLoadedError');
-    expect(body).not.toContain(CAR.kind === 'vehicle' ? CAR.vehicleId : '');
+    expect(body).not.toContain('car-a');
+    expect(logs).toContain('car-a');
   });
 });
 
