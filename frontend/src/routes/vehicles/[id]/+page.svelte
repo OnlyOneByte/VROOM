@@ -128,6 +128,7 @@
 	let totalCount = $state(0);
 	let isLoadingPage = $state(false);
 	let expensesFetched = $state(false);
+	let expensesLoaded = $state(false);
 	let hasLoadedExpensesTab = $state(false);
 	let expensesLoadError = $state<string | null>(null);
 	let expenseSortBy = $state<'date' | 'amount'>('date');
@@ -330,6 +331,7 @@
 		)
 	);
 	let tabExpenses = $derived(currentOffset === 0 ? [...pendingTabRows, ...expenses] : expenses);
+	let tabWaiting = $derived(!expensesLoaded && tabExpenses.length === 0);
 
 	let firstExpense = $derived(
 		summary !== null &&
@@ -598,6 +600,7 @@
 			expenses = result.data;
 			totalCount = result.pagination.totalCount;
 			currentOffset = offset;
+			expensesLoaded = true;
 		} catch (error) {
 			logLoadFailure(error, "Couldn't load expenses");
 			expensesLoadError = userFacingErrorMessage(error);
@@ -1166,10 +1169,15 @@
 							<CardFull.Root>
 								<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
 									<CardFull.Title>
-										All Expenses ({totalCount +
-											pendingTabRows.filter(row => pending.states.get(row.id)?.status !== 'failed')
-												.length -
-											expenses.filter(isDeleteHidden).length})
+										{#if tabWaiting}
+											All Expenses
+										{:else}
+											All Expenses ({totalCount +
+												pendingTabRows.filter(
+													row => pending.states.get(row.id)?.status !== 'failed'
+												).length -
+												expenses.filter(isDeleteHidden).length})
+										{/if}
 									</CardFull.Title>
 									{#if totalCount > 0 && isOwner}
 										<Button
@@ -1191,6 +1199,23 @@
 											message={expensesLoadError}
 											onRetry={() => fetchExpensesPage(currentOffset)}
 										/>
+									{:else if tabWaiting}
+										<div
+											class="divide-y"
+											role="status"
+											aria-label="Loading expenses"
+											data-testid="expenses-tab-loading"
+										>
+											{#each Array(3) as _, i (i)}
+												<div class="flex items-center justify-between gap-3 py-4">
+													<div class="space-y-1">
+														<Skeleton class="h-4 w-32" />
+														<Skeleton class="h-3 w-48" />
+													</div>
+													<Skeleton class="h-5 w-16" />
+												</div>
+											{/each}
+										</div>
 									{:else}
 										<ExpensesTable
 											expenses={tabExpenses}
