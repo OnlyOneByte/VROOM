@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Select from '#lib/components/ui/select/index.ts';
-	import { parseCsvHeaders } from '#lib/utils/import-mapping-helpers.ts';
+	import { splitCsvLine } from '#lib/utils/import-mapping-helpers.ts';
 	import type {
 		ImportDateFormat,
 		DistanceUnit,
@@ -41,11 +41,12 @@
 	const SKIP = "Don't import";
 
 	const examples = $derived(
-		parseCsvHeaders(
+		splitCsvLine(
 			form.csvText
 				.split('\n')
 				.slice(1)
-				.find(line => line.trim()) ?? ''
+				.find(line => line.trim())
+				?.trim() ?? ''
 		)
 	);
 	const missing = $derived(

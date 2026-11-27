@@ -76,6 +76,16 @@ describe('ManualMappingPanel: column mapping', () => {
 		);
 	});
 
+	test('a quoted example with a comma stays in its own column', () => {
+		const form = manualForm();
+		form.csvText = `${HEADERS.join(',')}\n2025-03-14,38.20,28410,9.82,"Camry, blue"\r\n`;
+		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
+
+		const rows = within(screen.getByTestId('column-mapping')).getAllByRole('row').slice(1);
+		expect(rows.at(-1)?.querySelector('td')?.textContent?.trim()).toBe('Camry, blue');
+		expect(rows).toHaveLength(HEADERS.length);
+	});
+
 	test('a column is named by its header and records the field chosen for it', async () => {
 		const form = manualForm();
 		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
