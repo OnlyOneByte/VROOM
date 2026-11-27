@@ -91,7 +91,7 @@ function renderEdit() {
 	});
 }
 
-const rootPathInput = () => screen.getByLabelText('Root Path') as HTMLInputElement;
+const rootPathInput = () => screen.getByLabelText('Photo folder') as HTMLInputElement;
 const displayNameInput = () => screen.getByLabelText('Name') as HTMLInputElement;
 const saveButton = () => screen.getByRole('button', { name: /^(save storage|save changes)$/i });
 
