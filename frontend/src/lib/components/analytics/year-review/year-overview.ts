@@ -16,8 +16,7 @@ export const YEAR_QUERIES = [
 	'running',
 	'fills',
 	'efficiency',
-	'previous',
-	'cars'
+	'previous'
 ] as const;
 export type YearQuery = (typeof YEAR_QUERIES)[number];
 
@@ -42,7 +41,6 @@ export function yearRequests(
 		running: { ...whole, metric: 'costPerDistance', groupBy: 'vehicle', include: 'running' },
 		fills: { ...whole, metric: 'count', groupBy: 'vehicle', categories: ['fuel'], include: 'all' },
 		efficiency: { metric: 'efficiency', interval: 'month', start, end },
-		cars: { ...whole, metric: 'cost', groupBy: 'vehicle', include: 'all' },
 		previous: {
 			metric: 'cost',
 			interval: 'none',
@@ -53,8 +51,12 @@ export function yearRequests(
 	};
 }
 
-export function carsWithSpending(response: AnalyticsQueryResponse | null) {
-	return (response?.series ?? []).filter(s => (s.values[0] ?? 0) > 0).length;
+export function coveredCars(response: AnalyticsQueryResponse | null) {
+	const coverage = response?.coverage;
+	return {
+		count: coverage?.vehicleIds.length ?? 0,
+		otherCurrencies: [...new Set((coverage?.otherCurrency ?? []).map(c => c.currency))]
+	};
 }
 
 export function percentChange(current: number, previous: number | null | undefined) {

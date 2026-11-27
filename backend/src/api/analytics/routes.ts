@@ -221,13 +221,34 @@ const bucketItemsSchema = z
 
 const fromVehicleQuery: ResourceOf = (c) => vehicleOrOwnAccount(c.req.query('vehicleId'), c);
 
-async function queryScope(userId: string, vehicleIds?: string[]): Promise<ReadableVehicle[]> {
+interface QueryCoverage {
+  vehicleIds: string[];
+  otherCurrency: Array<{ vehicleId: string; currency: string }>;
+  unavailable: number;
+}
+
+async function queryScope(
+  userId: string,
+  vehicleIds?: string[]
+): Promise<{ scope: ReadableVehicle[]; coverage: QueryCoverage }> {
   const readable = await readableVehicles(userId, vehicleIds);
   const currencyOf = await repos().preferences.currencies([
     userId,
     ...readable.map((v) => v.ownerId),
   ]);
-  return readable.filter((v) => currencyOf(v.ownerId) === currencyOf(userId));
+  const scope = readable.filter((v) => currencyOf(v.ownerId) === currencyOf(userId));
+  const otherCurrency = readable
+    .filter((v) => currencyOf(v.ownerId) !== currencyOf(userId))
+    .map((v) => ({ vehicleId: v.vehicleId, currency: currencyOf(v.ownerId) }));
+  const asked = new Set(vehicleIds ?? []);
+  return {
+    scope,
+    coverage: {
+      vehicleIds: scope.map((v) => v.vehicleId),
+      otherCurrency,
+      unavailable: asked.size === 0 ? 0 : asked.size - readable.length,
+    },
+  };
 }
 
 routes.use('*', requireAuth);
@@ -239,11 +260,14 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const query = c.req.valid('query');
-    const scope = await queryScope(user.id, query.vehicleIds);
+    const { scope, coverage } = await queryScope(user.id, query.vehicleIds);
     const data = await repos().analyticsQuery.items(user.id, query, scope);
     return c.json({
       success: true,
-      data: bucketItemsToApi(data, await repos().preferences.moneyScale(user.id)),
+      data: {
+        ...bucketItemsToApi(data, await repos().preferences.moneyScale(user.id)),
+        coverage,
+      },
     });
   }
 );
@@ -272,11 +296,14 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const query = c.req.valid('query');
-    const scope = await queryScope(user.id, query.vehicleIds);
+    const { scope, coverage } = await queryScope(user.id, query.vehicleIds);
     const data = await repos().analyticsQuery.query(user.id, query, scope);
     return c.json({
       success: true,
-      data: analyticsQueryToApi(data, await repos().preferences.moneyScale(user.id)),
+      data: {
+        ...analyticsQueryToApi(data, await repos().preferences.moneyScale(user.id)),
+        coverage,
+      },
     });
   }
 );
