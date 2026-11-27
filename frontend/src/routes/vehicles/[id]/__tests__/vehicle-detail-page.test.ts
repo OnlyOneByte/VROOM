@@ -59,6 +59,7 @@ vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => capture('media
 vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => captureWithMarker('insurance'));
 
 const getExpensesByVehicle = vi.fn();
+const updateExpense = vi.fn((..._args: unknown[]) => new Promise(() => {}));
 const getExpenseSummary = vi.fn();
 const downloadExpensesCsv = vi.fn();
 
@@ -80,7 +81,8 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 				? getRecentExpenses(vehicleId, params)
 				: getExpensesByVehicle(vehicleId, params),
 		getExpenseSummary: (...args: unknown[]) => getExpenseSummary(...args),
-		downloadExpensesCsv: (...args: unknown[]) => downloadExpensesCsv(...args)
+		downloadExpensesCsv: (...args: unknown[]) => downloadExpensesCsv(...args),
+		updateExpense: (...args: unknown[]) => updateExpense(...args)
 	}
 }));
 
@@ -108,6 +110,7 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 import Page from '../+page.svelte';
 import { forgetRecentlySynced, rememberSynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
+import { resetPendingEdits, scheduleEdit, undoEdit } from '#lib/utils/pending-edits.svelte.ts';
 
 const VEHICLE = {
 	id: 'v1',
@@ -666,6 +669,63 @@ describe('vehicle detail page tabs', () => {
 		expect(screen.queryByRole('status', { name: 'Loading expenses' })).toBeNull();
 		expect(screen.getByText('All Expenses (0)')).toBeInTheDocument();
 		expect(captured['table']?.['expenses']).toEqual([]);
+	});
+
+	test('an edit that moves an expense to another car takes it off this car, and Undo brings it back', async () => {
+		await mount();
+		await openTab('Expenses');
+		await waitFor(() => expect(captured['table']).toBeDefined());
+		const listedIds = () =>
+			(captured['table']?.['expenses'] as Expense[]).map(expense => expense.id);
+		expect(listedIds()).toEqual(['e1']);
+
+		try {
+			scheduleEdit(EXPENSE, { ...EXPENSE, vehicleId: 'v2' }, {
+				vehicleId: 'v2',
+				category: 'fuel',
+				amount: 45.5
+			} as never);
+			await settle();
+			expect(listedIds()).toEqual([]);
+
+			undoEdit('e1');
+			await settle();
+			expect(listedIds()).toEqual(['e1']);
+		} finally {
+			resetPendingEdits();
+		}
+	});
+
+	test('Undo of a move shows the expense again on its car even when the list loaded after the move', async () => {
+		getExpensesByVehicle.mockResolvedValue({
+			data: [],
+			pagination: { totalCount: 0, limit: 20, offset: 0, hasMore: false }
+		});
+		updateExpense.mockResolvedValueOnce({
+			...EXPENSE,
+			vehicleId: 'v2',
+			updatedAt: '2024-03-15T12:00:01.000Z'
+		});
+		try {
+			scheduleEdit(EXPENSE, { ...EXPENSE, vehicleId: 'v2' }, {
+				vehicleId: 'v2',
+				category: 'fuel',
+				amount: 45.5
+			} as never);
+			await settle();
+			await mount();
+			await openTab('Expenses');
+			await waitFor(() => expect(captured['table']).toBeDefined());
+			const listedIds = () =>
+				(captured['table']?.['expenses'] as Expense[]).map(expense => expense.id);
+			expect(listedIds()).toEqual([]);
+
+			undoEdit('e1');
+			await settle();
+			expect(listedIds()).toEqual(['e1']);
+		} finally {
+			resetPendingEdits();
+		}
 	});
 
 	test('a retry after a failed first load shows the loading state again, not "no expenses"', async () => {

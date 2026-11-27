@@ -242,6 +242,35 @@ describe('usePendingRows', () => {
 		stop();
 	});
 
+	test('a synced row still on screen stops counting once the summary was requested after its sync', () => {
+		offlineExpenseQueue.current = [entry('a'), entry('b', { timestamp: 2000 })];
+		let summaryRequestedAt = $state<number | undefined>();
+		let pending!: ReturnType<typeof usePendingRows>;
+		const stop = $effect.root(() => {
+			pending = usePendingRows({
+				match: () => true,
+				refresh: () => new Promise<void>(() => {}),
+				summaryRequestedAt: () => summaryRequestedAt
+			});
+		});
+		flushSync();
+		const beforeSync = Date.now() - 1;
+
+		offlineExpenseQueue.current = [entry('a'), entry('b', { timestamp: 2000, synced: true })];
+		flushSync();
+		expect(pending.rows.map(row => row.id)).toEqual(['b', 'a']);
+		expect(pending.saving.map(row => row.id)).toEqual(['b', 'a']);
+
+		summaryRequestedAt = beforeSync;
+		expect(pending.saving.map(row => row.id)).toEqual(['b', 'a']);
+
+		summaryRequestedAt = Date.now();
+		expect(pending.rows.map(row => row.id)).toEqual(['b', 'a']);
+		expect(pending.saving.map(row => row.id)).toEqual(['a']);
+		stop();
+		offlineExpenseQueue.current = [];
+	});
+
 	test('a kept row hides as soon as the list shows its server copy, before the refresh settles', () => {
 		offlineExpenseQueue.current = [entry('a')];
 		let listed = $state(new Set<string>());

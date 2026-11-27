@@ -53,7 +53,7 @@
 	import { usePendingRows } from '#lib/utils/sync/pending-rows.svelte.ts';
 	import { forgetRecentlySynced, recentlySynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
-	import { editedRows } from '#lib/utils/pending-edits.svelte.ts';
+	import { editedRows, movedBackRows, stillInView } from '#lib/utils/pending-edits.svelte.ts';
 	import FilterPills from '#lib/components/expenses/FilterPills.svelte';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import * as Popover from '#lib/components/ui/popover/index.ts';
@@ -77,6 +77,8 @@
 	let expenses = $state<Expense[]>([]);
 	let vehicles = $state<Vehicle[]>([]);
 	let summary = $state<ExpenseSummary | null>(null);
+	let summaryRequestedAt = $state<number | undefined>();
+	let listRequestedAt = $state<number | undefined>();
 
 	let currentOffset = $state(0);
 	let pageSize = $state(20);
@@ -112,7 +114,8 @@
 	const pending = usePendingRows({
 		match: expense => !selectedVehicleId || expense.vehicleId === selectedVehicleId,
 		refresh: () => fetchPageAndSummary(currentOffset, { keepMonthTotals: true }),
-		listedIds: () => listedExpenseIds
+		listedIds: () => listedExpenseIds,
+		summaryRequestedAt: () => summaryRequestedAt
 	});
 	let listedExpenseIds = $derived(new Set(expenses.map(expense => expense.id)));
 	let pendingFilters = $derived({
@@ -132,7 +135,23 @@
 		)
 	]);
 	let deletingRows = $derived(expenses.filter(isDeleteHidden));
-	let edited = $derived(editedRows(expenses.filter(expense => !isDeleteHidden(expense))));
+	let viewFilters = $derived({ ...pendingFilters, search: undefined });
+	const inView = (row: Expense) => matchesFilters(row, viewFilters);
+	const backInView = (row: Expense) => !isDeleteHidden(row) && inView(row);
+	let movedBackListed = $derived(
+		currentOffset === 0
+			? movedBackRows(
+					listedExpenseIds,
+					row => backInView(row) && matchesFilters(row, pendingFilters),
+					listRequestedAt
+				)
+			: []
+	);
+	let movedBackCounted = $derived(movedBackRows(listedExpenseIds, backInView, summaryRequestedAt));
+	let edited = $derived.by(() => {
+		const rows = editedRows(expenses.filter(expense => !isDeleteHidden(expense)));
+		return { before: rows.before, after: [...rows.after.filter(inView), ...movedBackCounted] };
+	});
 	let shownSummary = $derived.by(() => {
 		const now = Date.now();
 		const withQueued = withPendingInSummary(summary, pending.saving, now);
@@ -349,6 +368,7 @@
 		const isCurrentList = nextListRequest();
 		const isCurrentSummary = nextSummaryRequest();
 		const filtered = filtersActive;
+		const requestedAt = Date.now();
 		isLoadingPage = true;
 		void loadMonthTotals(keepMonthTotals);
 		try {
@@ -363,12 +383,15 @@
 
 			const listReported = isCurrentList();
 			if (listReported) {
-				if (pageResult.status === 'fulfilled') applyPage(pageResult.value, offset, filtered);
-				else failPage(pageResult.reason, offset);
+				if (pageResult.status === 'fulfilled') {
+					applyPage(pageResult.value, offset, filtered);
+					listRequestedAt = requestedAt;
+				} else failPage(pageResult.reason, offset);
 			}
 			if (isCurrentSummary()) {
 				if (summaryResult.status === 'fulfilled') {
 					summary = summaryResult.value;
+					summaryRequestedAt = requestedAt;
 				} else if (!listReported || pageResult.status === 'fulfilled') {
 					failSummary(summaryResult.reason);
 				}
@@ -555,7 +578,11 @@
 		return withPendingByMonth(withoutRemoved, edited.after);
 	});
 	let displayExpenses = $derived<ExpenseWithVehicle[]>(
-		[...pendingListRows, ...expenses].map(expense => ({
+		[
+			...pendingListRows,
+			...movedBackListed,
+			...expenses.filter(expense => stillInView(expense, inView))
+		].map(expense => ({
 			...expense,
 			vehicle: vehicleById.get(expense.vehicleId)
 		}))

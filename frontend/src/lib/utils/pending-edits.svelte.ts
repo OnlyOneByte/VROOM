@@ -25,6 +25,9 @@ interface PendingEdit {
 	undo?: boolean;
 	undoneAt?: string;
 	undoSeq?: number;
+	undid?: Expense;
+	landedAt?: number;
+	undidLandedAt?: number;
 	expected?: string | null;
 	currentUpdatedAt?: string | null;
 	retried?: boolean;
@@ -41,6 +44,7 @@ const edits = new SvelteMap<string, PendingEdit>();
 const inFlight = new SvelteMap<string, Promise<void>>();
 const versions = new SvelteMap<string, string>();
 const latest = new SvelteMap<string, Expense>();
+const ownStamps = new SvelteMap<string, readonly string[]>();
 const timedOut = new SvelteMap<string, EditPayload>();
 let nextSeq = 0;
 
@@ -85,11 +89,17 @@ function reportConflict(id: string, seq: number, updatedAt: string | null): void
 function landed(id: string, seq: number, saved: Expense | undefined): void {
 	const stamp = saved?.updatedAt;
 	noteVersion(id, stamp);
+	if (stamp) ownStamps.set(id, [...(ownStamps.get(id) ?? []), stamp]);
 	timedOut.delete(id);
 	const entry = edits.get(id);
 	if (!entry) return;
 	if (entry.seq === seq) {
-		edits.set(id, { ...entry, status: 'saved', ...(!entry.undo && stamp && { savedAt: stamp }) });
+		edits.set(id, {
+			...entry,
+			status: 'saved',
+			landedAt: Date.now(),
+			...(!entry.undo && stamp && { savedAt: stamp })
+		});
 		if (entry.retried && entry.undo) {
 			appStore.addNotification({
 				type: 'success',
@@ -105,8 +115,12 @@ function landed(id: string, seq: number, saved: Expense | undefined): void {
 				action: { label: 'Undo', onClick: () => undoEdit(id) }
 			});
 		}
-	} else if (entry.undo && entry.undoSeq === seq && !entry.undoneAt && stamp) {
-		edits.set(id, { ...entry, undoneAt: stamp });
+	} else if (entry.undo && entry.undoSeq === seq) {
+		edits.set(id, {
+			...entry,
+			undidLandedAt: Date.now(),
+			...(!entry.undoneAt && stamp && { undoneAt: stamp })
+		});
 	}
 }
 
@@ -251,6 +265,8 @@ export function undoEdit(id: string): void {
 		seq: ++nextSeq,
 		undo: true,
 		undoSeq: entry.seq,
+		undid: entry.after,
+		...(entry.landedAt !== undefined && { undidLandedAt: entry.landedAt }),
 		...(entry.savedAt && { undoneAt: entry.savedAt })
 	});
 	send(id);
@@ -288,6 +304,7 @@ export async function reloadLatest(id: string): Promise<void> {
 		appStore.dismissToast(toastId(id));
 		edits.delete(id);
 		timedOut.delete(id);
+		ownStamps.delete(id);
 		latest.set(id, fresh);
 		noteVersion(id, fresh.updatedAt);
 	} catch (error) {
@@ -305,9 +322,16 @@ function withLatest<T extends Expense>(expense: T): T {
 	return { ...expense, ...fresh };
 }
 
+function olderOwnSave(entry: PendingEdit, expense: Expense): boolean {
+	const stamps = ownStamps.get(expense.id);
+	if (!expense.updatedAt || !stamps?.includes(expense.updatedAt)) return false;
+	return entry.status !== 'saved' || expense.updatedAt !== stamps.at(-1);
+}
+
 function covers(entry: PendingEdit, expense: Expense): boolean {
 	if (expense.updatedAt === entry.before.updatedAt) return true;
 	if (entry.currentUpdatedAt && expense.updatedAt === entry.currentUpdatedAt) return true;
+	if (olderOwnSave(entry, expense)) return true;
 	return entry.undo === true && expense.updatedAt === entry.undoneAt;
 }
 
@@ -321,6 +345,35 @@ export function shownExpense<T extends Expense>(listed: T): T {
 	const expense = withLatest(listed);
 	const entry = overlay(expense);
 	return entry ? { ...expense, ...entry.after } : expense;
+}
+
+function loadedWhileMoved(entry: PendingEdit, loadedAt: number | undefined): boolean {
+	if (loadedAt === undefined || entry.undidLandedAt === undefined) return false;
+	if (loadedAt < entry.undidLandedAt) return false;
+	return entry.status !== 'saved' || entry.landedAt === undefined || loadedAt < entry.landedAt;
+}
+
+export function movedBackRows(
+	listedIds: ReadonlySet<string>,
+	inView: (row: Expense) => boolean,
+	loadedAt: number | undefined
+): Expense[] {
+	return [...edits.values()]
+		.filter(
+			entry =>
+				entry.undo &&
+				entry.undid &&
+				entry.status !== 'failed' &&
+				loadedWhileMoved(entry, loadedAt) &&
+				!listedIds.has(entry.before.id) &&
+				!inView(entry.undid) &&
+				inView(entry.before)
+		)
+		.map(({ before }) => before);
+}
+
+export function stillInView<T extends Expense>(listed: T, inView: (shown: T) => boolean): boolean {
+	return !overlay(withLatest(listed)) || inView(shownExpense(listed));
 }
 
 export function editedRows(expenses: readonly Expense[]): { before: Expense[]; after: Expense[] } {
@@ -361,5 +414,6 @@ export function resetPendingEdits(): void {
 	inFlight.clear();
 	versions.clear();
 	latest.clear();
+	ownStamps.clear();
 	timedOut.clear();
 }

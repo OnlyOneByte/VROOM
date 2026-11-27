@@ -19,7 +19,10 @@ import {
 	resetPendingEdits,
 	retryEdit,
 	scheduleEdit,
-	shownExpense
+	shownExpense,
+	movedBackRows,
+	stillInView,
+	undoEdit
 } from '../pending-edits.svelte.ts';
 
 const saved = {
@@ -108,6 +111,47 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		second.resolve(again);
 		await vi.waitFor(() => expect(shownExpense(saved)).toMatchObject({ amount: 70 }));
 		expect(notices().filter(n => n['type'] === 'error')).toEqual([]);
+	});
+
+	describe('a reload between two quick saves', () => {
+		const again = { ...changed, amount: 70 };
+		const againPayload = { vehicleId: 'v1', category: 'fuel', amount: 70 } as never;
+		const firstLanded = { ...changed, updatedAt: '2026-11-20T12:00:01.000Z' };
+
+		async function reloadAfterFirstSave() {
+			const second = deferred();
+			vi.mocked(expenseApi.updateExpense)
+				.mockResolvedValueOnce(firstLanded)
+				.mockReturnValueOnce(second.promise);
+			scheduleEdit(saved, changed, payload);
+			scheduleEdit(saved, again, againPayload);
+			await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+			return second;
+		}
+
+		test('the reloaded row shows the second edit while its save is pending, then the saved copy', async () => {
+			const second = await reloadAfterFirstSave();
+
+			expect(shownExpense(firstLanded)).toMatchObject({ amount: 70 });
+			expect(editFailureStates([firstLanded])).toEqual([]);
+
+			second.resolve({ ...again, updatedAt: '2026-11-20T12:00:02.000Z' });
+			await flush();
+			expect(shownExpense(firstLanded)).toMatchObject({ amount: 70 });
+		});
+
+		test('if the second save fails, the reloaded row shows Changes not saved with Retry', async () => {
+			const second = await reloadAfterFirstSave();
+
+			second.reject(new ApiError('down', 500));
+			await vi.waitFor(() =>
+				expect(editFailureStates([firstLanded])).toEqual([
+					['e1', expect.objectContaining({ status: 'failed', kind: 'edit' })]
+				])
+			);
+			expect(shownExpense(firstLanded)).toBe(firstLanded);
+			expect(notices().at(-1)?.['action']).toMatchObject({ label: 'Retry' });
+		});
 	});
 
 	test('a failure note is dropped once the list holds a newer server copy', async () => {
@@ -691,5 +735,91 @@ describe('an edit refused because the expense changed elsewhere', () => {
 			...signal,
 			expectedUpdatedAt: elsewhere
 		});
+	});
+});
+
+describe('an edit that moves an expense out of the view', () => {
+	beforeEach(() => vi.resetAllMocks());
+	afterEach(() => resetPendingEdits());
+
+	const onCar = (vehicleId: string) => (row: Expense) => row.vehicleId === vehicleId;
+
+	test('a vehicle change takes the row off the old car, and Undo brings it back', async () => {
+		vi.mocked(expenseApi.updateExpense).mockReturnValue(new Promise(() => {}));
+		expect(stillInView(saved, onCar('v1'))).toBe(true);
+
+		scheduleEdit(saved, { ...saved, vehicleId: 'v2' }, payload);
+		expect(stillInView(saved, onCar('v1'))).toBe(false);
+		expect(stillInView(saved, onCar('v2'))).toBe(true);
+
+		undoEdit('e1');
+		expect(stillInView(saved, onCar('v1'))).toBe(true);
+	});
+
+	test('a category change leaves a list filtered to the old category', () => {
+		vi.mocked(expenseApi.updateExpense).mockReturnValue(new Promise(() => {}));
+		const fuelOnly = (row: Expense) => row.category === 'fuel';
+
+		scheduleEdit(saved, { ...saved, category: 'maintenance' }, payload);
+		expect(stillInView(saved, fuelOnly)).toBe(false);
+	});
+
+	test('a row with no pending edit is never taken out, whatever the view', () => {
+		expect(stillInView(saved, () => false)).toBe(true);
+	});
+});
+
+describe('an Undo of an edit that moved an expense out of the view', () => {
+	beforeEach(() => {
+		vi.resetAllMocks();
+		vi.useFakeTimers({ toFake: ['Date'] });
+	});
+	afterEach(() => {
+		resetPendingEdits();
+		vi.useRealTimers();
+	});
+
+	const onV1 = (row: Expense) => row.vehicleId === 'v1';
+	const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+
+	async function moveThenUndo() {
+		const restore = deferred();
+		vi.mocked(expenseApi.updateExpense)
+			.mockResolvedValueOnce({ ...saved, vehicleId: 'v2', updatedAt: '2026-11-20T12:00:01.000Z' })
+			.mockReturnValueOnce(restore.promise);
+		vi.setSystemTime(1000);
+		scheduleEdit(saved, { ...saved, vehicleId: 'v2' }, payload);
+		await flush();
+		vi.setSystemTime(3000);
+		undoEdit('e1');
+		await flush();
+		return restore;
+	}
+
+	test('brings the row back only to a list loaded while the move was on the server', async () => {
+		const restore = await moveThenUndo();
+		expect(movedBackRows(new Set(), onV1, 2000)).toEqual([saved]);
+		expect(movedBackRows(new Set(), onV1, 500)).toEqual([]);
+		expect(movedBackRows(new Set(['e1']), onV1, 2000)).toEqual([]);
+
+		vi.setSystemTime(4000);
+		restore.resolve({ ...saved, updatedAt: '2026-11-20T12:00:02.000Z' });
+		await flush();
+		expect(movedBackRows(new Set(), onV1, 2000)).toEqual([saved]);
+		expect(movedBackRows(new Set(), onV1, 5000)).toEqual([]);
+	});
+
+	test('a list or summary with no load time never gets the row', async () => {
+		await moveThenUndo();
+		expect(movedBackRows(new Set(), onV1, undefined)).toEqual([]);
+	});
+
+	test('does not bring back an edit that never left the view', async () => {
+		vi.mocked(expenseApi.updateExpense).mockResolvedValue(saved);
+		vi.setSystemTime(1000);
+		scheduleEdit(saved, { ...saved, amount: 99 }, payload);
+		await flush();
+		undoEdit('e1');
+		expect(movedBackRows(new Set(), onV1, 2000)).toEqual([]);
 	});
 });
