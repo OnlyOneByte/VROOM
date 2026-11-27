@@ -53,12 +53,32 @@ class VisibleIntersectionObserver {
 	}
 }
 
+const MONTHS = [0, 1, 2, 3].map(m => new Date(Date.UTC(2026, m, 1)));
+const MONTH_NAMES = ['Jan 2026', 'Feb 2026', 'Mar 2026', 'Apr 2026'];
+
+function narrowContext(step: number) {
+	return {
+		xScale: (at: unknown) => MONTHS.findIndex(m => m === at) * step,
+		padding: { top: 0, right: 0, bottom: 0, left: 10 }
+	} as unknown as ChartState<Record<string, unknown>>;
+}
+
+function crowded(): ChartAnnotations {
+	return {
+		...ANNOTATIONS,
+		density: [],
+		formatAt: at => MONTH_NAMES[MONTHS.findIndex(m => m === at)] ?? '',
+		markers: MONTHS.map((at, i) => ({ at, label: `Service ${i + 1}` }))
+	};
+}
+
 async function settle() {
 	for (let i = 0; i < 10; i++) await new Promise(r => setTimeout(r, 0));
 }
 
 afterEach(() => {
 	cleanup();
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
 
@@ -107,38 +127,68 @@ describe('AnnotationLane', () => {
 		expect(Number.parseFloat(tip?.style.left ?? 'NaN')).toBeGreaterThanOrEqual(0);
 	});
 
-	test('markers closer than 24px share one marker that shows their count', async () => {
-		const months = [0, 1, 2, 3].map(m => new Date(Date.UTC(2026, m, 1)));
-		const narrow = {
-			xScale: (at: unknown) => months.findIndex(m => m === at) * 15,
-			padding: { top: 0, right: 0, bottom: 0, left: 10 }
-		} as unknown as ChartState<Record<string, unknown>>;
-		const annotations: ChartAnnotations = {
-			...ANNOTATIONS,
-			density: [],
-			formatAt: () => 'Month',
-			markers: months.map((at, i) => ({ at, label: `Service ${i + 1}` }))
-		};
-		const { container } = render(AnnotationLane, { props: { annotations, context: narrow } });
+	test('months closer than 24px to the drawn marker share one marker', async () => {
+		const { container } = render(AnnotationLane, {
+			props: { annotations: crowded(), context: narrowContext(15) }
+		});
 		const shown = [...container.querySelectorAll<HTMLElement>('[data-annotation-marker]')];
-		expect(shown.map(m => [m.style.left, m.textContent?.trim()])).toEqual([
-			['17.5px', '2'],
-			['47.5px', '2']
+		expect(shown.map(m => [m.style.left, m.textContent?.trim() ?? ''])).toEqual([
+			['25px', '3'],
+			['55px', '']
 		]);
 
 		const lane = screen.getByRole('group', { name: /^Services: 4 markers\./ });
-		await fireEvent.keyDown(lane, { key: 'End' });
-		expect(screen.getByText('Month: Service 4. 4 of 4.')).toBeInTheDocument();
-		expect(shown[1]?.className).toContain('ring-2');
-		expect(shown[0]?.className).not.toContain('ring-2');
+		await fireEvent.keyDown(lane, { key: 'ArrowRight' });
+		await fireEvent.keyDown(lane, { key: 'ArrowRight' });
+		expect(screen.getByText('Feb 2026: Service 2. 2 of 4.')).toBeInTheDocument();
+		expect(shown[0]?.className).toContain('ring-2');
+		expect(shown[1]?.className).not.toContain('ring-2');
 	});
 
-	test('markers far enough apart each keep their own marker', () => {
+	test('the count is the number of services, not of months', () => {
+		const annotations = crowded();
+		annotations.markers = annotations.markers?.map((m, i) =>
+			i === 0 ? { ...m, label: '3 services', rows: ['A', 'B', 'C'] } : m
+		);
 		const { container } = render(AnnotationLane, {
-			props: { annotations: ANNOTATIONS, context: CONTEXT }
+			props: { annotations, context: narrowContext(15) }
 		});
-		const shown = container.querySelectorAll('[data-annotation-group]');
-		expect(shown).toHaveLength(0);
+		expect(container.querySelector('[data-annotation-group]')?.textContent?.trim()).toBe('5');
+	});
+
+	test('tapping a group lists every month in it', async () => {
+		const { container } = render(AnnotationLane, {
+			props: { annotations: crowded(), context: narrowContext(15) }
+		});
+		const group = container.querySelector<HTMLElement>('[data-annotation-group]');
+		await fireEvent.click(group as HTMLElement);
+		const rows = [...(container.querySelector('[data-annotation-group-tip]')?.children ?? [])];
+		expect(rows.map(r => r.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+			'Jan 2026: Service 1',
+			'Feb 2026: Service 2',
+			'Mar 2026: Service 3'
+		]);
+	});
+
+	test('a group near the right edge stays inside the lane', async () => {
+		vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(30);
+		vi.stubGlobal(
+			'ResizeObserver',
+			class {
+				constructor(private readonly cb: (entries: unknown[], observer: unknown) => void) {}
+				observe(target: Element) {
+					queueMicrotask(() => this.cb([{ target, contentRect: { width: 30 } }], this));
+				}
+				unobserve() {}
+				disconnect() {}
+			}
+		);
+		const { container } = render(AnnotationLane, {
+			props: { annotations: crowded(), context: narrowContext(15) }
+		});
+		await settle();
+		const group = container.querySelector<HTMLElement>('[data-annotation-group]');
+		expect(Number.parseFloat(group?.style.left ?? 'NaN')).toBe(30 - 12);
 	});
 
 	test('a lane with no markers is not a tab stop', () => {

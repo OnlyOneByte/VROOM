@@ -27,24 +27,33 @@
 	}
 
 	const MARKER_SPACING = 24;
+	const GROUP_HALF_WIDTH = 12;
 
 	let groups = $derived.by(() => {
 		const placed = markers
 			.map((marker, index) => ({ index, x: left(marker.at) }))
 			.filter((p): p is { index: number; x: number } => p.x !== null)
 			.sort((a, b) => a.x - b.x);
-		const out: Array<{ start: number; x: number; members: number[] }> = [];
+		const out: Array<{ start: number; x: number; members: number[]; services: number }> = [];
 		for (const p of placed) {
+			const services = markers[p.index]?.rows?.length ?? 1;
 			const last = out.at(-1);
-			if (last && p.x - last.start < MARKER_SPACING) {
+			if (last && p.x - last.x < MARKER_SPACING) {
 				last.members.push(p.index);
+				last.services += services;
 				last.x = (last.start + p.x) / 2;
 			} else {
-				out.push({ start: p.x, x: p.x, members: [p.index] });
+				out.push({ start: p.x, x: p.x, members: [p.index], services });
 			}
 		}
-		return out;
+		const edge = laneWidth > 0 ? laneWidth - GROUP_HALF_WIDTH : Infinity;
+		return out.map(g =>
+			g.members.length > 1 ? { ...g, x: Math.min(Math.max(g.x, GROUP_HALF_WIDTH), edge) } : g
+		);
 	});
+	let activeGroup = $derived(
+		active === null ? undefined : groups.find(g => g.members.includes(active as number))
+	);
 
 	function describe(index: number): string {
 		const marker = markers[index];
@@ -116,20 +125,39 @@
 			></span>
 		{:else}
 			<span
-				class="border-foreground bg-background absolute -top-0.5 h-5 min-w-5 -translate-x-1/2 rounded-full border-2 px-1 text-center text-xs leading-4 font-semibold tabular-nums {isActive
+				class="border-foreground bg-background absolute top-0 h-4 min-w-4 -translate-x-1/2 rounded-full border-2 px-0.5 text-center text-xs leading-3 font-semibold tabular-nums {isActive
 					? 'ring-ring/60 ring-2'
 					: ''}"
 				style="left: {group.x}px"
 				onmouseenter={() => (active = group.members[0] ?? null)}
+				onclick={() => (active = group.members[0] ?? null)}
 				aria-hidden="true"
 				data-annotation-marker
 				data-annotation-group={group.members.length}
 			>
-				{group.members.length}
+				{group.services}
 			</span>
 		{/if}
 	{/each}
-	{#if shown}
+	{#if activeGroup && activeGroup.members.length > 1}
+		<div
+			class="bg-popover text-popover-foreground pointer-events-none absolute top-6 z-10 w-max max-w-56 rounded-md border px-2 py-1 text-xs shadow-md"
+			style="left: {tipLeft(activeGroup.x)}px"
+			bind:clientWidth={tipWidth}
+			aria-hidden="true"
+			data-annotation-group-tip
+		>
+			{#each activeGroup.members as index (index)}
+				{@const marker = markers[index]}
+				{#if marker}
+					<div class={index === active ? 'font-medium' : ''}>
+						<span class="text-muted-foreground">{annotations.formatAt(marker.at)}:</span>
+						{marker.label}
+					</div>
+				{/if}
+			{/each}
+		</div>
+	{:else if shown}
 		{@const x = left(shown.at)}
 		{#if x !== null}
 			<div
