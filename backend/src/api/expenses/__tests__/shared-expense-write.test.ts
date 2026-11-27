@@ -41,10 +41,12 @@ async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   return vehicleId;
 }
 
-function storedRow(expenseId: string): { user_id: string; created_by: string | null } {
-  return ctx.sqlite
-    .query('SELECT user_id, created_by FROM expenses WHERE id = ?')
-    .get(expenseId) as { user_id: string; created_by: string | null };
+async function storedRow(
+  expenseId: string
+): Promise<{ user_id: string; created_by: string | null }> {
+  return (await ctx.sql.get('SELECT user_id, created_by FROM expenses WHERE id = ?', [
+    expenseId,
+  ])) as { user_id: string; created_by: string | null };
 }
 
 describe('shared expense writes stamp the owner and createdBy', () => {
@@ -61,7 +63,7 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const row = storedRow(body.data.id);
+    const row = await storedRow(body.data.id);
     expect(row.user_id).toBe(ctx.user.id);
     expect(row.created_by).toBe(bId);
 
@@ -82,7 +84,7 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const row = storedRow(body.data.id);
+    const row = await storedRow(body.data.id);
     expect(row.user_id).toBe(ctx.user.id);
     expect(row.created_by).toBeNull();
   });
@@ -98,7 +100,7 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     } as Record<string, unknown>);
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
-    const row = storedRow(body.data.id);
+    const row = await storedRow(body.data.id);
     expect(row.user_id).toBe(ctx.user.id);
     expect(row.created_by).toBeNull();
   });
@@ -114,7 +116,7 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     } as Record<string, unknown>);
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
-    const row = storedRow(body.data.id);
+    const row = await storedRow(body.data.id);
     expect(row.user_id).toBe(ctx.user.id);
     expect(row.created_by).toBe(bId);
   });
@@ -133,11 +135,11 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     const putBody = await json<DataEnvelope<{ expenseAmount: number }>>(put);
     expect(put.status, JSON.stringify(putBody)).toBe(200);
     expect(putBody.data.expenseAmount).toBe(99);
-    expect(storedRow(id).user_id).toBe(ctx.user.id);
+    expect((await storedRow(id)).user_id).toBe(ctx.user.id);
 
     const ownersRow = await asB('DELETE', `/api/v1/expenses/${id}`);
     expect(ownersRow.status, "editor cannot delete the owner's expense").toBe(403);
-    expect(ctx.sqlite.query('SELECT id FROM expenses WHERE id = ?').get(id)).not.toBeNull();
+    expect(await ctx.sql.get('SELECT id FROM expenses WHERE id = ?', [id])).not.toBeNull();
 
     const mine = await asB('POST', '/api/v1/expenses', {
       vehicleId,
@@ -148,7 +150,7 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     const mineId = (await json<DataEnvelope<{ id: string }>>(mine)).data.id;
     const del = await asB('DELETE', `/api/v1/expenses/${mineId}`);
     expect(del.status, 'editor can delete an expense they added').toBe(200);
-    expect(ctx.sqlite.query('SELECT id FROM expenses WHERE id = ?').get(mineId)).toBeNull();
+    expect(await ctx.sql.get('SELECT id FROM expenses WHERE id = ?', [mineId])).toBeNull();
   });
 
   test('a VIEWER cannot create/update/delete on the shared vehicle it can see (403)', async () => {
@@ -173,10 +175,10 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     const del = await asB('DELETE', `/api/v1/expenses/${id}`);
     expect(del.status, 'viewer delete denied').toBe(403);
 
-    expect((storedRow(id) as { user_id: string }).user_id).toBe(ctx.user.id);
-    const stillAmount = ctx.sqlite
-      .query('SELECT expense_amount FROM expenses WHERE id = ?')
-      .get(id) as { expense_amount: number };
+    expect(((await storedRow(id)) as { user_id: string }).user_id).toBe(ctx.user.id);
+    const stillAmount = (await ctx.sql.get('SELECT expense_amount FROM expenses WHERE id = ?', [
+      id,
+    ])) as { expense_amount: number };
     expect(stillAmount.expense_amount).toBe(2000);
   });
 
@@ -198,11 +200,11 @@ describe('shared expense writes stamp the owner and createdBy', () => {
     const move = await asB('PUT', `/api/v1/expenses/${id}`, { vehicleId: bVehicle });
     expect(move.status, 'cross-owner reassignment rejected').toBeGreaterThanOrEqual(400);
     expect(move.status).toBeLessThan(500);
-    const row = storedRow(id);
+    const row = await storedRow(id);
     expect(row.user_id).toBe(ctx.user.id);
     expect(
       (
-        ctx.sqlite.query('SELECT vehicle_id FROM expenses WHERE id = ?').get(id) as {
+        (await ctx.sql.get('SELECT vehicle_id FROM expenses WHERE id = ?', [id])) as {
           vehicle_id: string;
         }
       ).vehicle_id
@@ -238,9 +240,9 @@ describe('a create replay is scoped to the request vehicle', () => {
     expect(text).not.toContain(savedBody.data.id);
     expect(text).not.toContain(privateId);
     expect(text).not.toContain('owner-only note');
-    const count = ctx.sqlite
-      .query("SELECT COUNT(*) AS n FROM expenses WHERE client_id = 'scope-key-1'")
-      .get() as { n: number };
+    const count = (await ctx.sql.get(
+      "SELECT COUNT(*) AS n FROM expenses WHERE client_id = 'scope-key-1'"
+    )) as { n: number };
     expect(count.n).toBe(1);
   });
 

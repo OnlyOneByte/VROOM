@@ -86,7 +86,7 @@ describe('the odometer reading must fit between the entries around its date', ()
   test('only the nearest earlier day is compared, so an old bad reading does not block new fill-ups', async () => {
     const old = await created('2020-01-01', 1);
     await created('2021-01-01', 5_000);
-    ctx.sqlite.query('UPDATE expenses SET mileage = 999999 WHERE id = ?').run(old);
+    await ctx.sql.run('UPDATE expenses SET mileage = 999999 WHERE id = ?', [old]);
 
     await created('2024-03-10', 10_400);
   });
@@ -159,7 +159,7 @@ describe('the odometer reading must fit between the entries around its date', ()
   test('an update that leaves the reading, date and vehicle alone is not re-checked', async () => {
     await created('2024-03-01', 10_000);
     const id = await created('2024-03-10', 10_400);
-    ctx.sqlite.query('UPDATE expenses SET mileage = 9000 WHERE id = ?').run(id);
+    await ctx.sql.run('UPDATE expenses SET mileage = 9000 WHERE id = ?', [id]);
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { description: 'Shell' });
     expect(res.status).toBe(200);
@@ -170,7 +170,7 @@ describe('the odometer reading must fit between the entries around its date', ()
     const first = await fillUp('2024-03-10', 10_400, { clientId: 'client-1' });
     const firstBody = await json<DataEnvelope<{ id: string }>>(first);
     expect(first.status).toBe(201);
-    ctx.sqlite.query('UPDATE expenses SET mileage = 11000 WHERE id = ?').run(earlier);
+    await ctx.sql.run('UPDATE expenses SET mileage = 11000 WHERE id = ?', [earlier]);
 
     const replay = await fillUp('2024-03-10', 10_400, { clientId: 'client-1' });
     const replayBody = await json<DataEnvelope<{ id: string }>>(replay);
@@ -217,18 +217,16 @@ describe('the odometer reading must fit between the entries around its date', ()
     const editDescription = (description: string) =>
       ctx.authed('PUT', `/api/v1/expenses/${id}`, { description, timeZone: 'Pacific/Auckland' });
 
-    ctx.sqlite
-      .query(
-        "UPDATE expenses SET source_type = 'insurance_term', source_id = 'term-1' WHERE id = ?"
-      )
-      .run(id);
+    await ctx.sql.run(
+      "UPDATE expenses SET source_type = 'insurance_term', source_id = 'term-1' WHERE id = ?",
+      [id]
+    );
     expect((await editDescription('Premium')).status).toBe(200);
 
-    ctx.sqlite
-      .query(
-        "UPDATE expenses SET source_type = NULL, source_id = NULL, group_id = 'g-1' WHERE id = ?"
-      )
-      .run(id);
+    await ctx.sql.run(
+      "UPDATE expenses SET source_type = NULL, source_id = NULL, group_id = 'g-1' WHERE id = ?",
+      [id]
+    );
     expect((await editDescription('Shared')).status).toBe(200);
   });
 
@@ -379,14 +377,15 @@ describe('manual odometer readings share the order check with expenses', () => {
   test('an edit that leaves the value and date alone is not re-checked', async () => {
     const id = await manualCreated('2024-03-10', 10_400);
     await created('2024-03-01', 10_000);
-    ctx.sqlite.query('UPDATE odometer_entries SET odometer = 9000 WHERE id = ?').run(id);
+    await ctx.sql.run('UPDATE odometer_entries SET odometer = 9000 WHERE id = ?', [id]);
 
     const res = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { note: 'checked' });
     expect(res.status).toBe(200);
 
-    ctx.sqlite
-      .query('UPDATE odometer_entries SET recorded_at = ? WHERE id = ?')
-      .run(Math.floor(Date.parse('2024-03-10T03:00:00.000Z') / 1000), id);
+    await ctx.sql.run('UPDATE odometer_entries SET recorded_at = ? WHERE id = ?', [
+      Math.floor(Date.parse('2024-03-10T03:00:00.000Z') / 1000),
+      id,
+    ]);
     const resent = await ctx.authed('PUT', `/api/v1/odometer/${id}`, {
       odometer: 9_000,
       recordedAt: '2024-03-10',

@@ -98,7 +98,10 @@ describe('POST /import — foreign-tracker mapping path', () => {
 
   test('a stored nickname with surrounding whitespace matches for both units and rows', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    ctx.sqlite.run('UPDATE vehicles SET nickname = ? WHERE id = ?', ['  Daily Driver ', vehicleId]);
+    await ctx.sql.run('UPDATE vehicles SET nickname = ? WHERE id = ?', [
+      '  Daily Driver ',
+      vehicleId,
+    ]);
     const res = await ctx.authed('POST', '/api/v1/expenses/import', {
       csv: FLAT_TRACKER_CSV,
       mapping: FLAT_TRACKER_MAPPING,

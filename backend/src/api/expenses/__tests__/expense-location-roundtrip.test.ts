@@ -20,8 +20,8 @@ interface ExpenseDb {
   location: string | null;
 }
 
-function locationOf(id: string): string | null {
-  return (ctx.sqlite.query('SELECT location FROM expenses WHERE id = ?').get(id) as ExpenseDb)
+async function locationOf(id: string): Promise<string | null> {
+  return ((await ctx.sql.get('SELECT location FROM expenses WHERE id = ?', [id])) as ExpenseDb)
     .location;
 }
 
@@ -47,7 +47,7 @@ describe('expense location create and update round-trip', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const { status, id, text } = await createExpense(vehicleId, { location: 'Shell, Main St' });
     expect(status, text).toBe(201);
-    expect(locationOf(id as string)).toBe('Shell, Main St');
+    expect(await locationOf(id as string)).toBe('Shell, Main St');
 
     const res = await ctx.authed('GET', `/api/v1/expenses/${id}`);
     expect(res.status).toBe(200);
@@ -59,17 +59,20 @@ describe('expense location create and update round-trip', () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Misc', model: 'Co', year: 2024 });
     const { status, id, text } = await createExpense(vehicleId, {});
     expect(status, text).toBe(201);
-    expect(locationOf(id as string)).toBeNull();
+    expect(await locationOf(id as string)).toBeNull();
   });
 
   test('PUT location:null clears a previously-saved location (clear-on-edit)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const { id } = await createExpense(vehicleId, { location: 'Downtown garage' });
-    expect(locationOf(id as string)).toBe('Downtown garage');
+    expect(await locationOf(id as string)).toBe('Downtown garage');
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { location: null });
     expect(res.status, await res.text()).toBe(200);
-    expect(locationOf(id as string), 'location should be NULL, not the stale value').toBeNull();
+    expect(
+      await locationOf(id as string),
+      'location should be NULL, not the stale value'
+    ).toBeNull();
   });
 
   test('PUT without location leaves the stored value untouched', async () => {
@@ -78,7 +81,7 @@ describe('expense location create and update round-trip', () => {
 
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { expenseAmount: 99 });
     expect(res.status, await res.text()).toBe(200);
-    expect(locationOf(id as string)).toBe('Keep me');
+    expect(await locationOf(id as string)).toBe('Keep me');
   });
 
   test('an over-cap location is rejected (400, the length bound)', async () => {

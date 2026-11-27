@@ -42,12 +42,11 @@ interface RawExpenseRow {
   missed_fillup: number;
   date_ms: number;
 }
-function listExpensesRaw(): RawExpenseRow[] {
-  return ctx.sqlite
-    .query(
-      'SELECT category, expense_amount, vehicle_id, mileage, volume, fuel_type, description, tags, missed_fillup, date AS date_ms FROM expenses WHERE user_id = ? ORDER BY date'
-    )
-    .all(ctx.user.id) as RawExpenseRow[];
+async function listExpensesRaw(): Promise<RawExpenseRow[]> {
+  return (await ctx.sql.all(
+    'SELECT category, expense_amount, vehicle_id, mileage, volume, fuel_type, description, tags, missed_fillup, date AS date_ms FROM expenses WHERE user_id = ? ORDER BY date',
+    [ctx.user.id]
+  )) as RawExpenseRow[];
 }
 
 interface ImportResponse {
@@ -111,15 +110,15 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(exportRes.status).toBe(200);
     const csv = await exportRes.text();
 
-    ctx.sqlite.run('DELETE FROM expenses WHERE user_id = ?', [ctx.user.id]);
-    expect(listExpensesRaw().length).toBe(0);
+    await ctx.sql.run('DELETE FROM expenses WHERE user_id = ?', [ctx.user.id]);
+    expect((await listExpensesRaw()).length).toBe(0);
 
     const importRes = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
     const importBody = await json<ImportResponse>(importRes);
     expect(importRes.status, JSON.stringify(importBody)).toBe(200);
     expect(importBody.data.imported).toBe(1);
 
-    const [row] = listExpensesRaw();
+    const [row] = await listExpensesRaw();
     expect(row, 'the round-tripped expense exists').toBeDefined();
     expect(row?.category).toBe('fuel');
     expect(row?.expense_amount).toBe(5240);
@@ -147,9 +146,10 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.imported).toBe(2);
 
-    const rows = ctx.sqlite
-      .query('SELECT description, tags FROM expenses WHERE user_id = ? ORDER BY date')
-      .all(ctx.user.id) as Array<{ description: string; tags: string }>;
+    const rows = (await ctx.sql.all(
+      'SELECT description, tags FROM expenses WHERE user_id = ? ORDER BY date',
+      [ctx.user.id]
+    )) as Array<{ description: string; tags: string }>;
     const tagsOf = (desc: string) =>
       JSON.parse(rows.find((r) => r.description === desc)?.tags ?? '[]');
     expect(tagsOf('Semis')).toEqual(['road', 'trip', 'toll']);
@@ -169,9 +169,10 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.imported).toBe(2);
 
-    const flags = ctx.sqlite
-      .query('SELECT description, missed_fillup AS m FROM expenses WHERE user_id = ? ORDER BY date')
-      .all(ctx.user.id) as Array<{ description: string; m: number }>;
+    const flags = (await ctx.sql.all(
+      'SELECT description, missed_fillup AS m FROM expenses WHERE user_id = ? ORDER BY date',
+      [ctx.user.id]
+    )) as Array<{ description: string; m: number }>;
     expect(flags.find((f) => f.description === 'Missed one')?.m).toBe(1);
     expect(flags.find((f) => f.description === 'Normal')?.m).toBe(0);
   });
@@ -377,7 +378,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(body.data.imported).toBe(1);
     expect(body.data.rows.find((r) => r.row === 2)?.status).toBe('error');
     expect(
-      ctx.sqlite.query('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?').get(sharedId)
+      await ctx.sql.get('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', [sharedId])
     ).toEqual({ n: 0 });
   });
 
@@ -475,12 +476,12 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
       ['error', 'Mileage must be greater than 0'],
       ['ready', undefined],
     ]);
-    expect(listExpensesRaw().map((r) => r.mileage)).toEqual([null, 1]);
+    expect((await listExpensesRaw()).map((r) => r.mileage)).toEqual([null, 1]);
   });
 
   test('a stored mileage of 0 exports blank and the export re-imports cleanly', async () => {
     const vehicleId = await seedCivic('Daily Driver');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage)
        VALUES ('legacy-zero', ?, ?, 'maintenance', 4500, 1717243200, 0)`,
       [vehicleId, ctx.user.id]
@@ -492,15 +493,15 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     const exported = parse(csv, { columns: true }) as Record<string, string>[];
     expect(exported.map((r) => [r.category, r.mileage])).toEqual([['maintenance', '']]);
 
-    ctx.sqlite.run('DELETE FROM expenses WHERE user_id = ?', [ctx.user.id]);
+    await ctx.sql.run('DELETE FROM expenses WHERE user_id = ?', [ctx.user.id]);
     const importRes = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
     const importBody = await json<ImportResponse>(importRes);
     expect(importRes.status, JSON.stringify(importBody)).toBe(200);
     expect(importBody.data.errorCount).toBe(0);
     expect(importBody.data.imported).toBe(1);
-    expect(listExpensesRaw().map((r) => [r.category, r.expense_amount, r.mileage])).toEqual([
-      ['maintenance', 4500, null],
-    ]);
+    expect((await listExpensesRaw()).map((r) => [r.category, r.expense_amount, r.mileage])).toEqual(
+      [['maintenance', 4500, null]]
+    );
   });
 
   test('matches a vehicle by its "year make model" name too (not just nickname)', async () => {
@@ -656,7 +657,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.imported).toBe(1);
 
-    const row = listExpensesRaw().find((r) => r.category === 'maintenance');
+    const row = (await listExpensesRaw()).find((r) => r.category === 'maintenance');
     expect(row, 'the maintenance row imported').toBeTruthy();
     expect(row?.mileage).toBe(120000);
     expect(row?.volume).toBeNull();
@@ -674,7 +675,7 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
     expect((await json<ImportResponse>(res)).data.imported).toBe(1);
 
-    const row = listExpensesRaw().find((r) => r.category === 'fuel');
+    const row = (await listExpensesRaw()).find((r) => r.category === 'fuel');
     expect(row?.mileage).toBe(30000);
     expect(row?.volume).toBe(10);
     expect(row?.fuel_type).toBe('regular');

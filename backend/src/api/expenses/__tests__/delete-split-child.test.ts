@@ -37,10 +37,10 @@ async function createEvenSplit(
   return body.data;
 }
 
-function rowCountForGroup(groupId: string): number {
-  const row = ctx.sqlite
-    .query('SELECT COUNT(*) AS n FROM expenses WHERE group_id = ?')
-    .get(groupId) as { n: number };
+async function rowCountForGroup(groupId: string): Promise<number> {
+  const row = (await ctx.sql.get('SELECT COUNT(*) AS n FROM expenses WHERE group_id = ?', [
+    groupId,
+  ])) as { n: number };
   return row.n;
 }
 
@@ -50,22 +50,22 @@ describe('deleting a split sibling via DELETE /:id', () => {
     const v2 = await seedVehicle('Toyota');
     const group = await createEvenSplit([v1, v2], 30);
     expect(group.siblings).toHaveLength(2);
-    expect(rowCountForGroup(group.groupId)).toBe(2);
+    expect(await rowCountForGroup(group.groupId)).toBe(2);
 
     const del = await ctx.authed('DELETE', `/api/v1/expenses/${group.siblings[0].id}`);
     expect(del.status).toBe(400);
 
-    expect(rowCountForGroup(group.groupId)).toBe(2);
+    expect(await rowCountForGroup(group.groupId)).toBe(2);
   });
 
   test('the group-delete route /split/:id removes EVERY sibling (the intended behavior)', async () => {
     const v1 = await seedVehicle('Honda');
     const v2 = await seedVehicle('Toyota');
     const group = await createEvenSplit([v1, v2], 30);
-    expect(rowCountForGroup(group.groupId)).toBe(2);
+    expect(await rowCountForGroup(group.groupId)).toBe(2);
 
     const del = await ctx.authed('DELETE', `/api/v1/expenses/split/${group.groupId}`);
     expect(del.status).toBe(200);
-    expect(rowCountForGroup(group.groupId)).toBe(0);
+    expect(await rowCountForGroup(group.groupId)).toBe(0);
   });
 });

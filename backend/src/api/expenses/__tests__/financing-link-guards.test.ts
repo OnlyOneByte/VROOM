@@ -22,10 +22,11 @@ interface Row {
   source_id: string | null;
 }
 
-function rowOf(id: string): Row {
-  return ctx.sqlite
-    .query('SELECT vehicle_id, source_type, source_id FROM expenses WHERE id = ?')
-    .get(id) as Row;
+async function rowOf(id: string): Promise<Row> {
+  return (await ctx.sql.get(
+    'SELECT vehicle_id, source_type, source_id FROM expenses WHERE id = ?',
+    [id]
+  )) as Row;
 }
 
 async function createFinancing(vehicleId: string): Promise<string> {
@@ -67,7 +68,7 @@ describe('moving a financing payment to another vehicle', () => {
     const res = await ctx.authed('PUT', `/api/v1/expenses/${id}`, { vehicleId: corolla });
     expect(res.status).toBe(400);
     expect(await res.text()).toContain("linked to the current vehicle's financing");
-    expect(rowOf(id)).toEqual({
+    expect(await rowOf(id)).toEqual({
       vehicle_id: civic,
       source_type: 'financing',
       source_id: financingId,
@@ -85,7 +86,7 @@ describe('moving a financing payment to another vehicle', () => {
       sourceId: null,
     });
     expect(res.status, await res.text()).toBe(200);
-    expect(rowOf(id)).toEqual({ vehicle_id: corolla, source_type: null, source_id: null });
+    expect(await rowOf(id)).toEqual({ vehicle_id: corolla, source_type: null, source_id: null });
   });
 
   test("works when the same request links the new vehicle's financing", async () => {
@@ -100,7 +101,7 @@ describe('moving a financing payment to another vehicle', () => {
       sourceId: corollaFinancing,
     });
     expect(res.status, await res.text()).toBe(200);
-    expect(rowOf(id)).toEqual({
+    expect(await rowOf(id)).toEqual({
       vehicle_id: corolla,
       source_type: 'financing',
       source_id: corollaFinancing,
@@ -123,9 +124,10 @@ describe('a split leg financing link', () => {
     expect(res.status, JSON.stringify(body)).toBe(201);
     const leg = body.data.siblings.find((s) => s.vehicleId === civic);
     if (!leg) throw new Error('no civic leg');
-    ctx.sqlite
-      .query("UPDATE expenses SET source_type = 'financing', source_id = ? WHERE id = ?")
-      .run(financingId, leg.id);
+    await ctx.sql.run("UPDATE expenses SET source_type = 'financing', source_id = ? WHERE id = ?", [
+      financingId,
+      leg.id,
+    ]);
     return { legId: leg.id, financingId };
   }
 
@@ -137,7 +139,7 @@ describe('a split leg financing link', () => {
     });
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('financing link is set for the whole split');
-    expect(rowOf(legId).source_id).toBe(financingId);
+    expect((await rowOf(legId)).source_id).toBe(financingId);
   });
 
   test('sending the unchanged link back is still allowed', async () => {
@@ -199,7 +201,7 @@ describe('moving with the old vehicle financing pair', () => {
       sourceId: financingId,
     });
     expect(res.status).toBe(400);
-    expect(rowOf(id).vehicle_id).toBe(civic);
+    expect((await rowOf(id)).vehicle_id).toBe(civic);
   });
 });
 
@@ -222,23 +224,23 @@ describe('replaying a saved financing payment', () => {
     const first = await json<DataEnvelope<{ id: string }>>(
       await postPayment(civic, financingId, 'replay-1')
     );
-    ctx.sqlite.run('UPDATE vehicle_financing SET is_active = 0 WHERE id = ?', [financingId]);
+    await ctx.sql.run('UPDATE vehicle_financing SET is_active = FALSE WHERE id = ?', [financingId]);
 
     const res = await postPayment(civic, financingId, 'replay-1');
     const body = await json<DataEnvelope<{ id: string }>>(res);
 
     expect(res.status, JSON.stringify(body)).toBe(201);
     expect(body.data.id).toBe(first.data.id);
-    const count = ctx.sqlite
-      .query("SELECT COUNT(*) AS n FROM expenses WHERE client_id = 'replay-1'")
-      .get() as { n: number };
+    const count = (await ctx.sql.get(
+      "SELECT COUNT(*) AS n FROM expenses WHERE client_id = 'replay-1'"
+    )) as { n: number };
     expect(count.n).toBe(1);
   });
 
   test('a new clientId is still validated against the inactive financing', async () => {
     const civic = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const financingId = await createFinancing(civic);
-    ctx.sqlite.run('UPDATE vehicle_financing SET is_active = 0 WHERE id = ?', [financingId]);
+    await ctx.sql.run('UPDATE vehicle_financing SET is_active = FALSE WHERE id = ?', [financingId]);
 
     const res = await postPayment(civic, financingId, 'fresh-1');
 
