@@ -36,15 +36,15 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 const ExpenseForm = (await import('../ExpenseForm.svelte')).default;
 
 describe('the quick-add loading figure', () => {
-	test('keeps the currency symbol hidden until settings say which currency it is', async () => {
+	test("keeps the currency symbol hidden while the cars are still loading, since it is the owner's currency", async () => {
 		render(ExpenseForm);
 		await tick();
 
 		expect(screen.getByTestId('loading-currency')).toHaveClass('invisible');
 
 		store.finish('EUR');
-		await vi.waitFor(() =>
-			expect(screen.getByTestId('loading-currency')).not.toHaveClass('invisible')
-		);
+		await tick();
+		await tick();
+		expect(screen.getByTestId('loading-currency')).toHaveClass('invisible');
 	});
 });

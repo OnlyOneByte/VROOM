@@ -28,27 +28,32 @@ describe('ReminderFormState', () => {
 	});
 
 	test.each([
-		['JPY', undefined],
-		['USD', 'Split amounts must total the expense amount']
-	])("a reminder's split total is checked in its cars' owner currency (%s)", (code, error) => {
-		const form = new ReminderFormState();
-		form.load(null, [
-			makeVehicle('v1', { ownerCurrency: code }),
-			makeVehicle('v2', { ownerCurrency: code })
-		]);
-		form.values.kind = 'expense';
-		form.values.name = 'Tax';
-		form.values.expenseAmount = '100';
-		form.values.selectedVehicleIds = ['v1', 'v2'];
-		form.values.splitMethod = 'absolute';
-		form.values.splitAllocations = [
-			{ vehicleId: 'v1', amount: 49.6 },
-			{ vehicleId: 'v2', amount: 50 }
-		];
-		expect(form.currency).toBe(code);
-		form.validate();
-		expect(form.errors['split']).toBe(error);
-	});
+		['JPY', [49, 51], undefined],
+		['JPY', [49.6, 50.4], 'Split amounts must be whole numbers'],
+		['USD', [49.6, 50.4], undefined],
+		['USD', [49.6, 50], 'Split amounts must total the expense amount']
+	])(
+		"a reminder's split is checked in its cars' owner currency (%s %j)",
+		(code, [first, second], error) => {
+			const form = new ReminderFormState();
+			form.load(null, [
+				makeVehicle('v1', { ownerCurrency: code }),
+				makeVehicle('v2', { ownerCurrency: code })
+			]);
+			form.values.kind = 'expense';
+			form.values.name = 'Tax';
+			form.values.expenseAmount = '100';
+			form.values.selectedVehicleIds = ['v1', 'v2'];
+			form.values.splitMethod = 'absolute';
+			form.values.splitAllocations = [
+				{ vehicleId: 'v1', amount: first },
+				{ vehicleId: 'v2', amount: second }
+			];
+			expect(form.currency).toBe(code);
+			form.validate();
+			expect(form.errors['split']).toBe(error);
+		}
+	);
 
 	test('toggling a vehicle on and off updates the selection', () => {
 		const form = new ReminderFormState();

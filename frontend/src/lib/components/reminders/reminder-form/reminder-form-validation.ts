@@ -1,4 +1,5 @@
 import { ApiError } from '#lib/utils/error-handling.ts';
+import { minorUnitScale } from '#lib/utils/formatters.ts';
 import {
 	splitAmountsMatchTotal,
 	splitPercentagesTotal100
@@ -60,13 +61,17 @@ export function validateReminderDraft(
 		) {
 			e['split'] = 'Split percentages must total 100%';
 		}
-		if (
-			showSplit &&
-			draft.splitMethod === 'absolute' &&
-			amt > 0 &&
-			!splitAmountsMatchTotal(draft.splitAllocations, amt, currency)
-		) {
-			e['split'] = 'Split amounts must total the expense amount';
+		if (showSplit && draft.splitMethod === 'absolute' && amt > 0) {
+			const scale = minorUnitScale(currency);
+			const fits = (n: number) => Math.abs(n * scale - Math.round(n * scale)) < 1e-6;
+			if (!draft.splitAllocations.every(a => fits(a.amount ?? 0))) {
+				e['split'] =
+					scale === 1
+						? 'Split amounts must be whole numbers'
+						: 'Split amounts can have at most 2 decimal places';
+			} else if (!splitAmountsMatchTotal(draft.splitAllocations, amt, currency)) {
+				e['split'] = 'Split amounts must total the expense amount';
+			}
 		}
 	}
 	return e;
