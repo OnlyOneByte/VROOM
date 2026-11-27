@@ -405,7 +405,7 @@
 						{#if backupProviderCount > 0}
 							<Button onclick={() => onBackupNow?.()}>
 								<RefreshCw aria-hidden="true" />
-								Back Up Now
+								Back up now
 							</Button>
 						{/if}
 					</div>

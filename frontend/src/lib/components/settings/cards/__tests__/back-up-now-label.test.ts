@@ -43,23 +43,48 @@ vi.mock('#lib/utils/sync/sync-manager.ts', () => ({
 const StorageProvidersCard = (await import('../StorageProvidersCard.svelte')).default;
 const BackupDialog = (await import('../../storage-provider/backup/BackupDialog.svelte')).default;
 
-describe('Back Up Now is one verb-form name for the cloud backup action', () => {
-	test('the Storage & Backup button is Back Up Now', async () => {
+describe('Back up now is one verb-form name for the cloud backup action', () => {
+	test('the Back up now and restore button is Back up now', async () => {
 		const onBackupNow = vi.fn();
 		render(StorageProvidersCard, { props: { onBackupNow } });
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Back Up Now' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Back up now' }));
 		expect(onBackupNow).toHaveBeenCalledOnce();
-		expect(screen.queryByText(/Backup to Cloud|Backup Now/)).toBeNull();
+		expect(screen.queryByText(/Backup to Cloud|Backup Now|Back Up Now/)).toBeNull();
 	});
 
-	test('the dialog title and its confirm button are Back Up Now', async () => {
+	test('the dialog title is Back up now and its confirm button names how many providers it reaches', async () => {
 		const onSync = vi.fn();
-		render(BackupDialog, { props: { open: true, backupProvidersEnabled: true, onSync } });
+		render(BackupDialog, {
+			props: {
+				open: true,
+				backupProvidersEnabled: true,
+				providerNames: ['Family Drive', 'Office S3'],
+				onSync
+			}
+		});
 
-		expect(await screen.findByRole('heading', { name: 'Back Up Now' })).toBeInTheDocument();
-		await fireEvent.click(screen.getByRole('button', { name: 'Back Up Now' }));
+		expect(await screen.findByRole('heading', { name: 'Back up now' })).toBeInTheDocument();
+		expect(screen.getByRole('list', { name: 'Backups go to' })).toHaveTextContent('Family Drive');
+		await fireEvent.click(screen.getByRole('button', { name: 'Back up to 2 providers' }));
 		expect(onSync).toHaveBeenCalledOnce();
-		expect(screen.queryByText(/Backup Now/)).toBeNull();
+		expect(screen.queryByText(/Backup Now|Back Up Now/)).toBeNull();
+	});
+
+	test('one provider reads in the singular, and none falls back to Back up now', async () => {
+		const { unmount } = render(BackupDialog, {
+			props: {
+				open: true,
+				backupProvidersEnabled: true,
+				providerNames: ['Family Drive'],
+				onSync: vi.fn()
+			}
+		});
+		expect(await screen.findByRole('button', { name: 'Back up to 1 provider' })).toBeEnabled();
+		unmount();
+
+		render(BackupDialog, { props: { open: true, backupProvidersEnabled: false, onSync: vi.fn() } });
+		expect(await screen.findByRole('button', { name: 'Back up now' })).toBeDisabled();
+		expect(screen.getByText('Turn on backups for a storage provider first.')).toBeInTheDocument();
 	});
 });

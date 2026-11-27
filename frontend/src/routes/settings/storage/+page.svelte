@@ -262,6 +262,7 @@
 				<module.default
 					bind:open={showBackupDialog}
 					{backupProvidersEnabled}
+					providerNames={backupProviders.map(p => p.displayName)}
 					onSync={handleBackupExecute}
 				/>
 			{/if}
