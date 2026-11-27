@@ -114,7 +114,7 @@ describe('mergeJsonField — defaults only for missing entries', () => {
     expect(cfg.providers).toEqual({ [odd]: { ...defaults, lastBackupAt: 't1' } });
   });
 
-  test('two writers racing on a new entry: the saved settings win in either order', async () => {
+  test('a settings save landing just before or just after the backup write is kept', async () => {
     const mine = { enabled: true, folderPath: 'Mine', retentionCount: 3 };
     const backup = () =>
       repo.mergeJsonField(
