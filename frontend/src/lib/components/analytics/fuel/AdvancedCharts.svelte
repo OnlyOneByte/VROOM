@@ -129,7 +129,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
 	{#if group === 'patterns'}
 		<AppBarChart
-			level={3}
+			level={4}
 			title="Seasonal Efficiency"
 			description="Average {efficiencyLabel} by season"
 			data={seasonalData}
@@ -145,7 +145,7 @@
 			}}
 		/>
 		<AppBarChart
-			level={3}
+			level={4}
 			title="Time Between Fill-ups"
 			description="Distribution of fill-up intervals"
 			data={fuelAdvanced.fillupIntervals}
@@ -161,7 +161,7 @@
 	{:else}
 		<div class="min-w-0" bind:clientWidth={radarCardWidth}>
 			<AppBarChart
-				level={3}
+				level={4}
 				class="h-full"
 				title="Vehicle Performance Comparison"
 				description={radarDescription}
@@ -178,7 +178,7 @@
 			/>
 		</div>
 		<AppBarChart
-			level={3}
+			level={4}
 			title="Monthly Spending by Category"
 			description="Spending by category over time"
 			data={heatmapData}

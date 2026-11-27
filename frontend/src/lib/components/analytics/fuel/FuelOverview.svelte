@@ -2,7 +2,16 @@
 	import type { FuelAdvancedResponse, FuelStatsResponse } from '#lib/types/index.ts';
 	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
 	import { formatCurrency, formatDateWith, formatNumber } from '#lib/utils/formatters.ts';
-	import { economyRows, priceSummary } from './fuel-overview';
+	import {
+		Table,
+		TableBody,
+		TableCaption,
+		TableCell,
+		TableHead,
+		TableHeader,
+		TableRow
+	} from '#lib/components/ui/table/index.ts';
+	import { chargerRows, economyRows, fillupRows, homeSplit, priceSummary } from './fuel-overview';
 
 	interface Props {
 		fuelStats: FuelStatsResponse;
@@ -10,6 +19,7 @@
 		vehicleColors: Record<string, string>;
 		rangeText: string;
 		volumeUnit: string;
+		volumeLabel: string;
 		chargeUnit: string;
 		efficiencyUnit: string;
 		electricEfficiencyUnit: string;
@@ -22,6 +32,7 @@
 		vehicleColors,
 		rangeText,
 		volumeUnit,
+		volumeLabel,
 		chargeUnit,
 		efficiencyUnit,
 		electricEfficiencyUnit,
@@ -31,7 +42,14 @@
 	let price = $derived(priceSummary(fuelStats.gasPriceHistory));
 	let charging = $derived(showCharging ? fuelStats.charging : undefined);
 	let economy = $derived(economyRows(fuelAdvanced?.vehicleRadar ?? []));
+	let fillups = $derived(fillupRows(fuelStats.fillupsByVehicle));
+	let chargers = $derived(charging ? chargerRows(charging.byChargerType) : []);
+	let split = $derived(charging ? homeSplit(charging.byChargerType) : null);
 	let money = (v: number) => formatCurrency(v, undefined, 2);
+	let rate = (v: number) => formatCurrency(v, undefined, 3);
+	let percent = (share: number) => `${formatNumber(share * 100, 0)}%`;
+	const flush =
+		'[&_td:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:first-child]:pl-0 [&_th:last-child]:pr-0';
 	let monthName = (month: string) =>
 		formatDateWith(parseMonthToDate(month), { month: 'long', year: 'numeric' });
 	let rangePhrase = $derived(
@@ -69,7 +87,7 @@
 				<h2 class="text-sm font-normal text-muted-foreground">Charging</h2>
 				<p class="max-w-md text-base md:text-lg">
 					{#if charging.averageCost.perEnergyUnit != null}
-						<strong>{money(charging.averageCost.perEnergyUnit)}</strong>
+						<strong>{rate(charging.averageCost.perEnergyUnit)}</strong>
 						per {chargeUnit} on average across
 					{/if}
 					<strong>{formatNumber(sessions, 0)}</strong>
@@ -78,6 +96,17 @@
 						{electricEfficiencyUnit}{/if}{#if charging.averageCost.perEnergyUnit == null}, with no
 						costs recorded{/if}.
 				</p>
+				{#if split}
+					<p class="max-w-md text-base md:text-lg">
+						<strong>{percent(split.homeShare)}</strong> of energy came from {#if split.homeRate != null}home
+							at
+							<strong>{rate(split.homeRate)}</strong> per {chargeUnit}{:else}home{/if}{#if split.awayRate != null};
+							away from home it cost <strong>
+								{rate(split.awayRate)}
+							</strong>
+							per {chargeUnit}{/if}.
+					</p>
+				{/if}
 			</div>
 		{/if}
 
@@ -108,3 +137,66 @@
 		{/if}
 	</div>
 </section>
+
+{#if fillups.length > 0 || chargers.length > 0}
+	<div class="grid gap-6 md:grid-cols-2 md:gap-10">
+		{#if fillups.length > 0}
+			<Table class={flush}>
+				<TableCaption
+					class="mt-0 mb-2 caption-top text-left text-base font-semibold text-foreground"
+				>
+					Fill-ups
+				</TableCaption>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Car</TableHead>
+						<TableHead class="text-right">Fill-ups</TableHead>
+						<TableHead class="text-right">{volumeLabel}</TableHead>
+						<TableHead class="text-right">Avg price</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{#each fillups as row (row.vehicleId)}
+						<TableRow>
+							<TableCell class="whitespace-normal">{row.label}</TableCell>
+							<TableCell class="text-right tabular-nums">{formatNumber(row.count, 0)}</TableCell>
+							<TableCell class="text-right tabular-nums">{formatNumber(row.volume, 0)}</TableCell>
+							<TableCell class="text-right tabular-nums">
+								{row.avgPrice != null ? money(row.avgPrice) : '—'}
+							</TableCell>
+						</TableRow>
+					{/each}
+				</TableBody>
+			</Table>
+		{/if}
+		{#if chargers.length > 0}
+			<Table class={flush}>
+				<TableCaption
+					class="mt-0 mb-2 caption-top text-left text-base font-semibold text-foreground"
+				>
+					Charging
+				</TableCaption>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Where</TableHead>
+						<TableHead class="text-right">Sessions</TableHead>
+						<TableHead class="text-right">Share of energy</TableHead>
+						<TableHead class="text-right">Per {chargeUnit}</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{#each chargers as row (row.key)}
+						<TableRow>
+							<TableCell>{row.label}</TableCell>
+							<TableCell class="text-right tabular-nums">{formatNumber(row.sessions, 0)}</TableCell>
+							<TableCell class="text-right tabular-nums">{percent(row.share)}</TableCell>
+							<TableCell class="text-right tabular-nums">
+								{row.rate != null ? rate(row.rate) : '—'}
+							</TableCell>
+						</TableRow>
+					{/each}
+				</TableBody>
+			</Table>
+		{/if}
+	</div>
+{/if}

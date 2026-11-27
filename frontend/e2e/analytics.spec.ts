@@ -128,17 +128,24 @@ async function mockAnalytics(page: Page, requests: URLSearchParams[] = []) {
 	);
 }
 
+async function openGroup(page: Page, title: string) {
+	const summary = page
+		.locator('summary')
+		.filter({ has: page.getByRole('heading', { name: title, exact: true }) });
+	if (!(await summary.locator('..').evaluate(el => (el as HTMLDetailsElement).open))) {
+		await summary.click();
+	}
+}
+
 async function openFuelTab(page: Page) {
 	await page.getByRole('tab', { name: 'Fuel & charging', exact: true }).click();
+	await openGroup(page, 'More detail');
 	await expect(page.getByText('Fuel spend per month')).toBeVisible();
 }
 
 async function openFillupDetails(page: Page) {
 	await openFuelTab(page);
-	const group = page.locator('details[data-slot="chart-group"]', { hasText: 'Fill-up details' });
-	if (!(await group.evaluate(el => (el as HTMLDetailsElement).open))) {
-		await group.locator('summary').click();
-	}
+	await openGroup(page, 'Fill-up details');
 }
 
 test.describe('Analytics', () => {

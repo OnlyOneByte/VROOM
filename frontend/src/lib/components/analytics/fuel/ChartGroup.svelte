@@ -5,10 +5,11 @@
 	interface Props {
 		title: string;
 		description: string;
+		level?: 2 | 3;
 		children: Snippet;
 	}
 
-	let { title, description, children }: Props = $props();
+	let { title, description, level = 2, children }: Props = $props();
 
 	let open = $state(false);
 
@@ -21,7 +22,9 @@
 	<summary
 		class="grid min-h-10 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg border bg-card px-4 py-3 text-left outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
 	>
-		<h2 class="col-start-1 font-semibold text-foreground">{title}</h2>
+		<svelte:element this={`h${level}`} class="col-start-1 font-semibold text-foreground">
+			{title}
+		</svelte:element>
 		<span class="col-start-1 text-sm text-muted-foreground">{description}</span>
 		<ChevronDown
 			class="col-start-2 row-span-2 row-start-1 h-5 w-5 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
