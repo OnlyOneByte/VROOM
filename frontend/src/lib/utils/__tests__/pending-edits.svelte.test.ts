@@ -164,6 +164,63 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(shownExpense(restored)).toBe(restored);
 	});
 
+	const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+
+	test('a second Undo click on the fading toast changes nothing', async () => {
+		const landed = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
+		vi.mocked(expenseApi.updateExpense).mockResolvedValueOnce(landed).mockResolvedValueOnce(saved);
+		scheduleEdit(saved, changed, payload);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(1));
+		await flush();
+
+		pressUndo();
+		pressUndo();
+		await flush();
+		expect(shownExpense(landed)).toMatchObject({ amount: 40, description: 'Arco' });
+		expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2);
+	});
+
+	test('Undo pressed before the save lands still holds once both saves land', async () => {
+		const landed = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
+		const restored = { ...saved, updatedAt: '2026-11-26T10:00:05.000Z' };
+		const edit = deferred();
+		const restore = deferred();
+		vi.mocked(expenseApi.updateExpense)
+			.mockReturnValueOnce(edit.promise)
+			.mockReturnValueOnce(restore.promise);
+		scheduleEdit(saved, changed, payload);
+		pressUndo();
+
+		edit.resolve(landed);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+		restore.resolve(restored);
+		await flush();
+		expect(shownExpense(landed)).toMatchObject({ amount: 40, description: 'Arco' });
+		expect(shownExpense(restored)).toBe(restored);
+	});
+
+	test('with two quick edits in flight, Undo holds on the row of the edit it undid', async () => {
+		const again = { ...changed, amount: 70 };
+		const firstLanded = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
+		const secondLanded = { ...again, updatedAt: '2026-11-26T10:00:01.000Z' };
+		const first = deferred();
+		const second = deferred();
+		vi.mocked(expenseApi.updateExpense)
+			.mockReturnValueOnce(first.promise)
+			.mockReturnValueOnce(second.promise)
+			.mockResolvedValueOnce(saved);
+		scheduleEdit(saved, changed, payload);
+		scheduleEdit(saved, again, payload);
+		pressUndo();
+
+		first.resolve(firstLanded);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+		second.resolve(secondLanded);
+		await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(3));
+		await flush();
+		expect(shownExpense(secondLanded)).toMatchObject({ amount: 40, description: 'Arco' });
+	});
+
 	test('a failed Undo on a reloaded row marks that row as failed', async () => {
 		const landed = { ...changed, updatedAt: '2026-11-26T10:00:00.000Z' };
 		vi.mocked(expenseApi.updateExpense)

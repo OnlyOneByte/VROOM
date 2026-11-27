@@ -2,6 +2,7 @@
 	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import type { Expense, Vehicle } from '#lib/types/index.ts';
 	import PaginationControls from '#lib/components/common/pagination-controls.svelte';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
@@ -95,7 +96,7 @@
 		])
 	);
 
-	let onDelete = $derived(canWrite ? onDeleteProp : undefined);
+	let onDelete = $derived(canWrite && authStore.user?.demo !== true ? onDeleteProp : undefined);
 
 	let vehicleMap = $derived(new Map(vehicles.map(v => [v.id, v])));
 

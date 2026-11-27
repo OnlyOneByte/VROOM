@@ -21,6 +21,7 @@ const EXCLUDED_BY_DESIGN = [
   'server_settings',
   'server_invites',
   'driver_backfills',
+  'money_unit_migrations',
 ] as const;
 
 function allSchemaTableNames(): string[] {

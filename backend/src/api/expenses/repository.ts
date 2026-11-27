@@ -52,6 +52,7 @@ export interface ExpenseFilters {
   endDate?: Date;
   tags?: string[];
   search?: string;
+  moneyScale?: number;
   timeZone?: string;
   startDateIsDay?: boolean;
   endDateIsDay?: boolean;
@@ -234,7 +235,7 @@ function buildExpenseConditions(filters: ExpenseFilters): SQL[] {
     }
   }
   const search = filters.search?.trim();
-  if (search) conditions.push(searchCondition(search));
+  if (search) conditions.push(searchCondition(search, filters.moneyScale ?? 100));
   if (filters.hideFinancials) conditions.push(hiddenFinancialsScope());
 
   return conditions;
@@ -262,21 +263,22 @@ export function parseAmountTerm(term: string): { whole: number; cents?: number }
   return whole === null ? null : { whole };
 }
 
-function amountCondition(term: string): SQL | undefined {
+function amountCondition(term: string, scale: number): SQL | undefined {
   const amount = parseAmountTerm(term);
   if (!amount) return undefined;
-  const whole = amount.whole * 100;
+  const whole = amount.whole * scale;
   if (amount.cents === undefined) {
-    return sql`(${expenses.expenseAmount} >= ${whole} AND ${expenses.expenseAmount} < ${whole + 100})`;
+    return sql`(${expenses.expenseAmount} >= ${whole} AND ${expenses.expenseAmount} < ${whole + scale})`;
   }
-  return eq(expenses.expenseAmount, whole + amount.cents);
+  const minor = (amount.cents * scale) / 100;
+  return Number.isInteger(minor) ? eq(expenses.expenseAmount, whole + minor) : undefined;
 }
 
-function searchCondition(search: string): SQL {
+function searchCondition(search: string, scale: number): SQL {
   const escaped = search.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`);
   const pattern = `%${escaped}%`;
   const like = (column: SQL) => sql`lower(${column}) LIKE ${pattern} ESCAPE '\\'`;
-  const amount = amountCondition(search);
+  const amount = amountCondition(search, scale);
   return sql`(${like(sql`${expenses.description}`)}
     OR ${like(sql`${expenses.category}`)}
     OR ${like(sql`${expenses.location}`)}

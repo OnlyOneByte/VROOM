@@ -17,7 +17,8 @@ import type { CommunityStatsRepository } from './repository';
 export type CommunityMetric = 'efficiency' | 'running_cost' | 'maintenance' | 'insurance';
 export type CommunityUnit = 'km_per_l' | 'km_per_kwh' | 'cents_per_km' | 'cents_per_year';
 
-export const COMMUNITY_SCHEMA_VERSION = 1;
+export const COMMUNITY_SCHEMA_VERSION = 2;
+const NOISE_RELEASE_VERSION = 1;
 export const COMMUNITY_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 export const LOCAL_SCOPE = 'local';
 const MIN_EFFICIENCY_INTERVALS = 3;
@@ -322,7 +323,7 @@ function publishBucket(
   const ownerValues = [...byOwner.values()]
     .map((values) => Math.min(Math.max(roundToStep(median(values), band.step), band.lo), band.hi))
     .sort((a, b) => a - b);
-  const release = `${COMMUNITY_SCHEMA_VERSION}|${band.lo}|${band.hi}|${EPSILON_COUNT}|${EPSILON_SUM}`;
+  const release = `${NOISE_RELEASE_VERSION}|${band.lo}|${band.hi}|${EPSILON_COUNT}|${EPSILON_SUM}`;
   const draw = (label: string) =>
     uniform(`${sample.bucketKey}|${release}|${dataDigest(ownerValues)}|${label}`);
   const noisyCount = byOwner.size + laplace(1 / EPSILON_COUNT, draw('count'));

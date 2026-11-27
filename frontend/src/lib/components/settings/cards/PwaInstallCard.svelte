@@ -49,7 +49,7 @@
 </script>
 
 <div class="py-3" data-testid="pwa-install">
-	<div class="flex items-center justify-between gap-4 [&>button]:shrink-0">
+	<div class="flex items-center justify-between gap-4">
 		<div class="min-w-0">
 			<p class="font-medium">Install the app</p>
 			{#if isStandalone}
@@ -79,12 +79,7 @@
 			{/if}
 		</div>
 		{#if canInstall && !isStandalone}
-			<Button
-				variant="outline"
-				class="h-10 rounded-full"
-				onclick={handleInstall}
-				disabled={installing}
-			>
+			<Button variant="outline" onclick={handleInstall} disabled={installing}>
 				{#if installing}
 					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
 					Installing…

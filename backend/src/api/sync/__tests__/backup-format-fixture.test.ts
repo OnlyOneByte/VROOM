@@ -94,14 +94,14 @@ describe('the frozen 2.0.0 backup fixture', () => {
   });
 
   test('a backup from a newer minor version is refused with a clear message', async () => {
-    const details = await restoreError(fixtureZip('3.1.0'));
+    const details = await restoreError(fixtureZip('3.2.0'));
 
     expect(details.join('\n')).toMatch(/newer version of VROOM.*Update VROOM/);
     expect(count('vehicles')).toBe(0);
   });
 
   test('a backup from a newer major version is refused with a clear message', async () => {
-    setCurrentVersion('3.1.0');
+    setCurrentVersion('3.2.0');
 
     const details = await restoreError(fixtureZip('4.0.0'));
 

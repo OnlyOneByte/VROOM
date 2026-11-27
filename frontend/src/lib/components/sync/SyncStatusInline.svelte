@@ -215,10 +215,10 @@
 
 			{#if providerNeedsAttention.current}
 				<a
-					href="{resolve(routes.settings)}#settings-connections"
+					href={resolve(routes.settingsStorage)}
 					class="block rounded-sm text-xs font-medium text-accent-ink underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				>
-					Fix it in Settings → Storage Providers
+					Fix it in Settings → Backups and storage
 				</a>
 			{/if}
 

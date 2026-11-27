@@ -158,20 +158,24 @@ function dollarsToCents(tables: BackupTables): BackupTables {
   return upgraded;
 }
 
-export function rescaleParts(totalCents: number, partsCents: number[], scale: number) {
-  const total = Math.round((totalCents * scale) / 100);
-  const exact = partsCents.map((cents) => (cents * scale) / 100);
-  const parts = exact.map(Math.floor);
-  const byRemainder = exact
-    .map((value, index) => ({ index, remainder: value - Math.floor(value) }))
+function roundHalfAway(value: number): number {
+  return Math.sign(value) * Math.round(Math.abs(value)) || 0;
+}
+
+export function rescaleParts(total: number, parts: number[], from: number, to: number) {
+  const rescaledTotal = roundHalfAway((total * to) / from);
+  const scaled = parts.map((part) => Math.round(part) * to);
+  const floored = scaled.map((value) => Math.floor(value / from));
+  const byRemainder = scaled
+    .map((value, index) => ({ index, remainder: value - (floored[index] ?? 0) * from }))
     .sort((a, b) => b.remainder - a.remainder || a.index - b.index);
-  let left = total - parts.reduce((sum, part) => sum + part, 0);
+  let left = rescaledTotal - floored.reduce((sum, part) => sum + part, 0);
   for (const { index } of byRemainder) {
     if (left <= 0) break;
-    parts[index] = (parts[index] ?? 0) + 1;
+    floored[index] = (floored[index] ?? 0) + 1;
     left--;
   }
-  return { total, parts };
+  return { total: rescaledTotal, parts: floored };
 }
 
 function parseSplitConfig(value: unknown): unknown {
@@ -185,16 +189,18 @@ function parseSplitConfig(value: unknown): unknown {
 
 function rescaleReminder(
   row: Record<string, unknown>,
-  totalCents: number | null,
-  scale: number
+  total: number | null,
+  from: number,
+  to: number
 ): Record<string, unknown> {
   const parsed = parseSplitConfig(row.expenseSplitConfig);
   if (!parsed || typeof parsed !== 'object' || (parsed as SplitConfig).method !== 'absolute') {
     return row;
   }
   const split = parsed as Extract<SplitConfig, { method: 'absolute' }>;
-  const cents = split.allocations.map((a) => Number(a.amount));
-  const rescaled = rescaleParts(totalCents ?? cents.reduce((a, b) => a + b, 0), cents, scale);
+  if (!Array.isArray(split.allocations)) return row;
+  const amounts = split.allocations.map((a) => Number(a.amount));
+  const rescaled = rescaleParts(total ?? amounts.reduce((a, b) => a + b, 0), amounts, from, to);
   const out = {
     ...split,
     allocations: split.allocations.map((a, i) => ({ ...a, amount: rescaled.parts[i] })),
@@ -207,26 +213,28 @@ function rescaleReminder(
 
 function rescaleSplitGroups(
   rows: Record<string, unknown>[],
-  centsRows: Record<string, unknown>[],
-  scale: number
+  sourceRows: Record<string, unknown>[],
+  from: number,
+  to: number
 ) {
   const legsByGroup = new Map<string, number[]>();
-  centsRows.forEach((row, index) => {
+  sourceRows.forEach((row, index) => {
     if (row.groupId) {
       const group = String(row.groupId);
       legsByGroup.set(group, [...(legsByGroup.get(group) ?? []), index]);
     }
   });
   for (const indexes of legsByGroup.values()) {
-    const total = toNumberOrNull(centsRows[indexes[0] ?? -1]?.groupTotal);
+    const total = toNumberOrNull(sourceRows[indexes[0] ?? -1]?.groupTotal);
     if (total === null) continue;
     const ordered = [...indexes].sort((a, b) =>
-      String(centsRows[a]?.id).localeCompare(String(centsRows[b]?.id))
+      String(sourceRows[a]?.id).localeCompare(String(sourceRows[b]?.id))
     );
     const { parts } = rescaleParts(
       total,
-      ordered.map((i) => toNumberOrNull(centsRows[i]?.expenseAmount) ?? 0),
-      scale
+      ordered.map((i) => toNumberOrNull(sourceRows[i]?.expenseAmount) ?? 0),
+      from,
+      to
     );
     ordered.forEach((rowIndex, i) => {
       const row = rows[rowIndex];
@@ -239,8 +247,11 @@ function rescaleSplitGroups(
 export function centsToMinorUnits(tables: BackupTables, accountCurrency = 'USD'): BackupTables {
   const currency = tables.userPreferences?.[0]?.currencyUnit ?? accountCurrency;
   const scale = minorUnitScale(String(currency));
-  if (scale === 100) return tables;
-  const rescale = (cents: number) => Math.round((cents * scale) / 100);
+  return scale === 100 ? tables : rescaleMoneyTables(tables, 100, scale);
+}
+
+export function rescaleMoneyTables(tables: BackupTables, from: number, to: number): BackupTables {
+  const rescale = (amount: number) => roundHalfAway((amount * to) / from);
   const upgraded: BackupTables = { ...tables };
   for (const [key, rows] of Object.entries(tables)) {
     const table = TABLE_SCHEMA_MAP[key];
@@ -250,21 +261,21 @@ export function centsToMinorUnits(tables: BackupTables, accountCurrency = 'USD')
     const rescaled = rows.map((row) => {
       const out = { ...row };
       for (const column of moneyColumns) {
-        const cents = toNumberOrNull(row[column]);
-        if (cents !== null) out[column] = rescale(cents);
+        const amount = toNumberOrNull(row[column]);
+        if (amount !== null) out[column] = rescale(amount);
       }
       return columns.includes('expenseSplitConfig')
-        ? rescaleReminder(out, toNumberOrNull(row.expenseAmount), scale)
+        ? rescaleReminder(out, toNumberOrNull(row.expenseAmount), from, to)
         : out;
     });
-    upgraded[key] = key === 'expenses' ? rescaleSplitGroups(rescaled, rows, scale) : rescaled;
+    upgraded[key] = key === 'expenses' ? rescaleSplitGroups(rescaled, rows, from, to) : rescaled;
   }
   return upgraded;
 }
 
 const BACKUP_UPGRADE_STEPS: BackupUpgradeStep[] = [
   { to: '2.0.0', upgrade: dollarsToCents },
-  { to: '3.0.0', upgrade: centsToMinorUnits },
+  { to: '3.1.0', upgrade: centsToMinorUnits },
 ];
 
 export function upgradeBackupTables(

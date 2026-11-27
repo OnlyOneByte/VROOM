@@ -125,7 +125,7 @@ function toWholeYen(ctx: TestApp): void {
     ctx.user.id,
   ]);
   for (const [table, columns] of Object.entries(MONEY_COLUMNS)) {
-    const set = columns.map((c) => `${c} = CAST(ROUND(${c} / 100.0) AS INTEGER) * 100`).join(', ');
+    const set = columns.map((c) => `${c} = CAST(ROUND(${c} / 100.0) AS INTEGER)`).join(', ');
     ctx.sqlite.run(`UPDATE ${table} SET ${set}`);
   }
 }

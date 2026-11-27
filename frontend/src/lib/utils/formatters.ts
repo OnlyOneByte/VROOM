@@ -1,3 +1,4 @@
+import { NO_DECIMAL_CURRENCIES } from '#lib/constants/currencies';
 import { settingsStore } from '#lib/stores/settings.svelte.ts';
 
 export function currentLocale(): string {
@@ -59,8 +60,8 @@ export function amountPlaceholder(currency?: string): string {
 	return digits > 0 ? `0.${'0'.repeat(digits)}` : '0';
 }
 
-export function minorUnitScale(_currency?: string): number {
-	return 100;
+export function minorUnitScale(currency?: string): number {
+	return NO_DECIMAL_CURRENCIES.has(userCurrency(currency)) ? 1 : 100;
 }
 
 export function toMinor(amount: number, currency?: string): number {

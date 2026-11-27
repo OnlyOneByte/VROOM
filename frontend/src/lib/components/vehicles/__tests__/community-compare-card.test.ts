@@ -169,6 +169,14 @@ describe('CommunityCompareCard', () => {
 			screen.getByText('See how your Civic EX compares with other owners on this server.')
 		).toBeInTheDocument();
 		expect(screen.queryByRole('link', { name: 'Turn on community stats' })).toBeNull();
+		expect(screen.getByText('Community comparisons aren’t part of the demo.')).toBeInTheDocument();
+	});
+
+	test('a signed-in user who has not opted in gets the link and no demo line', async () => {
+		compare.mockResolvedValue(all('opt_in_required'));
+		await mount();
+		expect(screen.getByRole('link', { name: 'Turn on community stats' })).toBeInTheDocument();
+		expect(screen.queryByText('Community comparisons aren’t part of the demo.')).toBeNull();
 	});
 
 	test('a user whose opt-in is not in a refresh yet is told to wait, with no numbers', async () => {
@@ -242,6 +250,24 @@ describe('CommunityCompareCard', () => {
 		expect(screen.getAllByRole('img')[1]).toHaveAttribute(
 			'aria-label',
 			"Your $450/yr is below the others' average of $600/yr"
+		);
+	});
+
+	test('a no-decimal currency is shown in whole units, not divided by 100', async () => {
+		compare.mockResolvedValue({
+			currency: 'JPY',
+			metrics: [
+				metric('maintenance', {
+					status: 'ok',
+					unit: 'cents_per_year',
+					yours: 45_000,
+					bucket: { n: 10, mean: 60_000, computedAt: '' }
+				})
+			]
+		});
+		await mount();
+		expect(screen.getByTestId('community-compare-maintenance')).toHaveTextContent(
+			'You ¥45,000/yr · Others ¥60,000/yr'
 		);
 	});
 

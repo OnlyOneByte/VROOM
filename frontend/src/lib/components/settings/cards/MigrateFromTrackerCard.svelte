@@ -79,7 +79,7 @@
 	}
 </script>
 
-<div class="flex items-center justify-between gap-4 [&>button]:shrink-0 py-3" bind:this={content}>
+<div class="flex items-center justify-between gap-4 py-3" bind:this={content}>
 	<div class="min-w-0">
 		<p class="font-medium">Import</p>
 		{#if loadError}
@@ -101,17 +101,10 @@
 			data-testid="migrate-loading"
 		/>
 	{:else if loadError}
-		<Button variant="outline" class="h-10 rounded-full" onclick={retryVehicles}>Retry</Button>
+		<Button variant="outline" onclick={retryVehicles}>Retry</Button>
 	{:else if vehicles.length > 0}
 		<div class="shrink-0" data-testid="migrate-card">
-			<Button
-				variant="outline"
-				class="h-10 rounded-full"
-				onclick={openDialog}
-				data-testid="migrate-open"
-			>
-				Import
-			</Button>
+			<Button variant="outline" onclick={openDialog} data-testid="migrate-open">Import</Button>
 		</div>
 	{/if}
 </div>

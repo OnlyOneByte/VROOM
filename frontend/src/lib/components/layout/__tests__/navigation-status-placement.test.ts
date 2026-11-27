@@ -150,7 +150,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 
 		beforeEach(() => authStore.setUser(alice));
 
-		it('is never reported as Up to date, and the panel links to Storage Providers', async () => {
+		it('is never reported as Up to date, and the panel links to Backups and storage', async () => {
 			attention.current = true;
 			render(Navigation);
 
@@ -165,8 +165,8 @@ describe('the sync status indicator lives in the navigation, never floating over
 			await fireEvent.click(trigger);
 			const panel = await screen.findByRole('dialog', { name: 'Sync status' });
 			expect(
-				within(panel).getByRole('link', { name: 'Fix it in Settings → Storage Providers' })
-			).toHaveAttribute('href', '/settings#settings-connections');
+				within(panel).getByRole('link', { name: 'Fix it in Settings → Backups and storage' })
+			).toHaveAttribute('href', '/settings/storage');
 		});
 
 		it('reads Up to date when /sync/status reports no provider needing attention', () => {

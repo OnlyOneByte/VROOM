@@ -56,17 +56,17 @@ describe('storage provider edit page states', () => {
 		expect(screen.getByRole('status')).toHaveTextContent('Loading provider');
 	});
 
-	test('an unknown provider keeps the heading and offers a 40px Back to Settings', async () => {
+	test('an unknown provider keeps the heading and offers a 40px way back to Backups and storage', async () => {
 		getProviders.mockResolvedValue([]);
 		render(EditPage);
 
 		expect(await screen.findByText('Provider not found')).toBeInTheDocument();
 		expect(screen.getByRole('heading', { level: 1, name: 'Edit Provider' })).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
-		const back = screen.getByText('Back to Settings', { selector: 'button' });
+		const back = screen.getByText('Back to Backups and storage', { selector: 'button' });
 		expect(back.className).toMatch(/(^|\s)h-10(\s|$)/);
 		await fireEvent.click(back);
-		expect(goto).toHaveBeenCalledWith('/settings');
+		expect(goto).toHaveBeenCalledWith('/settings/storage');
 	});
 
 	test('a failed load announces the reason, and a failed Retry keeps focus on Retry', async () => {

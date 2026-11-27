@@ -3,6 +3,7 @@ import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Expense, Vehicle } from '#lib/types/index.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { authStore } from '#lib/stores/auth.svelte.ts';
 import { settingsStore } from '#lib/stores/settings.svelte.ts';
 import {
 	UNDO_WINDOW_MS,
@@ -379,6 +380,26 @@ describe('ExpensesTable deleting', () => {
 
 		expect(screen.queryByRole('button', { name: 'Delete expense' })).toBeNull();
 		expect(screen.queryByRole('link', { name: 'Edit expense' })).toBeNull();
+	});
+
+	test('in the demo garage rows keep Edit but have no Delete, so no row can vanish', () => {
+		authStore.setUser({
+			id: 'demo-garage',
+			email: 'demo@example.com',
+			displayName: 'Demo',
+			createdAt: '2026-01-01T00:00:00Z',
+			updatedAt: '2026-01-01T00:00:00Z',
+			demo: true
+		});
+		try {
+			const { container } = mountTable();
+
+			expect(screen.queryByRole('button', { name: 'Delete expense' })).toBeNull();
+			expect(screen.getAllByRole('link', { name: 'Edit expense' })).toHaveLength(3);
+			expect(desktopAmounts(container)).toHaveLength(3);
+		} finally {
+			authStore.clearUser();
+		}
 	});
 });
 

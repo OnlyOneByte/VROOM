@@ -17,7 +17,12 @@ import {
 } from '../../db/schema';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences } from '../../types';
 import { chunk, rowsPerInsert } from '../../utils/chunk';
-import type { CommunityExpense, CommunityVehicle, InsurancePremium } from './aggregator';
+import {
+  COMMUNITY_SCHEMA_VERSION,
+  type CommunityExpense,
+  type CommunityVehicle,
+  type InsurancePremium,
+} from './aggregator';
 
 export interface CommunityInput {
   optedInOwners: number;
@@ -131,7 +136,8 @@ export class CommunityStatsRepository {
         and(
           eq(communityStats.scope, scope),
           inArray(communityStats.bucketKey, bucketKeys),
-          gte(communityStats.nPublished, minGroup)
+          gte(communityStats.nPublished, minGroup),
+          eq(communityStats.schemaVersion, COMMUNITY_SCHEMA_VERSION)
         )
       );
   }

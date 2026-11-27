@@ -12,6 +12,7 @@
 	import { UNEXPECTED_FAILURE_MESSAGE, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 
 	const DISCLOSURE_KEY = 'vroom.push.disclosed';
+	const uid = $props.id();
 
 	let status = $state<pushUtil.PushStatus>('off');
 	let isLoading = $state(true);
@@ -130,12 +131,12 @@
 		<div class="space-y-2" data-testid="push-error">
 			<p class="font-medium">Reminder notifications</p>
 			<p class="text-sm text-destructive" role="alert">{loadError}</p>
-			<Button variant="outline" class="h-10 rounded-full" onclick={retryStatus}>Retry</Button>
+			<Button variant="outline" onclick={retryStatus}>Retry</Button>
 		</div>
 	{:else}
 		<div class="flex items-center justify-between gap-4" data-testid="push-card">
 			<div class="min-w-0">
-				<p class="font-medium">Reminder notifications</p>
+				<p id="{uid}-label" class="font-medium">Reminder notifications</p>
 				<p class="text-sm text-muted-foreground" data-testid="push-status">{statusLine}</p>
 			</div>
 			{#if toggleable}
@@ -147,7 +148,7 @@
 						checked={isOn}
 						onCheckedChange={onToggle}
 						disabled={isToggling}
-						aria-label="Reminder notifications"
+						aria-labelledby="{uid}-label"
 						data-testid="push-toggle"
 					/>
 				</div>

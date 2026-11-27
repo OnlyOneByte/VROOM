@@ -16,7 +16,7 @@
 	} from '#lib/services/community-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatNumber, fromMinor } from '#lib/utils/formatters.ts';
 	import {
 		getDistanceUnitLabel,
 		getElectricEfficiencyLabel,
@@ -144,11 +144,12 @@
 	}
 
 	function amount(metric: CompareMetric, value: number): string {
+		const currency = result?.currency ?? undefined;
 		if (metric.unit === 'cents_per_distance') {
-			return formatCurrency(value / 100, result?.currency ?? undefined, 2);
+			return formatCurrency(fromMinor(value, currency), currency, 2);
 		}
 		if (metric.unit === 'cents_per_year') {
-			return formatCurrency(value / 100, result?.currency ?? undefined, 0);
+			return formatCurrency(fromMinor(value, currency), currency, 0);
 		}
 		return formatNumber(value, 1);
 	}
@@ -247,7 +248,11 @@
 					See how {isOwner ? 'your' : 'this'}
 					{vehicle.model} compares with other owners on this server.
 				</p>
-				{#if authStore.user?.demo !== true}
+				{#if authStore.user?.demo === true}
+					<p class="text-sm text-muted-foreground">
+						Community comparisons aren’t part of the demo.
+					</p>
+				{:else}
 					<Button href={`${resolve(routes.settings)}#community-comparisons`} variant="outline">
 						Turn on community stats
 					</Button>
