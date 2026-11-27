@@ -150,7 +150,7 @@
 	function errorMessageFor(err: unknown): string {
 		if (err instanceof ApiError && err.code === 'NO_PROVIDER') {
 			hasProvider = false;
-			return 'No assistant provider is connected. Add one in Settings → Assistant (AI).';
+			return 'No assistant provider is connected. Add one in Settings → AI helpers.';
 		}
 		if (err instanceof ApiError && err.statusCode === 502) {
 			return "The AI provider couldn't be reached. Check the key and model in Settings, then try again.";
@@ -197,8 +197,8 @@
 				key — the assistant is read-only and can never change your data.
 			{/snippet}
 			{#snippet action()}
-				<Button href="{resolve(routes.settings)}#assistant-providers" class="h-10">
-					Go to Settings
+				<Button href="{resolve(routes.settingsAi)}#assistant-providers">
+					Set up the assistant
 				</Button>
 			{/snippet}
 		</EmptyState>
@@ -208,7 +208,7 @@
 				<p class="text-sm text-muted-foreground" data-testid="assistant-provider">
 					Using <span class="font-medium text-foreground">{providerName}</span> ·
 					<a
-						href="{resolve(routes.settings)}#assistant-providers"
+						href="{resolve(routes.settingsAi)}#assistant-providers"
 						aria-label="Change the assistant provider"
 						class="underline underline-offset-2 hover:text-foreground rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					>
