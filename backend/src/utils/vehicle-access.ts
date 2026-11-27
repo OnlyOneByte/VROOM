@@ -1,6 +1,7 @@
-import { and, eq, isNull, notInArray, type SQL, sql } from 'drizzle-orm';
+import { and, eq, isNull, notInArray, or, type SQL, sql } from 'drizzle-orm';
 import { appContext } from '../app-context';
 import type { AsyncHandle } from '../db/async-sqlite';
+import { sqlFalse } from '../db/dialect';
 import { expenses, vehicleShares, vehicles } from '../db/schema';
 import { NotFoundError } from '../errors';
 import { resolverFor, vehicleResources } from '../permissions/grants';
@@ -195,6 +196,26 @@ export function isFinancialCategory(category: string | null | undefined): boolea
 
 export function isFinancialExpense(expense: { sourceType: string | null; category: string }) {
   return isFinancialSource(expense.sourceType) || isFinancialCategory(expense.category);
+}
+
+export function readableExpensesScope(readable: readonly ReadableVehicle[]): SQL {
+  if (readable.length === 0) return sqlFalse();
+  const pairs = readable.map(
+    (v) =>
+      and(
+        eq(expenses.vehicleId, v.vehicleId),
+        eq(expenses.userId, v.ownerId),
+        v.hideFinancials ? hiddenFinancialsScope() : undefined
+      ) as SQL
+  );
+  return or(...pairs) as SQL;
+}
+
+export function readableVehiclesScope(readable: readonly ReadableVehicle[]): SQL {
+  if (readable.length === 0) return sqlFalse();
+  return or(
+    ...readable.map((v) => and(eq(vehicles.id, v.vehicleId), eq(vehicles.userId, v.ownerId)))
+  ) as SQL;
 }
 
 export function assertMaySeeExpense(

@@ -293,7 +293,8 @@ routes.get(
       { start: startDate, end: endDate },
       ytdStart,
       timeZone,
-      vehicleIds
+      vehicleIds,
+      await queryScope(user.id, vehicleIds)
     );
     return c.json({
       success: true,
@@ -358,7 +359,8 @@ routes.get(
       user.id,
       { start: startDate, end: endDate },
       timeZone,
-      vehicleIds
+      vehicleIds,
+      await queryScope(user.id, vehicleIds)
     );
     return c.json({
       success: true,
@@ -374,7 +376,12 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { timeZone, vehicleIds } = c.req.valid('query');
-    const data = await repos().analytics.getFinancing(user.id, timeZone, vehicleIds);
+    const data = await repos().analytics.getFinancing(
+      user.id,
+      timeZone,
+      vehicleIds,
+      await queryScope(user.id, vehicleIds)
+    );
     return c.json({
       success: true,
       data: financingToApi(data, await repos().preferences.moneyScale(user.id)),
@@ -389,7 +396,12 @@ routes.get(
   async (c) => {
     const user = c.get('user');
     const { timeZone, vehicleIds } = c.req.valid('query');
-    const data = await repos().analytics.getInsurance(user.id, timeZone, vehicleIds);
+    const data = await repos().analytics.getInsurance(
+      user.id,
+      timeZone,
+      vehicleIds,
+      await queryScope(user.id, vehicleIds)
+    );
     return c.json({
       success: true,
       data: insuranceToApi(data, await repos().preferences.moneyScale(user.id)),
