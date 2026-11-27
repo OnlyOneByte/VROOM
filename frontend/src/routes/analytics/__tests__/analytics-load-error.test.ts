@@ -5,6 +5,9 @@ import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 const summaryCall = vi.hoisted(() => vi.fn());
 
 vi.mock('#lib/components/analytics/fuel/FuelStatsTab.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/analytics/explore/ExploreTab.svelte', async () => ({
+	default: (await import('./ExploreStub.svelte')).default
+}));
 vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: {
 		query: () => new Promise(() => {}),

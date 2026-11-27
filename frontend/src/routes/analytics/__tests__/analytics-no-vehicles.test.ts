@@ -5,6 +5,9 @@ const vehicleCount = vi.hoisted(() => ({ value: 0 }));
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('#lib/components/analytics/fuel/FuelStatsTab.svelte', () => ({ default: () => {} }));
+vi.mock('#lib/components/analytics/explore/ExploreTab.svelte', async () => ({
+	default: (await import('./ExploreStub.svelte')).default
+}));
 vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: {
 		query: () => new Promise(() => {}),

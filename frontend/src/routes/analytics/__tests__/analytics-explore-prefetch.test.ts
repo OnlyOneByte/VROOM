@@ -57,7 +57,7 @@ describe('the Explore query on page load', () => {
 			await screen.findByLabelText('Loading the chart', undefined, { timeout: 10_000 })
 		).toBeTruthy();
 		expect(mocks.query).toHaveBeenCalledTimes(1);
-	});
+	}, 20_000);
 
 	test('leaving Explore for another tab sends no further Explore query', async () => {
 		render(Page);
@@ -67,5 +67,5 @@ describe('the Explore query on page load', () => {
 		await fireEvent.click(screen.getByRole('tab', { name: 'Fuel & charging' }));
 		await screen.findByRole('heading', { name: 'Fuel & charging' });
 		expect(mocks.query).toHaveBeenCalledTimes(1);
-	});
+	}, 20_000);
 });

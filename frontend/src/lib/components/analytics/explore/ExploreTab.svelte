@@ -25,6 +25,7 @@
 		EXPLORE_INTERVALS,
 		chartForm,
 		exploreRequest,
+		queryCache,
 		takePrefetched,
 		describeQuery,
 		metricInfo,
@@ -47,7 +48,6 @@
 		bucketBounds,
 		expensesNote,
 		percentChange,
-		queryCache,
 		seriesFor,
 		valueFormatter
 	} from './explore-data';
@@ -580,7 +580,7 @@
 			message={error}
 			onRetry={() => load(request, requestKey, query)}
 		/>
-	{:else if !response || !chartReady}
+	{:else if !response || (!chartReady && hasData(response))}
 		<div aria-busy="true" aria-label="Loading the chart">
 			<Skeleton class="h-[300px] w-full" />
 		</div>
