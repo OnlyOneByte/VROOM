@@ -114,3 +114,59 @@ describe('expenses of a shared car follow the share settings everywhere', () => 
     expect(await listedIds(ctx.authed)).toEqual([LINKED, MANUAL, RUNNING].sort());
   });
 });
+
+describe('other views of a shared car follow the same settings', () => {
+  test('the fuel-advanced cost breakdown leaves out what the share hides', async () => {
+    const res = await viewer.request(
+      'GET',
+      `/api/v1/analytics/fuel-advanced?vehicleId=${CAR}&startDate=1704067200&endDate=1735603200`
+    );
+    expect(res.status).toBe(200);
+    const body =
+      await json<DataEnvelope<{ monthlyCostHeatmap: Array<Record<string, unknown>> }>>(res);
+    const totals = body.data.monthlyCostHeatmap.flatMap((row) =>
+      Object.values(row).filter((v): v is number => typeof v === 'number')
+    );
+    expect(totals).toContain(80);
+    expect(totals).not.toContain(50);
+    expect(totals).not.toContain(400);
+  });
+
+  test("a reminder's expenses leave out what the share hides", async () => {
+    ctx.sqlite.run(
+      "INSERT INTO reminders (id, user_id, name, type, frequency, start_date, expense_category, expense_amount) VALUES ('sev-rem', ?, 'Monthly', 'expense', 'monthly', ?, 'financial', 5000)",
+      [ctx.user.id, JUNE]
+    );
+    ctx.sqlite.run(
+      "INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('sev-rem', ?)",
+      [CAR]
+    );
+    ctx.sqlite.run(
+      "UPDATE expenses SET source_type = 'reminder', source_id = 'sev-rem' WHERE id = ?",
+      [MANUAL]
+    );
+
+    expect(await data<unknown[]>(viewer.request, '/api/v1/reminders/sev-rem/expenses')).toEqual([]);
+    const own = await data<Array<{ id: string }>>(ctx.authed, '/api/v1/reminders/sev-rem/expenses');
+    expect(own.map((e) => e.id)).toEqual([MANUAL]);
+  });
+
+  test('an editor without financial access cannot change or delete what they cannot see', async () => {
+    const editor = await createInvitee(ctx, 'sev-editor');
+    shareCar(ctx, CAR, editor, 'editor');
+    ctx.sqlite.run('UPDATE expenses SET updated_at = ? WHERE id = ?', [JUNE, MANUAL]);
+
+    const put = await editor.request('PUT', `/api/v1/expenses/${MANUAL}`, {
+      description: 'Changed',
+      expectedUpdatedAt: new Date(JUNE * 1000).toISOString(),
+    });
+    expect(put.status).toBe(404);
+    expect(
+      (await editor.request('DELETE', `/api/v1/expenses/${MANUAL}`)).status
+    ).toBeGreaterThanOrEqual(400);
+    const row = ctx.sqlite.query('SELECT description FROM expenses WHERE id = ?').get(MANUAL) as {
+      description: string;
+    } | null;
+    expect(row?.description).toBe('Paperwork fee');
+  });
+});

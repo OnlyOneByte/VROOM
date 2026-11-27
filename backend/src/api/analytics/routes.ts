@@ -387,15 +387,15 @@ routes.get(
     const user = c.get('user');
     const { startDate, endDate, vehicleId, vehicleIds, timeZone } = c.req.valid('query');
 
-    const scopeId = vehicleId
-      ? (await requireVehicleAccess(vehicleId, user.id, 'read')).ownerId
-      : user.id;
+    const access = vehicleId ? await requireVehicleAccess(vehicleId, user.id, 'read') : null;
+    const scopeId = access ? access.ownerId : user.id;
 
     const data = await repos().analytics.getFuelAdvanced(
       scopeId,
       { start: startDate, end: endDate },
       vehicleId ?? vehicleIds,
-      timeZone
+      timeZone,
+      access ? !seesFinancials(access) : false
     );
     return c.json({
       success: true,

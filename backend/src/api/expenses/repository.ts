@@ -39,7 +39,7 @@ import { logger } from '../../utils/logger';
 import { clampPagination, type PaginatedResult } from '../../utils/pagination';
 import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
-import { hiddenFinancialsScope } from '../../utils/vehicle-access';
+import { FINANCIAL_CATEGORIES, hiddenFinancialsScope } from '../../utils/vehicle-access';
 import { expenseSplitService } from './split-service';
 import { latestOf, nextUpdatedAt, nextUpdatedAtFor } from './updated-at';
 import {
@@ -334,7 +334,7 @@ export interface ExpenseSummary {
   costBuckets: CostBuckets;
 }
 
-export const OWNERSHIP_CATEGORIES = ['financial'] as const;
+export const OWNERSHIP_CATEGORIES = FINANCIAL_CATEGORIES;
 
 export interface CostBucketTotals {
   ownershipTotal: number;

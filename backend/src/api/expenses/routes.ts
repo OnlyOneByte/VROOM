@@ -483,6 +483,7 @@ routes.put(
       throw new ValidationError('A split cannot be moved to a vehicle owned by a different user');
     }
     assertMayTouchFinancialExpense(mayTouch, groupInfo.sourceType);
+    assertMaySeeExpense(mayTouch, groupInfo);
 
     const existing = await repos().expenses.getSplitExpense(id, groupInfo.ownerId);
     const kept = new Set(splitConfigVehicleIds(data.splitConfig));
@@ -580,6 +581,7 @@ routes.delete(
       user.id
     );
     assertMayTouchFinancialExpense(mayTouch, groupInfo.sourceType);
+    assertMaySeeExpense(mayTouch, groupInfo);
 
     await deleteWithPhotos(
       groupInfo.ownerId,
@@ -1057,6 +1059,7 @@ routes.put(
     const scale = await repos().preferences.moneyScale(existingExpense.userId);
     const updateData = expenseFromApi(body, scale);
     const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'read');
+    assertMaySeeExpense(writesFinancials(access), existingExpense);
     assertMayTouchFinancialExpense(
       writesFinancials(access),
       existingExpense.sourceType,
@@ -1147,6 +1150,7 @@ routes.delete(
     const existingExpense = await repos().expenses.findById(id);
     if (!existingExpense) throw new NotFoundError('Expense');
     const access = await requireVehicleAccess(existingExpense.vehicleId, user.id, 'read');
+    assertMaySeeExpense(writesFinancials(access), existingExpense);
     assertMayTouchFinancialExpense(writesFinancials(access), existingExpense.sourceType);
     if (existingExpense.groupId) {
       throw new ValidationError(
