@@ -7,6 +7,7 @@ import {
   SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { createInvitee } from '../../../test-helpers/invitee';
 import { seedVehicle } from '../../../test-helpers/seed';
 
 let ctx: TestApp;
@@ -346,6 +347,38 @@ describe('POST /api/v1/expenses/import (CSV)', () => {
     expect(res.status).toBe(200);
     expect((await json<ImportResponse>(res)).data.imported).toBe(1);
     expect((await listExpenses()).map((e) => e.expenseAmount)).toEqual([1200]);
+  });
+
+  test('a car shared with the importer cannot be an import target', async () => {
+    const sharedId = await seedCivic('Owner Car');
+    const b = await createInvitee(ctx, 'import-sharee', 'Sharee');
+    const invite = await ctx.authed('POST', '/api/v1/shares', {
+      vehicleId: sharedId,
+      email: b.email,
+      level: 'editor',
+    });
+    const inviteId = (await json<DataEnvelope<{ id: string }>>(invite)).data.id;
+    expect((await b.request('POST', `/api/v1/shares/${inviteId}/accept`)).status).toBe(200);
+    const own = await b.request('POST', '/api/v1/vehicles', {
+      make: 'Mazda',
+      model: '3',
+      year: 2020,
+      nickname: 'Own Car',
+    });
+    expect(own.status).toBeLessThan(300);
+
+    const csv = [
+      'date,vehicle,category,amount',
+      '2024-06-01T00:00:00.000Z,Owner Car,misc,12.50',
+      '2024-06-01T00:00:00.000Z,Own Car,misc,12.50',
+    ].join('\n');
+    const res = await b.request('POST', '/api/v1/expenses/import', { csv });
+    const body = await json<ImportResponse>(res);
+    expect(body.data.imported).toBe(1);
+    expect(body.data.rows.find((r) => r.row === 2)?.status).toBe('error');
+    expect(
+      ctx.sqlite.query('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?').get(sharedId)
+    ).toEqual({ n: 0 });
   });
 
   test('reports per-row errors (bad category / amount / date) and imports the good ones', async () => {
