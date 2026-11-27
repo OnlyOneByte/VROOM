@@ -22,6 +22,7 @@ import {
 } from '../../utils/unit-preferences-schema';
 import { LOCAL_OCR_PROVIDER_ID, localOcrEnabled } from '../providers/domains/vlm/registry';
 import { CAPABILITY_DOMAIN } from '../providers/resolve';
+import { updatePreferencesWithCurrency } from './repository';
 import {
   type BackupConfigUpdate,
   backupConfigSchema,
@@ -251,12 +252,19 @@ routes.put('/', authorize(ownAccount), async (c) => {
     await assertDefaultsOwned(providerDefaults, user.id);
   }
 
-  let updatedSettings = await repos().preferences.update(user.id, {
+  const preferenceUpdates = {
     ...restUpdates,
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
     ...consentUpdate(existingSettings, communityStatsOptIn),
-  });
+  };
+  const { currencyUnit } = preferenceUpdates;
+  let updatedSettings = currencyUnit
+    ? updatePreferencesWithCurrency(appContext().db, user.id, {
+        ...preferenceUpdates,
+        currencyUnit,
+      })
+    : await repos().preferences.update(user.id, preferenceUpdates);
   if (providerDefaults) {
     updatedSettings =
       (await repos().preferences.mergeJsonField(user.id, 'providerDefaults', providerDefaults)) ??

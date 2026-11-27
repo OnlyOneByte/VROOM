@@ -1,11 +1,24 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { AsyncAppDatabase } from '../../db/async-sqlite';
+import type { AppDatabase } from '../../db/connection';
 import { jsonMergePatch } from '../../db/dialect';
 import type { NewUserPreferences, SyncState, UserPreferences } from '../../db/schema';
-import { syncState, userPreferences } from '../../db/schema';
+import {
+  expenses,
+  insuranceClaims,
+  insurancePolicies,
+  insuranceTerms,
+  reminders,
+  syncState,
+  userPreferences,
+  vehicleFinancing,
+  vehicles,
+} from '../../db/schema';
+import type { DrizzleTransaction } from '../../db/types';
 import { DatabaseError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES } from '../../types';
 import { minorUnitScale } from '../../utils/money';
+import { type BackupTables, MONEY_CENTS_FIELDS, rescaleMoneyTables } from '../sync/backup';
 
 const DEFAULT_CURRENCY = 'USD';
 
@@ -116,6 +129,90 @@ export class PreferencesRepository {
       throw new DatabaseError('Failed to merge user preferences JSON field', error);
     }
   }
+}
+
+const OWNED_MONEY_TABLES = {
+  vehicles,
+  expenses,
+  financing: vehicleFinancing,
+  insuranceTerms,
+  insuranceClaims,
+  reminders,
+} as const;
+
+function ownedMoneyRows(tx: DrizzleTransaction, userId: string): BackupTables {
+  const ids = (rows: { id: string }[]) => rows.map((row) => row.id);
+  const vehicleIds = ids(
+    tx.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.userId, userId)).all()
+  );
+  const policyIds = ids(
+    tx
+      .select({ id: insurancePolicies.id })
+      .from(insurancePolicies)
+      .where(eq(insurancePolicies.userId, userId))
+      .all()
+  );
+  return {
+    vehicles: tx.select().from(vehicles).where(eq(vehicles.userId, userId)).all(),
+    expenses: tx.select().from(expenses).where(eq(expenses.userId, userId)).all(),
+    financing: tx
+      .select()
+      .from(vehicleFinancing)
+      .where(inArray(vehicleFinancing.vehicleId, vehicleIds))
+      .all(),
+    insuranceTerms: tx
+      .select()
+      .from(insuranceTerms)
+      .where(inArray(insuranceTerms.policyId, policyIds))
+      .all(),
+    insuranceClaims: tx
+      .select()
+      .from(insuranceClaims)
+      .where(inArray(insuranceClaims.policyId, policyIds))
+      .all(),
+    reminders: tx.select().from(reminders).where(eq(reminders.userId, userId)).all(),
+  };
+}
+
+function rescaleOwnedMoney(tx: DrizzleTransaction, userId: string, from: number, to: number): void {
+  const rescaled = rescaleMoneyTables(ownedMoneyRows(tx, userId), from, to);
+  for (const [key, table] of Object.entries(OWNED_MONEY_TABLES)) {
+    const columns = Object.keys(getTableColumns(table)).filter(
+      (name) => MONEY_CENTS_FIELDS.has(name) || name === 'expenseSplitConfig'
+    );
+    for (const row of rescaled[key] ?? []) {
+      const set = Object.fromEntries(columns.map((name) => [name, row[name]]));
+      tx.update(table)
+        .set(set)
+        .where(eq(table.id, String(row.id)))
+        .run();
+    }
+  }
+}
+
+export function updatePreferencesWithCurrency(
+  db: AppDatabase,
+  userId: string,
+  updates: Partial<NewUserPreferences> & { currencyUnit: string }
+): UserPreferences {
+  return db.transaction((tx) => {
+    const current = tx
+      .select({ currency: userPreferences.currencyUnit })
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId))
+      .get();
+    const from = minorUnitScale(current?.currency ?? DEFAULT_CURRENCY);
+    const to = minorUnitScale(updates.currencyUnit);
+    if (from !== to) rescaleOwnedMoney(tx, userId, from, to);
+    const updated = tx
+      .update(userPreferences)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(userPreferences.userId, userId))
+      .returning()
+      .get();
+    if (!updated) throw new DatabaseError('User preferences row vanished during a currency change');
+    return updated;
+  });
 }
 
 export class SyncStateRepository {
