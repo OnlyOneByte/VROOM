@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import type { AppDatabase } from '../../db/connection';
+import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { countNum } from '../../db/dialect';
 import { photoRefs, photos, type UserProvider, userProviders } from '../../db/schema';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../errors';
@@ -50,11 +50,9 @@ function isPhotoCategory(value: string): value is PhotoCategory {
 
 const routes = new Hono();
 
-type DbInstance = AppDatabase | Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
-
 // Another user's provider must look missing, so ids cannot be probed.
 async function findOwnedProviderOrThrow(
-  db: DbInstance,
+  db: AsyncAppDatabase,
   id: string,
   userId: string
 ): Promise<UserProvider> {
@@ -185,7 +183,7 @@ routes.get('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
   const domain = c.req.query('domain');
 
-  const db = appContext().db;
+  const db = appContext().asyncDb;
 
   const baseCondition = eq(userProviders.userId, user.id);
   const rows = await db
@@ -366,7 +364,7 @@ routes.put(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
 
-    const db = appContext().db;
+    const db = appContext().asyncDb;
 
     const existing = await findOwnedProviderOrThrow(db, id, user.id);
 
@@ -498,7 +496,7 @@ routes.delete(
     const { id } = c.req.valid('param');
     const force = c.req.valid('query').force === 'true';
 
-    const db = appContext().db;
+    const db = appContext().asyncDb;
 
     const existing = await findOwnedProviderOrThrow(db, id, user.id);
 
@@ -544,9 +542,7 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const db = appContext().db;
-
-    const existing = await findOwnedProviderOrThrow(db, id, user.id);
+    const existing = await findOwnedProviderOrThrow(appContext().asyncDb, id, user.id);
     if (existing.domain === 'auth') {
       throw new ValidationError('Sign-in providers cannot be tested through this endpoint');
     }
@@ -574,9 +570,9 @@ routes.post(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const db = appContext().db;
+    const { db, asyncDb } = appContext();
 
-    await findOwnedProviderOrThrow(db, id, user.id);
+    await findOwnedProviderOrThrow(asyncDb, id, user.id);
     await repos().photoRefs.resetFailedForProvider(id);
 
     const prefs = await repos().preferences.getOrCreate(user.id);
@@ -636,7 +632,7 @@ routes.get(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const db = appContext().db;
+    const db = appContext().asyncDb;
 
     await findOwnedProviderOrThrow(db, id, user.id);
 

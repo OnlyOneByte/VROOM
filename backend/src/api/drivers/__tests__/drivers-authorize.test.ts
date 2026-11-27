@@ -240,6 +240,28 @@ describe('recording who drove or paid', () => {
     expect(legs.find((leg) => leg.vehicleId === OTHER)?.paidByDriverId).toBeNull();
   });
 
+  test("each split leg's payer is the logger's driver on that leg's car", async () => {
+    await ctx.authed('PUT', sharing, { enabled: true });
+    await ctx.authed('PUT', `/api/v1/vehicles/${OTHER}/car-share`, { enabled: true });
+    const own = driverOf(await listDrivers(), ctx.user.id);
+    const otherRes = await ctx.authed('GET', `/api/v1/vehicles/${OTHER}/drivers`);
+    const otherOwn = driverOf((await json<DataEnvelope<Driver[]>>(otherRes)).data, ctx.user.id);
+    expect(own?.id).toBeDefined();
+    expect(otherOwn?.id).toBeDefined();
+    expect(otherOwn?.id).not.toBe(own?.id);
+    const res = await ctx.authed('POST', '/api/v1/expenses/split', {
+      splitConfig: { method: 'even', vehicleIds: [CAR, OTHER] },
+      category: 'maintenance',
+      totalAmount: 60,
+      date: '2024-06-01T00:00:00.000Z',
+    });
+    expect(res.status).toBe(201);
+    const legs = (await json<DataEnvelope<{ siblings: Record<string, unknown>[] }>>(res)).data
+      .siblings;
+    expect(legs.find((leg) => leg.vehicleId === CAR)?.paidByDriverId).toBe(own?.id);
+    expect(legs.find((leg) => leg.vehicleId === OTHER)?.paidByDriverId).toBe(otherOwn?.id);
+  });
+
   test('moving an expense still needs driver.record after car sharing is turned off', async () => {
     await ctx.authed('PUT', sharing, { enabled: true });
     seedCarShared();
