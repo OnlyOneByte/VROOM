@@ -187,7 +187,7 @@
 <div class="space-y-6 md:space-y-8">
 	<div class="flex justify-end">
 		<Select.Root type="single" value={String(selectedYear)} onValueChange={handleYearChange}>
-			<Select.Trigger aria-label="Report year" class="w-fit gap-2 font-medium">
+			<Select.Trigger aria-label="{selectedYear}, report year" class="w-fit gap-2 font-medium">
 				{selectedYear}
 			</Select.Trigger>
 			<Select.Content>
@@ -321,7 +321,7 @@
 						{#if biggestExpense}
 							<li class="flex items-center justify-between gap-3 py-3">
 								<div>
-									<p class="font-medium">Biggest single expense</p>
+									<p class="font-medium">Biggest single expense (excluding fill-ups)</p>
 									<p class="text-sm text-muted-foreground">
 										{biggestExpense.description} · {formatCurrency(biggestExpense.amount)} · {formatDateWith(
 											biggestExpense.date,
