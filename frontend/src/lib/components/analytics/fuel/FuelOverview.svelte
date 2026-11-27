@@ -98,10 +98,13 @@
 				</p>
 				{#if split}
 					<p class="max-w-md text-base md:text-lg">
-						<strong>{percent(split.homeShare)}</strong> of energy came from home at
-						<strong>{rate(split.homeRate)}</strong>
-						per {chargeUnit}{#if split.awayRate != null}; away from home it cost
-							<strong>{rate(split.awayRate)}</strong>{/if}.
+						<strong>{percent(split.homeShare)}</strong> of energy came from {#if split.homeRate != null}home
+							at
+							<strong>{rate(split.homeRate)}</strong> per {chargeUnit}{:else}home{/if}{#if split.awayRate != null};
+							away from home it cost <strong>
+								{rate(split.awayRate)}
+							</strong>
+							per {chargeUnit}{/if}.
 					</p>
 				{/if}
 			</div>

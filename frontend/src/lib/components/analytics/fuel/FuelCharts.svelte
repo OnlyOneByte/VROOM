@@ -98,7 +98,7 @@
 	}
 
 	let units: UnitsMetadata = $derived(fuelStats.units ?? settingsStore.unitPreferences);
-	let chartLevel = $derived(group === 'primary' ? (2 as const) : (3 as const));
+	let chartLevel = $derived(group === 'primary' ? (3 as const) : (4 as const));
 
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let volumeLabel = $derived(getLongFormLabel(units.volumeUnit));

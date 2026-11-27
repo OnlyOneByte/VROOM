@@ -30,10 +30,11 @@ function mainFuelType(history: PriceEntry[]): string | null {
 }
 
 function weightedMean(items: PriceEntry[]): number {
+	const byVolume = items.every(item => item.volume != null && item.volume > 0);
 	let sum = 0;
 	let weight = 0;
 	for (const item of items) {
-		const w = item.volume ?? 1;
+		const w = byVolume ? (item.volume as number) : 1;
 		sum += item.pricePerVolume * w;
 		weight += w;
 	}
@@ -120,14 +121,14 @@ export function chargerRows(byType: ChargerEntry[] | undefined): ChargerRow[] {
 
 export interface HomeSplit {
 	homeShare: number;
-	homeRate: number;
+	homeRate: number | null;
 	awayRate: number | null;
 }
 
 export function homeSplit(byType: ChargerEntry[] | undefined): HomeSplit | null {
 	const rows = (byType ?? []).filter(t => t.sessions > 0);
 	const home = rows.find(t => t.chargerType === 'home');
-	if (!home || home.pricePerEnergyUnit == null || rows.length < 2) return null;
+	if (!home || rows.length < 2) return null;
 	const away = rows.filter(
 		t => t.chargerType !== 'home' && t.chargerType !== 'unspecified' && t.pricePerEnergyUnit != null
 	);

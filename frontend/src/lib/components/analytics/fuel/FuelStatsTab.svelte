@@ -266,7 +266,7 @@
 		<Card.Content class="p-6">
 			<div class="mb-4 flex items-center gap-2">
 				<Icon class="h-5 w-5 text-muted-foreground" />
-				<h3 class="font-semibold text-foreground">{title}</h3>
+				<h4 class="font-semibold text-foreground">{title}</h4>
 			</div>
 
 			<div class="space-y-3 border-b pb-3">
@@ -411,7 +411,7 @@
 									<Card.Content class="p-6">
 										<div class="mb-4 flex items-center gap-2">
 											<Gauge class="h-5 w-5 text-muted-foreground" />
-											<h3 class="font-semibold text-foreground">Fuel Consumption</h3>
+											<h4 class="font-semibold text-foreground">Fuel Consumption</h4>
 										</div>
 
 										<div class="border-b pb-3 text-center">
@@ -473,7 +473,7 @@
 									<Card.Content class="p-6">
 										<div class="mb-4 flex items-center gap-2">
 											<Gauge class="h-5 w-5 text-muted-foreground" />
-											<h3 class="font-semibold text-foreground">Charging Efficiency</h3>
+											<h4 class="font-semibold text-foreground">Charging Efficiency</h4>
 										</div>
 
 										<div class="border-b pb-3 text-center">
@@ -528,7 +528,7 @@
 									<Card.Content class="p-6">
 										<div class="mb-4 flex items-center gap-2">
 											<Plug class="h-5 w-5 text-muted-foreground" />
-											<h3 class="font-semibold text-foreground">Charging Details</h3>
+											<h4 class="font-semibold text-foreground">Charging Details</h4>
 										</div>
 
 										<div class="border-b pb-4 text-center">
@@ -585,7 +585,7 @@
 									<Card.Content class="p-6">
 										<div class="mb-4 flex items-center gap-2">
 											<Droplet class="h-5 w-5 text-muted-foreground" />
-											<h3 class="font-semibold text-foreground">Fill-up Details</h3>
+											<h4 class="font-semibold text-foreground">Fill-up Details</h4>
 										</div>
 
 										<div class="border-b pb-4 text-center">
@@ -627,7 +627,7 @@
 								<Card.Content class="p-6">
 									<div class="mb-4 flex items-center gap-2">
 										<DollarSign class="h-5 w-5 text-muted-foreground" />
-										<h3 class="font-semibold text-foreground">Average Cost</h3>
+										<h4 class="font-semibold text-foreground">Average Cost</h4>
 									</div>
 
 									<div class="border-b pb-4 text-center">
@@ -672,7 +672,7 @@
 								<Card.Content class="p-6">
 									<div class="mb-4 flex items-center gap-2">
 										<Navigation class="h-5 w-5 text-muted-foreground" />
-										<h3 class="font-semibold text-foreground">Distance with VROOM</h3>
+										<h4 class="font-semibold text-foreground">Distance with VROOM</h4>
 									</div>
 
 									<div class="border-b pb-4 text-center">

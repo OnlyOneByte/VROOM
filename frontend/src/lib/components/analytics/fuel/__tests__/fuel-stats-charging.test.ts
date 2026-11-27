@@ -292,6 +292,18 @@ describe('FuelStatsTab summary and groups', () => {
 		expect(moreDetail.textContent).toContain('Fuel cost per');
 		expect(groups.every(g => !(g as HTMLDetailsElement).open)).toBe(true);
 	});
+
+	test('every heading inside a group sits below that group in the outline', () => {
+		const { container } = render(FuelStatsTab, { fuelStats: stats(gas), fuelAdvanced: advanced });
+		const rank = (h: Element) => Number(h.tagName.slice(1));
+		const groups = [...container.querySelectorAll('details[data-slot="chart-group"]')];
+		for (const group of groups) {
+			const own = group.querySelector(':scope > summary > :is(h2, h3)') as Element;
+			const inner = [...group.querySelectorAll(':scope > div :is(h1, h2, h3, h4, h5, h6)')];
+			expect(inner.length).toBeGreaterThan(0);
+			expect(inner.filter(h => rank(h) <= rank(own)).map(h => h.textContent?.trim())).toEqual([]);
+		}
+	});
 });
 
 describe('FuelStatsTab best and worst efficiency', () => {

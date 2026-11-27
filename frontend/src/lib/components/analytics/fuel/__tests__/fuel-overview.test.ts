@@ -68,6 +68,11 @@ describe('fuel overview figures', () => {
 		expect(priceSummary([...history].reverse())?.fuelType).toBe('Premium');
 	});
 
+	test('without a volume on every fill-up, the average falls back to a plain mean', () => {
+		const summary = priceSummary([{ ...fill('2026-10', 3), volume: 30 }, fill('2026-10', 4)]);
+		expect(summary?.average).toBeCloseTo(3.5);
+	});
+
 	test('the average and monthly averages weight each fill-up by its volume', () => {
 		const summary = priceSummary([
 			{ ...fill('2026-10', 3), volume: 2 },
@@ -109,6 +114,9 @@ describe('fuel overview figures', () => {
 		const split = homeSplit(byType);
 		expect(split).toMatchObject({ homeShare: 0.84, homeRate: 0.14 });
 		expect(split?.awayRate).toBeCloseTo((0.3 * 4 + 0.42 * 12) / 16);
+		const freeHome = homeSplit([charger('home', 40, 0.9, null), charger('dc_fast', 5, 0.1, 0.42)]);
+		expect(freeHome).toMatchObject({ homeShare: 0.9, homeRate: null });
+		expect(freeHome?.awayRate).toBeCloseTo(0.42);
 		expect(homeSplit([charger('home', 40, 1, 0.14)])).toBeNull();
 		expect(homeSplit([charger('dc_fast', 5, 1, 0.42)])).toBeNull();
 	});
@@ -194,7 +202,7 @@ describe('FuelOverview', () => {
 		expect(chargingTable.textContent).toMatch(/Home\s*40\s*84%\s*\$0\.140/);
 		expect(chargingTable.textContent).toMatch(/DC fast\s*7\s*16%\s*\$0\.420/);
 		expect(screen.getByRole('region', { name: 'Fuel and charging overview' }).textContent).toMatch(
-			/84%\s*of energy came from home at\s*\$0\.140\s*per kWh; away from home it cost\s*\$0\.420\./
+			/84%\s*of energy came from home\s+at\s*\$0\.140\s*per kWh;\s*away from home it cost\s*\$0\.420\s*per kWh\./
 		);
 	});
 
