@@ -153,7 +153,7 @@
 				<Label for="calendar-url">Your private calendar link</Label>
 				<div class="flex gap-2">
 					<Input id="calendar-url" value={link} readonly class="min-w-0 font-mono text-xs" />
-					<Button variant="outline" class="h-11.5 shrink-0 rounded-full" onclick={copyLink}>
+					<Button variant="outline" class="h-11.5 shrink-0" onclick={copyLink}>
 						<Copy class="mr-1 h-4 w-4" aria-hidden="true" />
 						Copy link
 					</Button>
