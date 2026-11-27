@@ -1,8 +1,8 @@
 import { createId } from '@paralleldrive/cuid2';
 import { and, eq, inArray } from 'drizzle-orm';
+import type { AsyncHandle } from '../../db/async-sqlite';
 import type { Expense, NewExpense, SplitMethod } from '../../db/schema';
 import { expenses, photos } from '../../db/schema';
-import type { DrizzleTransaction } from '../../db/types';
 import { percentageToBasisPoints, type SplitConfig } from './validation';
 
 export class ExpenseSplitService {
@@ -63,53 +63,7 @@ export class ExpenseSplitService {
   }
 
   async createSiblings(
-    tx: DrizzleTransaction,
-    params: {
-      groupId: string;
-      userId: string;
-      splitMethod: SplitMethod;
-      groupTotal: number;
-      allocations: Array<{ vehicleId: string; amount: number }>;
-      category: string;
-      date: Date;
-      tags?: string[];
-      description?: string;
-      sourceType?: string;
-      sourceId?: string;
-      createdBy?: string | null;
-    }
-  ): Promise<Expense[]> {
-    const siblings: Expense[] = [];
-
-    for (const allocation of params.allocations) {
-      const newExpense: NewExpense = {
-        id: createId(),
-        vehicleId: allocation.vehicleId,
-        expenseAmount: allocation.amount,
-        userId: params.userId,
-        createdBy: params.createdBy ?? null,
-        groupId: params.groupId,
-        groupTotal: params.groupTotal,
-        splitMethod: params.splitMethod,
-        category: params.category,
-        date: params.date,
-        tags: params.tags ?? null,
-        description: params.description ?? null,
-        missedFillup: false,
-        sourceType: params.sourceType ?? null,
-        sourceId: params.sourceId ?? null,
-      };
-
-      const [inserted] = await tx.insert(expenses).values(newExpense).returning();
-      siblings.push(inserted);
-    }
-
-    return siblings;
-  }
-
-  // bun:sqlite transactions roll back only when the callback is synchronous; an async insert autocommits alone.
-  createSiblingsSync(
-    tx: DrizzleTransaction,
+    tx: AsyncHandle,
     params: {
       groupId: string;
       userId: string;
@@ -125,7 +79,7 @@ export class ExpenseSplitService {
       createdBy?: string | null;
       payerFor?: (vehicleId: string) => string | null;
     }
-  ): Expense[] {
+  ): Promise<Expense[]> {
     const siblings: Expense[] = [];
 
     for (const allocation of params.allocations) {
@@ -148,15 +102,16 @@ export class ExpenseSplitService {
         paidByDriverId: params.payerFor?.(allocation.vehicleId) ?? null,
       };
 
-      const inserted = tx.insert(expenses).values(newExpense).returning().get();
+      const [inserted] = await tx.insert(expenses).values(newExpense).returning();
+      if (!inserted) throw new Error('Expense insert returned no row');
       siblings.push(inserted);
     }
 
     return siblings;
   }
 
-  updateSiblingsSync(
-    tx: DrizzleTransaction,
+  async updateSiblings(
+    tx: AsyncHandle,
     params: {
       groupId: string;
       existing: [Expense, ...Expense[]];
@@ -165,7 +120,7 @@ export class ExpenseSplitService {
       allocations: Array<{ vehicleId: string; amount: number }>;
       createdBy: string | null;
     }
-  ): Expense[] {
+  ): Promise<Expense[]> {
     const [template] = params.existing;
     const unmatchedByVehicle = new Map<string, Expense[]>();
     for (const leg of params.existing) {
@@ -181,10 +136,11 @@ export class ExpenseSplitService {
         eq(expenses.userId, template.userId)
       );
     const updatedAt = new Date();
-    const legs = params.allocations.flatMap((allocation) => {
+    const legs: Expense[] = [];
+    for (const allocation of params.allocations) {
       const match = unmatchedByVehicle.get(allocation.vehicleId)?.shift();
       if (!match) {
-        return this.createSiblingsSync(tx, {
+        const created = await this.createSiblings(tx, {
           groupId: params.groupId,
           userId: template.userId,
           createdBy: params.createdBy,
@@ -198,8 +154,10 @@ export class ExpenseSplitService {
           sourceType: template.sourceType ?? undefined,
           sourceId: template.sourceId ?? undefined,
         });
+        legs.push(...created);
+        continue;
       }
-      return tx
+      const updated = await tx
         .update(expenses)
         .set({
           expenseAmount: allocation.amount,
@@ -208,18 +166,18 @@ export class ExpenseSplitService {
           updatedAt,
         })
         .where(groupLegs([match.id]))
-        .returning()
-        .all();
-    });
+        .returning();
+      legs.push(...updated);
+    }
 
     const removedIds = [...unmatchedByVehicle.values()].flat().map((leg) => leg.id);
     const [survivor] = legs;
     if (removedIds.length > 0 && survivor) {
-      tx.update(photos)
+      await tx
+        .update(photos)
         .set({ entityId: survivor.id })
-        .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, removedIds)))
-        .run();
-      tx.delete(expenses).where(groupLegs(removedIds)).run();
+        .where(and(eq(photos.entityType, 'expense'), inArray(photos.entityId, removedIds)));
+      await tx.delete(expenses).where(groupLegs(removedIds));
     }
 
     return legs;

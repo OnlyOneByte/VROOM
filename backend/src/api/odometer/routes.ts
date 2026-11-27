@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { repos } from '../../app-context';
-import type { DrizzleTransaction } from '../../db/types';
+import type { AsyncHandle } from '../../db/async-sqlite';
 import { NotFoundError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import {
@@ -54,7 +54,7 @@ const createBodySchema = odometerCreateSchema.extend({
 const updateSchema = createBodySchema.partial();
 
 function inOrder(check: OdometerCheck | null) {
-  return (tx: DrizzleTransaction) => assertOdometerInOrder(tx, check);
+  return (tx: AsyncHandle) => assertOdometerInOrder(tx, check);
 }
 
 const fromEntry: ResourceOf = async (c) => {

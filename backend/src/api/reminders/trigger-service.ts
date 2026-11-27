@@ -1,10 +1,10 @@
 import { createId } from '@paralleldrive/cuid2';
-import { repos } from '../../app-context';
+import { appContext, repos } from '../../app-context';
 import { CONFIG } from '../../config';
-import { transaction } from '../../db/connection';
+import type { AsyncHandle } from '../../db/async-sqlite';
 import type { Expense, Reminder, ReminderNotification } from '../../db/schema';
 import { expenses, reminderNotifications } from '../../db/schema';
-import type { DrizzleTransaction, SplitConfig } from '../../db/types';
+import type { SplitConfig } from '../../db/types';
 import { ValidationError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
 import { logger } from '../../utils/logger';
@@ -240,12 +240,11 @@ export function previousDueBefore(
   return previous;
 }
 
-// bun:sqlite: keep transaction bodies synchronous; awaited statements autocommit separately.
-function createExpenseFromReminder(
-  tx: DrizzleTransaction,
+async function createExpenseFromReminder(
+  tx: AsyncHandle,
   { reminder, vehicleIds }: ReminderWithVehicles,
   dueDate: Date
-): Expense[] {
+): Promise<Expense[]> {
   const splitConfig = reminder.expenseSplitConfig as SplitConfig | null;
   const amount = reminder.expenseAmount ?? 0;
   const category = reminder.expenseCategory ?? 'misc';
@@ -255,7 +254,7 @@ function createExpenseFromReminder(
     if (!vehicleId) {
       throw new ValidationError('Reminder has no linked vehicle to create an expense for');
     }
-    const expense = tx
+    const [expense] = await tx
       .insert(expenses)
       .values({
         id: createId(),
@@ -273,15 +272,15 @@ function createExpenseFromReminder(
         sourceType: 'reminder',
         sourceId: reminder.id,
       })
-      .returning()
-      .get();
+      .returning();
+    if (!expense) throw new Error('Expense insert returned no row');
     return [expense];
   }
 
   const allocations = expenseSplitService.computeAllocations(splitConfig, amount);
   const groupId = createId();
 
-  return expenseSplitService.createSiblingsSync(tx, {
+  return expenseSplitService.createSiblings(tx, {
     groupId,
     userId: reminder.userId,
     splitMethod: splitConfig.method,
@@ -316,12 +315,12 @@ async function processExpensePeriod(
   timeZone: string | undefined
 ): Promise<{ created: Expense[]; advancedDue: Date } | null> {
   const advancedDue = advanceReminderDueDate(reminder, nextDue, timeZone);
-  return transaction((tx) => {
-    if (!repos().reminders.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
+  return appContext().asyncDb.transaction(async (tx) => {
+    if (!(await repos().reminders.claimPeriod(tx, reminder.id, nextDue, advancedDue, now))) {
       return null;
     }
     return {
-      created: createExpenseFromReminder(tx, { reminder, vehicleIds }, nextDue),
+      created: await createExpenseFromReminder(tx, { reminder, vehicleIds }, nextDue),
       advancedDue,
     };
   });
@@ -334,11 +333,11 @@ async function processNotificationPeriod(
   timeZone: string | undefined
 ): Promise<{ created: ReminderNotification; advancedDue: Date } | null> {
   const advancedDue = advanceReminderDueDate(reminder, nextDue, timeZone);
-  return transaction((tx) => {
-    if (!repos().reminders.claimPeriodSync(tx, reminder.id, nextDue, advancedDue, now)) {
+  return appContext().asyncDb.transaction(async (tx) => {
+    if (!(await repos().reminders.claimPeriod(tx, reminder.id, nextDue, advancedDue, now))) {
       return null;
     }
-    const created = tx
+    const [created] = await tx
       .insert(reminderNotifications)
       .values({
         id: createId(),
@@ -347,8 +346,8 @@ async function processNotificationPeriod(
         dueDate: nextDue,
         isRead: false,
       })
-      .returning()
-      .get();
+      .returning();
+    if (!created) throw new Error('Notification insert returned no row');
     return { created, advancedDue };
   });
 }
