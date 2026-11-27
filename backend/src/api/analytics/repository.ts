@@ -1530,8 +1530,6 @@ export class AnalyticsRepository {
     userId: string,
     timeZone: string | undefined
   ): Promise<number> {
-    const vehicleIds = vehicleRows.map((v) => v.id);
-
     const allMaintenance = await this.db
       .select({
         vehicleId: expenses.vehicleId,
