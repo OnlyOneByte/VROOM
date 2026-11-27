@@ -52,11 +52,12 @@ function photoCount(): number {
 
 async function expectReceiptFilesDeleted(expenseId: string, request: () => Promise<Response>) {
   const photoService = await import('../../photos/photo-service');
-  const spy = spyOn(photoService, 'deletePhotosForEntities');
+  const spy = spyOn(photoService, 'deleteStoredPhotoObjects');
   try {
     const res = await request();
     expect(res.status, await res.text()).toBe(200);
-    expect(spy).toHaveBeenCalledWith('expense', [expenseId], ctx.user.id);
+    const refIds = spy.mock.calls.flatMap(([refs]) => refs.map((ref) => ref.id));
+    expect(refIds, `the stored file of ${expenseId}'s receipt is deleted`).toContain('ref-1');
     expect(photoCount()).toBe(0);
   } finally {
     spy.mockRestore();
