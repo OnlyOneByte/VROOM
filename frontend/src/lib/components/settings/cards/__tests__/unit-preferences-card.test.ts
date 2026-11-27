@@ -226,7 +226,7 @@ describe('UnitPreferencesCard', () => {
 
 			await enter('-1');
 			expect(rate()).toHaveAttribute('aria-invalid', 'true');
-			expect(rate()).toHaveAccessibleDescription(/Enter a rate of 0 or more/);
+			expect(rate()).toHaveAccessibleDescription(/Use 0 or more/);
 
 			await enter('abc');
 			expect(onRateChange).not.toHaveBeenCalled();

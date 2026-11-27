@@ -51,7 +51,7 @@
 		const text = rateDraft.trim().replace(',', '.');
 		const value = text === '' ? 0 : Number(text);
 		if (!Number.isFinite(value) || value < 0) {
-			rateError = 'Enter a rate of 0 or more';
+			rateError = 'Use 0 or more';
 			return;
 		}
 		rateError = null;
@@ -166,14 +166,14 @@
 				</Select.Root>
 			</div>
 			<div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 py-3">
-				<div class="min-w-0">
+				<div class="min-w-0 flex-1 basis-48">
 					<label for={RATE_ANCHOR} class="font-medium">Business mileage rate</label>
 					<p id="{RATE_ANCHOR}-help" class="text-sm text-muted-foreground">
 						{getCurrencySymbol(currencyUnit)} per {perUnit}, to value your business trips. Leave
 						empty to turn it off.
 					</p>
 				</div>
-				<div class="w-full space-y-1 sm:w-40">
+				<div class="w-full space-y-1 sm:w-32 sm:shrink-0">
 					<Input
 						id={RATE_ANCHOR}
 						bind:ref={rateInput}
