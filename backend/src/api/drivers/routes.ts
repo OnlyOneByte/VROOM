@@ -87,13 +87,13 @@ driverRoutes.get(
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
     const { db, asyncDb } = appContext();
-    const owner = await repos().vehicles.findById(vehicleId);
-    if (!owner?.carShareEnabled) throw new NotFoundError('Car sharing');
+    const car = await repos().vehicles.findById(vehicleId);
+    if (!car?.carShareEnabled) throw new NotFoundError('Car sharing');
     const to = query.to ? Date.parse(query.to) : Date.now();
     const from = query.from ? Date.parse(query.from) : to - 30 * DAY;
     const resolver = requestResolver(c, db);
     const vehicle = { kind: 'vehicle' as const, vehicleId };
-    const scale = await repos().preferences.moneyScale(owner.userId);
+    const scale = await repos().preferences.moneyScale(car.userId);
     return c.json({
       success: true,
       data: await driverStats(asyncDb, vehicleId, {

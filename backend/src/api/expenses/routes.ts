@@ -421,7 +421,7 @@ routes.post(
     await assertSplitFinancingSourceValid(data.sourceType, data.sourceId, data.splitConfig);
 
     const payers = new Map<string, string | null>();
-    for (const vehicleId of new Set(splitConfigVehicleIds(data.splitConfig))) {
+    for (const vehicleId of splitConfigVehicleIds(data.splitConfig)) {
       payers.set(vehicleId, (await attributedDriver(c, vehicleId, undefined)) ?? null);
     }
     const payerFor = (vehicleId: string) => payers.get(vehicleId) ?? null;
