@@ -4,6 +4,7 @@ import type { AsyncHandle } from '../db/async-sqlite';
 import { expenses, vehicleShares, vehicles } from '../db/schema';
 import { NotFoundError } from '../errors';
 import { resolverFor, vehicleResources } from '../permissions/grants';
+import type { Resource } from '../permissions/resolve';
 
 export type VehicleRole = 'owner' | 'editor' | 'viewer';
 export type VehicleAccessMode = 'read' | 'write' | 'owner';
@@ -17,16 +18,23 @@ export interface VehicleAccess {
 export const FINANCIAL_READS = ['vehicle.financing.read', 'vehicle.insurance.read'] as const;
 const FINANCIAL_WRITES = ['vehicle.financing.write', 'vehicle.insurance.write'] as const;
 
+export function financialAccessOf(
+  resolver: { can: (permission: string, resource: Resource) => { allow: boolean } },
+  vehicleId: string
+): VehicleAccess['financials'] {
+  const vehicle = { kind: 'vehicle' as const, vehicleId };
+  const holdsAll = (permissions: readonly string[]) =>
+    permissions.every((p) => resolver.can(p, vehicle).allow);
+  return { read: holdsAll(FINANCIAL_READS), write: holdsAll(FINANCIAL_WRITES) };
+}
+
 async function memberFinancials(
   db: AsyncHandle,
   vehicleId: string,
   userId: string
 ): Promise<VehicleAccess['financials']> {
-  const vehicle = { kind: 'vehicle' as const, vehicleId };
-  const resolver = await resolverFor(userId, [vehicle], db);
-  const holdsAll = (permissions: readonly string[]) =>
-    permissions.every((p) => resolver.can(p, vehicle).allow);
-  return { read: holdsAll(FINANCIAL_READS), write: holdsAll(FINANCIAL_WRITES) };
+  const resolver = await resolverFor(userId, [{ kind: 'vehicle', vehicleId }], db);
+  return financialAccessOf(resolver, vehicleId);
 }
 
 const ROLES_FOR_MODE: Record<VehicleAccessMode, readonly VehicleRole[]> = {
@@ -181,11 +189,12 @@ export function hiddenFinancialsScope(): SQL {
   return sql`((${isNull(expenses.sourceType)} or ${notInArray(expenses.sourceType, [...FINANCIAL_SOURCE_TYPES])}) and ${notInArray(expenses.category, [...FINANCIAL_CATEGORIES])})`;
 }
 
+export function isFinancialCategory(category: string | null | undefined): boolean {
+  return (FINANCIAL_CATEGORIES as readonly (string | null | undefined)[]).includes(category);
+}
+
 export function isFinancialExpense(expense: { sourceType: string | null; category: string }) {
-  return (
-    isFinancialSource(expense.sourceType) ||
-    (FINANCIAL_CATEGORIES as readonly string[]).includes(expense.category)
-  );
+  return isFinancialSource(expense.sourceType) || isFinancialCategory(expense.category);
 }
 
 export function assertMaySeeExpense(
