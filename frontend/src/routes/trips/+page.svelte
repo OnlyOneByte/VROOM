@@ -14,7 +14,8 @@
 		formatCurrency,
 		formatDate,
 		formatNumber,
-		formatNumberUpTo
+		formatNumberUpTo,
+		formatRate
 	} from '#lib/utils/formatters.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
@@ -140,7 +141,7 @@
 					{#snippet meta()}
 						<span class="tabular-nums">
 							{formatNumberUpTo(s.businessDistance, 1)}
-							{distLabel} business at {formatCurrency(s.rate, undefined, 2)}/{distLabel}
+							{distLabel} business at {formatRate(s.rate)}/{distLabel}
 						</span>
 					{/snippet}
 				</HeroFigure>

@@ -202,6 +202,16 @@ describe('trips page list', () => {
 		expect(text).toContain('Avg / trip 617 mi');
 	});
 
+	test('a converted rate shows its own decimals, not rounded to cents', async () => {
+		getSummary.mockResolvedValue({ ...SUMMARY, rate: 0.4163, businessMileageValue: 374.67 });
+		list.mockResolvedValue(tripPage([trip()]));
+		render(Page);
+		await settle();
+
+		const text = screen.getByTestId('trip-summary-card').textContent?.replace(/\s+/g, ' ');
+		expect(text).toContain('900 mi business at $0.4163/mi');
+	});
+
 	test('with no mileage rate the hero shows the business distance instead of a value', async () => {
 		getSummary.mockResolvedValue({ ...SUMMARY, rate: 0, businessMileageValue: 0 });
 		list.mockResolvedValue(tripPage([trip()]));
