@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -93,6 +94,22 @@ describe('PUT /expenses/:id with expectedUpdatedAt', () => {
     expect(late.status).toBe(409);
     expect(ctx.sqlite.query('SELECT description FROM expenses WHERE id = ?').get(row.id)).toEqual({
       description: 'B',
+    });
+  });
+
+  test('clearing a financing link moves the version, so an edit read before it is refused', async () => {
+    const row = await createExpense();
+    ctx.sqlite
+      .query("UPDATE expenses SET source_type = 'financing', source_id = 'loan-1' WHERE id = ?")
+      .run(row.id);
+
+    expect(await repos().expenses.clearSource('financing', 'loan-1', ctx.user.id)).toBe(1);
+
+    const stale = await put(row.id, { description: 'Late', expectedUpdatedAt: row.updatedAt });
+    expect(stale.status).toBe(409);
+    expect((await json<ErrorBody>(stale)).error.code).toBe('EXPENSE_CHANGED');
+    expect(ctx.sqlite.query('SELECT description FROM expenses WHERE id = ?').get(row.id)).toEqual({
+      description: 'Oil change',
     });
   });
 

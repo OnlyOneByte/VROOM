@@ -41,6 +41,7 @@ import { BaseRepository } from '../../utils/repository';
 import { zonedDayWindow, zonedMidnight } from '../../utils/time-zone';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
 import { expenseSplitService } from './split-service';
+import { latestOf, nextUpdatedAt, nextUpdatedAtFor } from './updated-at';
 import {
   type OdometerCheck,
   type OdometerNeighbours,
@@ -80,22 +81,10 @@ const EXPENSE_SORT_COLUMNS = {
   category: expenses.category,
 } as const;
 
-const UPDATED_AT_STEP_MS = 1000;
-
 function assertNotChanged(stored: Date | null, expected: Date | undefined): void {
   if (expected && stored?.getTime() !== expected.getTime()) {
     throw new ExpenseChangedError(stored);
   }
-}
-
-function latestOf(times: (Date | null)[]): Date | null {
-  const latest = Math.max(0, ...times.map((d) => d?.getTime() ?? 0));
-  return latest > 0 ? new Date(latest) : null;
-}
-
-function nextUpdatedAt(previous: (Date | null)[]): Date {
-  const latest = latestOf(previous)?.getTime() ?? 0;
-  return new Date(Math.max(Date.now(), latest + UPDATED_AT_STEP_MS));
 }
 
 interface Readings {
@@ -870,11 +859,14 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
 
   async clearSource(sourceType: string, sourceId: string, userId: string): Promise<number> {
     try {
-      const result = await this.db
-        .update(expenses)
-        .set({ sourceType: null, sourceId: null })
-        .where(this.sourceScope(sourceType, sourceId, userId))
-        .returning();
+      const scope = this.sourceScope(sourceType, sourceId, userId);
+      const result = await this.db.transaction(async (tx) =>
+        tx
+          .update(expenses)
+          .set({ sourceType: null, sourceId: null, updatedAt: await nextUpdatedAtFor(tx, scope) })
+          .where(scope)
+          .returning({ id: expenses.id })
+      );
 
       return result.length;
     } catch (error) {

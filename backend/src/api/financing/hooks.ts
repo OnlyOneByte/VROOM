@@ -3,6 +3,7 @@ import { appContext } from '../../app-context';
 import { expenses, type VehicleFinancing, vehicleFinancing } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
+import { nextUpdatedAtFor } from '../expenses/updated-at';
 
 export async function deactivateFinancing(
   financingId: string,
@@ -18,16 +19,15 @@ export async function deactivateFinancing(
     if (!row) {
       throw new NotFoundError('Resource');
     }
+    const linked = and(
+      eq(expenses.sourceType, 'financing'),
+      eq(expenses.sourceId, financingId),
+      eq(expenses.userId, userId)
+    );
     const detached = await tx
       .update(expenses)
-      .set({ sourceType: null, sourceId: null })
-      .where(
-        and(
-          eq(expenses.sourceType, 'financing'),
-          eq(expenses.sourceId, financingId),
-          eq(expenses.userId, userId)
-        )
-      )
+      .set({ sourceType: null, sourceId: null, updatedAt: await nextUpdatedAtFor(tx, linked) })
+      .where(linked)
       .returning({ id: expenses.id });
     return { updated: row, cleared: detached.length };
   });

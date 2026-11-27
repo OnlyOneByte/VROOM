@@ -1,6 +1,7 @@
 import { createId } from '@paralleldrive/cuid2';
 import { desc, eq } from 'drizzle-orm';
 import { addGuestDriver, ownDriverId, setCarShare } from '../api/drivers/repository';
+import { nextUpdatedAtFor } from '../api/expenses/updated-at';
 import { createTermExpenses } from '../api/insurance/hooks';
 import { appContext } from '../app-context';
 import { assignServerRole } from '../permissions/grants';
@@ -148,7 +149,9 @@ async function shareWeekendCar(pattern: DrivingPattern): Promise<void> {
   let fillUp = 0;
   for (const row of rows) {
     const payer = row.category === 'fuel' && fillUp++ % 3 !== 0 ? jamie : owner;
-    await db.update(expenses).set({ paidByDriverId: payer }).where(eq(expenses.id, row.id));
+    const target = eq(expenses.id, row.id);
+    const updatedAt = await nextUpdatedAtFor(db, target);
+    await db.update(expenses).set({ paidByDriverId: payer, updatedAt }).where(target);
   }
   await db.update(trips).set({ driverId: jamie }).where(eq(trips.vehicleId, vehicleId));
 }

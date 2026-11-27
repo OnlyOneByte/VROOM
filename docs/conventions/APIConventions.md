@@ -135,8 +135,15 @@ need; don't reshape a repository to qualify.
 - If it is set and the stored value differs, the server writes nothing and answers **409** with
   code `EXPENSE_CHANGED` and `details.updatedAt` (the current value). If it is not set, the update
   behaves as before, so imports and older clients are unaffected.
-- `updated_at` is stored in whole seconds, so every update moves it forward by at least one
-  second. Two writes inside one second therefore never share a value.
+- Every write to an expense row moves `updated_at` forward, including writes that are not edits:
+  clearing a financing or other source link, deactivating a loan, the driver payer backfill and a
+  split group's total recompute. Without that, an edit read before such a write would overwrite it
+  unchecked.
+- `updated_at` is stored in whole seconds, so each write sets it to at least one second past the
+  latest value among the rows it touches (`nextUpdatedAt` and `nextUpdatedAtFor` in
+  `api/expenses/updated-at.ts`). Two writes inside one second therefore never share a value.
+  `expense-writes-stamp.test.ts` fails on a production `update(expenses)` that does not set
+  `updatedAt`.
 
 ### Ownership & Authorization
 - Every route checks access *before* the repository call. Don't delegate it downstream.

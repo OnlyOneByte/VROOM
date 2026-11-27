@@ -11,6 +11,7 @@ import {
 } from '../../db/schema';
 import { NotFoundError } from '../../errors';
 import { hiddenFinancialsScope } from '../../utils/vehicle-access';
+import { nextUpdatedAtFor } from '../expenses/updated-at';
 import { carShareEnabled, listDrivers } from './repository';
 
 export type BackfillRequest =
@@ -153,17 +154,16 @@ async function setDriver(
       .returning({ id: odometerEntries.id });
     return rows.length > 0;
   }
+  const target = and(
+    eq(expenses.id, entry.id),
+    eq(expenses.vehicleId, vehicleId),
+    match(expenses.paidByDriverId),
+    visibleExpenses(hideFinancials)
+  );
   const rows = await tx
     .update(expenses)
-    .set({ paidByDriverId: to })
-    .where(
-      and(
-        eq(expenses.id, entry.id),
-        eq(expenses.vehicleId, vehicleId),
-        match(expenses.paidByDriverId),
-        visibleExpenses(hideFinancials)
-      )
-    )
+    .set({ paidByDriverId: to, updatedAt: await nextUpdatedAtFor(tx, target) })
+    .where(target)
     .returning({ id: expenses.id });
   return rows.length > 0;
 }
