@@ -48,6 +48,26 @@ describe('plainDecimal', () => {
 	])('%s is written as %s, never with an exponent or grouping', (value, expected) => {
 		expect(plainDecimal(value)).toBe(expected);
 	});
+
+	test('a browser that allows only 20 decimals still shows the rate, to 20 decimals', () => {
+		const real = Number.prototype.toLocaleString;
+		const capped = vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(function (
+			this: number,
+			locales,
+			options
+		) {
+			if ((options?.maximumFractionDigits ?? 0) > 20) {
+				throw new RangeError('maximumFractionDigits value is out of range.');
+			}
+			return real.call(this, locales, options);
+		});
+		try {
+			expect(plainDecimal(0.4163)).toBe('0.4163');
+			expect(plainDecimal(0.0000000000000000000123456789)).toBe('0.00000000000000000001');
+		} finally {
+			capped.mockRestore();
+		}
+	});
 });
 
 describe('formatCurrency', () => {
