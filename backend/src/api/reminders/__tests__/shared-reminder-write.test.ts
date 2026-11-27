@@ -24,9 +24,9 @@ async function shareAccepted(level: 'viewer' | 'editor'): Promise<string> {
   return vehicleId;
 }
 
-function storedReminderUserId(reminderId: string): string {
+async function storedReminderUserId(reminderId: string): Promise<string> {
   return (
-    ctx.sqlite.query('SELECT user_id FROM reminders WHERE id = ?').get(reminderId) as {
+    (await ctx.sql.get('SELECT user_id FROM reminders WHERE id = ?', [reminderId])) as {
       user_id: string;
     }
   ).user_id;
@@ -52,7 +52,7 @@ describe('reminder writes on shared vehicles', () => {
     expect(res.status, JSON.stringify(body)).toBe(201);
     const rid = body.data.reminder.id;
 
-    expect(storedReminderUserId(rid)).toBe(ctx.user.id);
+    expect(await storedReminderUserId(rid)).toBe(ctx.user.id);
 
     const ownerList = await json<DataEnvelope<ReminderEnvelope[]>>(
       await ctx.authed('GET', `/api/v1/reminders?vehicleId=${vehicleId}`)
@@ -75,12 +75,13 @@ describe('reminder writes on shared vehicles', () => {
     const body = await json<DataEnvelope<ReminderEnvelope>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
     const rid = body.data.reminder.id;
-    expect(storedReminderUserId(rid)).toBe(ctx.user.id);
+    expect(await storedReminderUserId(rid)).toBe(ctx.user.id);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
-    const materialized = ctx.sqlite
-      .query("SELECT user_id FROM expenses WHERE source_type = 'reminder' AND source_id = ?")
-      .all(rid) as Array<{ user_id: string }>;
+    const materialized = (await ctx.sql.all(
+      "SELECT user_id FROM expenses WHERE source_type = 'reminder' AND source_id = ?",
+      [rid]
+    )) as Array<{ user_id: string }>;
     for (const row of materialized) {
       expect(row.user_id).toBe(ctx.user.id);
     }
@@ -97,7 +98,7 @@ describe('reminder writes on shared vehicles', () => {
     });
     const body = await json<DataEnvelope<ReminderEnvelope>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
-    expect(storedReminderUserId(body.data.reminder.id)).toBe(ctx.user.id);
+    expect(await storedReminderUserId(body.data.reminder.id)).toBe(ctx.user.id);
   });
 
   test('a reminder spanning two owners is rejected', async () => {
@@ -137,11 +138,11 @@ describe('reminder writes on shared vehicles', () => {
       name: 'Tire rotation (edited)',
     });
     expect(put.status, 'editor can update a shared reminder').toBe(200);
-    expect(storedReminderUserId(rid)).toBe(ctx.user.id);
+    expect(await storedReminderUserId(rid)).toBe(ctx.user.id);
 
     const mark = await b.request('POST', `/api/v1/reminders/${rid}/mark-serviced`);
     expect(mark.status, 'editor can mark-serviced a shared reminder').toBe(200);
-    expect(storedReminderUserId(rid)).toBe(ctx.user.id);
+    expect(await storedReminderUserId(rid)).toBe(ctx.user.id);
 
     const owners = await b.request('DELETE', `/api/v1/reminders/${rid}`);
     expect(owners.status, "editor cannot delete the owner's reminder").toBe(403);
@@ -156,7 +157,7 @@ describe('reminder writes on shared vehicles', () => {
     const mineId = (await json<DataEnvelope<ReminderEnvelope>>(mine)).data.reminder.id;
     const del = await b.request('DELETE', `/api/v1/reminders/${mineId}`);
     expect(del.status, 'editor can delete a reminder they added').toBe(200);
-    expect(ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(mineId)).toBeNull();
+    expect(await ctx.sql.get('SELECT id FROM reminders WHERE id = ?', [mineId])).toBeNull();
   });
 
   test('a viewer cannot create, update, delete, or mark-serviced a shared reminder (403)', async () => {
@@ -190,7 +191,7 @@ describe('reminder writes on shared vehicles', () => {
       403
     );
 
-    expect(ctx.sqlite.query('SELECT id FROM reminders WHERE id = ?').get(rid)).not.toBeNull();
+    expect(await ctx.sql.get('SELECT id FROM reminders WHERE id = ?', [rid])).not.toBeNull();
   });
 });
 
@@ -209,15 +210,15 @@ describe('reminder writes after the reminder lost its vehicles', () => {
     expect(created.status, JSON.stringify(body)).toBe(201);
     expect((await ctx.authed('DELETE', `/api/v1/vehicles/${vehicleId}`)).status).toBe(200);
     expect(
-      ctx.sqlite
-        .query('SELECT 1 FROM reminder_vehicles WHERE reminder_id = ?')
-        .get(body.data.reminder.id)
+      await ctx.sql.get('SELECT 1 FROM reminder_vehicles WHERE reminder_id = ?', [
+        body.data.reminder.id,
+      ])
     ).toBeNull();
     return body.data.reminder.id;
   }
 
-  function storedReminder(rid: string): { name: string; is_active: number } | null {
-    return ctx.sqlite.query('SELECT name, is_active FROM reminders WHERE id = ?').get(rid) as {
+  async function storedReminder(rid: string): Promise<{ name: string; is_active: number } | null> {
+    return (await ctx.sql.get('SELECT name, is_active FROM reminders WHERE id = ?', [rid])) as {
       name: string;
       is_active: number;
     } | null;
@@ -225,7 +226,7 @@ describe('reminder writes after the reminder lost its vehicles', () => {
 
   test('another user cannot read, edit, service or delete it', async () => {
     const rid = await vehiclelessReminder();
-    const before = storedReminder(rid);
+    const before = await storedReminder(rid);
 
     const serviced = await b.request('POST', `/api/v1/reminders/${rid}/mark-serviced`);
     expect(serviced.status, 'mark-serviced').toBe(404);
@@ -236,16 +237,16 @@ describe('reminder writes after the reminder lost its vehicles', () => {
       'PUT'
     ).toBe(404);
 
-    expect(storedReminder(rid)).toEqual(before);
+    expect(await storedReminder(rid)).toEqual(before);
   });
 
   test('its owner can still service and delete it', async () => {
     const rid = await vehiclelessReminder();
 
     expect((await ctx.authed('POST', `/api/v1/reminders/${rid}/mark-serviced`)).status).toBe(200);
-    expect(storedReminder(rid)?.is_active).toBe(0);
+    expect((await storedReminder(rid))?.is_active).toBe(0);
 
     expect((await ctx.authed('DELETE', `/api/v1/reminders/${rid}`)).status).toBe(200);
-    expect(storedReminder(rid)).toBeNull();
+    expect(await storedReminder(rid)).toBeNull();
   });
 });

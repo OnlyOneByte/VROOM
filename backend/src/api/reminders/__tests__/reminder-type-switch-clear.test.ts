@@ -23,12 +23,11 @@ interface ReminderRowDb {
   expense_tags: string | null;
 }
 
-function reminderRow(id: string): ReminderRowDb {
-  return ctx.sqlite
-    .query(
-      'SELECT id, type, expense_category, expense_amount, expense_tags FROM reminders WHERE id = ?'
-    )
-    .get(id) as ReminderRowDb;
+async function reminderRow(id: string): Promise<ReminderRowDb> {
+  return (await ctx.sql.get(
+    'SELECT id, type, expense_category, expense_amount, expense_tags FROM reminders WHERE id = ?',
+    [id]
+  )) as ReminderRowDb;
 }
 
 describe('reminder type switch clears expense-template fields', () => {
@@ -49,7 +48,7 @@ describe('reminder type switch clears expense-template fields', () => {
     expect(created.status, JSON.stringify(createdBody)).toBe(201);
     const id = createdBody.data.reminder.id;
 
-    const before = reminderRow(id);
+    const before = await reminderRow(id);
     expect(before.type).toBe('expense');
     expect(before.expense_category).toBe('financial');
     expect(before.expense_amount).toBe(12550);
@@ -63,7 +62,7 @@ describe('reminder type switch clears expense-template fields', () => {
     const updatedBody = await json<DataEnvelope<{ reminder: unknown }>>(updated);
     expect(updated.status, JSON.stringify(updatedBody)).toBe(200);
 
-    const after = reminderRow(id);
+    const after = await reminderRow(id);
     expect(after.type).toBe('notification');
     expect(after.expense_category, 'category cleared').toBeNull();
     expect(after.expense_amount, 'amount cleared').toBeNull();
@@ -88,7 +87,7 @@ describe('reminder type switch clears expense-template fields', () => {
     });
     expect(updated.status, await updated.text()).toBe(200);
 
-    const after = reminderRow(id);
+    const after = await reminderRow(id);
     expect(after.type).toBe('expense');
     expect(after.expense_category).toBe('maintenance');
     expect(after.expense_amount).toBe(8000);

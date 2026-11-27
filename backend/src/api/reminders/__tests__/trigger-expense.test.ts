@@ -31,18 +31,17 @@ interface ExpenseRowDb {
   vehicle_id: string;
 }
 
-function expensesForReminder(reminderId: string): ExpenseRowDb[] {
-  return ctx.sqlite
-    .query(
-      'SELECT id, category, expense_amount, tags, source_type, source_id, vehicle_id FROM expenses WHERE source_type = ? AND source_id = ?'
-    )
-    .all('reminder', reminderId) as ExpenseRowDb[];
+async function expensesForReminder(reminderId: string): Promise<ExpenseRowDb[]> {
+  return (await ctx.sql.all(
+    'SELECT id, category, expense_amount, tags, source_type, source_id, vehicle_id FROM expenses WHERE source_type = ? AND source_id = ?',
+    ['reminder', reminderId]
+  )) as ExpenseRowDb[];
 }
 
-function reminderRow(id: string): { is_active: number; next_due_date: number } {
-  return ctx.sqlite
-    .query('SELECT is_active, next_due_date FROM reminders WHERE id = ?')
-    .get(id) as { is_active: number; next_due_date: number };
+async function reminderRow(id: string): Promise<{ is_active: number; next_due_date: number }> {
+  return (await ctx.sql.get('SELECT is_active, next_due_date FROM reminders WHERE id = ?', [
+    id,
+  ])) as { is_active: number; next_due_date: number };
 }
 
 async function createOverdueExpenseReminder(
@@ -75,7 +74,7 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.createdExpenses.length).toBeGreaterThanOrEqual(1);
 
-    const rows = expensesForReminder(reminderId);
+    const rows = await expensesForReminder(reminderId);
     expect(rows.length).toBeGreaterThanOrEqual(1);
     const first = rows[0];
     expect(first.category).toBe('financial');
@@ -85,7 +84,7 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     expect(first.source_id).toBe(reminderId);
     expect(first.tags ?? '').toContain('insurance');
 
-    const after = reminderRow(reminderId);
+    const after = await reminderRow(reminderId);
     expect(after.is_active).toBe(1);
   });
 
@@ -94,11 +93,11 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     const reminderId = await createOverdueExpenseReminder(vehicleId);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
-    const countAfterFirst = expensesForReminder(reminderId).length;
+    const countAfterFirst = (await expensesForReminder(reminderId)).length;
     expect(countAfterFirst).toBeGreaterThanOrEqual(1);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
-    const countAfterSecond = expensesForReminder(reminderId).length;
+    const countAfterSecond = (await expensesForReminder(reminderId)).length;
     expect(countAfterSecond).toBe(countAfterFirst);
   });
 
@@ -116,11 +115,11 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(200);
 
-    const after = reminderRow(reminderId);
+    const after = await reminderRow(reminderId);
     expect(after.is_active).toBe(0);
-    const countAfter = expensesForReminder(reminderId).length;
+    const countAfter = (await expensesForReminder(reminderId)).length;
     await ctx.authed('POST', '/api/v1/reminders/trigger');
-    expect(expensesForReminder(reminderId).length).toBe(countAfter);
+    expect((await expensesForReminder(reminderId)).length).toBe(countAfter);
   });
 
   test('endDate bounds catch-up to the in-window occurrences, then deactivates', async () => {
@@ -133,8 +132,8 @@ describe('expense-reminder trigger (auto-creates financial records)', () => {
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(200);
 
-    expect(expensesForReminder(reminderId)).toHaveLength(3);
-    expect(reminderRow(reminderId).is_active).toBe(0);
+    expect(await expensesForReminder(reminderId)).toHaveLength(3);
+    expect((await reminderRow(reminderId)).is_active).toBe(0);
   });
 });
 
@@ -150,12 +149,11 @@ interface SplitRowDb extends ExpenseRowDb {
   split_method: string | null;
 }
 
-function splitRowsForReminder(reminderId: string): SplitRowDb[] {
-  return ctx.sqlite
-    .query(
-      'SELECT id, category, expense_amount, tags, source_type, source_id, vehicle_id, group_id, group_total, split_method FROM expenses WHERE source_type = ? AND source_id = ? ORDER BY vehicle_id'
-    )
-    .all('reminder', reminderId) as SplitRowDb[];
+async function splitRowsForReminder(reminderId: string): Promise<SplitRowDb[]> {
+  return (await ctx.sql.all(
+    'SELECT id, category, expense_amount, tags, source_type, source_id, vehicle_id, group_id, group_total, split_method FROM expenses WHERE source_type = ? AND source_id = ? ORDER BY vehicle_id',
+    ['reminder', reminderId]
+  )) as SplitRowDb[];
 }
 
 describe('expense-reminder trigger — split materialization', () => {
@@ -170,7 +168,7 @@ describe('expense-reminder trigger — split materialization', () => {
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(200);
 
-    const rows = splitRowsForReminder(reminderId);
+    const rows = await splitRowsForReminder(reminderId);
     expect(rows.length).toBeGreaterThanOrEqual(2);
 
     const byGroup = new Map<string, SplitRowDb[]>();
@@ -210,7 +208,7 @@ describe('expense-reminder trigger — split materialization', () => {
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(200);
 
-    const rows = splitRowsForReminder(reminderId);
+    const rows = await splitRowsForReminder(reminderId);
     expect(rows.length).toBeGreaterThanOrEqual(2);
 
     const byGroup = new Map<string, SplitRowDb[]>();
@@ -252,10 +250,10 @@ describe('a split reminder naming a deleted vehicle is contained to that reminde
     expect(res.status).toBe(200);
     const body = await json<DataEnvelope<TriggerResultShape>>(res);
 
-    const rows = splitRowsForReminder(splitReminderId);
+    const rows = await splitRowsForReminder(splitReminderId);
     expect(rows.some((r) => r.vehicle_id === v2)).toBe(false);
     expect(body.data.skipped.some((s) => s.reminderId === splitReminderId)).toBe(true);
 
-    expect(expensesForReminder(okReminderId).length).toBeGreaterThanOrEqual(1);
+    expect((await expensesForReminder(okReminderId)).length).toBeGreaterThanOrEqual(1);
   });
 });

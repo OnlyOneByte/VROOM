@@ -34,23 +34,23 @@ async function createOverdueReminder(
   return body.data.reminder.id;
 }
 
-function materializedRows(reminderId: string): Array<{ date: number; n: number }> {
-  return ctx.sqlite
-    .query(
-      `SELECT date, COUNT(*) AS n FROM expenses
+async function materializedRows(reminderId: string): Promise<Array<{ date: number; n: number }>> {
+  return (await ctx.sql.all(
+    `SELECT date, COUNT(*) AS n FROM expenses
        WHERE source_type = 'reminder' AND source_id = ?
-       GROUP BY date ORDER BY date`
-    )
-    .all(reminderId) as Array<{ date: number; n: number }>;
+       GROUP BY date ORDER BY date`,
+    [reminderId]
+  )) as Array<{ date: number; n: number }>;
 }
 
-function notificationRows(reminderId: string): Array<{ due_date: number; n: number }> {
-  return ctx.sqlite
-    .query(
-      `SELECT due_date, COUNT(*) AS n FROM reminder_notifications
-       WHERE reminder_id = ? GROUP BY due_date ORDER BY due_date`
-    )
-    .all(reminderId) as Array<{ due_date: number; n: number }>;
+async function notificationRows(
+  reminderId: string
+): Promise<Array<{ due_date: number; n: number }>> {
+  return (await ctx.sql.all(
+    `SELECT due_date, COUNT(*) AS n FROM reminder_notifications
+       WHERE reminder_id = ? GROUP BY due_date ORDER BY due_date`,
+    [reminderId]
+  )) as Array<{ due_date: number; n: number }>;
 }
 
 describe('POST /reminders/trigger under concurrency', () => {
@@ -65,7 +65,7 @@ describe('POST /reminders/trigger under concurrency', () => {
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
 
-    const periods = materializedRows(reminderId);
+    const periods = await materializedRows(reminderId);
     expect(periods.length).toBeGreaterThan(1);
     const duplicated = periods.filter((p) => p.n !== 1);
     expect(duplicated).toEqual([]);
@@ -91,7 +91,7 @@ describe('POST /reminders/trigger under concurrency', () => {
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
 
-    const periods = notificationRows(reminderId);
+    const periods = await notificationRows(reminderId);
     expect(periods.length).toBeGreaterThan(1);
     expect(periods.filter((p) => p.n !== 1)).toEqual([]);
   });
@@ -109,19 +109,18 @@ describe('POST /reminders/trigger under concurrency', () => {
       ctx.authed('POST', '/api/v1/reminders/trigger'),
     ]);
 
-    const groups = ctx.sqlite
-      .query(
-        `SELECT group_id, COUNT(*) AS legs, SUM(expense_amount) AS total, MAX(group_total) AS declared
-         FROM expenses WHERE source_type = 'reminder' AND source_id = ? GROUP BY group_id`
-      )
-      .all(reminderId) as Array<{ legs: number; total: number; declared: number }>;
+    const groups = (await ctx.sql.all(
+      `SELECT group_id, COUNT(*) AS legs, SUM(expense_amount) AS total, MAX(group_total) AS declared
+         FROM expenses WHERE source_type = 'reminder' AND source_id = ? GROUP BY group_id`,
+      [reminderId]
+    )) as Array<{ legs: number; total: number; declared: number }>;
     expect(groups.length).toBeGreaterThan(1);
     for (const group of groups) {
       expect(group.legs).toBe(2);
       expect(group.total).toBe(group.declared);
     }
 
-    const perDate = materializedRows(reminderId);
+    const perDate = await materializedRows(reminderId);
     expect(perDate.filter((p) => p.n !== 2)).toEqual([]);
   });
 });
@@ -137,10 +136,11 @@ describe('a reminder period commits all-or-nothing', () => {
       expenseSplitConfig: { method: 'even', vehicleIds: [live, doomed] },
     });
 
-    ctx.sqlite.run('DELETE FROM vehicles WHERE id = ?', [doomed]);
-    const dueBefore = ctx.sqlite
-      .query('SELECT next_due_date, last_triggered_at FROM reminders WHERE id = ?')
-      .get(reminderId) as { next_due_date: number; last_triggered_at: number | null };
+    await ctx.sql.run('DELETE FROM vehicles WHERE id = ?', [doomed]);
+    const dueBefore = (await ctx.sql.get(
+      'SELECT next_due_date, last_triggered_at FROM reminders WHERE id = ?',
+      [reminderId]
+    )) as { next_due_date: number; last_triggered_at: number | null };
 
     const res = await ctx.authed('POST', '/api/v1/reminders/trigger');
     expect(res.status).toBe(200);
@@ -151,10 +151,11 @@ describe('a reminder period commits all-or-nothing', () => {
     expect(body.data.createdExpenses).toEqual([]);
     expect(body.data.skipped.map((s) => s.reminderId)).toEqual([reminderId]);
 
-    expect(materializedRows(reminderId)).toEqual([]);
-    const dueAfter = ctx.sqlite
-      .query('SELECT next_due_date, last_triggered_at FROM reminders WHERE id = ?')
-      .get(reminderId) as { next_due_date: number; last_triggered_at: number | null };
+    expect(await materializedRows(reminderId)).toEqual([]);
+    const dueAfter = (await ctx.sql.get(
+      'SELECT next_due_date, last_triggered_at FROM reminders WHERE id = ?',
+      [reminderId]
+    )) as { next_due_date: number; last_triggered_at: number | null };
     expect(dueAfter.next_due_date).toBe(dueBefore.next_due_date);
     expect(dueAfter.last_triggered_at).toBe(dueBefore.last_triggered_at);
   });
