@@ -9,7 +9,44 @@ import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 const IDLE_STOP_MS = 60_000;
 export const LOCAL_OCR_MAX_WAITING = 8;
 const ENGINE_CRASH = /^RuntimeError\b/;
-const START_CRASH = /\bRuntimeError\b/;
+const START_CRASH = /failed to start: RuntimeError\b/;
+const START_ACTIONS = ['load', 'loadLanguage', 'initialize'];
+
+const TESSERACT_NODE_WORKER = dirname(
+  createRequire(import.meta.url).resolve('tesseract.js/src/worker-script/node/index.js')
+);
+
+const GUARDED_WORKER_SOURCE = `
+const { parentPort } = require('node:worker_threads');
+const worker = require(${JSON.stringify(join(TESSERACT_NODE_WORKER, '..', 'index.js'))});
+const getCore = require(${JSON.stringify(join(TESSERACT_NODE_WORKER, 'getCore.js'))});
+const gunzip = require(${JSON.stringify(join(TESSERACT_NODE_WORKER, 'gunzip.js'))});
+const cache = require(${JSON.stringify(join(TESSERACT_NODE_WORKER, 'cache.js'))});
+const settled = new Set();
+const startActions = new Set(${JSON.stringify(START_ACTIONS)});
+const send = (message) => {
+  const done = message && (message.status === 'resolve' || message.status === 'reject');
+  if (!done) return parentPort.postMessage(message);
+  const key = message.action + '-' + message.jobId;
+  if (settled.has(key)) return;
+  settled.add(key);
+  parentPort.postMessage(message);
+  if (message.status === 'reject' && startActions.has(message.action)) {
+    setTimeout(() => process.exit(1), 0);
+  }
+};
+parentPort.on('message', (packet) => worker.dispatchHandlers(packet, send));
+worker.setAdapter({ getCore, gunzip, fetch: globalThis.fetch, ...cache });
+`;
+
+let guardedWorkerPath: string | undefined;
+
+function guardedWorkerScript(): string {
+  guardedWorkerPath ??= URL.createObjectURL(
+    new Blob([GUARDED_WORKER_SOURCE], { type: 'application/javascript' })
+  );
+  return guardedWorkerPath;
+}
 
 export const LOCAL_OCR_LANG_PATH = join(
   dirname(createRequire(import.meta.url).resolve('@tesseract.js-data/eng/package.json')),
@@ -24,14 +61,17 @@ type ThreadHandle = {
   worker?: { on?: (event: string, listener: (error: unknown) => void) => void };
 };
 
+let langPath = LOCAL_OCR_LANG_PATH;
+
 function startRealWorker(): Promise<Worker> {
-  if (!existsSync(join(LOCAL_OCR_LANG_PATH, 'eng.traineddata.gz'))) {
+  if (!existsSync(join(langPath, 'eng.traineddata.gz'))) {
     return Promise.reject(new OcrUnavailableError('The text reader model is missing'));
   }
   return new Promise((resolve, reject) => {
     let starting = true;
     createWorker('eng', 1, {
-      langPath: LOCAL_OCR_LANG_PATH,
+      workerPath: guardedWorkerScript(),
+      langPath,
       gzip: true,
       cacheMethod: 'none',
       errorHandler: (error: unknown) => {
@@ -49,10 +89,11 @@ let workerFactory: WorkerFactory = startRealWorker;
 let timeoutMs = 30_000;
 
 export function setLocalOcrForTest(
-  options: { createWorker?: WorkerFactory | null; timeoutMs?: number } = {}
+  options: { createWorker?: WorkerFactory | null; timeoutMs?: number; langPath?: string } = {}
 ): void {
   workerFactory = options.createWorker ?? startRealWorker;
   timeoutMs = options.timeoutMs ?? 30_000;
+  langPath = options.langPath ?? LOCAL_OCR_LANG_PATH;
   startBroken = false;
 }
 
@@ -76,7 +117,7 @@ function markStartBroken(reason: string): void {
 
 function startOnceMoreAfterACrash(): Promise<Worker> {
   return workerFactory().catch((error: unknown) => {
-    if (!START_CRASH.test(String(error))) throw error;
+    if (startBroken || !START_CRASH.test(String(error))) throw error;
     logger.warn('The text reader crashed while starting; trying once more', {
       error: String(error),
     });
