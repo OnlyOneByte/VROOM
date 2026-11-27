@@ -266,6 +266,14 @@ describe('processBatch', () => {
 
     await processBatch(makeDeps());
 
+    expect(mockGetProvider).toHaveBeenCalledWith(activeRef.providerId, photo.userId);
+    expect(mockGetProvider).toHaveBeenCalledWith(pendingRef.providerId, photo.userId);
+    expect(mockResolveFolderPath).toHaveBeenCalledWith(
+      pendingRef.providerId,
+      photo.userId,
+      'vehicle_photos'
+    );
+
     expect(mockDownload).toHaveBeenCalledWith({
       providerType: 'google-drive',
       externalId: 'existing-file-id',

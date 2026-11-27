@@ -141,7 +141,7 @@ routes.get('/status', authorize(ownAccount), async (c) => {
   const providers = config?.providers;
   const providerRows = providers
     ? await appContext()
-        .db.select({
+        .asyncDb.select({
           id: userProviders.id,
           providerType: userProviders.providerType,
           status: userProviders.status,

@@ -158,27 +158,28 @@ of these, use the transaction handle `tx`
 inside a transaction callback and the async session outside it, and never pass `syncDb` to
 code that runs on the async session. The sync transactions and `syncDb` go in part C.
 
-A sync read that gates a later write stays sync until part C, even outside a transaction. On
-the sync driver nothing runs between the read and the write; on the async session another
-request can, so the check could pass on data that has changed by the time the write lands.
-That covers the role, override and share guards in `src/api/roles/routes.ts` and
-`src/api/shares/routes.ts`, the invite and signup-settings writes in
-`src/api/signup/store.ts`, and the profile backfill and provider token update in
-`src/api/auth/routes.ts`. In part C each such check moves inside the async transaction that
-does the write.
+A sync read that gates a later write in the same synchronous stretch stays sync until part C,
+even outside a transaction. With no `await` between them, nothing else runs between the read
+and the write; on the async session another request could, so the check could pass on data
+that has changed by the time the write lands. That covers the role, override and share guards
+in `src/api/roles/routes.ts` and `src/api/shares/routes.ts`, `pendingUser` and the invite and
+signup-settings writes in `src/api/signup/`. In part C each such check moves inside the async
+transaction that does the write. Code that already awaits between its read and its write
+gains nothing from the sync handle, because every `await` lets other requests run, and moves
+now.
 
-Reads that must see one moment stay sync for the same reason. A backup (`createBackup` in
-`src/api/sync/backup.ts`) and the Sheets mirror (`updateSpreadsheetWithUserData` in
-`src/api/providers/services/google-sheets-service.ts`) read several tables together; on the
-sync driver no write lands between those reads, so an expense never names a vehicle the backup
-missed. On the async session they would need a read transaction, which part C adds.
+The same holds for reads that look like one snapshot: a backup (`createBackup` in
+`src/api/sync/backup.ts`) and the Sheets mirror await each table in turn, so a write can land
+between two of their reads on either handle. A true snapshot needs a read transaction, which
+part C can add.
 
-What part C still has to move, besides the transactions themselves: those guards and snapshot
-reads, the helpers that sign-up, share and car-share transactions also call (`assignServerRole`,
-`signupSettings`, `attachPendingInvites`, the invite helpers, `carShareEnabled`,
-`ensureMemberDriver`), the three `syncResolverFor` callers below, the restore path, demo and
-sample seeding, and the key-rotation script. Connection upkeep in `src/db/connection.ts` stays
-sync by design.
+What part C still has to move, besides the transactions themselves: those guards, the helpers
+that sign-up, share and car-share transactions also call (`assignServerRole`, `signupSettings`,
+`attachPendingInvites`, the invite helpers, `carShareEnabled`, `ensureMemberDriver`), the
+synchronous checks that provider construction calls in `src/utils/outbound-url.ts`
+(`isNetworkAdmin`, `hasSecondAccount`, `adminEmailWarnings`), the three `syncResolverFor`
+callers below, the restore path, demo and sample seeding, and the key-rotation script.
+Connection upkeep in `src/db/connection.ts` stays sync by design.
 
 **Permissions load, then check.** A request's resolver reads its grants on the async session
 before anything is decided. `authorize()` calls `loadResolver(c, resources)` for the resources
