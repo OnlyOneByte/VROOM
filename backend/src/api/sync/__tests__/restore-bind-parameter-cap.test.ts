@@ -89,7 +89,7 @@ describe('restore of a backup larger than one statement can bind', () => {
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
-    ctx.sqlite.run("DELETE FROM expenses WHERE CAST(substr(id, 11) AS INTEGER) % 2 = 0");
+    ctx.sqlite.run('DELETE FROM expenses WHERE CAST(substr(id, 11) AS INTEGER) % 2 = 0');
     const deleted = Math.ceil(collidingRows / 2);
     ctx.sqlite.run("UPDATE expenses SET expense_amount = 9999 WHERE id = 'exp-merge-1'");
 

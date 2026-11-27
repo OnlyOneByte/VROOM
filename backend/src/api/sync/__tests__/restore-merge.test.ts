@@ -24,7 +24,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 const createCar = (licensePlate: string) =>
-  post<{ id: string }>('/api/v1/vehicles', { make: 'Honda', model: 'Fit', year: 2018, licensePlate });
+  post<{ id: string }>('/api/v1/vehicles', {
+    make: 'Honda',
+    model: 'Fit',
+    year: 2018,
+    licensePlate,
+  });
 
 const createExpense = (vehicleId: string, expenseAmount: number) =>
   post<{ id: string }>('/api/v1/expenses', {
@@ -81,7 +86,9 @@ describe('restore merge', () => {
     expect(result.imported?.expenses, 'its expense has no car to go on').toBe(0);
     expect(result.kept?.expenses).toBe(1);
     expect(count('SELECT COUNT(*) AS n FROM vehicles WHERE user_id = ?', ctx.user.id)).toBe(1);
-    expect(count('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', replacement.id)).toBe(0);
+    expect(count('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', replacement.id)).toBe(
+      0
+    );
   });
 
   test('preview reports what a merge would add and keep, and writes nothing', async () => {

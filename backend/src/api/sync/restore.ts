@@ -605,23 +605,32 @@ class RestoreService {
     const onPolicy = (row: Row): boolean => policyOk.has(String(row.policyId));
     const termRows = gate(data.insuranceTerms ?? [], onPolicy);
     const addedTerms = await insert(insuranceTerms, termRows);
-    const termOk = await mine(insuranceTerms, insuranceTerms.id, insuranceTerms.policyId, termRows, (
-      owner
-    ) => policyOk.has(owner));
+    const termOk = await mine(
+      insuranceTerms,
+      insuranceTerms.id,
+      insuranceTerms.policyId,
+      termRows,
+      (owner) => policyOk.has(owner)
+    );
     const addedTermVehicles = await insert(
       insuranceTermVehicles,
-      gate(data.insuranceTermVehicles ?? [], (row) => termOk.has(String(row.termId)) && onCar(row)).map(
-        (row, index) => ({ ...row, position: index + 1 })
-      )
+      gate(
+        data.insuranceTermVehicles ?? [],
+        (row) => termOk.has(String(row.termId)) && onCar(row)
+      ).map((row, index) => ({ ...row, position: index + 1 }))
     );
     const claimRows = gate(
       data.insuranceClaims ?? [],
       (row) => onPolicy(row) && optional(termOk, row.termId) && optional(carOk, row.vehicleId)
     );
     const addedClaims = await insert(insuranceClaims, claimRows);
-    const claimOk = await mine(insuranceClaims, insuranceClaims.id, insuranceClaims.policyId, claimRows, (
-      owner
-    ) => policyOk.has(owner));
+    const claimOk = await mine(
+      insuranceClaims,
+      insuranceClaims.id,
+      insuranceClaims.policyId,
+      claimRows,
+      (owner) => policyOk.has(owner)
+    );
 
     const reminderVehicleIds = new Map<string, string[]>();
     for (const link of data.reminderVehicles ?? []) {

@@ -34,7 +34,7 @@ async function createExpense(vehicleId: string): Promise<string> {
 }
 
 describe('restore merge stays inside the importing account', () => {
-  test("a backup car whose id belongs to another account is skipped, and nothing is added to that car", async () => {
+  test('a backup car whose id belongs to another account is skipped, and nothing is added to that car', async () => {
     const myVehicleId = await createVehicle('Honda');
     const myExpenseId = await createExpense(myVehicleId);
     const { backupService } = await import('../backup');
@@ -46,7 +46,9 @@ describe('restore merge stays inside the importing account', () => {
     const schema = await import('../../../db/schema');
     const otherId = 'other-user-1';
     const otherVehicleId = 'other-vehicle-1';
-    await db.insert(schema.users).values({ id: otherId, email: 'other@test.com', displayName: 'O' });
+    await db
+      .insert(schema.users)
+      .values({ id: otherId, email: 'other@test.com', displayName: 'O' });
     await db.insert(schema.vehicles).values({
       id: otherVehicleId,
       userId: otherId,
