@@ -316,11 +316,10 @@ async function processExpensePeriod(
 ): Promise<{ created: Expense[]; advancedDue: Date } | null> {
   const advancedDue = advanceReminderDueDate(reminder, nextDue, timeZone);
   return appContext().asyncDb.transaction(async (tx) => {
-    if (!(await repos().reminders.claimPeriod(tx, reminder.id, nextDue, advancedDue, now))) {
-      return null;
-    }
+    const claimed = await repos().reminders.claimPeriod(tx, reminder.id, nextDue, advancedDue, now);
+    if (!claimed) return null;
     return {
-      created: await createExpenseFromReminder(tx, { reminder, vehicleIds }, nextDue),
+      created: await createExpenseFromReminder(tx, { reminder: claimed, vehicleIds }, nextDue),
       advancedDue,
     };
   });

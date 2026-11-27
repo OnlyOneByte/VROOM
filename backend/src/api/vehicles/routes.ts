@@ -359,11 +359,13 @@ routes.post('/', zValidator('json', createVehicleSchema), authorize(ownAccount),
 
   const ownerCurrency = (await repos().preferences.currencies([user.id]))(user.id);
   const scale = minorUnitScale(ownerCurrency);
-  const createdVehicle = await repos().vehicles.create({
-    ...vehicleFromApi(vehicleData, scale),
-    unitPreferences,
-    userId: user.id,
-  });
+  const createdVehicle = await repos().preferences.writeAtScale(user.id, scale, () =>
+    repos().vehicles.create({
+      ...vehicleFromApi(vehicleData, scale),
+      unitPreferences,
+      userId: user.id,
+    })
+  );
 
   const response: ApiResponse<typeof createdVehicle & { ownerCurrency: string }> = {
     success: true,
@@ -480,11 +482,13 @@ routes.put(
     const ownerId = existingVehicle.userId;
     const ownerCurrency = (await repos().preferences.currencies([ownerId]))(ownerId);
     const scale = minorUnitScale(ownerCurrency);
-    const updatedVehicle = await repos().vehicles.update(id, {
-      ...vehicleFromApi(restUpdateData, scale),
-      ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
-      ...(renamedWithoutCatalogModel(existingVehicle, updateData) && { catalogModelId: null }),
-    });
+    const updatedVehicle = await repos().preferences.writeAtScale(ownerId, scale, () =>
+      repos().vehicles.update(id, {
+        ...vehicleFromApi(restUpdateData, scale),
+        ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
+        ...(renamedWithoutCatalogModel(existingVehicle, updateData) && { catalogModelId: null }),
+      })
+    );
 
     return c.json({
       success: true,
