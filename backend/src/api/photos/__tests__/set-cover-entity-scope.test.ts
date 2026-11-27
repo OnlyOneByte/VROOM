@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigration, loadMigrations } from '../../../db/__tests__/migration-helpers';
+import { openAsyncDatabase } from '../../../db/async-sqlite';
 import type { AppDatabase } from '../../../db/connection';
 import * as schema from '../../../db/schema';
 import { NotFoundError } from '../../../errors';
@@ -34,7 +35,7 @@ beforeEach(() => {
   sqliteDb.run('PRAGMA foreign_keys = ON');
   for (const m of loadMigrations()) applyMigration(sqliteDb, m);
   db = drizzle(sqliteDb, { schema });
-  repo = new PhotoRepository(db);
+  repo = new PhotoRepository(openAsyncDatabase(db.$client).db);
   sqliteDb.run(`INSERT INTO users (id, email, display_name) VALUES ('${USER}', 'a@test.com', 'A')`);
   sqliteDb.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES

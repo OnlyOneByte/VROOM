@@ -48,7 +48,7 @@ beforeEach(() => {
     applyMigration(sqliteDb, m);
   }
   db = drizzle(sqliteDb, { schema });
-  repo = new InsurancePolicyRepository(db);
+  repo = new InsurancePolicyRepository(openAsyncDatabase(db.$client).db);
   seedTestData();
 });
 
