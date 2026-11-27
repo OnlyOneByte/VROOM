@@ -280,6 +280,32 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 		expect(drive).toHaveAttribute('aria-pressed', 'false');
 	});
 
+	test('clicking the type that is already picked keeps what was typed', async () => {
+		render(ProviderForm, { props: {} });
+		const s3 = screen.getByRole('button', { name: /S3 \/ B2 \/ R2/i });
+		await fireEvent.click(s3);
+		await fireEvent.input(screen.getByLabelText('Endpoint'), {
+			target: { value: 'https://s3.example.com' }
+		});
+		await fireEvent.input(rootPathInput(), { target: { value: 'vroom/scans' } });
+
+		await fireEvent.click(s3);
+
+		expect(screen.getByLabelText('Endpoint')).toHaveValue('https://s3.example.com');
+		expect(rootPathInput().value).toBe('vroom/scans');
+	});
+
+	test('a backup folder path with ".." is marked invalid and names the problem', async () => {
+		render(ProviderForm, { props: {} });
+		await fireEvent.click(screen.getByRole('button', { name: /S3 \/ B2 \/ R2/i }));
+		const path = screen.getByLabelText('Backup folder path');
+
+		await fireEvent.input(path, { target: { value: '../escape' } });
+
+		expect(path).toHaveAttribute('aria-invalid', 'true');
+		expect(path).toHaveAccessibleDescription('Folder path must not contain ".."');
+	});
+
 	test('picking a type seeds its default path, and an edit of that path is what gets saved', async () => {
 		render(ProviderForm, { props: {} });
 
@@ -338,7 +364,7 @@ describe('ProviderForm — a photo-only provider has no ZIP backup', () => {
 		updateProvider.mockResolvedValue({} as UserProviderInfo);
 	});
 
-	test('the edit form hides the Backup Settings card and saves a stale ZIP setting as off', async () => {
+	test('the edit form has no Backups section and saves a stale ZIP setting as off', async () => {
 		render(ProviderForm, {
 			props: {
 				providerId: 'photos-1',
@@ -350,7 +376,8 @@ describe('ProviderForm — a photo-only provider has no ZIP backup', () => {
 		await vi.waitFor(() => expect(settingsStore.settings).not.toBeNull());
 		await new Promise(r => setTimeout(r, 0));
 
-		expect(screen.queryByText('Backup Settings')).toBeNull();
+		expect(screen.getByRole('region', { name: 'Photos' })).toBeInTheDocument();
+		expect(screen.queryByRole('region', { name: 'Backups' })).toBeNull();
 		expect(screen.queryByLabelText(/zip backup/i)).toBeNull();
 
 		await fireEvent.click(saveButton());

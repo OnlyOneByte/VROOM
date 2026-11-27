@@ -48,29 +48,39 @@ beforeEach(() => {
 	deleteProvider.mockResolvedValue(undefined);
 });
 
-async function clickDangerZoneDelete(): Promise<void> {
+async function clickDeleteStorage(): Promise<void> {
 	render(ProviderForm, {
 		props: { providerId: 'drive-1', existingProvider: STORED_PROVIDER }
 	});
 	await fireEvent.click(await screen.findByRole('button', { name: 'Delete storage' }));
 }
 
-describe('ProviderForm Danger Zone asks before deleting', () => {
+describe('ProviderForm Remove storage section asks before deleting', () => {
+	test('on edit, Save changes comes before the Remove storage section', async () => {
+		render(ProviderForm, {
+			props: { providerId: 'drive-1', existingProvider: STORED_PROVIDER }
+		});
+		const save = await screen.findByRole('button', { name: 'Save changes' });
+		const remove = screen.getByRole('region', { name: 'Remove storage' });
+
+		expect(save.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+	});
+
 	test('Delete storage opens a confirmation and deletes nothing yet', async () => {
-		await clickDangerZoneDelete();
+		await clickDeleteStorage();
 		expect(await screen.findByText('Delete My Drive?')).toBeInTheDocument();
-		expect(screen.getByText(/Backups to this provider stop/)).toBeInTheDocument();
+		expect(screen.getByText(/Backups here stop/)).toBeInTheDocument();
 		expect(deleteProvider).not.toHaveBeenCalled();
 	});
 
 	test('confirming deletes the provider', async () => {
-		await clickDangerZoneDelete();
+		await clickDeleteStorage();
 		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 		await waitFor(() => expect(deleteProvider).toHaveBeenCalledWith('drive-1', { force: false }));
 	});
 
 	test('cancelling deletes nothing', async () => {
-		await clickDangerZoneDelete();
+		await clickDeleteStorage();
 		await fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
 		expect(deleteProvider).not.toHaveBeenCalled();
 	});
@@ -79,7 +89,7 @@ describe('ProviderForm Danger Zone asks before deleting', () => {
 		deleteProvider.mockRejectedValueOnce(
 			new ApiError('3 photos are stored only in this provider.', 409, { photosOnlyHere: 3 })
 		);
-		await clickDangerZoneDelete();
+		await clickDeleteStorage();
 		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 		expect(
 			await screen.findByText('3 photos are stored only in this provider.')

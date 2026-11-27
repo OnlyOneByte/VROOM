@@ -316,7 +316,7 @@
 			const verb = isEditMode ? 'updated' : 'added';
 			if (unsaved.length > 0) {
 				appStore.showWarning(
-					`${name} ${verb}, but its ${unsaved.join(' and ')} couldn't be saved. Re-open the provider to try again.`
+					`${name} ${verb}, but its ${unsaved.join(' and ')} couldn't be saved. Open it again to retry.`
 				);
 			} else {
 				appStore.showSuccess(`${name} ${verb} successfully`);
@@ -326,7 +326,7 @@
 			if (selectedEntry) fieldErrors = fieldErrorsFrom(error, selectedEntry);
 			if (Object.keys(fieldErrors).length > 0) void focusFirstProblem(connectionCard);
 			appStore.showError(
-				`Couldn't ${isEditMode ? 'update' : 'add'} the provider. ${userFacingErrorMessage(error)}`
+				`Couldn't ${isEditMode ? 'update' : 'add'} the storage. ${userFacingErrorMessage(error)}`
 			);
 		} finally {
 			isSaving = false;
@@ -350,7 +350,7 @@
 				photoLossConfirmOpen = true;
 				return;
 			}
-			appStore.showError(`Couldn't remove the provider. ${userFacingErrorMessage(error)}`);
+			appStore.showError(`Couldn't remove the storage. ${userFacingErrorMessage(error)}`);
 		} finally {
 			isDeleting = false;
 		}
@@ -391,10 +391,7 @@
 					>
 						<Icon class="size-5 text-foreground" />
 					</div>
-					<div class="min-w-0">
-						<p class="font-medium">{pt.label}</p>
-						<p class="text-sm text-muted-foreground">{pt.description}</p>
-					</div>
+					<p class="min-w-0 font-medium">{pt.label}</p>
 				</div>
 			{/if}
 		{:else}
@@ -420,12 +417,13 @@
 						<button
 							type="button"
 							aria-pressed={selected}
-							class="inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none
+							class="inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none
 								{selected
 								? 'border-foreground bg-foreground text-background'
 								: 'cursor-pointer border-border bg-surface text-foreground hover:bg-sunk'}"
 							onclick={() => {
-								if (pt.id !== selectedType && selectedEntry?.connect === 'oauth') oauth.forget();
+								if (pt.id === selectedType) return;
+								if (selectedEntry?.connect === 'oauth') oauth.forget();
 								selectedType = pt.id;
 								photoRootPath = getDefaultPhotoRootPath(pt.id);
 								folderSettings = defaultFolderSettings(pt.id);
@@ -530,6 +528,17 @@
 				</Card>
 			{/if}
 
+			<div class="flex justify-end border-t pt-6">
+				<Button onclick={handleSave} disabled={!canSave || isSaving}>
+					{#if isSaving}
+						<LoaderCircle class="animate-spin" aria-hidden="true" />
+						Saving…
+					{:else}
+						{isEditMode ? 'Save changes' : 'Save storage'}
+					{/if}
+				</Button>
+			</div>
+
 			{#if isEditMode}
 				<Card variant="section" role="region" aria-labelledby="provider-remove-title">
 					<CardHeader>
@@ -557,31 +566,20 @@
 					</CardContent>
 				</Card>
 			{/if}
-
-			<div class="flex justify-end border-t pt-6">
-				<Button onclick={handleSave} disabled={!canSave || isSaving}>
-					{#if isSaving}
-						<LoaderCircle class="animate-spin" aria-hidden="true" />
-						Saving…
-					{:else}
-						{isEditMode ? 'Save changes' : 'Save storage'}
-					{/if}
-				</Button>
-			</div>
 		{/if}
 	</div>
 </FormLayout>
 
 <ConfirmDialog
 	bind:open={deleteConfirmOpen}
-	title="Delete {displayName.trim() || 'provider'}?"
-	description="Backups to this provider stop and its settings are removed from VROOM. Your files stay in the provider itself."
+	title="Delete {displayName.trim() || 'storage'}?"
+	description="Backups here stop and its settings are removed from VROOM. Your files stay in the storage itself."
 	onConfirm={() => handleDelete()}
 />
 
 <ConfirmDialog
 	bind:open={photoLossConfirmOpen}
-	title="Delete {displayName.trim() || 'provider'}?"
+	title="Delete {displayName.trim() || 'storage'}?"
 	description={photoLossMessage}
 	confirmLabel="Delete anyway"
 	onConfirm={() => handleDelete(true)}
