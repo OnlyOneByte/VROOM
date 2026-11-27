@@ -105,7 +105,12 @@ describe('PUT /expenses/:id with expectedUpdatedAt', () => {
 });
 
 describe('PUT /expenses/split/:id with expectedUpdatedAt', () => {
-  async function createSplit(): Promise<{ groupId: string; updatedAt: string }> {
+  async function createSplit(): Promise<{
+    groupId: string;
+    updatedAt: string;
+    legIds: string[];
+    other: string;
+  }> {
     const other = await seedVehicle(ctx, { make: 'Toyota', model: 'Corolla', year: 2022 });
     const res = await ctx.authed('POST', '/api/v1/expenses/split', {
       splitConfig: { method: 'even', vehicleIds: [vehicleId, other] },
@@ -120,8 +125,20 @@ describe('PUT /expenses/split/:id with expectedUpdatedAt', () => {
         .map((s) => s.updatedAt)
         .sort()
         .at(-1) ?? '';
-    return { groupId: body.data.groupId, updatedAt: latest };
+    return {
+      groupId: body.data.groupId,
+      updatedAt: latest,
+      legIds: body.data.siblings.map((s) => s.id),
+      other,
+    };
   }
+
+  const latestLegTime = (groupId: string): string => {
+    const row = ctx.sqlite
+      .query('SELECT MAX(updated_at) AS t FROM expenses WHERE group_id = ?')
+      .get(groupId) as { t: number };
+    return new Date(row.t * 1000).toISOString();
+  };
 
   const splitPut = (groupId: string, body: object) =>
     ctx.authed('PUT', `/api/v1/expenses/split/${groupId}`, body);
@@ -159,5 +176,44 @@ describe('PUT /expenses/split/:id with expectedUpdatedAt', () => {
       totalAmount: 50,
     });
     expect(res.status).toBe(200);
+  });
+
+  test('editing two legs in the same second still moves the split version each time', async () => {
+    const { groupId, legIds, other } = await createSplit();
+    const [legA = '', legB = ''] = legIds;
+    expect((await put(legA, { description: 'A' })).status).toBe(200);
+    const afterA = latestLegTime(groupId);
+    expect((await put(legB, { description: 'B' })).status).toBe(200);
+    expect(latestLegTime(groupId) > afterA).toBe(true);
+
+    const stale = await splitPut(groupId, {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId, other] },
+      totalAmount: 40,
+      expectedUpdatedAt: afterA,
+    });
+    expect(stale.status).toBe(409);
+  });
+
+  test('a split update that adds a leg gives every leg the new version', async () => {
+    const { groupId, updatedAt, other } = await createSplit();
+    const third = await seedVehicle(ctx, { make: 'Mazda', model: '3', year: 2020 });
+    const ok = await splitPut(groupId, {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId, other, third] },
+      totalAmount: 30,
+      expectedUpdatedAt: updatedAt,
+    });
+    expect(ok.status).toBe(200);
+    const legs = (await json<DataEnvelope<{ siblings: Row[] }>>(ok)).data.siblings;
+    expect(legs).toHaveLength(3);
+    expect(new Set(legs.map((leg) => leg.updatedAt)).size).toBe(1);
+    expect(legs[0]?.updatedAt && legs[0].updatedAt > updatedAt).toBe(true);
+
+    const stale = await splitPut(groupId, {
+      splitConfig: { method: 'even', vehicleIds: [vehicleId] },
+      totalAmount: 30,
+      expectedUpdatedAt: updatedAt,
+    });
+    expect(stale.status).toBe(409);
+    expect(legAmounts(groupId)).toHaveLength(3);
   });
 });
