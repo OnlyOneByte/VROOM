@@ -47,6 +47,11 @@ describe('edgeLabelShift (x labels at the plot edges stay inside the chart)', ()
 		expect(edgeLabelShift(0, 'Aug ’26', 241, padding)).toBe(0);
 	});
 
+	test('with no left gutter allowed, the first bar label moves right to clear the y-axis labels', () => {
+		expect(edgeLabelShift(14, 'Nov ’25', 241, padding)).toBe(0);
+		expect(edgeLabelShift(14, 'Nov ’25', 241, { left: 0, right: 4 })).toBeCloseTo(12.5);
+	});
+
 	test('before the chart has a size, labels stay where they are', () => {
 		expect(edgeLabelShift(10, 'Nov ’26', 0, padding)).toBe(0);
 		expect(edgeLabelShift(undefined, 'Nov ’26', 241, padding)).toBe(0);

@@ -22,7 +22,7 @@ describe('x labels at the plot edges stay inside the chart', () => {
 		'%s draws its x tick labels with EdgeTickLabel',
 		file => {
 			const src = read(file);
-			expect(src).toContain('<EdgeTickLabel {props} />');
+			expect(src).toMatch(/<EdgeTickLabel \{props\}( clearGutter)? \/>/);
 			expect(src).toContain('tickLabel: edgeTickLabel');
 		}
 	);

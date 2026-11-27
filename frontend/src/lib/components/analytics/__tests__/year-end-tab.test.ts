@@ -144,7 +144,9 @@ describe('YearEndTab', () => {
 		const list = await screen.findByRole('list', { name: 'Highlights' });
 		expect(list.textContent).toMatch(/Cheapest car to run\s*Sparky · \$0\.09\/mi/);
 		expect(list.textContent).toMatch(/Most fill-ups and charges\s*Daily Driver · 36/);
-		expect(list.textContent).toMatch(/Biggest single expense\s*Insurance · \$1,200\.00 · Feb 10/);
+		expect(list.textContent).toMatch(
+			/Biggest single expense \(excluding fill-ups\)\s*Insurance · \$1,200\.00 · Feb 10/
+		);
 		expect(api.queryItems).toHaveBeenCalledWith({
 			start: secs(new Date(2026, 0, 1)),
 			end: secs(new Date(2026, 10, 28)),
@@ -161,7 +163,7 @@ describe('YearEndTab', () => {
 		expect(text()).toContain('$4,555');
 	});
 
-	test('a car shared with you in another currency is named as left out', async () => {
+	test('a car shared with you in another currency gives the currency note', async () => {
 		getVehicles.mockImplementation((opts?: { includeShared?: boolean }) =>
 			Promise.resolve(opts?.includeShared ? [...OWNED, SHARED, SHARED_EUR] : OWNED)
 		);
@@ -220,7 +222,7 @@ describe('YearEndTab', () => {
 		expect(eff.map(d => d.efficiency)).toEqual([30, 32]);
 	});
 
-	test('a year with no spending says so, and still names a car left out', async () => {
+	test('a year with no spending says so, and still shows the currency note', async () => {
 		getVehicles.mockResolvedValue([SHARED_EUR]);
 		api.query.mockImplementation((p: AnalyticsQueryParams) =>
 			Promise.resolve({
@@ -263,7 +265,7 @@ describe('YearEndTab', () => {
 		);
 		render(YearEndTab);
 
-		const trigger = screen.getByRole('combobox', { name: 'Report year' });
+		const trigger = screen.getByRole('combobox', { name: '2026, report year' });
 		await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
 		await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
 		const option = await screen.findByRole('option', { name: '2025' });
