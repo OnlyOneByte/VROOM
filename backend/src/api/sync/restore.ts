@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns, inArray, ne, type Table } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, max, ne, type Table } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { appContext, repos } from '../../app-context';
 import { TABLE_SCHEMA_MAP } from '../../config';
@@ -237,6 +237,10 @@ class RestoreService {
     } catch (error) {
       if (error instanceof MergePreviewRollback) {
         return { success: true, preview: summary, merge: error.counts, ...skipped };
+      }
+      if (mode === 'preview') {
+        logger.warn('Merge preview failed; returning the plain preview', { error });
+        return { success: true, preview: summary, ...skipped };
       }
       if (!isUniqueConstraintError(error)) throw error;
       logger.warn('Restore rolled back on a record conflict', { error });
@@ -481,20 +485,29 @@ class RestoreService {
     table: TTable,
     rows: Record<string, unknown>[],
     merge: boolean
-  ): Promise<number> {
-    if (rows.length === 0) return 0;
+  ): Promise<Record<string, unknown>[]> {
+    if (rows.length === 0) return [];
     const columnCount = Object.keys(getTableColumns(table)).length;
-    let added = 0;
+    const added: Record<string, unknown>[] = [];
     for (const batch of chunk(rows, rowsPerInsert(columnCount))) {
       const values = batch as unknown as TTable['$inferInsert'][];
       if (merge) {
-        added += (await tx.insert(table).values(values).onConflictDoNothing().returning()).length;
+        const inserted = await tx.insert(table).values(values).onConflictDoNothing().returning();
+        added.push(...(inserted as Record<string, unknown>[]));
       } else {
         await tx.insert(table).values(values);
-        added += batch.length;
+        added.push(...batch);
       }
     }
     return added;
+  }
+
+  private async lastTermVehiclePosition(tx: AsyncHandle): Promise<number> {
+    const row = await tx
+      .select({ last: max(insuranceTermVehicles.position) })
+      .from(insuranceTermVehicles)
+      .then(firstRow);
+    return Number(row?.last ?? 0);
   }
 
   private async mineAmong(
@@ -550,8 +563,9 @@ class RestoreService {
           )
         : Promise.resolve(new Set(rows.map((row) => String(row.id))));
     const isOwner = (owner: string): boolean => owner === userId;
-    const insert = (table: SQLiteTable, rows: Row[]): Promise<number> =>
+    const insert = (table: SQLiteTable, rows: Row[]): Promise<Row[]> =>
       this.insertRows(tx, table, rows, merge);
+    const idsOf = (rows: Row[]): Set<string> => new Set(rows.map((row) => String(row.id)));
 
     // SQLite checks foreign keys on insert, so parents must be inserted before children.
     const vehicleRows = this.stampUserId(data.vehicles, userId).map((row) => ({
@@ -567,6 +581,8 @@ class RestoreService {
     const carOk = await mine(vehicles, vehicles.id, vehicles.userId, vehicleRows, isOwner);
     const onCar = (row: Row): boolean => carOk.has(String(row.vehicleId));
     const ownCar = (owner: string): boolean => carOk.has(owner);
+    const newCars = idsOf(addedVehicles);
+    const onNewCar = (row: Row): boolean => newCars.has(String(row.vehicleId));
 
     const driverRows = gate(data.vehicleDrivers ?? [], onCar).map((driver) => ({
       ...driver,
@@ -612,12 +628,17 @@ class RestoreService {
       termRows,
       (owner) => policyOk.has(owner)
     );
+    const newTerms = idsOf(addedTerms);
+    const positionBase = merge ? await this.lastTermVehiclePosition(tx) : 0;
     const addedTermVehicles = await insert(
       insuranceTermVehicles,
       gate(
         data.insuranceTermVehicles ?? [],
-        (row) => termOk.has(String(row.termId)) && onCar(row)
-      ).map((row, index) => ({ ...row, position: index + 1 }))
+        (row) =>
+          termOk.has(String(row.termId)) &&
+          onCar(row) &&
+          (newTerms.has(String(row.termId)) || onNewCar(row))
+      ).map((row, index) => ({ ...row, position: positionBase + index + 1 }))
     );
     const claimRows = gate(
       data.insuranceClaims ?? [],
@@ -647,9 +668,16 @@ class RestoreService {
     const addedReminders = await insert(reminders, reminderRows);
     const reminderOk = await mine(reminders, reminders.id, reminders.userId, reminderRows, isOwner);
     const onReminder = (row: Row): boolean => reminderOk.has(String(row.reminderId));
+    const newReminders = idsOf(addedReminders);
     const addedReminderVehicles = await insert(
       reminderVehicles,
-      gate(data.reminderVehicles ?? [], (row) => onReminder(row) && onCar(row))
+      gate(
+        data.reminderVehicles ?? [],
+        (row) =>
+          onReminder(row) &&
+          onCar(row) &&
+          (newReminders.has(String(row.reminderId)) || onNewCar(row))
+      )
     );
     const addedNotifications = await insert(
       reminderNotifications,
@@ -666,10 +694,24 @@ class RestoreService {
       row.sourceId === '' ||
       (EXPENSE_SOURCES.has(String(row.sourceType)) &&
         Boolean(sources[String(row.sourceType)]?.has(String(row.sourceId))));
+    const groupsHere = merge
+      ? await this.mineAmong(
+          tx,
+          expenses,
+          expenses.groupId,
+          expenses.userId,
+          (data.expenses ?? []).flatMap((row) => (row.groupId ? [String(row.groupId)] : [])),
+          isOwner
+        )
+      : new Set<string>();
     const expenseRows = this.keepMemberAuthors(
       gate(
         this.stampUserId(data.expenses, userId),
-        (row) => onCar(row) && optional(driverOk, row.paidByDriverId) && sourceOk(row)
+        (row) =>
+          onCar(row) &&
+          optional(driverOk, row.paidByDriverId) &&
+          sourceOk(row) &&
+          !(row.groupId && groupsHere.has(String(row.groupId)))
       ),
       consentedShares,
       (row) => [String(row.vehicleId)]
@@ -737,10 +779,19 @@ class RestoreService {
       insurance_claim: claimOk,
       odometer_entry: odometerOk,
     };
+    const newEntities: Record<string, Set<string>> = {
+      vehicle: newCars,
+      expense: idsOf(addedExpenses),
+      insurance_policy: idsOf(addedPolicies),
+      insurance_claim: idsOf(addedClaims),
+      odometer_entry: idsOf(addedOdometer),
+    };
+    const onNewEntity = (row: Row): boolean =>
+      Boolean(newEntities[String(row.entityType)]?.has(String(row.entityId)));
     const photoRows = this.keepMemberAuthors(
       gate(this.stampUserId(data.photos, userId), (row) =>
         Boolean(entities[String(row.entityType)]?.has(String(row.entityId)))
-      ),
+      ).map((row) => (merge && !onNewEntity(row) ? { ...row, isCover: false } : row)),
       consentedShares,
       (row) => [photoVehicle(row)]
     );
@@ -758,24 +809,24 @@ class RestoreService {
       refRows.filter((ref) => knownProviders.has(String(ref.providerId)))
     );
     return {
-      vehicles: addedVehicles,
-      expenses: addedExpenses,
-      financing: addedFinancing,
-      insurance: addedPolicies,
-      insuranceTerms: addedTerms,
-      insuranceTermVehicles: addedTermVehicles,
-      insuranceClaims: addedClaims,
-      reminders: addedReminders,
-      reminderVehicles: addedReminderVehicles,
-      reminderNotifications: addedNotifications,
-      odometer: addedOdometer,
-      photos: addedPhotos,
-      photoRefs: addedPhotoRefs,
-      userPreferences: addedPreferences,
-      syncState: addedSyncState,
-      trips: addedTrips,
-      vehicleShares: addedShares,
-      vehicleDrivers: addedDrivers,
+      vehicles: addedVehicles.length,
+      expenses: addedExpenses.length,
+      financing: addedFinancing.length,
+      insurance: addedPolicies.length,
+      insuranceTerms: addedTerms.length,
+      insuranceTermVehicles: addedTermVehicles.length,
+      insuranceClaims: addedClaims.length,
+      reminders: addedReminders.length,
+      reminderVehicles: addedReminderVehicles.length,
+      reminderNotifications: addedNotifications.length,
+      odometer: addedOdometer.length,
+      photos: addedPhotos.length,
+      photoRefs: addedPhotoRefs.length,
+      userPreferences: addedPreferences.length,
+      syncState: addedSyncState.length,
+      trips: addedTrips.length,
+      vehicleShares: addedShares.length,
+      vehicleDrivers: addedDrivers.length,
     };
   }
 
