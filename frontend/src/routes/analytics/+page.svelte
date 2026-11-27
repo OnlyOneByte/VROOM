@@ -388,6 +388,9 @@
 						<PerVehicleTab
 							{dateRange}
 							preferredVehicleId={vehicleIds?.[0]}
+							{vehicleColors}
+							{hiddenFinancials}
+							rangeText={rangeLabel(filters, d => formatDate(d))}
 							filterLabel={filtered ? filterLabel : undefined}
 							onClearFilters={filtered ? clearFilters : undefined}
 						/>

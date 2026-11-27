@@ -91,7 +91,7 @@ export function categoryMatrix(
 	return { cars, more: ranked.length - cars.length, rows };
 }
 
-const REASONS: Record<ExpenseCategory, string> = {
+export const REASONS: Record<ExpenseCategory, string> = {
 	fuel: 'fuel and charging',
 	maintenance: 'maintenance',
 	financial: 'loan and insurance payments',
