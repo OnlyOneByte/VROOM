@@ -83,7 +83,13 @@ import {
   convertVolume,
   type UnitScale,
 } from '../../utils/unit-conversions';
-import { hiddenFinancialsScope, ownedVehiclesScope } from '../../utils/vehicle-access';
+import {
+  hiddenFinancialsScope,
+  ownedVehiclesScope,
+  type ReadableVehicle,
+  readableExpensesScope,
+  readableVehiclesScope,
+} from '../../utils/vehicle-access';
 import { FinancingRepository } from '../financing/repository';
 import { isTermInForce, termInForceAt } from '../insurance/in-force';
 
@@ -110,6 +116,48 @@ function vehicleFilterCondition(
 ): SQL | undefined {
   if (!filter) return undefined;
   return filter.length > 0 ? inArray(column, [...filter]) : sqlFalse();
+}
+
+function ownerScope(
+  userId: string,
+  filter: VehicleFilter,
+  readable: readonly ReadableVehicle[] | undefined
+): SQL[] {
+  if (readable) return [readableExpensesScope(readable)];
+  const vehicleCondition = vehicleFilterCondition(expenses.vehicleId, filter);
+  return vehicleCondition
+    ? [eq(expenses.userId, userId), vehicleCondition]
+    : [eq(expenses.userId, userId)];
+}
+
+function mergeInsurance(parts: InsuranceData[]): InsuranceData {
+  const monthly = new Map<string, number>();
+  const carriers = new Map<string, { annualPremium: number; vehicleCount: number }>();
+  for (const part of parts) {
+    for (const m of part.monthlyPremiumTrend) {
+      monthly.set(m.month, (monthly.get(m.month) ?? 0) + m.premiums);
+    }
+    for (const c of part.costByCarrier) {
+      const entry = carriers.get(c.carrier) ?? { annualPremium: 0, vehicleCount: 0 };
+      entry.annualPremium += c.annualPremium;
+      entry.vehicleCount += c.vehicleCount;
+      carriers.set(c.carrier, entry);
+    }
+  }
+  const sum = (pick: (d: InsuranceData['summary']) => number) =>
+    parts.reduce((total, part) => total + pick(part.summary), 0);
+  return {
+    summary: {
+      totalMonthlyPremiums: sum((d) => d.totalMonthlyPremiums),
+      totalAnnualPremiums: sum((d) => d.totalAnnualPremiums),
+      activePoliciesCount: sum((d) => d.activePoliciesCount),
+    },
+    vehicleDetails: parts.flatMap((part) => part.vehicleDetails),
+    monthlyPremiumTrend: [...monthly]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, premiums]) => ({ month, premiums })),
+    costByCarrier: [...carriers].map(([carrier, data]) => ({ carrier, ...data })),
+  };
 }
 
 function toVehicleFilter(vehicles: string | VehicleFilter): VehicleFilter {
@@ -512,12 +560,15 @@ export class AnalyticsRepository {
     }
   }
 
-  async getAllVehicleUnits(userId: string): Promise<Map<string, UnitPreferences>> {
+  async getAllVehicleUnits(
+    userId: string,
+    readable?: readonly ReadableVehicle[]
+  ): Promise<Map<string, UnitPreferences>> {
     try {
       const rows = await this.db
         .select({ id: vehicles.id, unitPreferences: vehicles.unitPreferences })
         .from(vehicles)
-        .where(ownedVehiclesScope(userId));
+        .where(readable ? readableVehiclesScope(readable) : ownedVehiclesScope(userId));
 
       const result = new Map<string, UnitPreferences>();
       for (const row of rows) {
@@ -818,12 +869,38 @@ export class AnalyticsRepository {
 
   private async queryVehicleNameMap(
     userId: string,
-    filter?: VehicleFilter
+    filter?: VehicleFilter,
+    readable?: readonly ReadableVehicle[]
   ): Promise<Map<string, string>> {
+    if (readable) return this.queryReadableVehicleNames(readable);
     const all = await this.queryAllVehicleNames(userId);
     if (!filter) return all;
     const picked = new Set(filter);
     return new Map([...all].filter(([id]) => picked.has(id)));
+  }
+
+  private async queryReadableVehicleNames(
+    readable: readonly ReadableVehicle[]
+  ): Promise<Map<string, string>> {
+    const rows = await this.db
+      .select({
+        id: vehicles.id,
+        make: vehicles.make,
+        model: vehicles.model,
+        year: vehicles.year,
+        nickname: vehicles.nickname,
+      })
+      .from(vehicles)
+      .where(readableVehiclesScope(readable));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const map = new Map<string, string>();
+    for (const { vehicleId } of readable) {
+      const r = byId.get(vehicleId);
+      if (!r) continue;
+      const base = `${r.year} ${r.make} ${r.model}`;
+      map.set(r.id, r.nickname ? `${base} (${r.nickname})` : base);
+    }
+    return map;
   }
 
   private async queryAllVehicleNames(userId: string): Promise<Map<string, string>> {
@@ -854,11 +931,10 @@ export class AnalyticsRepository {
   private async queryFuelExpenses(
     userId: string,
     range?: DateRange,
-    filter?: VehicleFilter
+    filter?: VehicleFilter,
+    readable?: readonly ReadableVehicle[]
   ): Promise<FuelExpenseRow[]> {
-    const conditions = [eq(expenses.userId, userId), eq(expenses.category, 'fuel')];
-    const vehicleCondition = vehicleFilterCondition(expenses.vehicleId, filter);
-    if (vehicleCondition) conditions.push(vehicleCondition);
+    const conditions = [...ownerScope(userId, filter, readable), eq(expenses.category, 'fuel')];
     if (range) {
       conditions.push(gte(expenses.date, new Date(range.start * 1000)));
       conditions.push(lt(expenses.date, new Date(range.end * 1000)));
@@ -883,11 +959,10 @@ export class AnalyticsRepository {
     userId: string,
     range?: DateRange,
     filter?: VehicleFilter,
-    hideFinancials = false
+    hideFinancials = false,
+    readable?: readonly ReadableVehicle[]
   ): Promise<GeneralExpenseRow[]> {
-    const conditions = [eq(expenses.userId, userId)];
-    const vehicleCondition = vehicleFilterCondition(expenses.vehicleId, filter);
-    if (vehicleCondition) conditions.push(vehicleCondition);
+    const conditions = ownerScope(userId, filter, readable);
     if (hideFinancials) conditions.push(hiddenFinancialsScope());
     if (range) {
       conditions.push(gte(expenses.date, new Date(range.start * 1000)));
@@ -929,16 +1004,15 @@ export class AnalyticsRepository {
   private async queryFuelAggregates(
     userId: string,
     range: DateRange,
-    filter?: VehicleFilter
+    filter?: VehicleFilter,
+    readable?: readonly ReadableVehicle[]
   ): Promise<FuelAggregates> {
     const conditions = [
-      eq(expenses.userId, userId),
+      ...ownerScope(userId, filter, readable),
       eq(expenses.category, 'fuel'),
       gte(expenses.date, new Date(range.start * 1000)),
       lt(expenses.date, new Date(range.end * 1000)),
     ];
-    const vehicleCondition = vehicleFilterCondition(expenses.vehicleId, filter);
-    if (vehicleCondition) conditions.push(vehicleCondition);
     const isCharge = inArray(expenses.fuelType, [...ELECTRIC_FUEL_TYPES]);
     const isGas = or(
       isNull(expenses.fuelType),
@@ -1452,12 +1526,10 @@ export class AnalyticsRepository {
   }
 
   private async computeFleetHealthScore(
-    vehicleRows: Array<{ id: string }>,
+    vehicleRows: Array<{ id: string; ownerId?: string }>,
     userId: string,
     timeZone: string | undefined
   ): Promise<number> {
-    const vehicleIds = vehicleRows.map((v) => v.id);
-
     const allMaintenance = await this.db
       .select({
         vehicleId: expenses.vehicleId,
@@ -1465,7 +1537,16 @@ export class AnalyticsRepository {
         mileage: expenses.mileage,
       })
       .from(expenses)
-      .where(and(inArray(expenses.vehicleId, vehicleIds), eq(expenses.category, 'maintenance')))
+      .where(
+        and(
+          or(
+            ...vehicleRows.map((v) =>
+              and(eq(expenses.vehicleId, v.id), eq(expenses.userId, v.ownerId ?? userId))
+            )
+          ),
+          eq(expenses.category, 'maintenance')
+        )
+      )
       .orderBy(asc(expenses.date), asc(expenses.mileage));
 
     const maintenanceByVehicle = new Map<
@@ -1481,7 +1562,17 @@ export class AnalyticsRepository {
       arr.push({ date: row.date, mileage: row.mileage });
     }
 
-    const coveredVehicleIds = await this.queryCoveredVehicleIds(vehicleIds, userId, timeZone);
+    const owners = new Map<string, string[]>();
+    for (const v of vehicleRows) {
+      const owner = v.ownerId ?? userId;
+      owners.set(owner, [...(owners.get(owner) ?? []), v.id]);
+    }
+    const coveredVehicleIds = new Set<string>();
+    for (const [owner, ids] of owners) {
+      for (const id of await this.queryCoveredVehicleIds(ids, owner, timeZone)) {
+        coveredVehicleIds.add(id);
+      }
+    }
 
     let totalScore = 0;
     for (const v of vehicleRows) {
@@ -1809,16 +1900,17 @@ export class AnalyticsRepository {
     userId: string,
     range: DateRange,
     timeZone?: string,
-    filter?: VehicleFilter
+    filter?: VehicleFilter,
+    readable?: readonly ReadableVehicle[]
   ): Promise<CrossVehicleData> {
     try {
       const [vehicleNameMap, allExpenses, fuelRows, userUnits, vehicleUnitsMap] = await Promise.all(
         [
-          this.queryVehicleNameMap(userId, filter),
-          this.queryAllExpenses(userId, range, filter),
-          this.queryFuelExpenses(userId, range, filter),
+          this.queryVehicleNameMap(userId, filter, readable),
+          this.queryAllExpenses(userId, range, filter, false, readable),
+          this.queryFuelExpenses(userId, range, filter, readable),
           this.getUserUnits(userId),
-          this.getAllVehicleUnits(userId),
+          this.getAllVehicleUnits(userId, readable),
         ]
       );
 
@@ -1884,11 +1976,16 @@ export class AnalyticsRepository {
   async getFinancing(
     userId: string,
     timeZone?: string,
-    filter?: VehicleFilter
+    filter?: VehicleFilter,
+    readable?: readonly ReadableVehicle[]
   ): Promise<FinancingData> {
     const calendar = zonedCalendar(timeZone);
     try {
-      const vehicleNameMap = await this.queryVehicleNameMap(userId, filter);
+      const vehicleNameMap = await this.queryVehicleNameMap(
+        userId,
+        filter,
+        readable?.filter((v) => !v.hideFinancials)
+      );
       const userVehicleIds = [...vehicleNameMap.keys()];
       if (userVehicleIds.length === 0) {
         return {
@@ -1962,11 +2059,31 @@ export class AnalyticsRepository {
     }
   }
 
+  private async insuranceAcrossOwners(
+    userId: string,
+    timeZone: string | undefined,
+    filter: VehicleFilter,
+    readable: readonly ReadableVehicle[]
+  ): Promise<InsuranceData> {
+    const shared = new Map<string, string[]>();
+    for (const v of readable) {
+      if (v.ownerId === userId || v.hideFinancials) continue;
+      shared.set(v.ownerId, [...(shared.get(v.ownerId) ?? []), v.vehicleId]);
+    }
+    const parts = await Promise.all([
+      this.getInsurance(userId, timeZone, filter),
+      ...[...shared].map(([ownerId, ids]) => this.getInsurance(ownerId, timeZone, ids)),
+    ]);
+    return mergeInsurance(parts);
+  }
+
   async getInsurance(
     userId: string,
     timeZone?: string,
-    filter?: VehicleFilter
+    filter?: VehicleFilter,
+    readable?: readonly ReadableVehicle[]
   ): Promise<InsuranceData> {
+    if (readable) return this.insuranceAcrossOwners(userId, timeZone, filter, readable);
     const calendar = zonedCalendar(timeZone);
     try {
       const vehicleNameMap = await this.queryVehicleNameMap(userId);
@@ -2267,7 +2384,8 @@ export class AnalyticsRepository {
     range: DateRange,
     ytdStart?: number,
     timeZone?: string,
-    filter?: VehicleFilter
+    filter?: VehicleFilter,
+    readable?: readonly ReadableVehicle[]
   ): Promise<AnalyticsSummaryData> {
     try {
       const prevRange: DateRange = {
@@ -2285,19 +2403,24 @@ export class AnalyticsRepository {
         userUnits,
         vehicleUnitsMap,
       ] = await Promise.all([
-        this.queryVehicleNameMap(userId, filter),
+        this.queryVehicleNameMap(userId, filter, readable),
         this.db
           .select({
             id: vehicles.id,
+            ownerId: vehicles.userId,
           })
           .from(vehicles)
-          .where(and(ownedVehiclesScope(userId), vehicleFilterCondition(vehicles.id, filter))),
-        this.queryAllExpenses(userId, range, filter),
-        this.queryFuelExpenses(userId, range, filter),
-        this.queryFuelExpenses(userId, prevRange, filter),
-        this.queryFuelAggregates(userId, prevRange, filter),
+          .where(
+            readable
+              ? readableVehiclesScope(readable)
+              : and(ownedVehiclesScope(userId), vehicleFilterCondition(vehicles.id, filter))
+          ),
+        this.queryAllExpenses(userId, range, filter, false, readable),
+        this.queryFuelExpenses(userId, range, filter, readable),
+        this.queryFuelExpenses(userId, prevRange, filter, readable),
+        this.queryFuelAggregates(userId, prevRange, filter, readable),
         this.getUserUnits(userId),
-        this.getAllVehicleUnits(userId),
+        this.getAllVehicleUnits(userId, readable),
       ]);
 
       const fuelRowsByVehicle = sortByVehicleThenDate(fuelRows);

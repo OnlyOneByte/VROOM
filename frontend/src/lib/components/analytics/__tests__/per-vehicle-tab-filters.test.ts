@@ -10,7 +10,12 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
-type ChartProps = { title?: string; data?: unknown; xAxisProps?: unknown };
+type ChartProps = {
+	title?: string;
+	data?: unknown;
+	xAxisProps?: unknown;
+	tooltipFormat?: (v: unknown) => string;
+};
 const charts = vi.hoisted(() => [] as ChartProps[]);
 vi.mock('#lib/components/charts/index.ts', () => ({
 	AppBarChart: (_: unknown, props: ChartProps) => {
@@ -195,6 +200,10 @@ describe('PerVehicleTab', () => {
 		expect(page).toContain('€10,000.00');
 		expect(page).toContain('€300.00');
 		expect(page).not.toMatch(/\$10,000|\$300/);
+		const spend = chart('Spending by category');
+		const axis = spend?.xAxisProps as { format: (v: number) => string };
+		expect(axis.format(1200)).toBe('€1,200');
+		expect(spend?.tooltipFormat?.(40)).toBe('€40.00');
 	});
 
 	test("a shared car's totals use its owner's currency's minor units", async () => {
