@@ -14,8 +14,16 @@ import { ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import SHARED_CURRENCIES from '../../shared-currencies.json';
-import type { BackupConfig, DefaultProviderCapability, StorageConfig } from '../../types';
+import {
+  type BackupConfig,
+  DEFAULT_UNIT_PREFERENCES,
+  type DefaultProviderCapability,
+  parseUnitPreferences,
+  type StorageConfig,
+  type UnitPreferences,
+} from '../../types';
 import { readJsonBody } from '../../utils/request-body';
+import { convertDistance } from '../../utils/unit-conversions';
 import {
   mergeUnitPreferences,
   partialUnitPreferencesSchema,
@@ -202,7 +210,7 @@ const updateSettingsSchema = baseSettingsSchema
     backupConfig: backupConfigSchema.optional(),
     providerDefaults: providerDefaultsSchema.optional(),
     themePreference: z.string().min(1).max(64).optional(),
-    businessMileageRate: z.number().min(0).max(100).optional(),
+    businessMileageRate: z.number().min(0).optional(),
     communityStatsOptIn: z.boolean().optional(),
     communityRegion: communityRegionSchema.nullable().optional(),
   })
@@ -218,6 +226,20 @@ routes.get('/', authorize(ownAccount), async (c) => {
     data: withServerSettings(prefs),
   });
 });
+
+function rateInNewDistanceUnit(
+  existing: { unitPreferences: unknown; businessMileageRate: number },
+  merged: UnitPreferences | undefined,
+  requestedRate: number | undefined
+): { businessMileageRate?: number } {
+  const to = merged?.distanceUnit;
+  if (requestedRate !== undefined || !to || existing.businessMileageRate <= 0) return {};
+  const from = (parseUnitPreferences(existing.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
+    .distanceUnit;
+  if (to === from) return {};
+  const perNewUnit = existing.businessMileageRate * convertDistance(1, to, from);
+  return { businessMileageRate: Math.round(perNewUnit * 10_000) / 10_000 };
+}
 
 routes.put('/', authorize(ownAccount), async (c) => {
   const user = c.get('user');
@@ -254,6 +276,11 @@ routes.put('/', authorize(ownAccount), async (c) => {
 
   const preferenceUpdates = {
     ...restUpdates,
+    ...rateInNewDistanceUnit(
+      existingSettings,
+      mergedUnitPreferences,
+      restUpdates.businessMileageRate
+    ),
     ...(mergedUnitPreferences && { unitPreferences: mergedUnitPreferences }),
     ...(mergedStorageConfig && { storageConfig: mergedStorageConfig }),
     ...consentUpdate(existingSettings, communityStatsOptIn),
