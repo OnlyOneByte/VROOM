@@ -58,10 +58,9 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 		render(BackupDialog, {
 			props: {
 				open: true,
-				backupProvidersEnabled: true,
 				providers: [
-					{ id: 'p1', displayName: 'Family Drive' },
-					{ id: 'p2', displayName: 'Office S3' }
+					{ id: 'p1', displayName: 'Family Drive', savedOn: true },
+					{ id: 'p2', displayName: 'Office S3', savedOn: true }
 				],
 				onSync
 			}
@@ -70,7 +69,7 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 		expect(await screen.findByRole('heading', { name: 'Back up now' })).toBeInTheDocument();
 		expect(screen.getByRole('list', { name: 'Backups go to' })).toHaveTextContent('Family Drive');
 		await fireEvent.click(screen.getByRole('button', { name: 'Back up to 2 providers' }));
-		expect(onSync).toHaveBeenCalledOnce();
+		expect(onSync).toHaveBeenCalledExactlyOnceWith(undefined);
 		expect(screen.queryByText(/Backup Now|Back Up Now/)).toBeNull();
 	});
 
@@ -78,27 +77,27 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 		const { unmount } = render(BackupDialog, {
 			props: {
 				open: true,
-				backupProvidersEnabled: true,
-				providers: [{ id: 'p1', displayName: 'Family Drive' }],
+				providers: [{ id: 'p1', displayName: 'Family Drive', savedOn: true }],
 				onSync: vi.fn()
 			}
 		});
 		expect(await screen.findByRole('button', { name: 'Back up to 1 provider' })).toBeEnabled();
 		unmount();
 
-		render(BackupDialog, { props: { open: true, backupProvidersEnabled: false, onSync: vi.fn() } });
+		render(BackupDialog, { props: { open: true, onSync: vi.fn() } });
 		expect(await screen.findByRole('button', { name: 'Back up now' })).toBeDisabled();
-		expect(screen.getByText('Turn on backups for a storage provider first.')).toBeInTheDocument();
+		expect(
+			screen.getByText('Connect a storage provider that can hold backups first.')
+		).toBeInTheDocument();
 	});
 
 	test('two providers with the same name both show, without a duplicate-key crash', async () => {
 		render(BackupDialog, {
 			props: {
 				open: true,
-				backupProvidersEnabled: true,
 				providers: [
-					{ id: 'p1', displayName: 'Google Drive' },
-					{ id: 'p2', displayName: 'Google Drive' }
+					{ id: 'p1', displayName: 'Google Drive', savedOn: true },
+					{ id: 'p2', displayName: 'Google Drive', savedOn: true }
 				],
 				onSync: vi.fn()
 			}
@@ -106,5 +105,43 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 		const list = await screen.findByRole('list', { name: 'Backups go to' });
 		expect(list.querySelectorAll('li')).toHaveLength(2);
 		expect(screen.getByRole('button', { name: 'Back up to 2 providers' })).toBeEnabled();
+	});
+
+	test('switches start from the saved setting and choosing a subset sends only those ids', async () => {
+		const onSync = vi.fn();
+		render(BackupDialog, {
+			props: {
+				open: true,
+				providers: [
+					{ id: 'p1', displayName: 'Family Drive', savedOn: true },
+					{ id: 'p2', displayName: 'Office S3', savedOn: false }
+				],
+				onSync
+			}
+		});
+
+		const drive = await screen.findByRole('switch', { name: 'Back up to Family Drive' });
+		const s3 = screen.getByRole('switch', { name: 'Back up to Office S3' });
+		expect(drive).toHaveAttribute('aria-checked', 'true');
+		expect(s3).toHaveAttribute('aria-checked', 'false');
+		expect(screen.getByText('Backups off')).toBeInTheDocument();
+
+		await fireEvent.click(drive);
+		await fireEvent.click(s3);
+		await fireEvent.click(screen.getByRole('button', { name: 'Back up to 1 provider' }));
+		expect(onSync).toHaveBeenCalledExactlyOnceWith(['p2']);
+	});
+
+	test('turning every switch off disables the confirm button', async () => {
+		render(BackupDialog, {
+			props: {
+				open: true,
+				providers: [{ id: 'p1', displayName: 'Family Drive', savedOn: true }],
+				onSync: vi.fn()
+			}
+		});
+
+		await fireEvent.click(await screen.findByRole('switch', { name: 'Back up to Family Drive' }));
+		expect(screen.getByRole('button', { name: 'Back up now' })).toBeDisabled();
 	});
 });
