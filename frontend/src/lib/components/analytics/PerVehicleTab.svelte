@@ -75,7 +75,7 @@
 	async function loadVehicles() {
 		try {
 			isLoadingVehicles = true;
-			vehicles = await vehicleApi.getVehicles();
+			vehicles = await vehicleApi.getVehicles({ includeShared: true });
 			vehiclesLoadError = null;
 		} catch (e) {
 			vehiclesLoadError = userFacingErrorMessage(e);
@@ -84,8 +84,8 @@
 		}
 	}
 
-	function loadLifetime(vehicleId: string, owned: boolean) {
-		const queries = owned ? perVehicleRequests(vehicleId, dateRange).lifetime : [];
+	function loadLifetime(vehicleId: string) {
+		const queries = perVehicleRequests(vehicleId, dateRange).lifetime;
 		return Promise.all([
 			analyticsApi.getVehicleHealth(vehicleId),
 			analyticsApi.getVehicleTCO(vehicleId),
@@ -97,11 +97,10 @@
 
 	async function loadVehicleData(vehicleId: string) {
 		const current = ++request;
-		const owned = !vehicles.find(v => v.id === vehicleId)?.sharedAccess;
 		try {
 			isLoadingData = true;
 			if (lifetime?.key !== vehicleId) {
-				const entry = { key: vehicleId, data: loadLifetime(vehicleId, owned) };
+				const entry = { key: vehicleId, data: loadLifetime(vehicleId) };
 				entry.data.catch(() => {
 					if (lifetime === entry) lifetime = null;
 				});
@@ -112,7 +111,7 @@
 				await Promise.all([
 					lifetime.data,
 					analyticsApi.getVehicleExpenses(vehicleId, dateRange),
-					owned ? analyticsApi.query(monthlyQuery) : null
+					analyticsApi.query(monthlyQuery)
 				]);
 			if (current !== request) return;
 			health = healthData;
@@ -293,21 +292,6 @@
 				message={error}
 				onRetry={() => selectedVehicleId && loadVehicleData(selectedVehicleId)}
 			/>
-		{:else if health && tco && expenses && selectedVehicle?.sharedAccess}
-			<p class="max-w-xl text-muted-foreground">
-				{carName(selectedVehicle)} is shared with you, so the monthly and category overview isn't available
-				for it yet. Here are its health score and the totals you can see.
-			</p>
-			{#if filterLabel}
-				<p class="text-sm text-muted-foreground">
-					The health score and totals cover this car's whole history. The breakdown follows the date
-					range.
-				</p>
-			{/if}
-			{#if filterLabel && onClearFilters && breakdownRows.length === 0}
-				{@render noExpenses(filterLabel, onClearFilters)}
-			{/if}
-			{@render detail(health, 2)}
 		{:else if health && tco && expenses && selectedVehicle}
 			<section aria-label="{carName(selectedVehicle)} overview" class="space-y-8">
 				<div class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">

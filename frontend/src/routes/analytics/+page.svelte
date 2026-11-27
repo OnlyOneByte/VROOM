@@ -133,7 +133,7 @@
 	async function loadVehicles() {
 		try {
 			const { vehicleApi } = await import('#lib/services/vehicle-api.ts');
-			vehicles = await vehicleApi.getVehicles();
+			vehicles = await vehicleApi.getVehicles({ includeShared: true });
 			vehiclesError = null;
 		} catch (e) {
 			vehicles = [];

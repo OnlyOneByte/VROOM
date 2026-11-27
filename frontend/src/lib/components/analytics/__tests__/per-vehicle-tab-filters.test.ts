@@ -18,29 +18,29 @@ vi.mock('#lib/components/charts/index.ts', () => ({
 	}
 }));
 const chart = (title: string) => charts.findLast(c => c.title === title);
-vi.mock('#lib/services/vehicle-api.ts', () => ({
-	vehicleApi: {
-		getVehicles: () =>
-			Promise.resolve([
-				{ id: 'civic', year: 2019, make: 'Honda', model: 'Civic' },
-				{ id: 'rav4', year: 2022, make: 'Toyota', model: 'RAV4', nickname: 'Daily Driver' },
-				{
-					id: 'shared',
-					year: 2021,
-					make: 'Ford',
-					model: 'F-150',
-					sharedAccess: { seesFinancials: false }
-				},
-				{
-					id: 'open',
-					year: 2018,
-					make: 'Mazda',
-					model: 'CX-5',
-					sharedAccess: { seesFinancials: true }
-				}
-			])
-	}
-}));
+const getVehicles = vi.hoisted(() =>
+	vi.fn((_opts?: { includeShared?: boolean }) =>
+		Promise.resolve([
+			{ id: 'civic', year: 2019, make: 'Honda', model: 'Civic' },
+			{ id: 'rav4', year: 2022, make: 'Toyota', model: 'RAV4', nickname: 'Daily Driver' },
+			{
+				id: 'shared',
+				year: 2021,
+				make: 'Ford',
+				model: 'F-150',
+				sharedAccess: { seesFinancials: false }
+			},
+			{
+				id: 'open',
+				year: 2018,
+				make: 'Mazda',
+				model: 'CX-5',
+				sharedAccess: { seesFinancials: true }
+			}
+		])
+	)
+);
+vi.mock('#lib/services/vehicle-api.ts', () => ({ vehicleApi: { getVehicles } }));
 vi.mock('#lib/services/analytics-api.ts', () => ({
 	analyticsApi: api,
 	getDefaultDateRange: () => ({ startDate: 1, endDate: 2, ytdStart: 1 })
@@ -139,7 +139,13 @@ describe('PerVehicleTab', () => {
 		expect(axis.format('Jan ’26')).toBe('Jan ’26');
 	});
 
-	test('a car shared with you shows its health and totals, not the owner-only overview', async () => {
+	test('loads cars shared with you along with your own', async () => {
+		render(PerVehicleTab, { preferredVehicleId: 'rav4' });
+		expect(await screen.findByRole('button', { name: '2021 Ford F-150' })).toBeTruthy();
+		expect(getVehicles).toHaveBeenCalledWith({ includeShared: true });
+	});
+
+	test('a car shared with you gets the full overview, without the financial figures it hides', async () => {
 		api.getVehicleExpenses.mockResolvedValue({
 			expenseBreakdown: [
 				{ category: 'financial', amount: 900 },
@@ -147,11 +153,13 @@ describe('PerVehicleTab', () => {
 			]
 		});
 		render(PerVehicleTab, { preferredVehicleId: 'shared', hiddenFinancials: new Set(['shared']) });
-		expect(await screen.findByText(/2021 Ford F-150 is shared with you/)).toBeTruthy();
-		expect(screen.getByRole('heading', { level: 2, name: 'Vehicle Health Score' })).toBeTruthy();
-		expect(api.query).not.toHaveBeenCalled();
+		const hero = await findHero('2021 Ford F-150');
+		expect(hero.textContent).toContain('$2,200');
+		expect(api.query).toHaveBeenCalledWith(expect.objectContaining({ vehicleIds: ['shared'] }));
 		const page = document.body.textContent ?? '';
-		expect(page).not.toMatch(/all time|\$0\b|Not enough data|Total cost of ownership|10,000/);
+		expect(page).not.toMatch(
+			/is shared with you|7,800|10,000|loan|All in|Financial|Total cost of ownership/
+		);
 		const breakdown = chart('Spending by category')?.data as Array<{ key: string }>;
 		expect(breakdown.map(r => r.key)).toEqual(['fuel']);
 	});
@@ -164,7 +172,8 @@ describe('PerVehicleTab', () => {
 			]
 		});
 		render(PerVehicleTab, { preferredVehicleId: 'open' });
-		expect(await screen.findByText(/2018 Mazda CX-5 is shared with you/)).toBeTruthy();
+		const hero = await findHero('2018 Mazda CX-5');
+		expect(hero.textContent).toContain('$10,000');
 		expect(screen.getByText('Total cost of ownership')).toBeTruthy();
 		const breakdown = chart('Spending by category')?.data as Array<{ key: string }>;
 		expect(breakdown.map(r => r.key)).toEqual(['financial', 'fuel']);
@@ -172,16 +181,27 @@ describe('PerVehicleTab', () => {
 
 	test('a shared car with a filter and no expenses offers Clear filters', async () => {
 		api.getVehicleExpenses.mockResolvedValue({ expenseBreakdown: [] });
+		api.query.mockImplementation((p: AnalyticsQueryParams) =>
+			Promise.resolve(
+				p.interval === 'month'
+					? {
+							buckets: ['2026-01'],
+							series: [{ key: 'total', label: 'Cost', values: [0] }],
+							totals: {}
+						}
+					: respond(p)
+			)
+		);
 		const onClearFilters = vi.fn();
 		render(PerVehicleTab, {
 			preferredVehicleId: 'shared',
+			hiddenFinancials: new Set(['shared']),
 			filterLabel: 'last 3 months, 1 car',
 			onClearFilters
 		});
 		expect(
 			await screen.findByRole('heading', { level: 2, name: 'No expenses for last 3 months, 1 car' })
 		).toBeTruthy();
-		expect(screen.getByText(/cover this car's whole history/)).toBeTruthy();
 		await fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
 		expect(onClearFilters).toHaveBeenCalledOnce();
 	});
