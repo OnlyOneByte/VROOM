@@ -3,9 +3,10 @@
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { resolve } from '$app/paths';
+	import { goto } from '$app/navigation';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { ApiError, logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { routes } from '#lib/routes.ts';
 	import { LoaderCircle, ChevronRight, CircleAlert } from '@lucide/svelte';
@@ -24,21 +25,12 @@
 	import PWAInstallCard from '#lib/components/settings/cards/PwaInstallCard.svelte';
 	import PushNotificationsCard from '#lib/components/settings/cards/PushNotificationsCard.svelte';
 	import CalendarFeedCard from '#lib/components/settings/cards/CalendarFeedCard.svelte';
-	import PhotoStorageSettings from '#lib/components/settings/cards/StorageProvidersCard.svelte';
 	import ModelProvidersCard from '#lib/components/settings/cards/ModelProvidersCard.svelte';
 	import { fetchLastSyncTime } from '#lib/utils/sync/sync-manager.ts';
 	import { providerApi } from '#lib/services/provider-api.ts';
 	import { signupApi } from '#lib/services/signup-api.ts';
 	import { can } from '#lib/utils/permissions.ts';
-	import { toast } from 'svelte-sonner';
-	import type {
-		BackupConfig,
-		BackupOrchestratorResult,
-		CommunityStatsUpdate,
-		RestoreResult,
-		UserProviderInfo,
-		UserSettings
-	} from '#lib/types/index.ts';
+	import type { CommunityStatsUpdate, UserProviderInfo, UserSettings } from '#lib/types/index.ts';
 
 	let user = $derived(authStore.user);
 
@@ -69,47 +61,24 @@
 	let chargeUnit = $state<'kwh'>('kwh');
 	let currencyUnit = $state('USD');
 
-	let syncInactivityMinutes = $state(5);
+	let storageProviders = $state<UserProviderInfo[] | null>(null);
 
-	let storageProviders = $state<UserProviderInfo[]>([]);
-
-	let backupConfig = $derived<BackupConfig>(settings?.backupConfig ?? { providers: {} });
-
-	let backupProvidersEnabled = $derived(Object.values(backupConfig.providers).some(p => p.enabled));
-
-	let sheetsSyncEnabled = $derived(
-		Object.values(backupConfig.providers).some(p => p.sheetsSyncEnabled)
-	);
-
-	let backupProviders = $derived.by(() => {
-		const enabledIds = Object.entries(backupConfig.providers)
-			.filter(([, s]) => s.enabled)
-			.map(([id]) => id);
-		return storageProviders
-			.filter(p => enabledIds.includes(p.id))
-			.map(p => ({ id: p.id, displayName: p.displayName, providerType: p.providerType }));
+	let storageSummary = $derived.by(() => {
+		if (storageProviders === null) return 'Photos and backups in storage you own';
+		if (storageProviders.length === 0) return 'Not set up yet';
+		return storageProviders.map(p => p.displayName).join(' · ');
 	});
-
-	let showBackupDialog = $state(false);
-	let showRestoreDialog = $state(false);
-
-	type BackupDialogModule =
-		typeof import('#lib/components/settings/storage-provider/backup/BackupDialog.svelte');
-	type RestoreDialogModule =
-		typeof import('#lib/components/settings/storage-provider/backup/RestoreDialog.svelte');
-	let backupDialog = $state<Promise<BackupDialogModule | null> | null>(null);
-	let restoreDialog = $state<Promise<RestoreDialogModule | null> | null>(null);
 
 	const migrateCard = import('#lib/components/settings/cards/MigrateFromTrackerCard.svelte');
 	migrateCard.catch(() => undefined);
 
-	function dialogLoadFailed(error: unknown) {
-		appStore.showError(`Couldn't open this dialog. ${userFacingErrorMessage(error)}`);
-	}
-
 	let isInitialized = $state(false);
 
 	onMount(() => {
+		if (location.hash === '#settings-connections') {
+			void goto(resolve(routes.settingsStorage), { replaceState: true });
+			return;
+		}
 		settingsStore.load();
 		loadProviders();
 	});
@@ -120,11 +89,9 @@
 	}
 
 	async function loadProviders() {
-		try {
-			storageProviders = await providerApi.getProviders('storage');
-		} catch {
-			// Leave the list empty; the page already renders its empty state.
-		}
+		storageProviders = await providerApi
+			.getProviders('storage')
+			.catch((): UserProviderInfo[] | null => null);
 	}
 
 	let managesServer = $state(false);
@@ -144,7 +111,6 @@
 			volumeUnit = settings.unitPreferences.volumeUnit;
 			chargeUnit = settings.unitPreferences.chargeUnit;
 			currencyUnit = settings.currencyUnit;
-			syncInactivityMinutes = settings.syncInactivityMinutes || 5;
 			isInitialized = true;
 		}
 	});
@@ -218,21 +184,6 @@
 		return updates.communityStatsOptIn ? 'Community stats turned on' : 'Community stats turned off';
 	}
 
-	function saveSyncInterval() {
-		void saveSettings({ syncInactivityMinutes }, 'Backup timing saved');
-	}
-
-	let syncOnInactivityRequested = false;
-
-	$effect(() => {
-		if (!settings || syncOnInactivityRequested || settings.syncOnInactivity !== false) return;
-		if (!backupProvidersEnabled && !sheetsSyncEnabled) return;
-		syncOnInactivityRequested = true;
-		persist({ syncOnInactivity: true }).catch(() => {
-			syncOnInactivityRequested = false;
-		});
-	});
-
 	async function handleBackup() {
 		isBackingUp = true;
 		try {
@@ -243,108 +194,6 @@
 		} finally {
 			isBackingUp = false;
 		}
-	}
-
-	function handleBackupNowClick() {
-		backupDialog ??=
-			import('#lib/components/settings/storage-provider/backup/BackupDialog.svelte').catch(
-				error => {
-					backupDialog = null;
-					showBackupDialog = false;
-					dialogLoadFailed(error);
-					return null;
-				}
-			);
-		showBackupDialog = true;
-	}
-
-	function backupProblem(
-		failedProviders: string[],
-		results: BackupOrchestratorResult['results']
-	): string {
-		const names = (ids: string[]) =>
-			new Intl.ListFormat('en', { type: 'conjunction' }).format(
-				ids.map(id => storageProviders.find(provider => provider.id === id)?.displayName ?? id)
-			);
-		const unusable = failedProviders.filter(id => results[id]?.unusable);
-		const failed = failedProviders.filter(id => !results[id]?.unusable);
-		const problems = [
-			...(failed.length > 0 ? [`${names(failed)} failed`] : []),
-			...(unusable.length > 0 ? [`${names(unusable)} can't be used`] : [])
-		];
-		const them = failedProviders.length === 1 ? 'it' : 'them';
-		const fix = failed.length > 0 ? 'Check' : 'Reconnect';
-		return `${problems.join(' and ')}. ${fix} ${them} under Storage Providers, then try again.`;
-	}
-
-	function failedBackupProblem(error: unknown): string | null {
-		if (!(error instanceof ApiError) || error.code !== 'BACKUP_FAILED') return null;
-		const { failedProviders, results } = error.details ?? {};
-		if (!Array.isArray(failedProviders) || failedProviders.length === 0) return null;
-		if (typeof results !== 'object' || results === null) return null;
-		return backupProblem(
-			failedProviders.map(String),
-			results as BackupOrchestratorResult['results']
-		);
-	}
-
-	async function handleBackupExecute() {
-		showBackupDialog = false;
-		const toastId = toast.loading('Backup in progress...');
-
-		try {
-			const data = await settingsStore.executeSync(['backup'], true);
-			const providers = (count: number) => `${count} provider${count === 1 ? '' : 's'}`;
-
-			if (data.outcome === 'success') {
-				toast.success(`Backed up to ${providers(Object.keys(data.results).length)}`, {
-					id: toastId
-				});
-			} else if (data.outcome === 'partial') {
-				const succeeded = Object.values(data.results).filter(r => r.success).length;
-				toast.warning(
-					`Backed up to ${providers(succeeded)}. ${backupProblem(data.failedProviders, data.results)}`,
-					{ id: toastId }
-				);
-			} else if (data.outcome === 'noop') {
-				toast.info('Nothing to back up: no provider has backups turned on', { id: toastId });
-			} else {
-				toast.error(`Couldn't back up. ${backupProblem(data.failedProviders, data.results)}`, {
-					id: toastId
-				});
-			}
-
-			await fetchLastSyncTime();
-			await settingsStore.load();
-			isInitialized = false;
-		} catch (error) {
-			toast.dismiss(toastId);
-			appStore.showError(
-				`Couldn't back up. ${failedBackupProblem(error) ?? userFacingErrorMessage(error)}`
-			);
-		}
-	}
-
-	function handleRestoreClick() {
-		restoreDialog ??=
-			import('#lib/components/settings/storage-provider/backup/RestoreDialog.svelte').catch(
-				error => {
-					restoreDialog = null;
-					showRestoreDialog = false;
-					dialogLoadFailed(error);
-					return null;
-				}
-			);
-		showRestoreDialog = true;
-	}
-
-	function handleRestoreComplete(result: RestoreResult) {
-		if (result.imported) {
-			const total = Object.values(result.imported).reduce((sum, count) => sum + count, 0);
-			appStore.showSuccess(`Successfully restored ${total} records`);
-		}
-		settingsStore.load();
-		isInitialized = false;
 	}
 </script>
 
@@ -444,6 +293,27 @@
 						</CardContent>
 					</Card>
 
+					<Card variant="section" role="region" aria-labelledby="settings-storage">
+						<CardHeader>
+							<CardTitle level={2} id="settings-storage" class="text-base">
+								Backups and storage
+							</CardTitle>
+							<CardAction>
+								<a
+									href={resolve(routes.settingsStorage)}
+									class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
+									aria-label="Manage backups and storage"
+								>
+									Manage
+								</a>
+							</CardAction>
+						</CardHeader>
+						<CardContent class="pb-3" data-testid="settings-storage-summary">
+							<p class="font-medium">Storage you own</p>
+							<p class="truncate text-sm text-muted-foreground">{storageSummary}</p>
+						</CardContent>
+					</Card>
+
 					<Card variant="section" role="region" aria-labelledby="settings-data">
 						<CardHeader>
 							<CardTitle level={2} id="settings-data" class="text-base">Your data</CardTitle>
@@ -483,48 +353,14 @@
 					</Card>
 				</div>
 			</div>
-			<section class="space-y-4" aria-labelledby="settings-connections">
+			<section class="space-y-4" aria-labelledby="settings-ai">
 				<div>
-					<h2 id="settings-connections" class="text-lg font-semibold">Connections</h2>
-					<p class="text-sm text-muted-foreground">
-						Storage and AI services you connect with your own account or key.
-					</p>
+					<h2 id="settings-ai" class="text-lg font-semibold">Connections</h2>
+					<p class="text-sm text-muted-foreground">AI services you connect with your own key.</p>
 				</div>
-				<PhotoStorageSettings
-					bind:syncInactivityMinutes
-					onSyncInactivityChange={saveSyncInterval}
-					onBackupNow={handleBackupNowClick}
-					onRestore={handleRestoreClick}
-				/>
 				<ModelProvidersCard domain="vlm" />
 				<ModelProvidersCard domain="llm" />
 			</section>
 		</div>
-	{/if}
-
-	{#if backupDialog}
-		{#await backupDialog then module}
-			{#if module}
-				<module.default
-					bind:open={showBackupDialog}
-					{backupProvidersEnabled}
-					onSync={handleBackupExecute}
-				/>
-			{/if}
-		{/await}
-	{/if}
-
-	{#if restoreDialog}
-		{#await restoreDialog then module}
-			{#if module}
-				<module.default
-					bind:open={showRestoreDialog}
-					{backupProviders}
-					{sheetsSyncEnabled}
-					onRestore={handleRestoreComplete}
-					onClose={() => {}}
-				/>
-			{/if}
-		{/await}
 	{/if}
 </div>

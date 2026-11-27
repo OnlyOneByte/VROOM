@@ -3,19 +3,20 @@ import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { User, UserProviderInfo, UserSettings } from '#lib/types/index.ts';
 import { fakeSettingsState, settingsStoreFake } from './settings-store-fake.svelte.ts';
-import { toast } from 'svelte-sonner';
 import { ApiError, SERVER_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { packRules } from '@casl/ability/extra';
 import type { PackedRules } from '#lib/utils/permissions.ts';
 
-const { showError, showSuccess, getProviders, fetchLastSyncTime } = vi.hoisted(() => ({
+const { showError, showSuccess, getProviders, fetchLastSyncTime, goto } = vi.hoisted(() => ({
 	showError: vi.fn<(message: string) => void>(),
 	showSuccess: vi.fn<(message: string) => void>(),
 	getProviders: vi.fn<(domain?: string) => Promise<UserProviderInfo[]>>(),
-	fetchLastSyncTime: vi.fn<() => Promise<void>>()
+	fetchLastSyncTime: vi.fn<() => Promise<void>>(),
+	goto: vi.fn(async () => {})
 }));
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+vi.mock('$app/navigation', () => ({ goto }));
 vi.mock('#lib/stores/settings.svelte.ts', async () => ({
 	settingsStore: (await import('./settings-store-fake.svelte.ts')).settingsStoreFake
 }));
@@ -277,7 +278,7 @@ describe('Settings page loading', () => {
 		expect(within(data).getByRole('button', { name: 'Export' })).toBeInTheDocument();
 	});
 
-	test('groups storage and both AI provider cards under one Connections section', async () => {
+	test('groups both AI provider cards under one Connections section, with no storage card', async () => {
 		await mount();
 		const section = screen.getByRole('region', { name: 'Connections' });
 		expect(section.nextElementSibling).toBeNull();
@@ -288,7 +289,36 @@ describe('Settings page loading', () => {
 		).toBeTruthy();
 		expect(section).toContainElement(screen.getByTestId('stub-model-vlm'));
 		expect(section).toContainElement(screen.getByTestId('stub-model-llm'));
-		expect(screen.queryByRole('button', { name: 'stub download' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'stub backup now' })).toBeNull();
+		expect(screen.queryByRole('spinbutton', { name: 'stub inactivity' })).toBeNull();
+	});
+
+	test.each([
+		[[], 'Not set up yet'],
+		[
+			[
+				{ id: 'p1', displayName: 'Family Drive' },
+				{ id: 'p2', displayName: 'Office S3' }
+			],
+			'Family Drive · Office S3'
+		]
+	])('Backups and storage links to its page and sums up %o', async (providers, summary) => {
+		getProviders.mockResolvedValue(providers as UserProviderInfo[]);
+		await mount();
+		const storage = within(screen.getByRole('region', { name: 'Backups and storage' }));
+		expect(storage.getByRole('link', { name: 'Manage backups and storage' })).toHaveAttribute(
+			'href',
+			'/settings/storage'
+		);
+		expect(screen.getByTestId('settings-storage-summary')).toHaveTextContent(summary);
+	});
+
+	test('an old link to the storage section goes to the Backups and storage page', async () => {
+		window.history.replaceState(null, '', '/settings#settings-connections');
+		await mount();
+		expect(goto).toHaveBeenCalledWith('/settings/storage', { replaceState: true });
+		expect(settingsStoreFake.load).not.toHaveBeenCalled();
+		window.history.replaceState(null, '', '/');
 	});
 });
 
@@ -299,13 +329,6 @@ describe('Settings page preferences', () => {
 		expect(stubInput('stub volume')).toHaveValue('liters');
 		expect(stubInput('stub currency')).toHaveValue('EUR');
 		expect(screen.getByTestId('stub-charge')).toHaveTextContent('kwh');
-		expect(stubInput('stub inactivity')).toHaveValue(15);
-	});
-
-	test('a zero inactivity window falls back to five minutes', async () => {
-		loadsWith(makeSettings({ syncInactivityMinutes: 0 }));
-		await mount();
-		expect(stubInput('stub inactivity')).toHaveValue(5);
 	});
 
 	test('changing a unit saves just the units and confirms with a toast', async () => {
@@ -324,39 +347,6 @@ describe('Settings page preferences', () => {
 		await change('stub currency', 'GBP');
 		expect(settingsStoreFake.update).toHaveBeenCalledWith({ currencyUnit: 'GBP' });
 		expect(showSuccess).toHaveBeenCalledWith('Currency saved');
-	});
-
-	test('changing the inactivity window saves just that window', async () => {
-		await mount();
-		await change('stub inactivity', '30');
-		expect(settingsStoreFake.update).toHaveBeenCalledWith({ syncInactivityMinutes: 30 });
-		expect(showSuccess).toHaveBeenCalledWith('Backup timing saved');
-	});
-
-	test('sync-on-inactivity follows whether any provider has backup or sheets sync on', async () => {
-		loadsWith(
-			makeSettings({
-				syncOnInactivity: false,
-				backupConfig: {
-					providers: {
-						p1: { enabled: false, folderPath: '/', retentionCount: 5, sheetsSyncEnabled: true }
-					}
-				}
-			})
-		);
-		await mount();
-		expect(settingsStoreFake.update).toHaveBeenCalledWith({ syncOnInactivity: true });
-		expect(settingsStoreFake.update).toHaveBeenCalledTimes(1);
-		expect(showSuccess).not.toHaveBeenCalled();
-	});
-
-	test.each([
-		['already on, no provider syncing', undefined],
-		['off, no provider syncing', false]
-	])('sync-on-inactivity is left alone when %s', async (_case, stored) => {
-		loadsWith(makeSettings({ syncOnInactivity: stored }));
-		await mount();
-		expect(settingsStoreFake.update).not.toHaveBeenCalled();
 	});
 
 	test('overlapping saves keep the newer pick on screen and reload once both finish', async () => {
@@ -532,208 +522,7 @@ describe('Settings page preferences', () => {
 	});
 });
 
-describe('Settings page backups', () => {
-	async function backUpNow() {
-		await fireEvent.click(screen.getByRole('button', { name: 'stub backup now' }));
-		await settle();
-		await fireEvent.click(screen.getByRole('button', { name: 'stub sync' }));
-		await settle();
-	}
-
-	function orchestratorResult(
-		outcome: 'success' | 'partial' | 'failed' | 'noop',
-		results: Record<string, boolean>,
-		failedProviders: string[] = [],
-		unusable: string[] = []
-	) {
-		return {
-			timestamp: '2026-11-23T00:00:00.000Z',
-			outcome,
-			failedProviders,
-			results: Object.fromEntries(
-				Object.entries(results).map(([id, success]) => [
-					id,
-					{ success, capabilities: {}, ...(unusable.includes(id) && { unusable: true }) }
-				])
-			)
-		};
-	}
-
-	test('a successful run ends the loading toast with how many providers it reached', async () => {
-		settingsStoreFake.executeSync.mockResolvedValue(
-			orchestratorResult('success', { p1: true, p2: true })
-		);
-		await mount();
-		await backUpNow();
-		expect(toast.success).toHaveBeenCalledWith('Backed up to 2 providers', { id: 'toast-1' });
-	});
-
-	test('a partial run names the failed provider and says the rest succeeded', async () => {
-		getProviders.mockResolvedValue([
-			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
-			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo
-		]);
-		settingsStoreFake.executeSync.mockResolvedValue(
-			orchestratorResult('partial', { p1: true, p2: false }, ['p2'])
-		);
-		await mount();
-		await backUpNow();
-		expect(toast.warning).toHaveBeenCalledWith(
-			'Backed up to 1 provider. Office S3 failed. Check it under Storage Providers, then try again.',
-			{ id: 'toast-1' }
-		);
-		expect(toast.error).not.toHaveBeenCalled();
-	});
-
-	test('a run with nothing to back up ends the spinner and says why', async () => {
-		settingsStoreFake.executeSync.mockResolvedValue(orchestratorResult('noop', {}));
-		await mount();
-		await backUpNow();
-		expect(toast.info).toHaveBeenCalledWith(
-			'Nothing to back up: no provider has backups turned on',
-			{ id: 'toast-1' }
-		);
-	});
-
-	test('a failed run reported in the body ends the toast with the failed providers', async () => {
-		settingsStoreFake.executeSync.mockResolvedValue(
-			orchestratorResult('failed', { p1: false }, ['p1'])
-		);
-		await mount();
-		await backUpNow();
-		expect(toast.error).toHaveBeenCalledWith(
-			"Couldn't back up. p1 failed. Check it under Storage Providers, then try again.",
-			{ id: 'toast-1' }
-		);
-	});
-
-	test('a partial run lists three failed providers as a sentence', async () => {
-		getProviders.mockResolvedValue([
-			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
-			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo,
-			{ id: 'p3', displayName: 'Home NAS' } as UserProviderInfo,
-			{ id: 'p4', displayName: 'Cabin S3' } as UserProviderInfo
-		]);
-		settingsStoreFake.executeSync.mockResolvedValue(
-			orchestratorResult('partial', { p1: true, p2: false, p3: false, p4: false }, [
-				'p2',
-				'p3',
-				'p4'
-			])
-		);
-		await mount();
-		await backUpNow();
-		expect(toast.warning).toHaveBeenCalledWith(
-			'Backed up to 1 provider. Office S3, Home NAS, and Cabin S3 failed. Check them under Storage Providers, then try again.',
-			{ id: 'toast-1' }
-		);
-	});
-
-	test('a partial run joins two failed providers with "and" next to an unusable one', async () => {
-		getProviders.mockResolvedValue([
-			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
-			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo,
-			{ id: 'p3', displayName: 'Home NAS' } as UserProviderInfo,
-			{ id: 'p4', displayName: 'Old Drive' } as UserProviderInfo
-		]);
-		settingsStoreFake.executeSync.mockResolvedValue(
-			orchestratorResult(
-				'partial',
-				{ p1: true, p2: false, p3: false, p4: false },
-				['p2', 'p3', 'p4'],
-				['p4']
-			)
-		);
-		await mount();
-		await backUpNow();
-		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 1 provider. Office S3 and Home NAS failed and Old Drive can't be used. Check them under Storage Providers, then try again.",
-			{ id: 'toast-1' }
-		);
-	});
-
-	test('a partial run names a provider that failed and one that cannot be used, with a next step', async () => {
-		getProviders.mockResolvedValue([
-			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
-			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo,
-			{ id: 'p3', displayName: 'Old Drive' } as UserProviderInfo
-		]);
-		settingsStoreFake.executeSync.mockResolvedValue(
-			orchestratorResult('partial', { p1: true, p2: false, p3: false }, ['p2', 'p3'], ['p3'])
-		);
-		await mount();
-		await backUpNow();
-		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 1 provider. Office S3 failed and Old Drive can't be used. Check them under Storage Providers, then try again.",
-			{ id: 'toast-1' }
-		);
-	});
-
-	test.each([
-		[
-			{ p1: { success: false, capabilities: {} } },
-			"Couldn't back up. Family Drive failed. Check it under Storage Providers, then try again."
-		],
-		[
-			{ p1: { success: false, unusable: true, capabilities: {} } },
-			"Couldn't back up. Family Drive can't be used. Reconnect it under Storage Providers, then try again."
-		]
-	])(
-		'an all-failed 502 names the provider from the error details (%o)',
-		async (results, message) => {
-			getProviders.mockResolvedValue([
-				{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo
-			]);
-			settingsStoreFake.executeSync.mockRejectedValue(
-				new ApiError(
-					'All backup providers failed',
-					502,
-					{ failedProviders: ['p1'], results },
-					'BACKUP_FAILED'
-				)
-			);
-			await mount();
-			await backUpNow();
-			expect(toast.dismiss).toHaveBeenCalled();
-			expect(showError).toHaveBeenCalledWith(message);
-			expect(screen.queryByText(/no provider has backups turned on/)).toBeNull();
-		}
-	);
-
-	test.each([
-		[
-			new ApiError('A backup is already in progress', 409, undefined, 'BACKUP_IN_PROGRESS'),
-			"Couldn't back up. A backup is already running. Try again once it finishes."
-		],
-		[
-			new ApiError('ENOSPC: no space left on device', 500),
-			`Couldn't back up. ${SERVER_FAILURE_MESSAGE}`
-		]
-	])('a failed backup explains %s in a plain sentence', async (error, message) => {
-		settingsStoreFake.executeSync.mockRejectedValue(error);
-		await mount();
-		await fireEvent.click(screen.getByRole('button', { name: 'stub backup now' }));
-		await settle();
-		await fireEvent.click(screen.getByRole('button', { name: 'stub sync' }));
-		await settle();
-		expect(toast.dismiss).toHaveBeenCalled();
-		expect(showError).toHaveBeenCalledWith(message);
-	});
-
-	test.each([
-		['stub backup now', 'stub sync'],
-		['stub restore', 'stub restore']
-	])('the dialog behind %s mounts only once it is opened', async (trigger, dialogButton) => {
-		await mount();
-		const before = screen.queryAllByRole('button', { name: dialogButton }).length;
-		expect(screen.queryByTestId('stub-open')).toBeNull();
-
-		await fireEvent.click(screen.getAllByRole('button', { name: trigger })[0]!);
-		await settle();
-		expect(screen.getAllByRole('button', { name: dialogButton })).toHaveLength(before + 1);
-		expect(screen.getByTestId('stub-open')).toBeInTheDocument();
-	});
-
+describe('Settings page export', () => {
 	test('a failed download explains why', async () => {
 		settingsStoreFake.downloadBackup.mockRejectedValue(new ApiError('zip stream broke', 500));
 		await mount();
