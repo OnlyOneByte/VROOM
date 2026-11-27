@@ -402,7 +402,7 @@
 							</CardAction>
 						</CardHeader>
 						<CardContent class="divide-y">
-							<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-3">
+							<div class="flex items-center justify-between gap-4 [&>button]:shrink-0 pb-3">
 								<div class="min-w-0">
 									<p class="truncate font-medium">{user?.displayName ?? 'User'}</p>
 									{#if user?.email}
@@ -447,7 +447,7 @@
 									Couldn't load the migration tool. Check your connection and reload.
 								</p>
 							{/await}
-							<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+							<div class="flex items-center justify-between gap-4 [&>button]:shrink-0 py-3">
 								<div class="min-w-0">
 									<p class="font-medium">Export everything</p>
 									<p class="text-sm text-muted-foreground">

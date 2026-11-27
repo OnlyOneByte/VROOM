@@ -49,7 +49,7 @@
 </script>
 
 <div class="py-3" data-testid="pwa-install">
-	<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+	<div class="flex items-center justify-between gap-4 [&>button]:shrink-0">
 		<div class="min-w-0">
 			<p class="font-medium">Install the app</p>
 			{#if isStandalone}
