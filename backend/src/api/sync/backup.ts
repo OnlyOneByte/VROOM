@@ -158,8 +158,12 @@ function dollarsToCents(tables: BackupTables): BackupTables {
   return upgraded;
 }
 
+function roundHalfAway(value: number): number {
+  return Math.sign(value) * Math.round(Math.abs(value)) || 0;
+}
+
 export function rescaleParts(totalCents: number, partsCents: number[], scale: number) {
-  const total = Math.round((totalCents * scale) / 100);
+  const total = roundHalfAway((totalCents * scale) / 100);
   const exact = partsCents.map((cents) => (cents * scale) / 100);
   const parts = exact.map(Math.floor);
   const byRemainder = exact
@@ -193,6 +197,7 @@ function rescaleReminder(
     return row;
   }
   const split = parsed as Extract<SplitConfig, { method: 'absolute' }>;
+  if (!Array.isArray(split.allocations)) return row;
   const cents = split.allocations.map((a) => Number(a.amount));
   const rescaled = rescaleParts(totalCents ?? cents.reduce((a, b) => a + b, 0), cents, scale);
   const out = {
@@ -240,7 +245,7 @@ export function centsToMinorUnits(tables: BackupTables, accountCurrency = 'USD')
   const currency = tables.userPreferences?.[0]?.currencyUnit ?? accountCurrency;
   const scale = minorUnitScale(String(currency));
   if (scale === 100) return tables;
-  const rescale = (cents: number) => Math.round((cents * scale) / 100);
+  const rescale = (cents: number) => roundHalfAway((cents * scale) / 100);
   const upgraded: BackupTables = { ...tables };
   for (const [key, rows] of Object.entries(tables)) {
     const table = TABLE_SCHEMA_MAP[key];

@@ -40,10 +40,13 @@ There are two steps:
   `MONEY_CENTS_FIELDS` columns by 100. `coerceRow` then rounds them, since float products such as
   12.34 × 100 land just below the integer.
 - **`3.0.0`, to the minor unit of the backup's own currency** (scale `minorUnitScale`):
+  - The scale is 1 for the currencies in `noDecimals` in `backend/src/shared-currencies.json` and 100 for the rest. The list is pinned rather than read from `Intl`, because Bun and the browsers disagree on the digits of some currencies (HUF, IDR, COP, PKR, IRR and others).
   - The currency is the backup's `userPreferences.currencyUnit`. A backup without preferences (restore keeps the account's own in that case) uses the account's currency.
-  - A 2.0.0 backup holds cents, so `centsToMinorUnits` rescales each money column, rounding halves up.
-  - The legs of a split group and the absolute allocations of a reminder split are rescaled together with `rescaleParts`: each part is floored, and the units left are handed out by largest remainder (first by `id` on a tie). So the parts still add up to the rounded total, and none goes below zero.
+  - A 2.0.0 backup holds cents, so `centsToMinorUnits` rescales each money column, rounding halves away from zero.
+  - The legs of a split group and the absolute allocations of a reminder split are rescaled together with `rescaleParts`: each part is floored, and the units left are handed out by largest remainder. Ties go to the leg with the lower `id`, and to the earlier allocation in a reminder split. So the parts still add up to the rounded total, and none goes below zero.
+  - An absolute reminder split without allocations is left as it is.
   - A two-decimal currency is left as it is.
+  - Migration `0028_money_minor_units` applies the same rules to stored data, once (`money_unit_migrations` records it). `migration-0028.test.ts` checks that it and this step agree for a forint user.
 
 ### Rollback and old backups
 

@@ -1,10 +1,9 @@
-import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import AdmZip from 'adm-zip';
 import { useTestApp } from '../../../test-helpers/http-client';
-import * as money from '../../../utils/money';
 import { backupService, centsToMinorUnits } from '../backup';
 import { restoreService } from '../restore';
 
@@ -12,11 +11,6 @@ const FIXTURE_DIR = join(import.meta.dir, 'fixtures', 'backup-2.0.0');
 const LOAN_PAYMENT_ID = 'xdfo83wsg1gk954b2slxyb2s';
 
 const app = useTestApp();
-afterEach(() => mock.restore());
-
-function wholeYen(): void {
-  spyOn(money, 'minorUnitScale').mockImplementation((currency) => (currency === 'JPY' ? 1 : 100));
-}
 
 function fixtureZip(currency: string): Buffer {
   const zip = new AdmZip();
@@ -61,7 +55,6 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
   });
 
   test('a 2.0.0 backup in a no-decimal currency is rescaled once, never twice', async () => {
-    wholeYen();
     const first = await restoreService.restoreFromBackup(
       app().user.id,
       fixtureZip('JPY'),
@@ -77,7 +70,6 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
   });
 
   test('split legs still add up to their group total after rounding', () => {
-    wholeYen();
     const legs = ['a', 'b', 'c'].map((id) => ({
       id,
       groupId: 'g',
@@ -94,7 +86,6 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
   });
 
   test('absolute reminder split allocations are rescaled with the amount', () => {
-    wholeYen();
     const split = { method: 'absolute', allocations: [{ vehicleId: 'v', amount: 120000 }] };
     const { reminders = [] } = centsToMinorUnits({
       userPreferences: [{ currencyUnit: 'JPY' }],
@@ -116,14 +107,12 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
     expect(hash.digest('hex')).toBe(
       '8b93aa4f2b02f47582608899d5ea8eb1619360b67b139113d603ada424bf7b98'
     );
-    wholeYen();
     const result = await restoreService.restoreFromBackup(app().user.id, zip.toBuffer(), 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(loanPayment()).toBe(373);
   });
 
   test('rounding never pushes a leg below zero, and the legs keep their total', () => {
-    wholeYen();
     const legs = ['a', 'b', 'c', 'd'].map((id) => ({
       id,
       groupId: 'g',
@@ -140,7 +129,6 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
   });
 
   test('absolute reminder allocations keep adding up to the amount', () => {
-    wholeYen();
     const split = {
       method: 'absolute',
       allocations: ['a', 'b', 'c'].map((vehicleId, i) => ({
@@ -158,7 +146,6 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
   });
 
   test('restoring a backup without preferences into a yen account rescales it', async () => {
-    wholeYen();
     app().sqlite.run(
       'INSERT OR REPLACE INTO user_preferences (user_id, currency_unit) VALUES (?, ?)',
       [app().user.id, 'JPY']
@@ -171,9 +158,19 @@ describe('backup 3.0.0 stores minor units of the backup currency', () => {
   });
 
   test('a backup without preferences is rescaled with the account currency', () => {
-    wholeYen();
     const { expenses = [] } = centsToMinorUnits({ expenses: [{ expenseAmount: '120000' }] }, 'JPY');
     expect(expenses[0]?.expenseAmount).toBe(1200);
+  });
+
+  test('an absolute reminder split without allocations passes through', () => {
+    const { reminders = [] } = centsToMinorUnits({
+      userPreferences: [{ currencyUnit: 'JPY' }],
+      reminders: [{ expenseAmount: '5050', expenseSplitConfig: '{"method":"absolute"}' }],
+    });
+    expect(reminders[0]).toEqual({
+      expenseAmount: 51,
+      expenseSplitConfig: '{"method":"absolute"}',
+    });
   });
 
   test('two-decimal currencies pass through untouched', () => {

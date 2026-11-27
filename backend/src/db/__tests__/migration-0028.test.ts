@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { centsToMinorUnits } from '../../api/sync/backup';
 import SHARED_CURRENCIES from '../../shared-currencies.json';
 import { applyMigration, applyMigrationsUpTo, loadMigrations } from './migration-helpers';
 
@@ -55,7 +56,7 @@ function snapshot(db: Database, id: string) {
       .query(
         `SELECT id, expense_amount, group_total FROM expenses WHERE user_id = '${id}' ORDER BY id`
       )
-      .all(),
+      .all() as { id: string; expense_amount: number; group_total: number | null }[],
     vehicle: one(`SELECT purchase_price FROM vehicles WHERE id = '${id}-v'`),
     financing: one(
       `SELECT original_amount, payment_amount, residual_value, excess_mileage_fee FROM vehicle_financing WHERE id = '${id}-f'`
@@ -172,6 +173,38 @@ describe('Migration 0028: money in minor units for currencies without decimals',
     expect(
       db.query("SELECT name FROM sqlite_temp_master WHERE name LIKE '__money%'").all()
     ).toEqual([]);
+  });
+
+  test('agrees with the 2.0.0 backup upgrade for a forint user', () => {
+    seedUser(db, 'huf', 'HUF');
+    db.run("UPDATE expenses SET expense_amount = -150 WHERE id = 'huf-e3'");
+    db.run("UPDATE expenses SET expense_amount = 250 WHERE id = 'huf-e2'");
+    const rows = (q: string) => db.query(q).all() as Record<string, unknown>[];
+    const upgraded = centsToMinorUnits({
+      userPreferences: [{ currencyUnit: 'HUF' }],
+      expenses: rows(
+        "SELECT id, group_id AS groupId, group_total AS groupTotal, expense_amount AS expenseAmount FROM expenses WHERE user_id = 'huf' ORDER BY id"
+      ),
+      vehicles: rows("SELECT purchase_price AS purchasePrice FROM vehicles WHERE user_id = 'huf'"),
+      reminders: rows(
+        "SELECT expense_amount AS expenseAmount, expense_split_config AS expenseSplitConfig FROM reminders WHERE id = 'huf-r'"
+      ),
+    });
+
+    applyMigration(db, money);
+    const migrated = snapshot(db, 'huf');
+    expect(migrated.expenses.map((e) => (e as { expense_amount: number }).expense_amount)).toEqual(
+      (upgraded.expenses ?? []).map((e) => Number(e.expenseAmount))
+    );
+    expect(migrated.vehicle.purchase_price).toBe(Number(upgraded.vehicles?.[0]?.purchasePrice));
+    const reminder = upgraded.reminders?.[0];
+    expect(migrated.reminder.expense_amount).toBe(Number(reminder?.expenseAmount));
+    expect(JSON.parse(String(migrated.reminder.expense_split_config))).toEqual(
+      JSON.parse(String(reminder?.expenseSplitConfig))
+    );
+    expect(migrated.expenses.map((e) => (e as { expense_amount: number }).expense_amount)).toEqual([
+      1000, 3, -2, 34, 33, 33,
+    ]);
   });
 
   test('lists exactly the supported currencies that have no decimals', () => {

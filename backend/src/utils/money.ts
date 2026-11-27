@@ -3,14 +3,27 @@ import type { CostBuckets, CostBucketTotals, ExpenseSummary } from '../api/expen
 import { CONFIG } from '../config';
 import type { SplitConfig } from '../db/types';
 import { ValidationError } from '../errors';
+import SHARED_CURRENCIES from '../shared-currencies.json';
 
 // Round before truncating: 12.34 * 100 is 1233.9999… in binary floating point.
 export function dollarsToCents(dollars: number): number {
   return Math.round(dollars * 100);
 }
 
-export function minorUnitScale(_currency: string): number {
-  return 100;
+const NO_DECIMALS = new Set(SHARED_CURRENCIES.noDecimals);
+
+export function minorUnitScale(currency: string): number {
+  return NO_DECIMALS.has(currency) ? 1 : 100;
+}
+
+export function currencyFormatOptions(currency: string): Intl.NumberFormatOptions {
+  const digits = Math.log10(minorUnitScale(currency));
+  return {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  };
 }
 
 export function toMajor(scale: number) {
@@ -218,10 +231,10 @@ export function formatNumberForMessage(value: number): string {
 }
 
 export function formatMoneyForMessage(minor: number, currency: string): string {
-  return (minor / minorUnitScale(currency)).toLocaleString('en-US', {
-    style: 'currency',
-    currency,
-  });
+  return (minor / minorUnitScale(currency)).toLocaleString(
+    'en-US',
+    currencyFormatOptions(currency)
+  );
 }
 
 export function formatDateForMessage(date: Date, options: Intl.DateTimeFormatOptions): string {
