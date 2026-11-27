@@ -58,7 +58,7 @@
 		} catch (err) {
 			if (err instanceof ApiError && err.code === 'NO_PROVIDER') {
 				errorMessage =
-					'No receipt-scanning provider is set up yet. Add one in Settings → Receipt Scanning.';
+					'No receipt-scanning provider is set up yet. Add one in Settings → AI helpers.';
 			} else if (err instanceof ApiError && (err.statusCode === 422 || err.statusCode === 503)) {
 				errorMessage = `${err.message} Or fill it in manually.`;
 			} else if (err instanceof ApiError && err.statusCode === 502) {
@@ -129,10 +129,10 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Scan a receipt</AlertDialog.Title>
 			<AlertDialog.Description>
-				Your receipt photo is read by the provider chosen in Settings → Receipt Scanning: the
-				built-in text reader on your VROOM server, or an AI provider you added, which then receives
-				the image. It fills in the amount, date and fuel details, and you review them before
-				anything is saved. Nothing is stored by VROOM until you save the expense.
+				Your receipt photo is read by the provider chosen in Settings → AI helpers: the built-in
+				text reader on your VROOM server, or an AI provider you added, which then receives the
+				image. It fills in the amount, date and fuel details, and you review them before anything is
+				saved. Nothing is stored by VROOM until you save the expense.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

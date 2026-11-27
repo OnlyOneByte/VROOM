@@ -13,6 +13,7 @@
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import {
 		Card,
+		CardAction,
 		CardContent,
 		CardDescription,
 		CardHeader,
@@ -42,36 +43,36 @@
 	const COPY = {
 		vlm: {
 			icon: Sparkles,
-			title: 'Receipt Scanning',
+			title: 'Receipt scanning',
 			description:
 				'The built-in text reader reads receipts on your VROOM server, with no AI model and no key. For harder receipts, connect a vision-AI provider with your own key: your receipt is then sent only to the provider you choose. For maximum privacy, self-host with Ollama.',
 			noun: 'receipt-scanning provider',
-			addLabel: 'Add AI Provider',
+			addLabel: 'Add AI provider',
 			summary: 'Scan receipts into expense drafts, built in or with your own AI key.',
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your receipt image is sent only to this provider when you scan.',
 			namePlaceholder: 'My receipt parser',
 			feature: 'Receipt scanning',
 			useFor: 'receipt scanning',
-			useForTitle: 'Receipt Scanning',
+			useForTitle: 'receipt scanning',
 			loadError: "Couldn't load your receipt-scanning providers.",
 			capability: 'ai.vision',
 			anchor: 'receipt-scanning'
 		},
 		llm: {
 			icon: Bot,
-			title: 'Assistant (AI)',
+			title: 'Assistant',
 			description:
 				'Connect a chat-AI provider to ask questions about your vehicles and costs. Bring your own key — your questions are sent only to the provider you choose. The assistant is read-only and can never change your data. For maximum privacy, self-host with Ollama.',
 			noun: 'assistant provider',
-			addLabel: 'Add Assistant Provider',
+			addLabel: 'Add AI assistant',
 			summary: 'Ask an AI about your vehicles and costs with your own key.',
 			dialogNote:
 				'The API key is stored encrypted and never shown again. Your questions are sent only to this provider when you chat.',
 			namePlaceholder: 'My assistant',
 			feature: 'The assistant',
 			useFor: 'the assistant',
-			useForTitle: 'the Assistant',
+			useForTitle: 'the assistant',
 			loadError: "Couldn't load your assistant providers.",
 			capability: 'ai.llm',
 			anchor: 'assistant-providers'
@@ -179,7 +180,9 @@
 	async function retryLoad() {
 		await loadData();
 		await tick();
-		focusFirstButton(content);
+		focusFirstButton(
+			error ? content?.querySelector(`[data-testid="${domain}-provider-error"]`) : content
+		);
 	}
 
 	function openCreate() {
@@ -287,122 +290,131 @@
 	{:else}
 		<Button
 			variant="outline"
-			class="h-10"
 			aria-disabled={savingDefaultId !== null}
 			onclick={() => useAsDefault(provider)}
 		>
 			{#if savingDefaultId === provider.id}
-				<LoaderCircle class="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+				<LoaderCircle class="animate-spin" aria-hidden="true" />
 			{/if}
 			Use for {copy.useForTitle}
 		</Button>
 	{/if}
 {/snippet}
 
-<Card id={copy.anchor} tabindex={-1}>
+<Card
+	variant="section"
+	id={copy.anchor}
+	tabindex={-1}
+	role="region"
+	aria-labelledby="{copy.anchor}-title"
+	class="outline-none"
+	bind:ref={content}
+>
 	<CardHeader>
-		<div class="flex items-center gap-2">
-			<Icon class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={3}>{copy.title}</CardTitle>
-		</div>
+		<CardTitle level={2} id="{copy.anchor}-title" class="text-base">{copy.title}</CardTitle>
+		<CardAction>
+			<Button onclick={openCreate} data-testid="{domain}-add-provider">
+				<Plus aria-hidden="true" />
+				{copy.addLabel}
+			</Button>
+		</CardAction>
 		<CardDescription>{copy.summary}</CardDescription>
 		<HowItWorks>
 			<p class="text-sm text-muted-foreground">{copy.description}</p>
 		</HowItWorks>
 	</CardHeader>
-	<CardContent bind:ref={content}>
+	<CardContent>
 		{#if isLoading}
-			<div class="flex items-center justify-center py-8">
-				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+			<div class="flex items-center justify-center py-8" role="status">
+				<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
+				<span class="sr-only">Loading your {copy.noun}s</span>
 			</div>
 		{:else if error}
 			<div class="space-y-3" data-testid="{domain}-provider-error">
 				<p class="text-sm text-destructive" role="alert">{error}</p>
-				<Button variant="outline" size="sm" class="h-10" onclick={retryLoad}>Retry</Button>
+				<Button variant="outline" onclick={retryLoad}>Retry</Button>
 			</div>
+		{:else if providers.length === 0 && builtins.length === 0}
+			<p class="text-sm text-muted-foreground">No {copy.noun} connected</p>
 		{:else}
-			<div class="space-y-3">
-				<div class="flex flex-wrap items-center justify-between gap-2">
-					{#if providers.length === 0 && builtins.length === 0}
-						<p class="text-sm text-muted-foreground">No {copy.noun} connected</p>
-					{:else}
-						<p class="text-sm font-medium">Providers</p>
-					{/if}
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-10"
-						onclick={openCreate}
-						data-testid="{domain}-add-provider"
-					>
-						<Plus class="h-4 w-4 mr-1" />
-						{copy.addLabel}
-					</Button>
-				</div>
-
-				{#if providers.length > 0 || builtins.length > 0}
-					<div class="space-y-2">
-						{#each builtins as entry (entry.id)}
-							{@const id = builtinId(entry)}
-							<div class="space-y-3 rounded-lg border p-3" data-testid="{domain}-builtin-row">
+			<div class="divide-y">
+				{#each builtins as entry (entry.id)}
+					{@const id = builtinId(entry)}
+					<div class="space-y-3 py-3 first:pt-0" data-testid="{domain}-builtin-row">
+						<div class="flex min-w-0 items-center gap-3">
+							<div
+								class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+								aria-hidden="true"
+							>
+								<Icon class="size-5 text-foreground" />
+							</div>
+							<div class="min-w-0">
+								<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+									<p class="font-medium">{entry.label}</p>
+									<Badge variant="outline" class="shrink-0 text-muted-foreground">Built in</Badge>
+								</div>
+								<p class="text-sm text-muted-foreground">{entry.description}</p>
+							</div>
+						</div>
+						{#if choiceCount > 1}
+							<div class="sm:pl-14">
+								{@render defaultControl({ id, displayName: entry.label })}
+							</div>
+						{/if}
+					</div>
+				{/each}
+				{#each providers as provider (provider.id)}
+					<div class="space-y-3 py-3 first:pt-0" data-testid="{domain}-provider-row">
+						<div class="flex items-center justify-between gap-2">
+							<div class="flex min-w-0 items-center gap-3">
+								<div
+									class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+									aria-hidden="true"
+								>
+									<Icon class="size-5 text-foreground" />
+								</div>
 								<div class="min-w-0">
 									<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-										<p class="text-sm font-medium">{entry.label}</p>
-										<Badge variant="outline" class="shrink-0 text-xs text-muted-foreground">
-											Built in
-										</Badge>
+										<p class="font-medium break-words">{provider.displayName}</p>
+										<ProviderStatusBadge status={provider.status} />
 									</div>
-									<p class="text-xs text-muted-foreground">{entry.description}</p>
+									<p class="truncate text-sm text-muted-foreground">
+										{labelFor(provider.providerType)}
+										{#if typeof provider.config['model'] === 'string'}
+											· {provider.config['model']}
+										{/if}
+									</p>
 								</div>
-								{#if choiceCount > 1}
-									{@render defaultControl({ id, displayName: entry.label })}
-								{/if}
 							</div>
-						{/each}
-						{#each providers as provider (provider.id)}
-							<div class="space-y-3 rounded-lg border p-3" data-testid="{domain}-provider-row">
-								<div class="flex items-center justify-between gap-2">
-									<div class="min-w-0">
-										<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-											<p class="text-sm font-medium truncate">{provider.displayName}</p>
-											<ProviderStatusBadge status={provider.status} />
-										</div>
-										<p class="text-xs text-muted-foreground truncate">
-											{labelFor(provider.providerType)}
-											{#if typeof provider.config['model'] === 'string'}
-												· {provider.config['model']}
-											{/if}
-										</p>
-									</div>
-									<div class="flex items-center gap-2 shrink-0">
-										<Button
-											variant="ghost"
-											size="icon"
-											class="size-10"
-											aria-label="Edit {provider.displayName}"
-											onclick={() => openEdit(provider)}
-										>
-											<Pencil class="h-4 w-4" />
-										</Button>
-										<Button
-											variant="ghost"
-											size="icon"
-											class="size-10"
-											aria-label="Delete {provider.displayName}"
-											onclick={() => confirmDelete(provider)}
-										>
-											<Trash2 class="h-4 w-4 text-destructive" />
-										</Button>
-									</div>
-								</div>
-								{#if choiceCount > 1 && provider.status !== 'disabled'}
-									{@render defaultControl(provider)}
-								{/if}
-								<ProviderHealth {provider} onFix={openEdit} onUpdated={replaceProvider} />
+							<div class="flex shrink-0 items-center gap-2">
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-10"
+									aria-label="Edit {provider.displayName}"
+									onclick={() => openEdit(provider)}
+								>
+									<Pencil class="h-4 w-4" aria-hidden="true" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-10"
+									aria-label="Delete {provider.displayName}"
+									onclick={() => confirmDelete(provider)}
+								>
+									<Trash2 class="h-4 w-4 text-destructive" aria-hidden="true" />
+								</Button>
 							</div>
-						{/each}
+						</div>
+						<div class="space-y-3 sm:pl-14">
+							{#if choiceCount > 1 && provider.status !== 'disabled'}
+								{@render defaultControl(provider)}
+							{/if}
+							<ProviderHealth {provider} onFix={openEdit} onUpdated={replaceProvider} />
+						</div>
 					</div>
-				{/if}
+				{/each}
 			</div>
 		{/if}
 	</CardContent>
@@ -471,8 +483,8 @@
 				data-testid="{domain}-save-provider"
 			>
 				{#if isSaving}
-					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-					Saving...
+					<LoaderCircle class="animate-spin" aria-hidden="true" />
+					Saving…
 				{:else}
 					{editingId === null ? 'Add provider' : 'Save'}
 				{/if}
