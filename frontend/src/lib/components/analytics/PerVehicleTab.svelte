@@ -24,7 +24,9 @@
 	} from '#lib/types/index.ts';
 	import { formatCurrency, formatNumberUpTo } from '#lib/utils/formatters.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { getCostPerDistanceLabel, getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
+	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
+	import HeroFigure from '#lib/components/common/hero-figure.svelte';
 	import type { AnalyticsDateRange } from './analytics-filters';
 	import ChartGroup from './fuel/ChartGroup.svelte';
 	import { bucketLabel } from './explore/explore-data';
@@ -158,7 +160,6 @@
 	const carName = (v: Vehicle) => v.nickname || `${v.year} ${v.make} ${v.model}`;
 
 	let units = $derived(selectedVehicle?.unitPreferences ?? settingsStore.unitPreferences);
-	let costPerDistLabel = $derived(getCostPerDistanceLabel(units.distanceUnit));
 	let distLongLabel = $derived(getDistanceUnitLabel(units.distanceUnit));
 	let distShort = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 	let distWord = $derived(units.distanceUnit === 'kilometers' ? 'kilometer' : 'mile');
@@ -181,6 +182,11 @@
 			value: monthly?.series[0]?.values[i] ?? 0
 		}))
 	);
+	const isMobile = new IsMobile();
+	let monthTicks = $derived.by(() => {
+		const step = Math.max(1, Math.ceil(monthRows.length / (isMobile.current ? 4 : 12)));
+		return monthRows.filter((_, i) => i % step === 0).map(r => r.label);
+	});
 	let monthAverage = $derived(monthly?.totals.perBucket ?? null);
 	const monthSeries = [{ key: 'value', label: 'Running costs', color: 'var(--chart-1)' }];
 	const monthConfig: Chart.ChartConfig = {
@@ -224,14 +230,17 @@
 		const ownership = [
 			{ label: 'Total cost of ownership', value: formatCurrency(tco.totalCost) },
 			{
-				label: costPerDistLabel,
+				label: `Ownership cost per ${distWord}`,
 				value: tco.costPerDistance != null ? formatCurrency(tco.costPerDistance) : 'N/A'
 			}
 		];
 		return [
 			...(hideFinancial ? [] : ownership),
-			{ label: 'Cost per Month', value: formatCurrency(tco.costPerMonth) },
-			{ label: `Total ${distLongLabel}`, value: formatNumberUpTo(tco.totalDistance, 1) }
+			{ label: 'Cost per month', value: formatCurrency(tco.costPerMonth) },
+			{
+				label: `Total ${distLongLabel.toLowerCase()}`,
+				value: formatNumberUpTo(tco.totalDistance, 1)
+			}
 		];
 	});
 </script>
@@ -289,17 +298,24 @@
 				{carName(selectedVehicle)} is shared with you, so the monthly and category overview isn't available
 				for it yet. Here are its health score and the totals you can see.
 			</p>
+			{#if filterLabel}
+				<p class="text-sm text-muted-foreground">
+					The health score and totals cover this car's whole history. The breakdown follows the date
+					range.
+				</p>
+			{/if}
+			{#if filterLabel && onClearFilters && breakdownRows.length === 0}
+				{@render noExpenses(filterLabel, onClearFilters)}
+			{/if}
 			{@render detail(health, 2)}
 		{:else if health && tco && expenses && selectedVehicle}
 			<section aria-label="{carName(selectedVehicle)} overview" class="space-y-8">
 				<div class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
 					<div class="space-y-2">
-						<h2 class="text-base text-muted-foreground md:text-lg">
-							{carName(selectedVehicle)}, all time
-							<span class="block text-3xl font-bold text-foreground tabular-nums md:text-4xl">
-								{formatCurrency(hero?.total ?? 0, undefined, 0)}
-							</span>
-						</h2>
+						<HeroFigure
+							label="{carName(selectedVehicle)}, all time"
+							value={formatCurrency(hero?.total ?? 0, undefined, 0)}
+						/>
 						{#if hero?.top || hero?.running != null}
 							<p class="max-w-md text-muted-foreground">
 								{#if hero.top}{hero.top.percent}% of it went on {hero.top.reason}.{/if}
@@ -348,20 +364,7 @@
 
 				<div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-10">
 					{#if filterLabel && onClearFilters && rangeEmpty}
-						<EmptyState level={2}>
-							{#snippet icon()}
-								<div class="mb-4 rounded-full bg-muted p-4">
-									<SearchX class="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-								</div>
-							{/snippet}
-							{#snippet title()}No expenses for {filterLabel}{/snippet}
-							{#snippet description()}
-								This car has no expenses in the chosen dates. Try a longer date range.
-							{/snippet}
-							{#snippet action()}
-								<Button variant="outline" onclick={onClearFilters}>Clear filters</Button>
-							{/snippet}
-						</EmptyState>
+						{@render noExpenses(filterLabel, onClearFilters)}
 					{:else if monthRows.length > 0}
 						<AppBarChart
 							level={2}
@@ -375,6 +378,7 @@
 							referenceLines={monthAverage != null
 								? [{ value: monthAverage, label: 'Monthly average' }]
 								: []}
+							xAxisProps={{ ticks: monthTicks, format: (v: unknown) => String(v) }}
 							yAxisFormat={v => formatCurrency(v, undefined, 0)}
 							tooltipFormat={v => formatCurrency(Number(v))}
 							tooltipLabelFormat={v => String(v)}
@@ -407,6 +411,23 @@
 		{/if}
 	</div>
 {/if}
+
+{#snippet noExpenses(label: string, clear: () => void)}
+	<EmptyState level={2}>
+		{#snippet icon()}
+			<div class="mb-4 rounded-full bg-muted p-4">
+				<SearchX class="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+			</div>
+		{/snippet}
+		{#snippet title()}No expenses for {label}{/snippet}
+		{#snippet description()}
+			This car has no expenses in the chosen dates. Try a longer date range.
+		{/snippet}
+		{#snippet action()}
+			<Button variant="outline" onclick={clear}>Clear filters</Button>
+		{/snippet}
+	</EmptyState>
+{/snippet}
 
 {#snippet detail(health: VehicleHealthResponse, level: 2 | 3)}
 	<div class="space-y-4 md:space-y-6">

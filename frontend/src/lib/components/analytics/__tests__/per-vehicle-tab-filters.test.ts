@@ -10,7 +10,14 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
-vi.mock('#lib/components/charts/index.ts', () => ({ AppBarChart: () => {} }));
+type ChartProps = { title?: string; data?: unknown; xAxisProps?: unknown };
+const charts = vi.hoisted(() => [] as ChartProps[]);
+vi.mock('#lib/components/charts/index.ts', () => ({
+	AppBarChart: (_: unknown, props: ChartProps) => {
+		charts.push(props);
+	}
+}));
+const chart = (title: string) => charts.findLast(c => c.title === title);
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicles: () =>
@@ -23,6 +30,13 @@ vi.mock('#lib/services/vehicle-api.ts', () => ({
 					make: 'Ford',
 					model: 'F-150',
 					sharedAccess: { seesFinancials: false }
+				},
+				{
+					id: 'open',
+					year: 2018,
+					make: 'Mazda',
+					model: 'CX-5',
+					sharedAccess: { seesFinancials: true }
 				}
 			])
 	}
@@ -58,8 +72,14 @@ const RANGE = { startDate: 100, endDate: 200, ytdStart: 50 };
 const lifetimeCalls = () =>
 	api.query.mock.calls.filter(([p]) => (p as AnalyticsQueryParams).interval === 'none');
 
+async function findHero(name: string) {
+	const label = await screen.findByText(`${name}, all time`);
+	return label.closest('[data-slot="hero-figure"]') as HTMLElement;
+}
+
 beforeEach(() => {
 	vi.clearAllMocks();
+	charts.length = 0;
 	api.getVehicleHealth.mockResolvedValue({
 		vehicleName: 'Toyota RAV4',
 		overallScore: 50,
@@ -95,7 +115,7 @@ describe('PerVehicleTab', () => {
 
 	test('the hero names the total, the biggest share and the running costs', async () => {
 		render(PerVehicleTab, { preferredVehicleId: 'rav4', rangeText: 'Last 12 months' });
-		const hero = await screen.findByRole('heading', { level: 2, name: /Daily Driver, all time/ });
+		const hero = await findHero('Daily Driver');
 		expect(hero.textContent).toContain('$10,000');
 		expect(screen.getByText(/78% of it went on loan and insurance payments\./).textContent).toMatch(
 			/Running costs were\s+\$2,200\./
@@ -106,6 +126,17 @@ describe('PerVehicleTab', () => {
 		expect(rates?.textContent).toMatch(/All in, lifetime\s*\$0\.90\/mi/);
 		expect(rates?.textContent).toMatch(/Running, lifetime\s*\$0\.25\/mi/);
 		expect(rates?.textContent).toMatch(/Running, last 12 months\s*\$0\.20\/mi/);
+	});
+
+	test('the monthly chart labels its months on the x-axis', async () => {
+		render(PerVehicleTab, { preferredVehicleId: 'rav4' });
+		await findHero('Daily Driver');
+		const axis = chart('Spend by month, running only')?.xAxisProps as {
+			ticks: string[];
+			format: (v: unknown) => string;
+		};
+		expect(axis.ticks).toEqual(['Jan ’26', 'Feb ’26']);
+		expect(axis.format('Jan ’26')).toBe('Jan ’26');
 	});
 
 	test('a car shared with you shows its health and totals, not the owner-only overview', async () => {
@@ -121,20 +152,60 @@ describe('PerVehicleTab', () => {
 		expect(api.query).not.toHaveBeenCalled();
 		const page = document.body.textContent ?? '';
 		expect(page).not.toMatch(/all time|\$0\b|Not enough data|Total cost of ownership|10,000/);
+		const breakdown = chart('Spending by category')?.data as Array<{ key: string }>;
+		expect(breakdown.map(r => r.key)).toEqual(['fuel']);
+	});
+
+	test('a car shared with full access shows its ownership totals and financial spend', async () => {
+		api.getVehicleExpenses.mockResolvedValue({
+			expenseBreakdown: [
+				{ category: 'financial', amount: 900 },
+				{ category: 'fuel', amount: 40 }
+			]
+		});
+		render(PerVehicleTab, { preferredVehicleId: 'open' });
+		expect(await screen.findByText(/2018 Mazda CX-5 is shared with you/)).toBeTruthy();
+		expect(screen.getByText('Total cost of ownership')).toBeTruthy();
+		const breakdown = chart('Spending by category')?.data as Array<{ key: string }>;
+		expect(breakdown.map(r => r.key)).toEqual(['financial', 'fuel']);
+	});
+
+	test('a shared car with a filter and no expenses offers Clear filters', async () => {
+		api.getVehicleExpenses.mockResolvedValue({ expenseBreakdown: [] });
+		const onClearFilters = vi.fn();
+		render(PerVehicleTab, {
+			preferredVehicleId: 'shared',
+			filterLabel: 'last 3 months, 1 car',
+			onClearFilters
+		});
+		expect(
+			await screen.findByRole('heading', { level: 2, name: 'No expenses for last 3 months, 1 car' })
+		).toBeTruthy();
+		expect(screen.getByText(/cover this car's whole history/)).toBeTruthy();
+		await fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+		expect(onClearFilters).toHaveBeenCalledOnce();
 	});
 
 	test('a car whose financials are hidden shows no loan amounts or wording', async () => {
+		api.getVehicleExpenses.mockResolvedValue({
+			expenseBreakdown: [
+				{ category: 'financial', amount: 900 },
+				{ category: 'fuel', amount: 40 }
+			]
+		});
 		render(PerVehicleTab, { preferredVehicleId: 'rav4', hiddenFinancials: new Set(['rav4']) });
-		const hero = await screen.findByRole('heading', { level: 2, name: /Daily Driver, all time/ });
+		const hero = await findHero('Daily Driver');
 		expect(hero.textContent).toContain('$2,200');
 		const page = document.body.textContent ?? '';
 		expect(page).not.toMatch(/7,800|10,000|loan|All in|Financial/);
 		expect(screen.getByText(/68% of it went on fuel and charging\./)).toBeTruthy();
+		const breakdown = chart('Spending by category')?.data as Array<{ key: string }>;
+		expect(breakdown.map(r => r.key)).toEqual(['fuel']);
 	});
 
 	test('a new date range re-sends only the range requests', async () => {
 		const { rerender } = render(PerVehicleTab, { dateRange: RANGE, preferredVehicleId: 'rav4' });
-		await screen.findByRole('heading', { level: 2, name: /Daily Driver, all time/ });
+		await findHero('Daily Driver');
 		expect(lifetimeCalls()).toHaveLength(3);
 
 		await rerender({ dateRange: { ...RANGE, startDate: 150 }, preferredVehicleId: 'rav4' });
@@ -152,7 +223,7 @@ describe('PerVehicleTab', () => {
 		expect(screen.queryByText(/all time/)).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-		const hero = await screen.findByRole('heading', { level: 2, name: /Daily Driver, all time/ });
+		const hero = await findHero('Daily Driver');
 		expect(hero.textContent).toContain('$10,000');
 		expect(lifetimeCalls()).toHaveLength(6);
 		expect(api.getVehicleHealth).toHaveBeenCalledTimes(2);
@@ -161,9 +232,7 @@ describe('PerVehicleTab', () => {
 	test('picking another car loads that car', async () => {
 		render(PerVehicleTab, { preferredVehicleId: 'rav4' });
 		await fireEvent.click(await screen.findByRole('button', { name: '2019 Honda Civic' }));
-		expect(
-			await screen.findByRole('heading', { level: 2, name: /2019 Honda Civic, all time/ })
-		).toBeTruthy();
+		expect(await findHero('2019 Honda Civic')).toBeTruthy();
 		expect(api.getVehicleHealth).toHaveBeenLastCalledWith('civic');
 		expect(screen.getByRole('button', { name: '2019 Honda Civic', pressed: true })).toBeTruthy();
 	});
