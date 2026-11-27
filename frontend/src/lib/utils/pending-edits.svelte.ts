@@ -41,6 +41,7 @@ const edits = new SvelteMap<string, PendingEdit>();
 const inFlight = new SvelteMap<string, Promise<void>>();
 const versions = new SvelteMap<string, string>();
 const latest = new SvelteMap<string, Expense>();
+const ownStamps = new SvelteMap<string, readonly string[]>();
 const timedOut = new SvelteMap<string, EditPayload>();
 let nextSeq = 0;
 
@@ -85,6 +86,7 @@ function reportConflict(id: string, seq: number, updatedAt: string | null): void
 function landed(id: string, seq: number, saved: Expense | undefined): void {
 	const stamp = saved?.updatedAt;
 	noteVersion(id, stamp);
+	if (stamp) ownStamps.set(id, [...(ownStamps.get(id) ?? []), stamp]);
 	timedOut.delete(id);
 	const entry = edits.get(id);
 	if (!entry) return;
@@ -288,6 +290,7 @@ export async function reloadLatest(id: string): Promise<void> {
 		appStore.dismissToast(toastId(id));
 		edits.delete(id);
 		timedOut.delete(id);
+		ownStamps.delete(id);
 		latest.set(id, fresh);
 		noteVersion(id, fresh.updatedAt);
 	} catch (error) {
@@ -305,9 +308,16 @@ function withLatest<T extends Expense>(expense: T): T {
 	return { ...expense, ...fresh };
 }
 
+function olderOwnSave(entry: PendingEdit, expense: Expense): boolean {
+	const stamps = ownStamps.get(expense.id);
+	if (!expense.updatedAt || !stamps?.includes(expense.updatedAt)) return false;
+	return entry.status !== 'saved' || expense.updatedAt !== stamps.at(-1);
+}
+
 function covers(entry: PendingEdit, expense: Expense): boolean {
 	if (expense.updatedAt === entry.before.updatedAt) return true;
 	if (entry.currentUpdatedAt && expense.updatedAt === entry.currentUpdatedAt) return true;
+	if (olderOwnSave(entry, expense)) return true;
 	return entry.undo === true && expense.updatedAt === entry.undoneAt;
 }
 
@@ -361,5 +371,6 @@ export function resetPendingEdits(): void {
 	inFlight.clear();
 	versions.clear();
 	latest.clear();
+	ownStamps.clear();
 	timedOut.clear();
 }

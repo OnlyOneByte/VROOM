@@ -110,6 +110,47 @@ describe('editing an expense updates the row while the PUT runs', () => {
 		expect(notices().filter(n => n['type'] === 'error')).toEqual([]);
 	});
 
+	describe('a reload between two quick saves', () => {
+		const again = { ...changed, amount: 70 };
+		const againPayload = { vehicleId: 'v1', category: 'fuel', amount: 70 } as never;
+		const firstLanded = { ...changed, updatedAt: '2026-11-20T12:00:01.000Z' };
+
+		async function reloadAfterFirstSave() {
+			const second = deferred();
+			vi.mocked(expenseApi.updateExpense)
+				.mockResolvedValueOnce(firstLanded)
+				.mockReturnValueOnce(second.promise);
+			scheduleEdit(saved, changed, payload);
+			scheduleEdit(saved, again, againPayload);
+			await vi.waitFor(() => expect(expenseApi.updateExpense).toHaveBeenCalledTimes(2));
+			return second;
+		}
+
+		test('the reloaded row shows the second edit while its save is pending, then the saved copy', async () => {
+			const second = await reloadAfterFirstSave();
+
+			expect(shownExpense(firstLanded)).toMatchObject({ amount: 70 });
+			expect(editFailureStates([firstLanded])).toEqual([]);
+
+			second.resolve({ ...again, updatedAt: '2026-11-20T12:00:02.000Z' });
+			await flush();
+			expect(shownExpense(firstLanded)).toMatchObject({ amount: 70 });
+		});
+
+		test('if the second save fails, the reloaded row shows Changes not saved with Retry', async () => {
+			const second = await reloadAfterFirstSave();
+
+			second.reject(new ApiError('down', 500));
+			await vi.waitFor(() =>
+				expect(editFailureStates([firstLanded])).toEqual([
+					['e1', expect.objectContaining({ status: 'failed', kind: 'edit' })]
+				])
+			);
+			expect(shownExpense(firstLanded)).toBe(firstLanded);
+			expect(notices().at(-1)?.['action']).toMatchObject({ label: 'Retry' });
+		});
+	});
+
 	test('a failure note is dropped once the list holds a newer server copy', async () => {
 		vi.mocked(expenseApi.updateExpense).mockRejectedValueOnce(new ApiError('down', 500));
 		scheduleEdit(saved, changed, payload);
