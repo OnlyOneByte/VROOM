@@ -152,6 +152,16 @@ describe('UnitPreferencesCard', () => {
 		await settle();
 		expect(onCurrencyChange).not.toHaveBeenCalled();
 		expect(currency()).toHaveTextContent('USD – US Dollar ($)');
+
+		await fireEvent.click(currency());
+		await settle();
+		expect(screen.getByRole('option', { name: 'USD – US Dollar ($)' })).toHaveAttribute(
+			'aria-selected',
+			'true'
+		);
+		await fireEvent.pointerUp(screen.getByRole('option', { name: 'JPY – Japanese Yen (¥)' }));
+		await settle();
+		expect(screen.getByRole('alertdialog')).toHaveTextContent('Switch to JPY');
 	});
 
 	test('confirming the switch saves the currency without cents', async () => {

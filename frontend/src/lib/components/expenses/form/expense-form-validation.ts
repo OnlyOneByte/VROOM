@@ -17,6 +17,7 @@ export function hasMileageEntry(value: unknown): boolean {
 interface ValidationContext {
 	category: string;
 	vehicle: Vehicle | null;
+	currency?: string;
 	volumeUnit: VolumeUnit;
 	chargeUnit: ChargeUnit;
 	allVehicleExpenses: Array<{ id: string; date: string; mileage?: number }>;
@@ -44,8 +45,8 @@ export function validateExpenseField(field: string, ctx: ValidationContext): str
 			if (amount > EXPENSE_LIMITS.MAX_AMOUNT) {
 				return `Amount must be ${formatNumber(EXPENSE_LIMITS.MAX_AMOUNT, 0)} or less`;
 			}
-			if (!fitsMinorUnit(amount, ctx.vehicle?.ownerCurrency)) {
-				const digits = Math.log10(minorUnitScale(ctx.vehicle?.ownerCurrency));
+			if (!fitsMinorUnit(amount, ctx.currency ?? ctx.vehicle?.ownerCurrency)) {
+				const digits = Math.log10(minorUnitScale(ctx.currency ?? ctx.vehicle?.ownerCurrency));
 				return digits > 0
 					? `Amount can have at most ${digits} decimal places`
 					: 'Amount must be a whole number';

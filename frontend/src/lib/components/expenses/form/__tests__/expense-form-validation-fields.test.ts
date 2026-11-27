@@ -77,6 +77,17 @@ describe('validateExpenseField — amount bounds', () => {
 		).toBeNull();
 	});
 
+	test("a split checks decimals in the split cars' owner currency", () => {
+		const dollarCar = { id: 'v2', ownerCurrency: 'USD' } as Vehicle;
+		const amount = { amount: '12.50' };
+		expect(
+			validateExpenseField('amount', ctx({ vehicle: dollarCar, currency: 'JPY', formData: amount }))
+		).toBe('Amount must be a whole number');
+		expect(
+			validateExpenseField('amount', ctx({ vehicle: null, currency: 'USD', formData: amount }))
+		).toBeNull();
+	});
+
 	test('a normal positive amount → null', () => {
 		expect(validateExpenseField('amount', ctx({ formData: { amount: '42.50' } }))).toBeNull();
 	});

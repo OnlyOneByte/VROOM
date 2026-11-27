@@ -15,7 +15,7 @@
 
 	let { form }: Props = $props();
 
-	const currencySymbol = $derived(getCurrencySymbol());
+	const currencySymbol = $derived(getCurrencySymbol(form.currency));
 	const fuelAllowed = $derived(isFuelAllowed(form.values));
 </script>
 
@@ -54,10 +54,10 @@
 				<Input
 					id="reminder-expense-amount"
 					type="number"
-					step={amountStep()}
+					step={amountStep(form.currency)}
 					min="0"
 					bind:value={form.values.expenseAmount}
-					placeholder={amountPlaceholder()}
+					placeholder={amountPlaceholder(form.currency)}
 					class={currencySymbol.length > 1 ? 'pl-14' : 'pl-8'}
 					aria-invalid={!!form.errors['expenseAmount']}
 				/>

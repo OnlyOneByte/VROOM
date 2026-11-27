@@ -12,7 +12,10 @@ import {
 	type ReminderDraft
 } from './reminder-form-model';
 
-export function validateReminderDraft(draft: ReminderDraft): Record<string, string> {
+export function validateReminderDraft(
+	draft: ReminderDraft,
+	currency?: string
+): Record<string, string> {
 	const e: Record<string, string> = {};
 	const mileage = hasMileageTrigger(draft.triggerMode);
 	if (!draft.name.trim()) e['name'] = 'Name is required';
@@ -61,7 +64,7 @@ export function validateReminderDraft(draft: ReminderDraft): Record<string, stri
 			showSplit &&
 			draft.splitMethod === 'absolute' &&
 			amt > 0 &&
-			!splitAmountsMatchTotal(draft.splitAllocations, amt)
+			!splitAmountsMatchTotal(draft.splitAllocations, amt, currency)
 		) {
 			e['split'] = 'Split amounts must total the expense amount';
 		}
