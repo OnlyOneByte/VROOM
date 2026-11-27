@@ -10,6 +10,7 @@ function baseExpense(): ImportableExpense {
     mileage: 30_000,
     volume: 11.5,
     fuelType: 'Regular',
+    chargerType: null,
     description: 'fill up',
     location: 'Shell, Main St',
     tags: ['road', 'trip'],

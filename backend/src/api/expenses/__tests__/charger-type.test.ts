@@ -17,7 +17,6 @@ beforeEach(async () => {
     make: 'Tesla',
     model: 'Model 3',
     year: 2022,
-    vehicleType: 'electric',
   });
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
@@ -72,6 +71,34 @@ describe('charger type on charging expenses', () => {
       chargerType: 'home',
     });
     expect(misc.chargerType).toBeNull();
+  });
+
+  test('a CSV export carries it and re-imports it', async () => {
+    await create(charge('home'));
+    const exported = await ctx.authed('GET', '/api/v1/expenses/export');
+    const csv = await exported.text();
+    expect(csv.split('\n')[0]).toContain('"chargerType"');
+    expect(csv).toContain('"home"');
+
+    ctx.sqlite.run('DELETE FROM expenses');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
+    expect(res.status).toBe(200);
+    const row = ctx.sqlite.query('SELECT charger_type FROM expenses').get();
+    expect(row).toEqual({ charger_type: 'home' });
+  });
+
+  test('a CSV row with an unknown charger type is an error on that row', async () => {
+    const csv = [
+      'date,vehicle,category,amount,mileage,volume,fuelType,chargerType',
+      '2024-06-01T00:00:00.000Z,2022 Tesla Model 3,fuel,10,1000,30,Electric,DC_Fast',
+      '2024-06-02T00:00:00.000Z,2022 Tesla Model 3,fuel,10,1010,30,Electric,garage',
+    ].join('\n');
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv, dryRun: true });
+    const body = await json<{
+      data: { rows: { row: number; status: string; message?: string }[] };
+    }>(res);
+    expect(body.data.rows.map((r) => r.status)).toEqual(['ready', 'error']);
+    expect(body.data.rows[1]?.message).toMatch(/Charger type must be one of/);
   });
 
   test('an update can set and clear it, and switching to gas clears it', async () => {

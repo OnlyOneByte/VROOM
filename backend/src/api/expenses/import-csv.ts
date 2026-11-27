@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto';
 import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { EXPENSE_CATEGORIES, isElectricFuelType } from '../../db/types';
+import {
+  CHARGER_TYPES,
+  type ChargerType,
+  EXPENSE_CATEGORIES,
+  isElectricFuelType,
+} from '../../db/types';
 import { ValidationError } from '../../errors';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
 import { dollarsToCents, hasAtMostTwoDecimals, parsedToMinor } from '../../utils/money';
@@ -34,6 +39,7 @@ export interface ImportableExpense {
   mileage: number | null;
   volume: number | null;
   fuelType: string | null;
+  chargerType: ChargerType | null;
   description: string | null;
   location: string | null;
   tags: string[];
@@ -216,6 +222,11 @@ function parseRow(
   const mileage = mileageResult.value;
   const volume = volumeResult.value;
   const fuelType = fuelTypeResult.value;
+  const chargerCell = get('chargerType').trim().toLowerCase();
+  if (chargerCell && !(CHARGER_TYPES as readonly string[]).includes(chargerCell)) {
+    return { error: `Charger type must be one of ${CHARGER_TYPES.join(', ')}, or empty` };
+  }
+  const chargerType = (chargerCell || null) as ChargerType | null;
   const missedFillup = /^(true|1|yes)$/i.test(get('missedFillup'));
 
   if (category === 'fuel' && (!volume || mileage === null)) {
@@ -235,6 +246,7 @@ function parseRow(
       mileage,
       volume,
       fuelType,
+      chargerType,
       description: descriptionResult.value,
       location: locationResult.value,
       tags: tagsResult.value,
