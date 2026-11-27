@@ -161,6 +161,30 @@ describe('changing the distance unit converts the stored rate', () => {
     expect((await read()).businessMileageRate).toBe(0.00005033);
   });
 
+  test('a rate under 0.001 keeps 4 significant digits both ways, so it survives a round trip', async () => {
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'kilometers' },
+      businessMileageRate: 0.0005,
+    });
+    await ctx.authed('PUT', '/api/v1/settings', { unitPreferences: { distanceUnit: 'miles' } });
+    expect((await read()).businessMileageRate).toBe(0.0008047);
+
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'kilometers' },
+    });
+    expect((await read()).businessMileageRate).toBe(0.0005);
+
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'miles' },
+      businessMileageRate: 0.00016,
+    });
+    await ctx.authed('PUT', '/api/v1/settings', {
+      unitPreferences: { distanceUnit: 'kilometers' },
+    });
+    await ctx.authed('PUT', '/api/v1/settings', { unitPreferences: { distanceUnit: 'miles' } });
+    expect((await read()).businessMileageRate).toBe(0.00016);
+  });
+
   test('changing only the fuel unit leaves the rate alone', async () => {
     await ctx.authed('PUT', '/api/v1/settings', {
       unitPreferences: { distanceUnit: 'miles' },
