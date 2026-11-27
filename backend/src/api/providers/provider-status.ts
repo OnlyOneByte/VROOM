@@ -28,7 +28,7 @@ export async function recordProviderHealth(
   const notTurnedOff = and(eq(userProviders.id, providerId), ne(userProviders.status, 'disabled'));
   if (result.ok) {
     await appContext()
-      .db.update(userProviders)
+      .asyncDb.update(userProviders)
       .set({
         status: 'active',
         lastErrorCode: null,
@@ -46,7 +46,7 @@ export async function recordProviderHealth(
       ? sql`'needs_reauth'`
       : sql`CASE WHEN ${userProviders.status} = 'needs_reauth' THEN 'needs_reauth' WHEN ${failures} >= ${FAILURES_BEFORE_ERROR} THEN 'error' ELSE ${userProviders.status} END`;
   await appContext()
-    .db.update(userProviders)
+    .asyncDb.update(userProviders)
     .set({ status, lastErrorCode: code, failureCount: failures, lastCheckedAt: now })
     .where(notTurnedOff);
 }

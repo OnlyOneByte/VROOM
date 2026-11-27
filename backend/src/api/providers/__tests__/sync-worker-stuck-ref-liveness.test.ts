@@ -99,7 +99,7 @@ beforeEach(() => {
       findById: (id: string) => Promise.resolve(makePhoto(id)),
     },
     registry: {
-      getProviderInternal: () =>
+      getProvider: () =>
         Promise.resolve({
           type: 'google-drive',
           download: () => Promise.resolve(Buffer.from('bytes')),

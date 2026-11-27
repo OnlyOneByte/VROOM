@@ -378,21 +378,6 @@ export class StorageProviderRegistry {
     return this.createProviderInstance(providerRow);
   }
 
-  async getProviderInternal(providerId: string): Promise<StorageProvider> {
-    const row = await this.db
-      .select()
-      .from(userProviders)
-      .where(eq(userProviders.id, providerId))
-      .limit(1);
-
-    const providerRow = row[0];
-    if (!providerRow) {
-      throw new NotFoundError('Storage provider');
-    }
-
-    return this.createProviderInstance(providerRow);
-  }
-
   async getProvidersByDomain(userId: string, domain: string): Promise<UserProvider[]> {
     return this.db
       .select()
@@ -400,17 +385,15 @@ export class StorageProviderRegistry {
       .where(and(eq(userProviders.userId, userId), eq(userProviders.domain, domain)));
   }
 
-  async resolveProviderFolderPath(providerId: string, category: PhotoCategory): Promise<string> {
-    const row = await this.db
-      .select()
-      .from(userProviders)
-      .where(eq(userProviders.id, providerId))
-      .limit(1);
-
-    const providerRow = row[0];
+  async resolveProviderFolderPath(
+    providerId: string,
+    userId: string,
+    category: PhotoCategory
+  ): Promise<string> {
+    const providerRow = await this.findOwnedProvider(providerId, userId);
     if (!providerRow) return '';
 
-    const storageConfig = await this.loadStorageConfig(providerRow.userId);
+    const storageConfig = await this.loadStorageConfig(userId);
     return this.resolveFolderPath(providerRow, storageConfig, providerId, category);
   }
 
