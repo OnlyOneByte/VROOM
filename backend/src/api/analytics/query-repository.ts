@@ -580,7 +580,7 @@ function itemsWhere(
 export class AnalyticsQueryRepository {
   private db: AsyncAppDatabase;
 
-  constructor(private syncDb: AppDatabase) {
+  constructor(syncDb: AppDatabase) {
     this.db = openAsyncDatabase(syncDb.$client).db;
   }
 
@@ -689,16 +689,16 @@ export class AnalyticsQueryRepository {
       vehicleInfo,
       userUnits,
       periods,
-      driverNames: query.groupBy === 'driver' ? this.driverNames(vehicleInfo) : new Map(),
+      driverNames: query.groupBy === 'driver' ? await this.driverNames(vehicleInfo) : new Map(),
     };
     return { ctx, currency: prefs?.currency ?? 'USD', range, prior };
   }
 
-  private driverNames(vehicleInfo: Map<string, VehicleInfo>): Map<string, string> {
+  private async driverNames(vehicleInfo: Map<string, VehicleInfo>): Promise<Map<string, string>> {
     const many = vehicleInfo.size > 1;
     const names = new Map<string, string>();
     for (const [vehicleId, info] of vehicleInfo) {
-      for (const driver of listDrivers(this.syncDb, vehicleId)) {
+      for (const driver of await listDrivers(this.db, vehicleId)) {
         const car = many ? ` (${info.name})` : '';
         names.set(driver.id, `${driver.name}${car}`);
       }

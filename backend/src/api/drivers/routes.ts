@@ -17,7 +17,6 @@ import {
 } from './backfill';
 import {
   addGuestDriver,
-  carShareEnabled,
   DRIVER_COLORS,
   findDriver,
   listDrivers,
@@ -47,8 +46,9 @@ const updateSchema = z.strictObject({
   archived: z.boolean().optional(),
 });
 
-function requireCarShare(vehicleId: string): void {
-  if (!carShareEnabled(appContext().db, vehicleId)) throw new NotFoundError('Car sharing');
+async function requireCarShare(vehicleId: string): Promise<void> {
+  const vehicle = await repos().vehicles.findById(vehicleId);
+  if (!vehicle?.carShareEnabled) throw new NotFoundError('Car sharing');
 }
 
 export const driverRoutes = new Hono();
@@ -59,10 +59,10 @@ driverRoutes.get(
   '/',
   zValidator('param', vehicleIdParam),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
-    requireCarShare(vehicleId);
-    return c.json({ success: true, data: listDrivers(appContext().db, vehicleId) });
+    await requireCarShare(vehicleId);
+    return c.json({ success: true, data: await listDrivers(appContext().asyncDb, vehicleId) });
   }
 );
 
@@ -86,18 +86,17 @@ driverRoutes.get(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
-    const { db } = appContext();
-    if (!carShareEnabled(db, vehicleId)) throw new NotFoundError('Car sharing');
+    const { db, asyncDb } = appContext();
+    const owner = await repos().vehicles.findById(vehicleId);
+    if (!owner?.carShareEnabled) throw new NotFoundError('Car sharing');
     const to = query.to ? Date.parse(query.to) : Date.now();
     const from = query.from ? Date.parse(query.from) : to - 30 * DAY;
     const resolver = requestResolver(c, db);
     const vehicle = { kind: 'vehicle' as const, vehicleId };
-    const owner = await repos().vehicles.findById(vehicleId);
-    if (!owner) throw new NotFoundError('Vehicle');
     const scale = await repos().preferences.moneyScale(owner.userId);
     return c.json({
       success: true,
-      data: driverStats(db, vehicleId, {
+      data: await driverStats(asyncDb, vehicleId, {
         period: { from, to },
         withEstimates: query.estimates === 'true',
         viewerUserId: c.get('user').id,
@@ -113,16 +112,17 @@ driverRoutes.get(
   '/rules',
   zValidator('param', vehicleIdParam),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
-    requireCarShare(vehicleId);
-    const { db } = appContext();
+    await requireCarShare(vehicleId);
+    const { db, asyncDb } = appContext();
     const everyone = requestResolver(c, db).can('vehicle.driver_stats.read', {
       kind: 'vehicle',
       vehicleId,
     }).allow;
-    const own = ownDriverId(db, vehicleId, c.get('user').id);
-    return c.json({ success: true, data: rulesFor(readRules(db, vehicleId), everyone, own) });
+    const own = await ownDriverId(asyncDb, vehicleId, c.get('user').id);
+    const rules = await readRules(asyncDb, vehicleId);
+    return c.json({ success: true, data: rulesFor(rules, everyone, own) });
   }
 );
 
@@ -131,22 +131,20 @@ driverRoutes.put(
   zValidator('param', vehicleIdParam),
   zValidator('json', rulesSchema),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
-    requireCarShare(vehicleId);
-    const { db } = appContext();
+    await requireCarShare(vehicleId);
+    const { asyncDb } = appContext();
     const rules = c.req.valid('json');
     const active = new Set(
-      listDrivers(db, vehicleId)
-        .filter((d) => !d.archived)
-        .map((d) => d.id)
+      (await listDrivers(asyncDb, vehicleId)).filter((d) => !d.archived).map((d) => d.id)
     );
     for (const rule of [rules.running, rules.ownership]) {
       if (rule.kind === 'fixed' && Object.keys(rule.shares).some((id) => !active.has(id))) {
         throw new ValidationError('Fixed shares can only name active drivers of this vehicle');
       }
     }
-    writeRules(db, vehicleId, rules);
+    await writeRules(asyncDb, vehicleId, rules);
     return c.json({ success: true, data: rules });
   }
 );
@@ -159,8 +157,8 @@ driverRoutes.get(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     const query = c.req.valid('query');
-    const { db } = appContext();
-    requireCarShare(vehicleId);
+    const { db, asyncDb } = appContext();
+    await requireCarShare(vehicleId);
     const resolver = requestResolver(c, db);
     const vehicle = { kind: 'vehicle' as const, vehicleId };
     if (!resolver.can('vehicle.expense.read', vehicle).allow) {
@@ -170,7 +168,7 @@ driverRoutes.get(
     const access = await requireVehicleAccess(vehicleId, userId, 'read');
     const to = query.to ? Date.parse(query.to) : Date.now();
     const from = query.from ? Date.parse(query.from) : to - 30 * DAY;
-    const result = computeBalances(db, vehicleId, {
+    const result = await computeBalances(asyncDb, vehicleId, {
       period: { from, to },
       hideFinancials: !seesFinancials(access),
     });
@@ -178,7 +176,7 @@ driverRoutes.get(
       success: true,
       data: balancesView(result, {
         everyone: resolver.can('vehicle.driver_stats.read', vehicle).allow,
-        ownDriver: ownDriverId(db, vehicleId, userId),
+        ownDriver: await ownDriverId(asyncDb, vehicleId, userId),
         scale: await repos().preferences.moneyScale(access.ownerId),
       }),
     });
@@ -190,11 +188,12 @@ driverRoutes.post(
   zValidator('param', vehicleIdParam),
   zValidator('json', guestSchema),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
-    requireCarShare(vehicleId);
-    const id = addGuestDriver(appContext().db, vehicleId, c.req.valid('json'), c.get('user').id);
-    const created = listDrivers(appContext().db, vehicleId).find((d) => d.id === id);
+    await requireCarShare(vehicleId);
+    const { asyncDb } = appContext();
+    const id = await addGuestDriver(asyncDb, vehicleId, c.req.valid('json'), c.get('user').id);
+    const created = (await listDrivers(asyncDb, vehicleId)).find((d) => d.id === id);
     return c.json({ success: true, data: created }, 201);
   }
 );
@@ -214,9 +213,12 @@ const backfillSchema = z.discriminatedUnion('mode', [
     }),
 ]);
 
-function backfillRequest(vehicleId: string, body: z.infer<typeof backfillSchema>): BackfillRequest {
+async function backfillRequest(
+  vehicleId: string,
+  body: z.infer<typeof backfillSchema>
+): Promise<BackfillRequest> {
   if (body.mode === 'logged') return body;
-  const driver = findDriver(appContext().db, vehicleId, body.driverId);
+  const driver = await findDriver(appContext().asyncDb, vehicleId, body.driverId);
   if (!driver || driver.archivedAt !== null) {
     throw new ValidationError("That driver doesn't drive this vehicle");
   }
@@ -231,10 +233,10 @@ driverRoutes.get(
   '/backfill',
   zValidator('param', vehicleIdParam),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
-    requireCarShare(vehicleId);
-    return c.json({ success: true, data: recentBackfills(appContext().db, vehicleId) });
+    await requireCarShare(vehicleId);
+    return c.json({ success: true, data: await recentBackfills(appContext().asyncDb, vehicleId) });
   }
 );
 
@@ -245,16 +247,12 @@ driverRoutes.post(
   authorize(vehicleParam('vehicleId')),
   async (c) => {
     const { vehicleId } = c.req.valid('param');
-    requireCarShare(vehicleId);
-    const { db } = appContext();
+    await requireCarShare(vehicleId);
+    const { asyncDb } = appContext();
     const hide = await hidesFinancials(vehicleId, c.get('user').id);
-    const planned = planBackfill(
-      db,
-      vehicleId,
-      backfillRequest(vehicleId, c.req.valid('json')),
-      hide
-    );
-    return c.json({ success: true, data: summarize(db, vehicleId, planned) });
+    const request = await backfillRequest(vehicleId, c.req.valid('json'));
+    const planned = await planBackfill(asyncDb, vehicleId, request, hide);
+    return c.json({ success: true, data: await summarize(asyncDb, vehicleId, planned) });
   }
 );
 
@@ -265,14 +263,15 @@ driverRoutes.post(
   authorize(vehicleParam('vehicleId')),
   async (c) => {
     const { vehicleId } = c.req.valid('param');
-    requireCarShare(vehicleId);
-    const { db } = appContext();
+    await requireCarShare(vehicleId);
+    const { db, asyncDb } = appContext();
     const body = c.req.valid('json');
     const userId = c.get('user').id;
     const hide = await hidesFinancials(vehicleId, userId);
-    const planned = planBackfill(db, vehicleId, backfillRequest(vehicleId, body), hide);
+    const request = await backfillRequest(vehicleId, body);
+    const planned = await planBackfill(asyncDb, vehicleId, request, hide);
     const { batchId, entries } = applyBackfill(db, vehicleId, body.mode, planned, userId, hide);
-    const data = { batchId, ...summarize(db, vehicleId, entries) };
+    const data = { batchId, ...(await summarize(asyncDb, vehicleId, entries)) };
     return c.json({ success: true, data }, batchId ? 201 : 200);
   }
 );
@@ -283,7 +282,7 @@ driverRoutes.post(
   authorize(vehicleParam('vehicleId')),
   async (c) => {
     const { vehicleId, batchId } = c.req.valid('param');
-    requireCarShare(vehicleId);
+    await requireCarShare(vehicleId);
     const hide = await hidesFinancials(vehicleId, c.get('user').id);
     const reverted = undoBackfill(appContext().db, vehicleId, batchId, hide);
     return c.json({ success: true, data: { reverted } });
@@ -295,10 +294,11 @@ driverRoutes.patch(
   zValidator('param', driverParam),
   zValidator('json', updateSchema),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId, driverId } = c.req.valid('param');
-    requireCarShare(vehicleId);
-    const driver = findDriver(appContext().db, vehicleId, driverId);
+    await requireCarShare(vehicleId);
+    const { asyncDb } = appContext();
+    const driver = await findDriver(asyncDb, vehicleId, driverId);
     if (!driver) throw new NotFoundError('Driver');
     const { name: newName, color: newColor, archived } = c.req.valid('json');
     if (driver.userId && (newName !== undefined || archived !== undefined)) {
@@ -306,12 +306,12 @@ driverRoutes.patch(
         "A member's name and access follow their account and share, so only the colour can change"
       );
     }
-    updateDriver(appContext().db, driverId, {
+    await updateDriver(asyncDb, driverId, {
       ...(newName !== undefined && { name: newName }),
       ...(newColor !== undefined && { color: newColor }),
       ...(archived !== undefined && { archivedAt: archived ? new Date() : null }),
     });
-    const updated = listDrivers(appContext().db, vehicleId).find((d) => d.id === driverId);
+    const updated = (await listDrivers(asyncDb, vehicleId)).find((d) => d.id === driverId);
     return c.json({ success: true, data: updated });
   }
 );
@@ -325,13 +325,14 @@ carShareRoutes.put(
   zValidator('param', vehicleIdParam),
   zValidator('json', z.strictObject({ enabled: z.boolean() })),
   authorize(vehicleParam('vehicleId')),
-  (c) => {
+  async (c) => {
     const { vehicleId } = c.req.valid('param');
     const { enabled } = c.req.valid('json');
-    setCarShare(appContext().db, vehicleId, enabled);
+    const { db, asyncDb } = appContext();
+    setCarShare(db, vehicleId, enabled);
     return c.json({
       success: true,
-      data: { enabled, drivers: enabled ? listDrivers(appContext().db, vehicleId) : [] },
+      data: { enabled, drivers: enabled ? await listDrivers(asyncDb, vehicleId) : [] },
     });
   }
 );

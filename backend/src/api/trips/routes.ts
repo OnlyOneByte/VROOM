@@ -79,7 +79,7 @@ routes.post('/', zValidator('json', createTripSchema), authorize(fromBodyVehicle
   const data = c.req.valid('json');
 
   const ownerId = await ownerOf(data.vehicleId, user.id);
-  const driverId = attributedDriver(c, data.vehicleId, data.driverId);
+  const driverId = await attributedDriver(c, data.vehicleId, data.driverId);
   const trip = await createTrip(
     ownerId,
     { ...data, driverId },
@@ -148,7 +148,7 @@ routes.put(
 
     const existing = await tripOf(id);
     const { driverId: requested, ...changes } = data;
-    const driverId = attributedDriver(c, existing.vehicleId, requested, existing.driverId);
+    const driverId = await attributedDriver(c, existing.vehicleId, requested, existing.driverId);
 
     const updated = await updateTrip(
       existing.userId,
