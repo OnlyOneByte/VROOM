@@ -78,6 +78,12 @@ describe('fittedBandTicks (bar x labels never overlap)', () => {
 		expect(fittedBandTicks(everyThird, String)(band(months, 600))).toEqual(everyThird);
 	});
 
+	test('the chart’s right padding gives the last label room, so it is kept', () => {
+		const quarter = months.slice(0, 3);
+		expect(fittedBandTicks(quarter, String, 0)(band(quarter, 102))).toEqual(['Jan ’26']);
+		expect(fittedBandTicks(quarter, String, 4)(band(quarter, 102))).toEqual(['Jan ’26', 'Mar ’26']);
+	});
+
 	test('car names cut to their band, as Cross-vehicle does, are all kept', () => {
 		const cars = [
 			'2020 Toyota Camry (Daily Driver)',

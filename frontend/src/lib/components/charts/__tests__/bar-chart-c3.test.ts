@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
+import { scaleBand } from 'd3-scale';
 
 type Props = Record<string, unknown>;
 
@@ -231,7 +232,22 @@ describe('C3 bar columns', () => {
 			xAxisProps: { ticks, format: (v: unknown) => String(v) }
 		});
 		await settle();
-		expect(typeof xAxis()['ticks']).toBe('function');
+		const fit = xAxis()['ticks'] as (scale: unknown) => unknown[];
+		const months = [
+			'Jan',
+			'Feb',
+			'Mar',
+			'Apr',
+			'May',
+			'Jun',
+			'Jul',
+			'Aug',
+			'Sep',
+			'Oct',
+			'Nov'
+		].map(m => `${m} ’26`);
+		const scale = scaleBand<string>().domain(months).range([0, 188]).padding(0.4);
+		expect(fit(scale)).toEqual(['Jan ’26', 'Jul ’26']);
 	});
 
 	test('a stack rounds only the top segment that has a value', async () => {
