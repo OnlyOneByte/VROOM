@@ -106,6 +106,7 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 }));
 
 import Page from '../+page.svelte';
+import { forgetRecentlySynced, rememberSynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 
 const VEHICLE = {
 	id: 'v1',
@@ -347,6 +348,35 @@ describe('vehicle detail page overview', () => {
 
 		expect(screen.getByText('No expenses yet')).toBeInTheDocument();
 		expect(captured['period']).toBeUndefined();
+	});
+
+	test("a car's just-synced first expense shows in place of the empty state", async () => {
+		getRecentExpenses.mockResolvedValue({
+			data: [],
+			pagination: { totalCount: 0, limit: 3, offset: 0, hasMore: false }
+		});
+		rememberSynced({
+			id: 'offline-1',
+			clientId: 'c-1',
+			vehicleId: 'v1',
+			tags: [],
+			category: 'misc',
+			amount: 12.34,
+			date: '2026-11-26T12:00:00.000Z',
+			description: 'Car wash on Elm',
+			timestamp: 1,
+			synced: true,
+			version: '3.0'
+		});
+		try {
+			await mount();
+
+			expect(await screen.findByText('Car wash on Elm')).toBeInTheDocument();
+			expect(screen.getByRole('heading', { name: 'Recent expenses' })).toBeInTheDocument();
+			expect(screen.queryByText('No expenses yet')).toBeNull();
+		} finally {
+			forgetRecentlySynced();
+		}
 	});
 
 	test('a shared viewer cannot share, add expenses or load owner-only photos', async () => {

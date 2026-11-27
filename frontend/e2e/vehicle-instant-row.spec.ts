@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { addSessionCookie, mockApi } from './support/mock-api';
+import { addSessionCookie, fulfillData, mockApi } from './support/mock-api';
 
 const VEHICLE = '/vehicles/vehicle-camry';
 
@@ -60,6 +60,42 @@ test.describe("A new expense shows on its vehicle's page before the page's lists
 			await expect(tab.getByText('All Expenses (1)')).toBeVisible();
 
 			lists.release();
+		});
+	}
+});
+
+test.describe("A car's first expense shows instead of the empty overview", () => {
+	test.beforeEach(async ({ page, context }) => {
+		await addSessionCookie(context);
+		await mockApi(page, { expenses: [] });
+		await page.route(
+			url => url.pathname === '/api/v1/expenses/summary',
+			route =>
+				fulfillData(route, {
+					totalAmount: 0,
+					expenseCount: 0,
+					monthlyAverage: 0,
+					recentAmount: 0,
+					categoryBreakdown: [],
+					monthlyTrend: []
+				})
+		);
+	});
+
+	for (const post of ['slow', 'quick'] as const) {
+		const state = post === 'slow' ? 'still saving' : 'just synced';
+		test(`a ${state} first expense replaces "no expenses yet" on the overview`, async ({
+			page
+		}) => {
+			await holdVehicleLists(page, post);
+			await saveFromVehicle(page);
+
+			const overview = page.getByRole('tabpanel', { name: 'Overview' });
+			await expect(overview.getByRole('heading', { name: 'Recent expenses' })).toBeVisible();
+			await expect(overview.getByText('Car wash on Elm')).toBeVisible();
+			await expect(
+				overview.getByText('Start tracking expenses for this vehicle to see insights and trends')
+			).toHaveCount(0);
 		});
 	}
 });

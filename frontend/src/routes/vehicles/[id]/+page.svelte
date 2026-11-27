@@ -328,19 +328,22 @@
 	);
 	let tabExpenses = $derived(currentOffset === 0 ? [...pendingTabRows, ...expenses] : expenses);
 
+	let firstExpense = $derived(summary !== null && !hasExpenseData);
 	let recentExpenses = $derived(
-		[...pending.rows, ...(recentSettled ? recentList : syncedRows)].slice(0, 3).map(expense => {
-			const sync = pending.states.get(expense.id);
-			return {
-				id: expense.id,
-				amount: expense.amount,
-				category: expense.category,
-				date: new Date(expense.date),
-				description: expense.description,
-				location: expense.location,
-				...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
-			};
-		})
+		[...pending.rows, ...(recentSettled && !firstExpense ? recentList : syncedRows)]
+			.slice(0, 3)
+			.map(expense => {
+				const sync = pending.states.get(expense.id);
+				return {
+					id: expense.id,
+					amount: expense.amount,
+					category: expense.category,
+					date: new Date(expense.date),
+					description: expense.description,
+					location: expense.location,
+					...(sync && { syncNote: sync.status === 'failed' ? 'Not saved' : 'Unsynced' })
+				};
+			})
 	);
 
 	let coverPhotoUrl = $derived.by(() => {
@@ -920,6 +923,13 @@
 							title="Couldn't load the expense summary"
 							message={summaryLoadError}
 							onRetry={loadSummary}
+						/>
+					{:else if firstExpense && overviewCards && recentExpenses.length > 0}
+						{@const [, { default: RecentActivityCard }] = overviewCards}
+						<RecentActivityCard
+							title="Recent expenses"
+							expenses={recentExpenses}
+							onSeeAll={seeAllExpenses}
 						/>
 					{:else if summary && !hasExpenseData}
 						<EmptyState>
