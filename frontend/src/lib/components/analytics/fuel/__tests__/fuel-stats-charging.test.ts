@@ -360,6 +360,49 @@ describe('FuelStatsTab best and worst efficiency', () => {
 	});
 });
 
+describe('FuelStatsTab with shared cars in another currency', () => {
+	const coverage = (currencies: string[]) => ({
+		vehicleIds: ['civic'],
+		otherCurrency: currencies.map((currency, i) => ({ vehicleId: `shared-${i}`, currency })),
+		unavailable: 0
+	});
+	const fillups = { currentYear: 4, previousYear: 0, currentMonth: 1, previousMonth: 2 };
+
+	test('says which currencies were left out of the figures', () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({ fillups }),
+			fuelAdvanced: advanced,
+			coverage: coverage(['EUR', 'GBP', 'EUR'])
+		});
+		expect(
+			screen.getByText(
+				'Not included: cars shared with you in EUR and GBP. These figures are in USD.'
+			)
+		).toBeTruthy();
+	});
+
+	test('explains an empty filter whose only car is in another currency', async () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({}),
+			fuelAdvanced: advanced,
+			filterLabel: 'year to date, 2020 vw golf',
+			onClearFilters: vi.fn(),
+			coverage: { ...coverage(['EUR']), vehicleIds: [] }
+		});
+		expect(await screen.findByText(/No fill-ups or charging for/)).toBeTruthy();
+		expect(screen.getByText(/Not included: cars shared with you in EUR\./)).toBeTruthy();
+	});
+
+	test('shows no note when every car is in the same currency', () => {
+		render(FuelStatsTab, {
+			fuelStats: stats({ fillups }),
+			fuelAdvanced: advanced,
+			coverage: coverage([])
+		});
+		expect(screen.queryByText(/Not included/)).toBeNull();
+	});
+});
+
 describe('FuelStatsTab under a filter that matches nothing', () => {
 	test('names the filter and offers Clear filters instead of the first-run empty state', async () => {
 		const onClearFilters = vi.fn();

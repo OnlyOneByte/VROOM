@@ -52,11 +52,7 @@ export function yearRequests(
 }
 
 export function coveredCars(response: AnalyticsQueryResponse | null) {
-	const coverage = response?.coverage;
-	return {
-		count: coverage?.vehicleIds.length ?? 0,
-		otherCurrencies: [...new Set((coverage?.otherCurrency ?? []).map(c => c.currency))]
-	};
+	return response?.coverage?.vehicleIds.length ?? 0;
 }
 
 export function percentChange(current: number, previous: number | null | undefined) {

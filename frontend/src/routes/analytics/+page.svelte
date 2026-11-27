@@ -346,6 +346,7 @@
 						<FuelStatsTab
 							{fuelStats}
 							{fuelAdvanced}
+							coverage={summary?.coverage}
 							{vehicleColors}
 							previousPeriodLabel={previousPeriodLabel(filters)}
 							rangeText={rangeLabel(filters, d => formatDate(d))}

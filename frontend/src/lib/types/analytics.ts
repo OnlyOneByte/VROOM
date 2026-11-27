@@ -169,6 +169,7 @@ export interface AnalyticsSummaryResponse {
 	quickStats: QuickStatsResponse;
 	fuelStats: FuelStatsResponse;
 	fuelAdvanced: FuelAdvancedResponse;
+	coverage?: AnalyticsQueryCoverage;
 }
 
 export interface CrossVehicleResponse {
@@ -189,6 +190,7 @@ export interface CrossVehicleResponse {
 		vehicles: Array<{ vehicleId: string; vehicleName: string; efficiency: number }>;
 	}>;
 	units?: UnitsMetadata;
+	coverage?: AnalyticsQueryCoverage;
 }
 
 export interface FinancingResponse {

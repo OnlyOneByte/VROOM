@@ -23,7 +23,12 @@
 	import { gotoWithQuery } from '#lib/utils/navigation.ts';
 	import { analyticsApi, getDefaultDateRange } from '#lib/services/analytics-api.ts';
 	import { expenseApi } from '#lib/services/expense-api.ts';
-	import type { FuelStatsResponse, FuelAdvancedResponse, PeriodCounts } from '#lib/types/index.ts';
+	import type {
+		AnalyticsQueryCoverage,
+		FuelStatsResponse,
+		FuelAdvancedResponse,
+		PeriodCounts
+	} from '#lib/types/index.ts';
 	import { formatCurrency, formatNumber, formatNumberUpTo } from '#lib/utils/formatters.ts';
 	import {
 		getDistanceUnitLabel,
@@ -39,6 +44,7 @@
 	import AdvancedCharts from './AdvancedCharts.svelte';
 	import ChartGroup from './ChartGroup.svelte';
 	import FuelOverview from './FuelOverview.svelte';
+	import SharedCurrencyNote from '../SharedCurrencyNote.svelte';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
 	import type { StatCardChange } from '#lib/components/charts/StatCard.svelte';
 	import { buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
@@ -53,9 +59,11 @@
 		previousPeriodLabel = 'vs the 12 months before',
 		dateRange,
 		vehicleIds,
-		rangeText = 'Last 12 months'
+		rangeText = 'Last 12 months',
+		coverage
 	}: {
 		rangeText?: string;
+		coverage?: AnalyticsQueryCoverage;
 		fuelStats?: FuelStatsResponse | null;
 		fuelAdvanced?: FuelAdvancedResponse | null;
 		vehicleColors?: Record<string, string>;
@@ -305,6 +313,10 @@
 		</Card.Content>
 	</Card.Root>
 {/snippet}
+
+{#if !isLoading && !error && !checkingFuelHistory}
+	<SharedCurrencyNote {coverage} class="mb-4" />
+{/if}
 
 {#if (isLoading && !error) || checkingFuelHistory}
 	<div class="flex justify-center p-12">

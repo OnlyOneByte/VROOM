@@ -29,6 +29,7 @@
 	import InsuranceAnalytics from './cross-vehicle/InsuranceAnalytics.svelte';
 	import CrossVehicleOverview from './cross-vehicle/CrossVehicleOverview.svelte';
 	import ChartGroup from './fuel/ChartGroup.svelte';
+	import SharedCurrencyNote from './SharedCurrencyNote.svelte';
 	import {
 		carValues,
 		categoryMatrix,
@@ -217,6 +218,7 @@
 	<LoadErrorCard title="Couldn't load cross-vehicle analytics" message={error} onRetry={loadData} />
 {:else if crossVehicle && financing && insurance}
 	<div class="space-y-4 md:space-y-6">
+		<SharedCurrencyNote coverage={crossVehicle.coverage} />
 		{#if !hasExpenses && filterLabel && onClearFilters}
 			<EmptyState level={2}>
 				{#snippet icon()}
