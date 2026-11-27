@@ -26,7 +26,7 @@ import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access
 import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { assertOdometerInOrder } from '../expenses/repository';
 import type { OdometerCheck } from '../expenses/validation';
-import { deleteAllPhotosForEntity } from '../photos/photo-service';
+import { deleteWithPhotos } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import { readingCheck } from './repository';
 
@@ -226,8 +226,11 @@ routes.delete(
     const existing = await repos().odometer.findById(id);
     if (!existing) throw new NotFoundError('Odometer entry');
 
-    await deleteAllPhotosForEntity('odometer_entry', id, existing.userId);
-    await repos().odometer.delete(id);
+    await deleteWithPhotos(
+      existing.userId,
+      async () => [{ entityType: 'odometer_entry', entityIds: [id] }],
+      () => repos().odometer.delete(id)
+    );
 
     return c.json({ success: true, message: 'Odometer reading deleted' });
   }
