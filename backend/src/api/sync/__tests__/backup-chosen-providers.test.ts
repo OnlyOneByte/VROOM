@@ -334,13 +334,10 @@ describe('A one-off backup does not undo changes made while it ran', () => {
     const { repos } = await import('../../../app-context');
     const preferences = repos().preferences;
     const write = preferences.mergeJsonField.bind(preferences);
-    preferences.mergeJsonField = (...args) => {
-      ctx.sqlite.run('UPDATE user_preferences SET backup_config = ? WHERE user_id = ?', [
-        JSON.stringify({
-          providers: { 'new-h': { enabled: true, folderPath: 'Mine', retentionCount: 3 } },
-        }),
-        ctx.user.id,
-      ]);
+    preferences.mergeJsonField = async (...args) => {
+      await write(ctx.user.id, 'backupConfig', {
+        providers: { 'new-h': { enabled: true, folderPath: 'Mine', retentionCount: 3 } },
+      });
       return write(...args);
     };
 
@@ -377,5 +374,81 @@ describe('A one-off backup does not undo changes made while it ran', () => {
 
     expect(res.status).toBe(200);
     expect(savedConfig().providers['new-g']).toBeUndefined();
+  });
+
+  test('a backup that finishes while its provider is being removed leaves no settings entry', async () => {
+    await seedProvider('gone-i', FAKE_TYPE, { enabled: true, folderPath: 'I', retentionCount: 5 });
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    backupStrategyRegistry.register(FAKE_TYPE, {
+      async execute(): Promise<BackupStrategyResult> {
+        await gate;
+        return { success: true, capabilities: { zip: { success: true } } };
+      },
+    });
+    const backup = ctx.authed('POST', '/api/v1/sync', {
+      syncTypes: ['backup'],
+      force: true,
+      providerIds: ['gone-i'],
+    });
+
+    const { repos } = await import('../../../app-context');
+    const preferences = repos().preferences;
+    const write = preferences.mergeJsonField.bind(preferences);
+    preferences.mergeJsonField = async (...args) => {
+      const result = await write(...args);
+      const providers = (args[2] as { providers?: Record<string, unknown> }).providers;
+      if (providers?.['gone-i'] === null) {
+        release();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return result;
+    };
+
+    try {
+      const res = await ctx.authed('DELETE', '/api/v1/providers/gone-i');
+      expect(res.status).toBe(204);
+      expect((await backup).status).toBe(200);
+    } finally {
+      preferences.mergeJsonField = write;
+      release();
+    }
+
+    expect(savedConfig().providers['gone-i']).toBeUndefined();
+  });
+
+  test('a provider removed between the backup check and its write gets no entry', async () => {
+    await seedProvider('gone-j', FAKE_TYPE, { enabled: true, folderPath: 'J', retentionCount: 5 });
+    await registerDuring(() => undefined);
+    const { repos } = await import('../../../app-context');
+    const preferences = repos().preferences;
+    const write = preferences.mergeJsonField.bind(preferences);
+    const outside = (await import('node:async_hooks')).AsyncLocalStorage.snapshot();
+    let removal: Promise<Response> | undefined;
+    preferences.mergeJsonField = async (...args) => {
+      const providers = (args[2] as { providers?: Record<string, unknown> }).providers;
+      if (!removal && providers?.['gone-j']) {
+        removal = outside(() => ctx.authed('DELETE', '/api/v1/providers/gone-j'));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return write(...args);
+    };
+
+    try {
+      const res = await ctx.authed('POST', '/api/v1/sync', {
+        syncTypes: ['backup'],
+        force: true,
+        providerIds: ['gone-j'],
+      });
+      expect(res.status).toBe(200);
+      expect((await removal)?.status).toBe(204);
+    } finally {
+      preferences.mergeJsonField = write;
+    }
+
+    expect(savedConfig().providers['gone-j']).toBeUndefined();
   });
 });

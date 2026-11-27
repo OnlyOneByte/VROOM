@@ -504,7 +504,6 @@ routes.delete(
     if (existing.domain === 'storage') {
       await assertNoPhotosOnlyHere(id, force);
       await cleanupStorageConfig(user.id, id);
-      await cleanupBackupConfig(user.id, id);
 
       try {
         await repos().photoRefs.deleteByProvider(id);
@@ -516,9 +515,12 @@ routes.delete(
       }
     }
 
-    await db
-      .delete(userProviders)
-      .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)));
+    await db.transaction(async () => {
+      await db
+        .delete(userProviders)
+        .where(and(eq(userProviders.id, id), eq(userProviders.userId, user.id)));
+      if (existing.domain === 'storage') await cleanupBackupConfig(user.id, id);
+    });
     await cleanupProviderDefaults(user.id, id);
 
     return c.body(null, 204);
