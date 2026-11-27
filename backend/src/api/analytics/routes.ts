@@ -222,6 +222,7 @@ const bucketItemsSchema = z
 const fromVehicleQuery: ResourceOf = (c) => vehicleOrOwnAccount(c.req.query('vehicleId'), c);
 
 async function queryScope(userId: string, vehicleIds?: string[]): Promise<ReadableVehicle[]> {
+  if (vehicleIds && vehicleIds.length === 0) return [];
   const readable = await readableVehicles(userId, vehicleIds);
   const currencyOf = await repos().preferences.currencies([
     userId,

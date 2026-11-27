@@ -25,7 +25,7 @@ interface Cross {
 }
 
 interface Summary {
-  quickStats: { vehicleCount: number };
+  quickStats: { vehicleCount: number; ytdSpending: number };
 }
 
 function expense(vehicleId: string, category: string, cents: number, source: string | null = null) {
@@ -105,6 +105,15 @@ describe('summary and Cross-vehicle cover cars shared with you, as each share al
     expect(costs(await cross(viewer.request))).toEqual({});
   });
 
+  test("the summary's spending leaves out what the share hides", async () => {
+    const data = await summary(viewer.request, '&ytdStart=1704067200');
+    expect(data.quickStats.ytdSpending).toBe(80);
+  });
+
+  test('an empty car list means no cars, as before', async () => {
+    expect(costs(await cross(ctx.authed, '&vehicleIds='))).toEqual({});
+  });
+
   test("the owner's view is unchanged", async () => {
     const data = await cross(ctx.authed);
     expect(costs(data)).toEqual({ [SHARED]: 80 + 50 + 400, [PRIVATE]: 700 });
@@ -176,11 +185,49 @@ describe('financing and insurance cover shared cars only where the share shows t
     expect(data.summary.totalAnnualPremiums).toBeCloseTo(1200);
   });
 
+  test("cars shared by two owners merge each owner's share of their own policies", async () => {
+    const other = await createInvitee(ctx, 'ssc-owner2');
+    seedCar(ctx, 'ssc-other', other.id);
+    shareCar(ctx, 'ssc-other', viewer, 'viewer');
+    const policy = await other.request('POST', '/api/v1/insurance', {
+      company: 'Mutual',
+      terms: [
+        {
+          startDate: '2026-01-01T00:00:00.000Z',
+          endDate: '2027-01-01T00:00:00.000Z',
+          totalCost: 600,
+          vehicleCoverage: { vehicleIds: ['ssc-other'] },
+        },
+      ],
+    });
+    expect(policy.status).toBeLessThan(300);
+    for (const car of [SHARED, 'ssc-other']) {
+      for (const permission of ['vehicle.financing.read', 'vehicle.insurance.read']) {
+        ctx.sqlite.run(
+          "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect) VALUES (?, ?, 'vehicle', ?, ?, 'allow')",
+          [`ssc-po-${car}-${permission}`, viewer.id, car, permission]
+        );
+      }
+    }
+
+    const data = await insurance(viewer.request);
+    expect(data.vehicleDetails.map((d) => d.vehicleId).sort()).toEqual(
+      ['ssc-other', SHARED].sort()
+    );
+    expect(data.summary.totalAnnualPremiums).toBeCloseTo(1200 + 600);
+  });
+
   test("the owner's financing and insurance are unchanged", async () => {
     const own = (await financing(ctx.authed)).vehicleDetails.map((d) => d.vehicleId);
     expect(own.sort()).toEqual([PRIVATE, SHARED].sort());
     const data = await insurance(ctx.authed);
     expect(data.vehicleDetails.map((d) => d.vehicleId).sort()).toEqual([PRIVATE, SHARED].sort());
+    expect(data.summary.totalAnnualPremiums).toBeCloseTo(2400);
+  });
+
+  test("an owner's policy whose cars were all removed from it still counts, as before", async () => {
+    ctx.sqlite.run('DELETE FROM insurance_term_vehicles');
+    const data = await insurance(ctx.authed);
     expect(data.summary.totalAnnualPremiums).toBeCloseTo(2400);
   });
 });

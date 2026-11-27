@@ -1539,7 +1539,16 @@ export class AnalyticsRepository {
         mileage: expenses.mileage,
       })
       .from(expenses)
-      .where(and(inArray(expenses.vehicleId, vehicleIds), eq(expenses.category, 'maintenance')))
+      .where(
+        and(
+          or(
+            ...vehicleRows.map((v) =>
+              and(eq(expenses.vehicleId, v.id), eq(expenses.userId, v.ownerId ?? userId))
+            )
+          ),
+          eq(expenses.category, 'maintenance')
+        )
+      )
       .orderBy(asc(expenses.date), asc(expenses.mileage));
 
     const maintenanceByVehicle = new Map<
@@ -2063,9 +2072,8 @@ export class AnalyticsRepository {
       if (v.ownerId === userId || v.hideFinancials) continue;
       shared.set(v.ownerId, [...(shared.get(v.ownerId) ?? []), v.vehicleId]);
     }
-    const own = readable.filter((v) => v.ownerId === userId).map((v) => v.vehicleId);
     const parts = await Promise.all([
-      this.getInsurance(userId, timeZone, filter ?? own),
+      this.getInsurance(userId, timeZone, filter),
       ...[...shared].map(([ownerId, ids]) => this.getInsurance(ownerId, timeZone, ids)),
     ]);
     return mergeInsurance(parts);
