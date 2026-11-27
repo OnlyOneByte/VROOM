@@ -1,6 +1,6 @@
 # Database Migration SOP
 
-A `backend/src/db/schema.ts` change is not done until a migration exists for it.
+A `backend/src/db/sqlite/schema.ts` change is not done until a migration exists for it, in `backend/drizzle/` and in `backend/drizzle-pg/` (`bun run db:generate:pg`).
 
 ## Generating a migration
 

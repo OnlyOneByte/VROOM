@@ -3,7 +3,7 @@ import { Column, getTableColumns, getTableName, is, SQL, StringChunk } from 'dri
 import { PgTable, getTableConfig as pgConfig } from 'drizzle-orm/pg-core';
 import { SQLiteTable, getTableConfig as sqliteConfig } from 'drizzle-orm/sqlite-core';
 import * as pg from '../pg/schema';
-import * as sqlite from '../schema';
+import * as sqlite from '../sqlite/schema';
 
 const PG_TYPE: Record<string, string> = {
   SQLiteText: 'text',

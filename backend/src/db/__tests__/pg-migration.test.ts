@@ -11,7 +11,7 @@ import { boolean, getTableConfig, index, PgTable, pgTable, text } from 'drizzle-
 import { drizzle as pgDrizzle } from 'drizzle-orm/pglite';
 import { migrate as pgMigrate } from 'drizzle-orm/pglite/migrator';
 import * as pg from '../pg/schema';
-import * as sqlite from '../schema';
+import * as sqlite from '../sqlite/schema';
 
 const BACKEND = join(import.meta.dir, '../../..');
 const PG_MIGRATIONS = join(BACKEND, 'drizzle-pg');

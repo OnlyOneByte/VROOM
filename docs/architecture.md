@@ -62,7 +62,7 @@ transient network blip and avoid retrying what will never succeed.
 
 ### Database
 
-SQLite via `bun:sqlite` + Drizzle. Schema is one file, `src/db/schema.ts`. Migrations live in
+SQLite via `bun:sqlite` + Drizzle. Tables are defined once, in `src/db/sqlite/schema.ts`; `src/db/pg/schema.ts` builds their Postgres twins from it, and `src/db/schema.ts` exports the active dialect's tables under the same names (#1682). Migrations live in
 `backend/drizzle/` and run on startup via `drizzle-orm/bun-sqlite/migrator`; `bun run db:init`
 applies them locally. Do not use `drizzle-kit push` against a real database — it diffs the
 schema directly and will offer to drop columns.
