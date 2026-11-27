@@ -48,7 +48,7 @@ describe('where you charged', () => {
 		expect(document.getElementById('chargerType')).toBeNull();
 		cleanup();
 		mount('charging');
-		expect(document.getElementById('chargerType')).toHaveTextContent('Not set (optional)');
+		expect(document.getElementById('chargerType')).toHaveTextContent('Not set');
 	});
 
 	test('picking a charger records it, and Not set clears it', async () => {
@@ -64,6 +64,18 @@ describe('where you charged', () => {
 		await choose('fuelType', 'DC Fast Charging');
 		expect(state.chargerType).toBe('dc_fast');
 		await choose('chargerType', 'Public Level 2');
+		expect(state.chargerType).toBe('public_l2');
+	});
+
+	test('the DC fast hint goes away when the charging type changes, unless you picked it', async () => {
+		const state = mount('charging');
+		await choose('fuelType', 'DC Fast Charging');
+		await choose('fuelType', 'Level 2 (AC)');
+		expect(state.chargerType).toBe('');
+
+		await choose('fuelType', 'DC Fast Charging');
+		await choose('chargerType', 'Public Level 2');
+		await choose('fuelType', 'Level 2 (AC)');
 		expect(state.chargerType).toBe('public_l2');
 	});
 

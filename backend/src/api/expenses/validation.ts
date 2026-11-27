@@ -59,10 +59,13 @@ export function clearFuelFieldsIfNotFuel<
     chargerType?: string | null;
     missedFillup?: boolean;
   },
->(data: T, effectiveCategory: string | undefined = data.category): T {
+>(
+  data: T,
+  effectiveCategory: string | undefined = data.category,
+  effectiveFuelType: string | null | undefined = data.fuelType
+): T {
   if (effectiveCategory === undefined || effectiveCategory === 'fuel') {
-    const notCharging = data.fuelType !== undefined && !isElectricFuelType(data.fuelType);
-    return notCharging ? { ...data, chargerType: null } : data;
+    return isElectricFuelType(effectiveFuelType ?? null) ? data : { ...data, chargerType: null };
   }
   return { ...data, volume: null, fuelType: null, chargerType: null, missedFillup: false };
 }

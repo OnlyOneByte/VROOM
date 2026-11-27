@@ -24,9 +24,17 @@
 
 	const NO_CHARGER = 'none';
 
+	let hinted = $state(false);
+
 	function chooseChargingType(value: string) {
 		fuelType = value;
-		if (value === 'DC Fast Charging' && !chargerType) chargerType = 'dc_fast';
+		if (value === 'DC Fast Charging' && !chargerType) {
+			chargerType = 'dc_fast';
+			hinted = true;
+		} else if (value !== 'DC Fast Charging' && hinted) {
+			chargerType = '';
+			hinted = false;
+		}
 	}
 
 	let showCustomFuelType = $state(false);
@@ -118,16 +126,17 @@
 	</div>
 
 	<div class="space-y-2">
-		<Label for="chargerType">Where you charged</Label>
+		<Label for="chargerType">Where you charged (Optional)</Label>
 		<Select.Root
 			type="single"
 			value={chargerType || NO_CHARGER}
 			onValueChange={v => {
 				chargerType = v && v !== NO_CHARGER ? (v as ChargerType) : '';
+				hinted = false;
 			}}
 		>
 			<Select.Trigger id="chargerType" class="w-full">
-				{chargerType ? CHARGER_TYPE_LABELS[chargerType] : 'Not set (optional)'}
+				{chargerType ? CHARGER_TYPE_LABELS[chargerType] : 'Not set'}
 			</Select.Trigger>
 			<Select.Content>
 				<Select.Item value={NO_CHARGER} label="Not set">Not set</Select.Item>

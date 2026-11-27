@@ -161,6 +161,25 @@ describe('charger type on charging expenses', () => {
     ]);
   });
 
+  test('is never stored on a fill-up that is not a charge, whatever the request leaves out', async () => {
+    const { fuelType: _noFuelType, ...withoutFuelType } = charge('home');
+    expect((await create(withoutFuelType)).chargerType).toBeNull();
+
+    const gas = await create(charge(null, 'Regular'));
+    const set = await ctx.authed('PUT', `/api/v1/expenses/${gas.id}`, { chargerType: 'home' });
+    expect(set.status).toBe(200);
+    expect((await json<DataEnvelope<Row>>(set)).data.chargerType).toBeNull();
+    expect(ctx.sqlite.query('SELECT charger_type FROM expenses WHERE id = ?').get(gas.id)).toEqual({
+      charger_type: null,
+    });
+  });
+
+  test('a charge keeps its charger type when an update changes something else', async () => {
+    const row = await create(charge('workplace'));
+    const res = await ctx.authed('PUT', `/api/v1/expenses/${row.id}`, { description: 'Office' });
+    expect((await json<DataEnvelope<Row>>(res)).data.chargerType).toBe('workplace');
+  });
+
   test('an update can set and clear it, and switching to gas clears it', async () => {
     const row = await create(charge(null));
     const set = await ctx.authed('PUT', `/api/v1/expenses/${row.id}`, { chargerType: 'dc_fast' });

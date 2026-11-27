@@ -61,7 +61,8 @@ const charging: NonNullable<FuelStatsResponse['charging']> = {
 	averageCost: { perSession: 7, perEnergyUnit: 0.467 },
 	priceHistory: [
 		{ date: '2024-01-05', month: '2024-01', fuelType: 'Level 2 (AC)', pricePerVolume: 0.467 }
-	]
+	],
+	byChargerType: []
 };
 
 describe('FuelStatsTab with nothing in the window', () => {

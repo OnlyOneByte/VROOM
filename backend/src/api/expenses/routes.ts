@@ -1082,7 +1082,11 @@ routes.put(
 
     const { paidByDriverId: requestedPayer, ...withoutPayer } = updateData;
     const payer = await payerChange(c, existingExpense, updateData.vehicleId, requestedPayer);
-    const normalizedUpdate = clearFuelFieldsIfNotFuel({ ...withoutPayer, ...payer }, finalCategory);
+    const normalizedUpdate = clearFuelFieldsIfNotFuel(
+      { ...withoutPayer, ...payer },
+      finalCategory,
+      finalFuelType
+    );
     const odometer = await editedOdometerCheck(existingExpense, {
       vehicleId: updateData.vehicleId ?? existingExpense.vehicleId,
       date: updateData.date ?? existingExpense.date,
