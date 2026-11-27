@@ -321,7 +321,7 @@
 						{#if biggestExpense}
 							<li class="flex items-center justify-between gap-3 py-3">
 								<div>
-									<p class="font-medium">Biggest single expense (excluding fill-ups)</p>
+									<p class="font-medium">Biggest single expense (excluding fill-ups and charges)</p>
 									<p class="text-sm text-muted-foreground">
 										{biggestExpense.description} · {formatCurrency(biggestExpense.amount)} · {formatDateWith(
 											biggestExpense.date,

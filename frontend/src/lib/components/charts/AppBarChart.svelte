@@ -12,6 +12,7 @@
 		type TooltipValueFormat,
 		CHART_PADDING,
 		distinctYTicks,
+		fittedBandTicks,
 		monthlyXAxisProps
 	} from '#lib/utils/chart-formatters.ts';
 	import type { Snippet } from 'svelte';
@@ -206,7 +207,13 @@
 	);
 	const NARROW_PLOT = 480;
 	let narrow = $derived(plotWidth > 0 && plotWidth < NARROW_PLOT);
-	let resolvedXAxisProps = $derived(xAxisProps ?? monthlyXAxisProps(data.length));
+	let resolvedXAxisProps = $derived.by(() => {
+		const props: Record<string, unknown> = xAxisProps ?? monthlyXAxisProps(data.length);
+		const ticks = props['ticks'];
+		if (!vertical || !Array.isArray(ticks)) return props;
+		const format = (props['format'] as ((_v: unknown) => string) | undefined) ?? String;
+		return { ...props, ticks: fittedBandTicks(ticks, format) };
+	});
 	let yTicks = $derived(
 		distinctYTicks(yAxisFormat, height - resolvedPadding.top - resolvedPadding.bottom)
 	);

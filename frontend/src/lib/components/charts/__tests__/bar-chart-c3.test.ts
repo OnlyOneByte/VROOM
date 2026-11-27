@@ -90,8 +90,24 @@ function barsConfig(): Props {
 	return (seen.chart?.['props'] as Props)['bars'] as Props;
 }
 
+function measuredWidth(width: number) {
+	vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+	vi.stubGlobal(
+		'ResizeObserver',
+		class {
+			constructor(private readonly cb: (entries: unknown[], observer: unknown) => void) {}
+			observe(target: Element) {
+				queueMicrotask(() => this.cb([{ target, contentRect: { width } }], this));
+			}
+			unobserve() {}
+			disconnect() {}
+		}
+	);
+}
+
 afterEach(() => {
 	cleanup();
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	seen.chart = null;
 	seen.bars = [];
@@ -158,24 +174,27 @@ describe('C3 bar columns', () => {
 	});
 
 	test('on a narrow plot the reference line is named under the chart, not over the bars', async () => {
-		vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
-		vi.stubGlobal(
-			'ResizeObserver',
-			class {
-				constructor(private readonly cb: (entries: unknown[], observer: unknown) => void) {}
-				observe(target: Element) {
-					queueMicrotask(() => this.cb([{ target, contentRect: { width: 300 } }], this));
-				}
-				unobserve() {}
-				disconnect() {}
-			}
-		);
+		measuredWidth(300);
 		await mount({ ...SINGLE, plotWidth: 300, referenceLines: [{ value: 311, label: 'Avg' }] });
 		await settle();
 		expect(seen.rules[0]).toMatchObject({ y: 311, dashArray: '4 4' });
 		expect(seen.texts.filter(t => t['value'] === 'Avg $311')).toHaveLength(0);
 		expect(screen.getByRole('list', { name: 'Reference lines' })).toHaveTextContent('Avg: $311.00');
-		vi.restoreAllMocks();
+	});
+
+	test('a plot measured narrow after it first draws moves the label under the chart', async () => {
+		measuredWidth(300);
+		await mount({ ...SINGLE, referenceLines: [{ value: 311, label: 'Avg' }] });
+		await settle();
+		expect(screen.getByRole('list', { name: 'Reference lines' })).toHaveTextContent('Avg: $311.00');
+	});
+
+	test('a wide plot keeps the label on the plot and lists nothing under it', async () => {
+		measuredWidth(800);
+		await mount({ ...SINGLE, plotWidth: 800, referenceLines: [{ value: 311, label: 'Avg' }] });
+		await settle();
+		expect(seen.texts.some(t => t['value'] === 'Avg $311')).toBe(true);
+		expect(screen.queryByRole('list', { name: 'Reference lines' })).toBeNull();
 	});
 
 	test('a stack rounds only the top segment that has a value', async () => {
