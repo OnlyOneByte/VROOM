@@ -52,11 +52,11 @@ async function clickDangerZoneDelete(): Promise<void> {
 	render(ProviderForm, {
 		props: { providerId: 'drive-1', existingProvider: STORED_PROVIDER }
 	});
-	await fireEvent.click(await screen.findByRole('button', { name: 'Delete Provider' }));
+	await fireEvent.click(await screen.findByRole('button', { name: 'Delete storage' }));
 }
 
 describe('ProviderForm Danger Zone asks before deleting', () => {
-	test('Delete Provider opens a confirmation and deletes nothing yet', async () => {
+	test('Delete storage opens a confirmation and deletes nothing yet', async () => {
 		await clickDangerZoneDelete();
 		expect(await screen.findByText('Delete My Drive?')).toBeInTheDocument();
 		expect(screen.getByText(/Backups to this provider stop/)).toBeInTheDocument();

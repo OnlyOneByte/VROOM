@@ -35,18 +35,18 @@
 	<div class="space-y-2">
 		<Label for="backup-folder-path" class="text-sm">Backup folder path</Label>
 		<div
-			class="flex items-center h-9 rounded-md border {folderPathError
+			class="flex h-11.5 items-center rounded-(--r-md) border-[1.5px] {folderPathError
 				? 'border-destructive'
-				: 'border-input'} bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+				: 'border-border-strong'} bg-surface text-base focus-within:border-foreground focus-within:ring-[3px] focus-within:ring-ring/50 md:text-sm"
 		>
 			{#if providerRootPrefix}
-				<span class="pl-3 text-muted-foreground select-none shrink-0">{providerRootPrefix}</span>
+				<span class="pl-3.5 text-muted-foreground select-none shrink-0">{providerRootPrefix}</span>
 			{/if}
 			<input
 				id="backup-folder-path"
 				bind:value={backupFolderPath}
 				placeholder="Backups"
-				class="flex-1 bg-transparent px-3 py-1 outline-none placeholder:text-muted-foreground {providerRootPrefix
+				class="min-w-0 flex-1 bg-transparent px-3.5 py-1 outline-none placeholder:text-muted-foreground {providerRootPrefix
 					? 'pl-0'
 					: ''}"
 			/>

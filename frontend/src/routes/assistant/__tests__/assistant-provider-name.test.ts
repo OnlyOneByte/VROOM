@@ -70,5 +70,9 @@ describe('assistant page names its provider', () => {
 		render(Page);
 
 		expect(await screen.findByText('No assistant provider connected')).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Set up the assistant' })).toHaveAttribute(
+			'href',
+			'/settings/ai#assistant-providers'
+		);
 	});
 });

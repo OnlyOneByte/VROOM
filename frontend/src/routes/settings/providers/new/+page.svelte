@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-	<title>Add Storage Provider - VROOM Car Tracker</title>
+	<title>Add storage - VROOM Car Tracker</title>
 	<meta name="description" content="Add a new storage provider" />
 </svelte:head>
 

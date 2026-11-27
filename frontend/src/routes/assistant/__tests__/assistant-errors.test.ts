@@ -145,6 +145,11 @@ describe('assistant page errors', () => {
 		await ask('How much did I spend?');
 
 		expect(await screen.findByText('No assistant provider connected')).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Set up the assistant' })).toHaveAttribute(
+			'href',
+			'/settings/ai#assistant-providers'
+		);
+		expect(screen.queryByRole('alert')).toBeNull();
 	});
 
 	test('a message the server rejects as too long is not reported as a missing provider', async () => {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { FolderOpen, ChevronDown } from '@lucide/svelte';
+	import { ChevronDown } from '@lucide/svelte';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -67,24 +67,19 @@
 </script>
 
 <div class="space-y-4">
-	<div class="flex items-center gap-2">
-		<FolderOpen class="h-4 w-4 text-muted-foreground" />
-		<span class="text-sm font-medium">Photo Storage Paths</span>
-	</div>
-
 	<div class="space-y-2">
-		<Label for="root-path" class="text-sm text-muted-foreground">Root Path</Label>
+		<Label for="root-path" class="text-sm">Photo folder</Label>
 		<div
-			class="flex items-center h-9 rounded-md border border-input bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+			class="flex h-11.5 items-center rounded-(--r-md) border-[1.5px] border-border-strong bg-surface text-base focus-within:border-foreground focus-within:ring-[3px] focus-within:ring-ring/50 md:text-sm"
 		>
 			{#if rootPrefix}
-				<span class="pl-3 text-muted-foreground select-none shrink-0">{rootPrefix}</span>
+				<span class="pl-3.5 text-muted-foreground select-none shrink-0">{rootPrefix}</span>
 			{/if}
 			<input
 				id="root-path"
 				bind:value={photoRootPath}
 				placeholder="Photos"
-				class="flex-1 bg-transparent px-3 py-1 outline-none placeholder:text-muted-foreground {rootPrefix
+				class="min-w-0 flex-1 bg-transparent px-3.5 py-1 outline-none placeholder:text-muted-foreground {rootPrefix
 					? 'pl-0'
 					: ''}"
 			/>
@@ -96,10 +91,12 @@
 
 	<Collapsible.Root bind:open={advancedOpen}>
 		<Collapsible.Trigger
-			class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+			class="flex min-h-10 w-full flex-wrap items-center gap-x-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
 		>
 			<ChevronDown
-				class="h-4 w-4 transition-transform duration-200 {advancedOpen ? 'rotate-180' : ''}"
+				class="h-4 w-4 shrink-0 transition-transform duration-200 {advancedOpen
+					? 'rotate-180'
+					: ''}"
 			/>
 			<span>Category paths & sync settings</span>
 			{#if hasCustomPaths}

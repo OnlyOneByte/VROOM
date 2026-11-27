@@ -321,9 +321,9 @@
 						</CardContent>
 					</Card>
 
-					<Card variant="section" role="region" aria-labelledby="settings-ai">
+					<Card variant="section" role="region" aria-labelledby="settings-ai-helpers">
 						<CardHeader>
-							<CardTitle level={2} id="settings-ai" class="text-base">AI helpers</CardTitle>
+							<CardTitle level={2} id="settings-ai-helpers" class="text-base">AI helpers</CardTitle>
 							<CardAction>
 								<a
 									href={resolve(routes.settingsAi)}
