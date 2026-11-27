@@ -1,6 +1,5 @@
 <script lang="ts">
 	import {
-		Table,
 		TableBody,
 		TableCaption,
 		TableCell,
@@ -83,39 +82,47 @@
 
 	{#if matrix.rows.length > 0}
 		<div class="space-y-2">
-			<Table class={flush}>
-				<TableCaption
-					class="mt-0 mb-2 caption-top text-left text-base font-semibold text-foreground"
-				>
-					Where the money went, all time
-				</TableCaption>
-				<TableHeader>
-					<TableRow>
-						<TableHead>Category</TableHead>
-						{#each matrix.cars as car (car.vehicleId)}
-							<TableHead class="text-right whitespace-normal">{car.label}</TableHead>
-						{/each}
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{#each matrix.rows as row (row.category)}
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<div
+				class="relative w-full overflow-x-auto"
+				role="region"
+				aria-label="Where the money went, all time"
+				tabindex="0"
+			>
+				<table class="w-full caption-bottom text-sm {flush}">
+					<TableCaption
+						class="mt-0 mb-2 caption-top text-left text-base font-semibold text-foreground"
+					>
+						Where the money went, all time
+					</TableCaption>
+					<TableHeader>
 						<TableRow>
-							<TableCell>{row.label}</TableCell>
-							{#each row.amounts as amount, i (matrix.cars[i]?.vehicleId)}
-								<TableCell class="text-right tabular-nums">
-									{#if amount == null}
-										<span aria-hidden="true">—</span><span class="sr-only">
-											Not shared with you
-										</span>
-									{:else}
-										{whole(amount)}
-									{/if}
-								</TableCell>
+							<TableHead>Category</TableHead>
+							{#each matrix.cars as car (car.vehicleId)}
+								<TableHead class="text-right">{car.label}</TableHead>
 							{/each}
 						</TableRow>
-					{/each}
-				</TableBody>
-			</Table>
+					</TableHeader>
+					<TableBody>
+						{#each matrix.rows as row (row.category)}
+							<TableRow>
+								<TableCell>{row.label}</TableCell>
+								{#each row.amounts as amount, i (matrix.cars[i]?.vehicleId)}
+									<TableCell class="text-right tabular-nums">
+										{#if amount == null}
+											<span aria-hidden="true">—</span><span class="sr-only">
+												Not shared with you
+											</span>
+										{:else}
+											{whole(amount)}
+										{/if}
+									</TableCell>
+								{/each}
+							</TableRow>
+						{/each}
+					</TableBody>
+				</table>
+			</div>
 			{#if matrix.more > 0}
 				<p class="text-sm text-muted-foreground">
 					And {matrix.more} more {matrix.more === 1 ? 'car' : 'cars'}, with lower totals. Filter by
