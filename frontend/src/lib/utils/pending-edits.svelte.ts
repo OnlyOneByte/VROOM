@@ -372,14 +372,27 @@ export function movedBackRows(
 		.map(({ before }) => before);
 }
 
-function summaryHolds(entry: PendingEdit, requestedAt: number): Expense | undefined {
+function serverCopyBeforeSave(entry: PendingEdit, listed: readonly Expense[]): Expense | undefined {
+	if (entry.currentUpdatedAt === undefined) return entry.before;
+	return listed.find(row => row.id === entry.before.id && row.updatedAt === entry.currentUpdatedAt);
+}
+
+function summaryHolds(
+	entry: PendingEdit,
+	requestedAt: number,
+	listed: readonly Expense[]
+): Expense | undefined {
 	if (entry.status === 'failed' || entry.status === 'conflict') return undefined;
 	if (entry.undo) return loadedWhileMoved(entry, requestedAt) ? entry.undid : undefined;
 	const landedAt = entry.status === 'saved' ? entry.landedAt : undefined;
-	return landedAt !== undefined && requestedAt >= landedAt ? undefined : entry.before;
+	if (landedAt !== undefined && requestedAt >= landedAt) return undefined;
+	return serverCopyBeforeSave(entry, listed);
 }
 
-export function summaryEdits(requestedAt: number | undefined): {
+export function summaryEdits(
+	requestedAt: number | undefined,
+	listed: readonly Expense[]
+): {
 	before: Expense[];
 	after: Expense[];
 } {
@@ -387,7 +400,7 @@ export function summaryEdits(requestedAt: number | undefined): {
 	const after: Expense[] = [];
 	if (requestedAt === undefined) return { before, after };
 	for (const entry of edits.values()) {
-		const held = summaryHolds(entry, requestedAt);
+		const held = summaryHolds(entry, requestedAt, listed);
 		if (held) {
 			before.push(held);
 			after.push(entry.after);

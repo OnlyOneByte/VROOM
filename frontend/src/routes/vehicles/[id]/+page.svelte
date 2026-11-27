@@ -208,7 +208,7 @@
 	);
 
 	let chartSummary = $derived.by(() => {
-		const edited = summaryEdits(summaryRequestedAt);
+		const edited = summaryEdits(summaryRequestedAt, expenses);
 		const removed = [...expenses.filter(isDeleteHidden), ...edited.before.filter(backOnThisCar)];
 		return withRowsInBreakdowns(withoutRowsInBreakdowns(summary, removed), [
 			...edited.after.filter(backOnThisCar),
