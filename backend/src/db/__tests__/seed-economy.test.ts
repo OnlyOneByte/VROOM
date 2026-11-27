@@ -12,7 +12,7 @@ const BANDS: Record<string, [number, number]> = {
   Civic: [32, 38],
   Prius: [48, 55],
   'F-150': [17, 22],
-  'Model 3': [3.5, 4.5],
+  'Model 3': [3.6, 4.4],
 };
 
 interface Row {
@@ -92,6 +92,24 @@ describe('the seeded garage, after the web-vitals seed', () => {
       const drops = rows.slice(1).filter((row, i) => row.mileage < (rows[i] as Row).mileage);
       expect({ model, drops: drops.length }).toEqual({ model, drops: 0 });
     }
+  });
+
+  test('no car has a reading below its starting mileage, or an expense from before it was bought', () => {
+    const early = db
+      .query(
+        `select v.model,
+           (select count(*) from expenses e where e.vehicle_id = v.id and e.mileage < v.initial_mileage)
+           + (select count(*) from odometer_entries o where o.vehicle_id = v.id and o.odometer < v.initial_mileage)
+             as belowStart,
+           (select count(*) from expenses e where e.vehicle_id = v.id and e.date < v.purchase_date) as beforePurchase
+         from vehicles v order by v.model`
+      )
+      .all();
+    expect(early).toEqual(
+      Object.keys(BANDS)
+        .sort()
+        .map((model) => ({ model, belowStart: 0, beforePurchase: 0 }))
+    );
   });
 
   test('charging sessions carry a valid charger type, and only charging sessions do', () => {

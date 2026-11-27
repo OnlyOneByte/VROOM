@@ -94,7 +94,9 @@ db.transaction(() => {
 		);
 	}
 	const vehicles = db
-		.query('select id, model, vehicle_type from vehicles where user_id = ?')
+		.query(
+			'select id, model, vehicle_type, initial_mileage, purchase_date from vehicles where user_id = ? order by created_at, id'
+		)
 		.all(user.id);
 	for (const vehicle of vehicles) {
 		const existing = db
@@ -114,11 +116,12 @@ db.transaction(() => {
 			first && band
 				? first.mileage - Math.round((first.volume ?? 0) * ((band[0] + band[1]) / 2))
 				: null;
-		const startMiles = endMiles == null ? 10000 : Math.max(500, endMiles - count * 60);
+		const startMiles = vehicle.initial_mileage ?? 10000;
+		const start = Math.max(now - span, vehicle.purchase_date ?? 0);
 		const steps = Array.from({ length: count }, () => 0.75 + random() * 0.5);
 		const scale =
 			(endMiles == null ? count * 60 : endMiles - startMiles) / steps.reduce((a, b) => a + b, 0);
-		const dateAt = i => now - span + Math.floor(((end - now + span) * i) / count);
+		const dateAt = i => start + Math.floor(((end - start) * i) / count);
 		const odometer = [];
 		let exact = startMiles;
 		let miles = startMiles;
