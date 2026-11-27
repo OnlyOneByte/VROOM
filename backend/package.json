@@ -16,6 +16,7 @@
     "build": "bun build src/index.ts src/scripts/rotate-provider-keys.ts --outdir ./dist --target bun --external tesseract.js --external @tesseract.js-data/eng",
     "start": "bun dist/index.js",
     "db:generate": "drizzle-kit generate",
+    "db:generate:pg": "drizzle-kit generate --config drizzle.pg.config.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:init": "bun src/db/init.ts",
