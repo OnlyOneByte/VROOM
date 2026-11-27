@@ -212,7 +212,6 @@
   "frontend/src/lib/components/__tests__/VehicleManagement.test.ts: Date-only strings parse as UTC midnight, which shifts by timezone.",
   "frontend/src/lib/components/__tests__/VehicleManagement.test.ts: Local noon: a fixed UTC instant formats to another day at UTC+13/+14.",
   "frontend/src/lib/components/analytics/PerVehicleTab.svelte: Tier colours fail WCAG contrast as text on their tint; the ring and a label carry the tier.",
-  "frontend/src/lib/components/analytics/YearEndTab.svelte: Tinted text fails WCAG AA at this size; only the icon takes the hue.",
   "frontend/src/lib/components/analytics/fuel/FuelStatsTab.svelte: Tinted percentage text fails WCAG AA; only the icon takes the direction colour.",
   "frontend/src/lib/components/charts/AppPieChart.svelte: Tween starts at mount, so mount only once the container is visible.",
   "frontend/src/lib/components/charts/ChartCard.svelte: LayerChart measures 0x0 in hidden containers; gate rendering on visibility.",
