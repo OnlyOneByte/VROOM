@@ -138,6 +138,43 @@ describe('UnitPreferencesCard', () => {
 		expect(currency()).toHaveTextContent('GBP – British Pound (£)');
 	});
 
+	test('switching to a currency without cents asks first, and Cancel keeps the old one', async () => {
+		const onCurrencyChange = vi.fn();
+		mount({ onCurrencyChange });
+
+		await pickCurrency('JPY – Japanese Yen (¥)');
+		const dialog = screen.getByRole('alertdialog');
+		expect(dialog).toHaveTextContent('Switch to JPY – Japanese Yen (¥)?');
+		expect(dialog).toHaveTextContent('rounded to a whole number');
+		expect(onCurrencyChange).not.toHaveBeenCalled();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+		await settle();
+		expect(onCurrencyChange).not.toHaveBeenCalled();
+		expect(currency()).toHaveTextContent('USD – US Dollar ($)');
+	});
+
+	test('confirming the switch saves the currency without cents', async () => {
+		const onCurrencyChange = vi.fn();
+		mount({ onCurrencyChange });
+
+		await pickCurrency('JPY – Japanese Yen (¥)');
+		await fireEvent.click(screen.getByRole('button', { name: 'Switch and round' }));
+		await settle();
+		expect(onCurrencyChange).toHaveBeenCalledOnce();
+		expect(currency()).toHaveTextContent('JPY – Japanese Yen (¥)');
+	});
+
+	test('moving to a currency with cents, or between two without, needs no confirmation', async () => {
+		const onCurrencyChange = vi.fn();
+		mount({ currencyUnit: 'JPY', onCurrencyChange });
+
+		await pickCurrency('KRW – South Korean Won (₩)');
+		await pickCurrency('EUR – Euro (€)');
+		expect(screen.queryByRole('alertdialog')).toBeNull();
+		expect(onCurrencyChange).toHaveBeenCalledTimes(2);
+	});
+
 	test('picking the value already selected saves nothing', async () => {
 		const onUnitsChange = vi.fn();
 		const onCurrencyChange = vi.fn();
