@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { AnalyticsQueryParams } from '#lib/types/index.ts';
 
-const api = vi.hoisted(() => ({ getYearEnd: vi.fn(), query: vi.fn() }));
+const api = vi.hoisted(() => ({ query: vi.fn(), queryItems: vi.fn() }));
 const getVehicles = vi.hoisted(() => vi.fn());
 type ChartProps = { title?: string; data?: unknown; xAxisProps?: unknown };
 const charts = vi.hoisted(() => [] as ChartProps[]);
@@ -26,6 +26,7 @@ const OWNED = [
 ];
 const SHARED = { id: 'f150', year: 2021, make: 'Ford', model: 'F-150', sharedAccess: {} };
 const one = (key: string, value: number) => ({ key, label: key, values: [value] });
+const secs = (d: Date) => Math.floor(d.getTime() / 1000);
 
 function respond(p: AnalyticsQueryParams) {
 	if (p.metric === 'cost' && p.interval === 'month') {
@@ -56,6 +57,25 @@ function respond(p: AnalyticsQueryParams) {
 	};
 }
 
+const ITEMS = {
+	total: 4555,
+	count: 123,
+	fuel: { total: 1055, count: 90 },
+	items: [
+		{
+			id: 'e1',
+			date: secs(new Date(2026, 1, 10, 12)),
+			category: 'financial',
+			vehicleId: 'civic',
+			vehicleName: 'Civic',
+			description: 'Insurance',
+			amount: 1200
+		}
+	],
+	others: null,
+	categories: []
+};
+
 const chart = (title: RegExp) => charts.findLast(c => title.test(c.title ?? ''));
 const text = () => (document.body.textContent ?? '').replace(/\s+/g, ' ');
 
@@ -64,19 +84,10 @@ beforeEach(() => {
 	vi.setSystemTime(new Date(2026, 10, 27, 12));
 	vi.clearAllMocks();
 	charts.length = 0;
-	getVehicles.mockResolvedValue(OWNED);
-	api.getYearEnd.mockResolvedValue({
-		year: 2026,
-		totalSpent: 99999,
-		categoryBreakdown: [],
-		efficiencyTrend: [],
-		biggestExpense: { description: 'Insurance', amount: 1200, date: '2026-02-10T12:00:00Z' },
-		previousYearComparison: null,
-		vehicleCount: 7,
-		totalDistance: 0,
-		avgEfficiency: null,
-		costPerDistance: null
-	});
+	getVehicles.mockImplementation((opts?: { includeShared?: boolean }) =>
+		Promise.resolve(opts?.includeShared ? [...OWNED, SHARED] : OWNED)
+	);
+	api.queryItems.mockResolvedValue(ITEMS);
 	api.query.mockImplementation((p: AnalyticsQueryParams) => Promise.resolve(respond(p)));
 });
 
@@ -86,6 +97,7 @@ afterEach(() => {
 
 describe('YearEndTab', () => {
 	test('the hero, the category bars and the monthly chart tell the same total', async () => {
+		getVehicles.mockResolvedValue(OWNED);
 		render(YearEndTab);
 		const label = await screen.findByText('2026 so far · 2 vehicles');
 		expect(label.parentElement?.parentElement?.textContent).toContain('$4,555');
@@ -93,7 +105,7 @@ describe('YearEndTab', () => {
 		expect(bars.textContent).toMatch(/Financial.*\$3,000.*Fuel.*\$1,055.*Maintenance.*\$500/s);
 		const months = chart(/All-in spend by month/)?.data as Array<{ value: number }>;
 		expect(months.reduce((sum, m) => sum + m.value, 0)).toBe(4555);
-		expect(text()).not.toMatch(/99,999|7 vehicles/);
+		expect(text()).not.toMatch(/shared with you/);
 	});
 
 	test('the summary counts, names the biggest month and compares with the same point last year', async () => {
@@ -107,8 +119,8 @@ describe('YearEndTab', () => {
 			.map(([p]) => p as AnalyticsQueryParams)
 			.find(p => p.metric === 'cost' && p.interval === 'none' && !p.groupBy);
 		expect(previous).toMatchObject({
-			start: Math.floor(new Date(2025, 0, 1).getTime() / 1000),
-			end: Math.floor(new Date(2025, 10, 28).getTime() / 1000)
+			start: secs(new Date(2025, 0, 1)),
+			end: secs(new Date(2025, 10, 28))
 		});
 	});
 
@@ -118,17 +130,22 @@ describe('YearEndTab', () => {
 		expect(list.textContent).toMatch(/Cheapest car to run\s*Sparky · \$0\.09\/mi/);
 		expect(list.textContent).toMatch(/Most fill-ups and charges\s*Daily Driver · 36/);
 		expect(list.textContent).toMatch(/Biggest single expense\s*Insurance · \$1,200\.00 · Feb 10/);
+		expect(api.queryItems).toHaveBeenCalledWith({
+			start: secs(new Date(2026, 0, 1)),
+			end: secs(new Date(2026, 10, 28)),
+			include: 'all',
+			metric: 'cost'
+		});
 	});
 
-	test('with a car shared with you, every figure covers owned cars and says so', async () => {
-		getVehicles.mockResolvedValue([...OWNED, SHARED]);
+	test('asks for shared cars, then says the figures cover the cars you own', async () => {
 		render(YearEndTab);
 		expect(await screen.findByText('2026 so far · 2 vehicles')).toBeTruthy();
+		expect(getVehicles).toHaveBeenCalledWith({ includeShared: true });
 		expect(text()).toContain(
 			"These figures cover the 2 vehicles you own. Cars shared with you aren't included yet."
 		);
 		expect(text()).toContain('$4,555');
-		expect(text()).not.toMatch(/99,999|Biggest single expense|Insurance/);
 	});
 
 	test('the monthly chart labels each month; the fuel economy chart uses the query', async () => {
@@ -144,7 +161,7 @@ describe('YearEndTab', () => {
 		expect(eff.map(d => d.efficiency)).toEqual([30, 32]);
 	});
 
-	test('a year with no spending says so', async () => {
+	test('a year with no spending says so, with the shared-car note', async () => {
 		api.query.mockImplementation((p: AnalyticsQueryParams) =>
 			Promise.resolve({ buckets: [], series: [], totals: { value: 0 }, metric: p.metric })
 		);
@@ -152,6 +169,7 @@ describe('YearEndTab', () => {
 		expect(
 			await screen.findByRole('heading', { level: 2, name: 'No expenses in 2026' })
 		).toBeTruthy();
+		expect(text()).toContain("Cars shared with you aren't included yet.");
 	});
 
 	test('a failed request shows the error card, and Retry loads the year again', async () => {
@@ -160,6 +178,38 @@ describe('YearEndTab', () => {
 		expect(await screen.findByText("Couldn't load year-end summary")).toBeTruthy();
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		expect(await screen.findByText('2026 so far · 2 vehicles')).toBeTruthy();
-		await waitFor(() => expect(api.getYearEnd).toHaveBeenCalledTimes(2));
+		await waitFor(() => expect(api.queryItems).toHaveBeenCalledTimes(2));
+	});
+
+	test('a late answer for the year you left does not replace the year you picked', async () => {
+		let releaseFirst: (v: unknown) => void = () => {};
+		api.queryItems.mockImplementationOnce(() => new Promise(r => (releaseFirst = r)));
+		api.query.mockImplementation((p: AnalyticsQueryParams) =>
+			Promise.resolve(
+				p.interval === 'month' && p.metric === 'cost' && p.start === secs(new Date(2025, 0, 1))
+					? {
+							buckets: ['2025-01'],
+							series: [{ key: 'total', label: 'Cost', values: [2222] }],
+							totals: { value: 2222, perBucket: 2222, perDistance: 0.4, distance: 5555 }
+						}
+					: respond(p)
+			)
+		);
+		render(YearEndTab);
+
+		const trigger = screen.getByRole('combobox', { name: 'Report year' });
+		await fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+		await fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' });
+		const option = await screen.findByRole('option', { name: '2025' });
+		await fireEvent.pointerUp(option, { button: 0, pointerType: 'mouse' });
+		await fireEvent.click(option);
+
+		const label = await screen.findByText('2025 · 2 vehicles');
+		const hero = () => label.parentElement?.parentElement?.textContent ?? '';
+		expect(hero()).toContain('$2,222');
+		releaseFirst(ITEMS);
+		await new Promise(r => setTimeout(r, 20));
+		expect(hero()).toContain('$2,222');
+		expect(text()).not.toContain('$4,555');
 	});
 });

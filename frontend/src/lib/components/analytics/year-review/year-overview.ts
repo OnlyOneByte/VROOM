@@ -26,10 +26,12 @@ export function yearRequests(
 ): Record<YearQuery, AnalyticsQueryParams> {
 	const { start, end, soFar } = yearRange(year, now);
 	const whole = { interval: 'none' as const, start, end };
+	const lastDay = new Date(year - 1, now.getMonth() + 1, 0).getDate();
+	const sameDay = Math.min(now.getDate(), lastDay);
 	const before = {
 		start: Math.floor(new Date(year - 1, 0, 1).getTime() / 1000),
 		end: soFar
-			? Math.floor(new Date(year - 1, now.getMonth(), now.getDate() + 1).getTime() / 1000)
+			? Math.floor(new Date(year - 1, now.getMonth(), sameDay + 1).getTime() / 1000)
 			: start
 	};
 	return {

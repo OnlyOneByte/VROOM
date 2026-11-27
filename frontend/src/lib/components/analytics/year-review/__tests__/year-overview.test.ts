@@ -45,6 +45,12 @@ describe('yearRequests', () => {
 		});
 	});
 
+	test('on Feb 29 the comparison stops at the end of Feb 28 last year', () => {
+		expect(yearRequests(2028, new Date(2028, 1, 29, 9)).previous).toMatchObject({
+			end: secs(new Date(2027, 2, 1))
+		});
+	});
+
 	test('a past year compares with the whole year before it', () => {
 		expect(yearRequests(2025, NOW).previous).toMatchObject({
 			start: secs(new Date(2024, 0, 1)),

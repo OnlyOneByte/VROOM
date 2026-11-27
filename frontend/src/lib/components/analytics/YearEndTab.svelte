@@ -9,10 +9,14 @@
 	import type * as Chart from '#lib/components/ui/chart/index.ts';
 	import { AppBarChart, AppLineChart } from '#lib/components/charts/index.ts';
 	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
-	import { buildCategoryPieData, buildChartConfig } from '#lib/utils/chart-colors.ts';
+	import {
+		buildCategoryPieData,
+		buildChartConfig,
+		getCategoryLabel
+	} from '#lib/utils/chart-colors.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
-	import type { AnalyticsQueryResponse, Vehicle, YearEndResponse } from '#lib/types/index.ts';
+	import type { AnalyticsBucketItems, AnalyticsQueryResponse, Vehicle } from '#lib/types/index.ts';
 	import {
 		formatCurrency,
 		formatDateWith,
@@ -41,7 +45,7 @@
 	const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 	let selectedYear = $state(currentYear);
-	let yearEnd = $state<YearEndResponse | null>(null);
+	let largest = $state<AnalyticsBucketItems | null>(null);
 	let vehicles = $state<Vehicle[]>([]);
 	let results = $state<Record<YearQuery, AnalyticsQueryResponse> | null>(null);
 	let isLoading = $state(true);
@@ -51,15 +55,16 @@
 	async function loadData(year: number) {
 		const current = ++request;
 		const queries = yearRequests(year);
+		const { start, end } = yearRange(year);
 		try {
 			isLoading = true;
-			const [summary, cars, ...responses] = await Promise.all([
-				analyticsApi.getYearEnd({ year }),
-				vehicleApi.getVehicles(),
+			const [items, cars, ...responses] = await Promise.all([
+				analyticsApi.queryItems({ start, end, include: 'all', metric: 'cost' }),
+				vehicleApi.getVehicles({ includeShared: true }),
 				...YEAR_QUERIES.map(key => analyticsApi.query(queries[key]))
 			]);
 			if (current !== request) return;
-			yearEnd = summary;
+			largest = items;
 			vehicles = cars;
 			results = Object.fromEntries(
 				YEAR_QUERIES.map((key, i) => [key, responses[i] as AnalyticsQueryResponse])
@@ -84,7 +89,7 @@
 		loadData(selectedYear);
 	});
 
-	let units = $derived(yearEnd?.units ?? settingsStore.unitPreferences);
+	let units = $derived(settingsStore.unitPreferences);
 	let efficiencyLabel = $derived(getFuelEfficiencyLabel(units.distanceUnit, units.volumeUnit));
 	let distShort = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 	let distLong = $derived(getDistanceUnitLabel(units.distanceUnit).toLowerCase());
@@ -111,7 +116,15 @@
 	let cheapest = $derived(cheapestToRun(results?.running ?? null));
 	let fillLeader = $derived(mostFills(results?.fills ?? null));
 	let change = $derived(percentChange(total, results?.previous.totals.value));
-	let biggestExpense = $derived(hasShared ? null : (yearEnd?.biggestExpense ?? null));
+	let biggestExpense = $derived.by(() => {
+		const item = largest?.items[0];
+		if (!item) return null;
+		return {
+			description: item.description || getCategoryLabel(item.category),
+			amount: item.amount,
+			date: new Date(item.date * 1000)
+		};
+	});
 
 	const isMobile = new IsMobile();
 	let monthRows = $derived(
@@ -188,6 +201,7 @@
 			onRetry={() => loadData(selectedYear)}
 		/>
 	{:else if results && total <= 0}
+		{@render sharedNote()}
 		<EmptyState level={2}>
 			{#snippet icon()}
 				<div class="mb-4 rounded-full bg-muted p-4">
@@ -199,11 +213,7 @@
 		</EmptyState>
 	{:else if results}
 		<section aria-label="{selectedYear} in review" class="space-y-8">
-			{#if hasShared}
-				<p class="text-sm text-muted-foreground">
-					These figures cover the {carsText} you own. Cars shared with you aren't included yet.
-				</p>
-			{/if}
+			{@render sharedNote()}
 			<div class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
 				<div class="space-y-2">
 					<HeroFigure
@@ -228,7 +238,7 @@
 				</div>
 				{#if categories.length > 0}
 					<div class="space-y-3">
-						<h2 class="text-base font-semibold" id="year-category-title">
+						<h2 class="text-lg font-semibold" id="year-category-title">
 							Where it went, {selectedYear}
 						</h2>
 						<ul class="space-y-2" aria-labelledby="year-category-title">
@@ -275,7 +285,7 @@
 					/>
 				{/if}
 				<div class="space-y-3">
-					<h2 class="text-base font-semibold" id="year-highlights-title">Highlights</h2>
+					<h2 class="text-lg font-semibold" id="year-highlights-title">Highlights</h2>
 					<ul class="divide-y" aria-labelledby="year-highlights-title">
 						{#if cheapest}
 							<li class="flex items-center justify-between gap-3 py-3">
@@ -306,7 +316,7 @@
 									<p class="font-medium">Biggest single expense</p>
 									<p class="text-sm text-muted-foreground">
 										{biggestExpense.description} · {formatCurrency(biggestExpense.amount)} · {formatDateWith(
-											new Date(biggestExpense.date),
+											biggestExpense.date,
 											{
 												month: 'short',
 												day: 'numeric'
@@ -329,7 +339,7 @@
 					<AppLineChart
 						level={3}
 						title="{efficiencyLabel} by month"
-						description="Fuel economy across all vehicles, {selectedYear}"
+						description="Fuel economy across the cars you own, {selectedYear}"
 						data={effTrendData}
 						x="date"
 						y="efficiency"
@@ -343,3 +353,11 @@
 		</ChartGroup>
 	{/if}
 </div>
+
+{#snippet sharedNote()}
+	{#if hasShared}
+		<p class="text-sm text-muted-foreground">
+			These figures cover the {carsText} you own. Cars shared with you aren't included yet.
+		</p>
+	{/if}
+{/snippet}
