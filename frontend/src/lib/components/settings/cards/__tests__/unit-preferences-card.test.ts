@@ -257,6 +257,18 @@ describe('UnitPreferencesCard', () => {
 			}
 		);
 
+		test('in KRW, a converted rate shown as 804.672 is accepted as it stands, not read as thousands', async () => {
+			const onRateChange = vi.fn();
+			mount({ currencyUnit: 'KRW', businessMileageRate: 804.672, onRateChange });
+			expect(rate()).toHaveValue('804.672');
+
+			await enter('804.672');
+
+			expect(rate()).not.toHaveAttribute('aria-invalid');
+			expect(screen.queryByRole('alert')).toBeNull();
+			expect(onRateChange).not.toHaveBeenCalled();
+		});
+
 		test('fixing a refused rate clears the error and saves it', async () => {
 			const onRateChange = vi.fn();
 			mount({ currencyUnit: 'KRW', onRateChange });

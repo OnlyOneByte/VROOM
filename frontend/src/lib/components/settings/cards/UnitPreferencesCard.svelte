@@ -63,6 +63,10 @@
 
 	function commitRate() {
 		const text = rateDraft.trim();
+		if (businessMileageRate > 0 && text === String(businessMileageRate)) {
+			rateError = null;
+			return;
+		}
 		rateError = rateProblem(text);
 		if (rateError) return;
 		const value = text === '' ? 0 : Number(text.replace(',', '.'));
