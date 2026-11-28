@@ -311,7 +311,7 @@
 			</Alert>
 		{/if}
 
-		<div class="grid gap-x-10 gap-y-6 lg:grid-cols-2">
+		<div class="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-2">
 			{#if dueReminders.length > 0}
 				{@render reminderSection('Due now', dueReminders, 'due')}
 			{/if}
