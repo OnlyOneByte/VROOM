@@ -7,11 +7,10 @@
 	import Navigation from '#lib/components/layout/Navigation.svelte';
 	import { isFormRoute, routes } from '#lib/routes.ts';
 	import { cn } from '#lib/utils.ts';
-	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { toast } from 'svelte-sonner';
 	import OfflineIndicator from '#lib/components/sync/OfflineIndicator.svelte';
-	import { NOTIFICATION_LIMITS } from '#lib/constants/limits.ts';
 	import PWAInstallPrompt from '#lib/components/layout/PWAInstallPrompt.svelte';
+	import { NOTIFICATION_LIMITS } from '#lib/constants/limits.ts';
 	import { syncConflicts } from '#lib/utils/sync/sync-state.svelte.ts';
 	import { pwaInfo } from 'virtual:pwa-info';
 	import '../app.css';
@@ -76,12 +75,22 @@
 	const shownNotifications = new Set<string>();
 
 	let SyncConflictResolver = $state<Component | null>(null);
+	let Toaster = $state<(typeof import('#lib/components/ui/sonner/index.ts'))['Toaster']>();
 
 	let webManifestLink = $derived(pwaInfo ? pwaInfo.webManifest.linkTag : '');
 
 	onMount(() => {
 		const timeZoneTimer = setTimeout(userTimeZone);
 		return () => clearTimeout(timeZoneTimer);
+	});
+
+	onMount(() => {
+		import('#lib/components/ui/sonner/index.ts').then(
+			module => (Toaster = module.Toaster),
+			error => {
+				if (import.meta.env.DEV) console.error('Failed to load the toaster:', error);
+			}
+		);
 	});
 
 	onMount(async () => {
@@ -285,4 +294,6 @@
 	<SyncConflictResolver />
 {/if}
 
-<Toaster position="bottom-right" richColors closeButton />
+{#if Toaster}
+	<Toaster position="bottom-right" richColors closeButton />
+{/if}
