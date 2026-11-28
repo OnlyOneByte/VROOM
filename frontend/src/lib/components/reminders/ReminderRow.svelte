@@ -104,7 +104,7 @@
 	});
 
 	let canResume = $derived(group === 'paused' && vehicleIds.length > 0);
-	let markingNote = $derived(servicing && group !== 'due' ? 'Marking serviced…' : '');
+	let markingNote = $derived(servicing ? 'Marking serviced…' : '');
 
 	function choose(action: (_item: ReminderWithVehicles) => void) {
 		menuOpen = false;
@@ -151,7 +151,9 @@
 		>
 			{status.text}
 		</p>
-		<p class="text-xs text-muted-foreground empty:hidden" role="status">{markingNote}</p>
+		<p class={group === 'due' ? 'sr-only' : 'text-xs text-muted-foreground'} role="status">
+			{markingNote}
+		</p>
 		{#if group === 'due' && mileage}
 			<Button
 				variant="link"

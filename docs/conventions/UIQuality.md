@@ -158,6 +158,12 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   tertiary and toolbar actions are `ghost`; actions that navigate use `href`.
 - `destructive` is for the final confirm of a delete inside `ConfirmDialog` — not for the button
   that opens it.
+- **Cancel, and every other "leave without saving" action, is `outline`**, on every form and in
+  every dialog. Never `link`: its accent ink is red in the default light theme, the same red as
+  Delete and error text, so a Cancel in it reads as a warning and is easy to mis-tap near Delete.
+  `link` is for an inline action that moves things forward, such as "Mark serviced" on a due
+  reminder. `outline` has no fill of its own, so a button drawn over a photo or another
+  non-surface background sets its own (`bg-background`).
 - Mobile primary actions are `size="lg"` (40px) or full-width. A page's primary action is the
   primary button in `PageHeader` at every width; the bottom bar's raised + is always Add expense.
   From `lg` up nothing fixed covers page content at rest: form action bars are sticky below `lg`
