@@ -22,7 +22,8 @@
 		calculateAmortizationSchedule,
 		calculatePayoffDate,
 		derivePaymentEntries,
-		resolveCurrentOdometer
+		resolveCurrentOdometer,
+		showsPaymentSchedule
 	} from '#lib/utils/financing-calculations.ts';
 	import type { Expense, Vehicle, VehicleStats, DerivedPaymentEntry } from '#lib/types/index.ts';
 
@@ -95,11 +96,7 @@
 	});
 
 	let hasNextPayment = $derived((vehicle?.financing?.paymentAmount ?? 0) > 0);
-	let hasSchedule = $derived(
-		vehicle?.financing?.financingType === 'loan' &&
-			(vehicle.financing.apr ?? 0) > 0 &&
-			amortizationSchedule.length > 0
-	);
+	let hasSchedule = $derived(showsPaymentSchedule(vehicle?.financing, amortizationSchedule));
 
 	onMount(() => {
 		if (vehicle?.financing?.isActive && !hasAttemptedPaymentLoad) {

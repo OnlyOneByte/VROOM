@@ -117,20 +117,20 @@ export function splitTermsByToday(
 	now: Date = new Date()
 ): {
 	shown: InsuranceTerm | undefined;
+	startsLater: boolean;
 	upcoming: InsuranceTerm | undefined;
-	past: InsuranceTerm[];
+	others: InsuranceTerm[];
 } {
 	const started = (t: InsuranceTerm) => getDaysRemaining(t.startDate, now) <= 0;
-	const ended = (t: InsuranceTerm) => hasTermEnded(t, now);
-	const inForce = sortTermsByEndDateDesc(terms.filter(t => started(t) && !ended(t)))[0];
-	const shown = inForce ?? getLatestTerm(terms);
-	const rest = terms.filter(t => t.id !== shown?.id);
+	const byStart = (a: InsuranceTerm, b: InsuranceTerm) => a.startDate.localeCompare(b.startDate);
+	const inForce = sortTermsByEndDateDesc(terms.filter(t => started(t) && !hasTermEnded(t, now)))[0];
+	const future = terms.filter(t => !started(t)).sort(byStart);
+	const shown = inForce ?? future[0] ?? getLatestTerm(terms);
 	return {
 		shown,
-		upcoming: rest
-			.filter(t => !started(t))
-			.sort((a, b) => a.startDate.localeCompare(b.startDate))[0],
-		past: sortTermsByEndDateDesc(rest.filter(ended))
+		startsLater: shown !== undefined && !started(shown),
+		upcoming: future.find(t => t.id !== shown?.id),
+		others: terms.filter(t => t.id !== shown?.id).sort((a, b) => byStart(b, a))
 	};
 }
 

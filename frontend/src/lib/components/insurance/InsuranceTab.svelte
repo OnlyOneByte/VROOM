@@ -33,7 +33,7 @@
 	let error = $state<string | null>(null);
 	let claimsError = $state<string | null>(null);
 	let claimsLoading = $state(true);
-	let showPastTerms = $state(false);
+	let showOtherTerms = $state(false);
 
 	let returnTo = $derived(`${resolve(paramRoutes.vehicle, { id: vehicleId })}?tab=insurance`);
 	let ordered = $derived.by(() => {
@@ -41,9 +41,9 @@
 		return [...active, ...inactive];
 	});
 	let termsByPolicy = $derived(new Map(policies.map(p => [p.id, splitTermsByToday(p.terms)])));
-	let pastTerms = $derived(
+	let otherTerms = $derived(
 		ordered.flatMap(policy =>
-			(termsByPolicy.get(policy.id)?.past ?? []).map(term => ({ policy, term }))
+			(termsByPolicy.get(policy.id)?.others ?? []).map(term => ({ policy, term }))
 		)
 	);
 
@@ -218,7 +218,11 @@
 									<span class="block font-semibold tabular-nums">{cost}</span>
 								{/if}
 								{#if term && days !== null && policy.isActive}
-									{#if split?.upcoming && days >= 0}
+									{#if split?.startsLater && term}
+										<span class="block text-sm text-muted-foreground">
+											Starts {formatDate(term.startDate)}
+										</span>
+									{:else if split?.upcoming && days >= 0}
 										<span class="block text-sm text-muted-foreground">
 											Next term from {formatDate(split.upcoming.startDate)}
 										</span>
@@ -234,21 +238,21 @@
 					</li>
 				{/each}
 			</ul>
-			{#if pastTerms.length > 0}
+			{#if otherTerms.length > 0}
 				<Button
 					variant="ghost"
 					class="-ml-3"
-					aria-expanded={showPastTerms}
-					aria-controls="vehicle-past-terms"
-					onclick={() => (showPastTerms = !showPastTerms)}
+					aria-expanded={showOtherTerms}
+					aria-controls="vehicle-other-terms"
+					onclick={() => (showOtherTerms = !showOtherTerms)}
 				>
-					{showPastTerms
-						? 'Hide past terms'
-						: `Show ${pastTerms.length} past ${pastTerms.length === 1 ? 'term' : 'terms'}`}
+					{showOtherTerms
+						? 'Hide other terms'
+						: `Show ${otherTerms.length} other ${otherTerms.length === 1 ? 'term' : 'terms'}`}
 				</Button>
-				{#if showPastTerms}
-					<ul class="divide-y border-y" id="vehicle-past-terms" aria-label="Past terms">
-						{#each pastTerms as { policy, term } (term.id)}
+				{#if showOtherTerms}
+					<ul class="divide-y border-y" id="vehicle-other-terms" aria-label="Other terms">
+						{#each otherTerms as { policy, term } (term.id)}
 							{@const cost = costText(term)}
 							<li class="flex items-center justify-between gap-4 py-3">
 								<span class="min-w-0">
