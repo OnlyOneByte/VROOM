@@ -141,7 +141,7 @@ describe('InsuranceTab policies', () => {
 		expect(row).toHaveTextContent('#SF123 · Jul 26, 2026 – Jan 24, 2027');
 		expect(row).toHaveTextContent('$1,200');
 		expect(row).toHaveTextContent('Renews in 62 days');
-		expect(row).toHaveAttribute('href', '/insurance/p1/edit?returnTo=/vehicles/v1');
+		expect(row).toHaveAttribute('href', `/insurance/p1/edit?returnTo=${RETURN_TO}`);
 		expect(screen.queryAllByRole('button', { name: /settings|renew|claim|upload/i })).toHaveLength(
 			0
 		);
@@ -160,7 +160,69 @@ describe('InsuranceTab policies', () => {
 		]);
 		expect(rows[1]).toHaveTextContent('Inactive');
 		expect(rows[1]).toHaveTextContent('$90.00/mo');
-		expect(rows[1]).not.toHaveTextContent(/Renews|Ended/);
+		expect(rows[1]).not.toHaveTextContent(/Renews|Expired/);
+	});
+
+	test('an active policy whose terms have all ended says Expired in red, and renewal within 30 days is amber', async () => {
+		onNov23();
+		const expired = makePolicy({
+			id: 'p3',
+			company: 'Lapsed Co',
+			terms: [makeTerm({ id: 't3', policyId: 'p3', endDate: '2026-11-01' })]
+		});
+		const soon = makePolicy({
+			id: 'p4',
+			company: 'Soon Co',
+			terms: [makeTerm({ id: 't4', policyId: 'p4', endDate: '2026-12-13' })]
+		});
+		getPoliciesForVehicle.mockResolvedValue([expired, soon]);
+		mount();
+		await settle();
+
+		const expiredStatus = screen.getByText('Expired Nov 1, 2026');
+		expect(expiredStatus).toHaveClass('text-destructive');
+		expect(screen.getByText('Renews in 20 days')).toHaveClass('text-warning');
+	});
+
+	test('viewers see coverage, notes and past terms without leaving the tab', async () => {
+		const withHistory = makePolicy({
+			id: 'p5',
+			company: 'State Farm',
+			notes: 'Agent: Pat, 555-0100',
+			terms: [
+				makeTerm({
+					id: 'new',
+					policyId: 'p5',
+					startDate: '2026-07-26',
+					endDate: '2027-01-24',
+					coverageDescription: 'Liability 100/300/100',
+					deductibleAmount: 500
+				}),
+				makeTerm({
+					id: 'old',
+					policyId: 'p5',
+					startDate: '2026-01-26',
+					endDate: '2026-07-26',
+					totalCost: 1150
+				})
+			]
+		});
+		getPoliciesForVehicle.mockResolvedValue([withHistory]);
+		mount(true);
+		await settle();
+
+		expect(screen.getByText('Liability 100/300/100 · $500.00 deductible')).toBeInTheDocument();
+		expect(screen.getByText('Agent: Pat, 555-0100')).toBeInTheDocument();
+		const toggle = screen.getByRole('button', { name: 'Show 1 past term' });
+		expect(toggle).toHaveAttribute('aria-expanded', 'false');
+		await fireEvent.click(toggle);
+		const past = screen.getByRole('list', { name: 'Past terms' });
+		expect(past).toHaveTextContent('Jan 26, 2026 – Jul 26, 2026');
+		expect(past).toHaveTextContent('$1,150.00');
+		expect(screen.getByRole('button', { name: 'Hide past terms' })).toHaveAttribute(
+			'aria-expanded',
+			'true'
+		);
 	});
 
 	test('the tab outline is two h2 sections, and Add policy keeps the return path', async () => {
@@ -236,6 +298,37 @@ describe('InsuranceTab claims', () => {
 
 		expect(getPoliciesForVehicle).toHaveBeenCalledTimes(1);
 		expect(within(claims).getByText('Collision')).toBeInTheDocument();
+	});
+
+	test('while claims load the section shows a placeholder, never "No claims"', async () => {
+		getPoliciesForVehicle.mockResolvedValue([policies[0] as InsurancePolicy]);
+		getClaims.mockReturnValue(new Promise(() => {}));
+		mount();
+		await settle();
+
+		expect(screen.getByText('Acme Mutual')).toBeInTheDocument();
+		expect(screen.getByTestId('claims-loading')).toBeInTheDocument();
+		expect(screen.queryByText('No claims for this car.')).toBeNull();
+	});
+
+	test('a claims retry keeps the error card up until the reload answers', async () => {
+		getPoliciesForVehicle.mockResolvedValue([policies[0] as InsurancePolicy]);
+		getClaims.mockRejectedValueOnce(new ApiError('down', 503));
+		let answer: (claims: InsuranceClaim[]) => void = () => {};
+		getClaims.mockReturnValueOnce(new Promise(resolve => (answer = resolve)));
+		mount();
+		await settle();
+
+		const claims = screen.getByRole('region', { name: 'Claims' });
+		await fireEvent.click(within(claims).getByRole('button', { name: 'Retry' }));
+		await settle();
+		expect(within(claims).getByText("Couldn't load this car's claims")).toBeInTheDocument();
+		expect(within(claims).queryByText('No claims for this car.')).toBeNull();
+
+		answer([]);
+		await settle();
+		expect(within(claims).queryByText("Couldn't load this car's claims")).toBeNull();
+		expect(within(claims).getByText('No claims for this car.')).toBeInTheDocument();
 	});
 
 	test('no claims says so', async () => {

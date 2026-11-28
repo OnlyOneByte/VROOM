@@ -153,7 +153,7 @@
 		{/if}
 
 		<div
-			class="grid gap-6 lg:grid-cols-2 lg:items-start lg:[&>:only-child]:col-span-2"
+			class="grid gap-6 empty:hidden lg:grid-cols-2 lg:items-start lg:[&>:only-child]:col-span-2"
 			data-testid="finance-next-payment-grid"
 		>
 			{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
