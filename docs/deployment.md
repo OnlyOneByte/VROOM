@@ -391,7 +391,9 @@ automatically at startup; there is no manual migration step.
 With opt-in Postgres (#1635, in progress) there is no database file: the migrations in
 `backend/drizzle-pg/` run at startup instead. The file backup, Litestream and WAL checkpoint notes
 below apply to SQLite only, and `bun src/db/checkpoint.ts` says so and does nothing. On Postgres,
-back up with the in-app backup ZIP or your Postgres host's own backups.
+the server backup is your Postgres host's own (`pg_dump`, or a managed provider's snapshots and
+point-in-time recovery). The in-app backup ZIP is not a server backup on either database: it
+exports one account's own data, without other accounts, sessions or roles.
 
 **Databases created before `0000_baseline` cannot be upgraded in place.** Their migration history
 no longer matches the journal. To move one forward:
@@ -569,7 +571,10 @@ list already names `default`, the list wins and `PROVIDER_ENCRYPTION_KEY` is ign
    - in the container: `docker compose exec backend bun dist/scripts/rotate-provider-keys.js`
      (on Portainer, open the backend container's console and run
      `bun dist/scripts/rotate-provider-keys.js`)
-   - from a checkout, in `backend/`: `bun run providers:rotate-key`
+   - from a checkout, in `backend/`: `bun run providers:rotate-key`. Use a checkout of the
+     version the server runs: on Postgres the script opens the database the way the server does,
+     including its startup migrations, so a newer checkout would migrate the database under the
+     running server.
 
    It works in batches of 100 rows, one transaction each, and prints how many rows it
    re-encrypted, how many were already on the current key and how many had no secret. It exits
