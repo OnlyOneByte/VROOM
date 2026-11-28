@@ -7,11 +7,11 @@
 	import { shareApi } from '#lib/services/share-api.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { shareLevelLabel } from '#lib/utils/share-helpers.ts';
+	import { pendingInvitations, shareLevelLabel } from '#lib/utils/share-helpers.ts';
 	import type { ReceivedShare } from '#lib/types/index.ts';
 
 	interface Props {
-		pending: ReceivedShare[];
+		invitations: ReceivedShare[];
 		loadError: string | null;
 		onRetry: () => void;
 		onAccepted: (_share: ReceivedShare) => void;
@@ -20,7 +20,7 @@
 	}
 
 	let {
-		pending,
+		invitations,
 		loadError,
 		onRetry,
 		onAccepted,
@@ -28,7 +28,7 @@
 		title = 'Shared with you'
 	}: Props = $props();
 
-	let waiting = $derived(pending.filter(share => share.status === 'pending'));
+	let waiting = $derived(pendingInvitations(invitations));
 
 	let acting = $state<string | null>(null);
 

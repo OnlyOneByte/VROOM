@@ -7,12 +7,8 @@
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.ts';
-	import {
-		amountPlaceholder,
-		amountStep,
-		formatCurrency,
-		formatDateWith
-	} from '#lib/utils/formatters.ts';
+	import MoneyInput from '#lib/components/common/MoneyInput.svelte';
+	import { amountStep, formatCurrency, formatDateWith } from '#lib/utils/formatters.ts';
 	import type { Vehicle, FinancingFormErrors, FinancingPaymentConfig } from '#lib/types/index.ts';
 	import type { DistanceUnit } from '#lib/types/settings.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
@@ -154,12 +150,8 @@
 									? 'Original loan amount'
 									: 'Loan amount'}
 						</Label>
-						<Input
+						<MoneyInput
 							id="originalAmount"
-							type="number"
-							min="0"
-							step={amountStep()}
-							placeholder={amountPlaceholder()}
 							bind:value={financingForm.originalAmount}
 							aria-invalid={!!errors['originalAmount']}
 							aria-describedby={errors['originalAmount'] ? 'originalAmount-error' : undefined}
@@ -258,12 +250,9 @@
 					{#if ownershipType === 'lease'}
 						<div class="space-y-2">
 							<Label for="paymentAmount">Monthly payment</Label>
-							<Input
+							<MoneyInput
 								id="paymentAmount"
-								type="number"
 								min={amountStep()}
-								step={amountStep()}
-								placeholder={amountPlaceholder()}
 								bind:value={financingForm.paymentAmount}
 								aria-invalid={!!errors['paymentAmount']}
 								aria-describedby={errors['paymentAmount'] ? 'paymentAmount-error' : undefined}
@@ -282,14 +271,7 @@
 									(optional)
 								</span>
 							</Label>
-							<Input
-								id="residualValue"
-								type="number"
-								min="0"
-								step={amountStep()}
-								placeholder={amountPlaceholder()}
-								bind:value={financingForm.residualValue}
-							/>
+							<MoneyInput id="residualValue" bind:value={financingForm.residualValue} />
 						</div>
 						<div class="space-y-2">
 							<Label for="mileageLimit">
@@ -309,14 +291,7 @@
 								Fee per extra {distanceShort}
 								<span class="font-normal text-muted-foreground">(optional)</span>
 							</Label>
-							<Input
-								id="excessMileageFee"
-								type="number"
-								min="0"
-								step={amountStep()}
-								placeholder={amountPlaceholder()}
-								bind:value={financingForm.excessMileageFee}
-							/>
+							<MoneyInput id="excessMileageFee" bind:value={financingForm.excessMileageFee} />
 						</div>
 					{/if}
 				</div>

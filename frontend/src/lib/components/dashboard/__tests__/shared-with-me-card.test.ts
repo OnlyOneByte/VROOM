@@ -49,12 +49,12 @@ async function settle() {
 }
 
 function mount(
-	props: { pending?: ReceivedShare[]; loadError?: string | null; title?: string | null } = {}
+	props: { invitations?: ReceivedShare[]; loadError?: string | null; title?: string | null } = {}
 ) {
 	const handlers = { onRetry: vi.fn(), onAccepted: vi.fn(), onDeclined: vi.fn() };
 	const view = render(SharedWithMeCard, {
 		props: {
-			pending: props.pending ?? [share()],
+			invitations: props.invitations ?? [share()],
 			loadError: props.loadError ?? null,
 			...(props.title !== undefined ? { title: props.title } : {}),
 			...handlers
@@ -75,12 +75,12 @@ afterEach(() => {
 
 describe('SharedWithMeCard listing', () => {
 	test('renders nothing when there are no pending invitations', () => {
-		const { container } = mount({ pending: [] });
+		const { container } = mount({ invitations: [] });
 		expect(container.textContent?.trim()).toBe('');
 	});
 
 	test('lists each invitation with its level and sharer', () => {
-		mount({ pending: [share({ id: 'p1', level: 'editor', sharedBy: 'Alex' })] });
+		mount({ invitations: [share({ id: 'p1', level: 'editor', sharedBy: 'Alex' })] });
 
 		expect(screen.getByText('Shared with you')).toBeInTheDocument();
 		expect(screen.getByText('Family Van')).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe('SharedWithMeCard listing', () => {
 
 	test('an invitation already accepted is not offered again', () => {
 		const { container } = mount({
-			pending: [share({ id: 'done', status: 'accepted', vehicleName: 'Old Van' })]
+			invitations: [share({ id: 'done', status: 'accepted', vehicleName: 'Old Van' })]
 		});
 		expect(container.textContent?.trim()).toBe('');
 		expect(screen.queryByRole('button', { name: /Accept/ })).toBeNull();
@@ -97,7 +97,7 @@ describe('SharedWithMeCard listing', () => {
 
 	test('only the pending ones are listed when both kinds come in', () => {
 		mount({
-			pending: [
+			invitations: [
 				share({ id: 'done', status: 'accepted', vehicleName: 'Old Van' }),
 				share({ id: 'new', status: 'pending', vehicleName: 'Family Van' })
 			]

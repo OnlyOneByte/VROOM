@@ -51,6 +51,7 @@
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { analyticsApi } from '#lib/services/analytics-api.ts';
 	import { shareApi } from '#lib/services/share-api.ts';
+	import { pendingInvitations } from '#lib/utils/share-helpers.ts';
 	import type {
 		AnalyticsQueryResponse,
 		DistanceUnit,
@@ -85,7 +86,7 @@
 	let policies = $state<InsurancePolicy[]>([]);
 	let invitations = $state<ReceivedShare[]>([]);
 	let invitationsError = $state<string | null>(null);
-	let pendingInvitations = $derived(invitations.filter(share => share.status === 'pending'));
+	let waitingInvitations = $derived(pendingInvitations(invitations));
 	let recurringCost = $state<RecurringCostSummary>({ count: 0, monthlyTotal: 0 });
 	let runningByMonth = $state<AnalyticsQueryResponse | null>(null);
 	let trendFailed = $state(false);
@@ -316,7 +317,7 @@
 
 {#snippet invitationsCard()}
 	<SharedWithMeCard
-		pending={pendingInvitations}
+		invitations={waitingInvitations}
 		loadError={invitationsError}
 		onRetry={retryInvitations}
 		onAccepted={loadDashboardData}
@@ -406,7 +407,7 @@
 	{#if attention.length > 0}
 		<NeedsAttentionCard items={attention} showAll />
 	{/if}
-	{#if invitationsError || pendingInvitations.length > 0}
+	{#if invitationsError || waitingInvitations.length > 0}
 		{@render invitationsCard()}
 	{/if}
 {/snippet}
