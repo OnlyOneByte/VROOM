@@ -20,6 +20,7 @@
 	import Button from '#lib/components/ui/button/button.svelte';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
 	import Input from '#lib/components/ui/input/input.svelte';
+	import MoneyInput from '#lib/components/common/MoneyInput.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
@@ -49,8 +50,6 @@
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { getDistanceUnitLabel, getLongFormLabel } from '#lib/utils/units.ts';
 	import {
-		amountPlaceholder,
-		amountStep,
 		dateOnlyToISO,
 		formatNumber,
 		fromMinor,
@@ -893,12 +892,8 @@
 
 						<div class="space-y-2">
 							<Label for="purchasePrice">{@render optional('Purchase price')}</Label>
-							<Input
+							<MoneyInput
 								id="purchasePrice"
-								type="number"
-								min="0"
-								step={amountStep()}
-								placeholder={amountPlaceholder()}
 								bind:value={vehicleForm.purchasePrice}
 								aria-invalid={!!errors['purchasePrice']}
 								aria-describedby={errors['purchasePrice'] ? 'purchasePrice-error' : undefined}

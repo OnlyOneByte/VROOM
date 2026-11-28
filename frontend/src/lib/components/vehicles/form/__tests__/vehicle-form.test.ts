@@ -1065,14 +1065,15 @@ describe('VehicleForm purchase price follows the currency', () => {
 	});
 
 	test.each([
-		['JPY', '1', '0'],
-		['USD', '0.01', '0.00']
-	])('a %s user steps the price by %s with placeholder %s', async (unit, step, placeholder) => {
+		['JPY', '1', '¥'],
+		['USD', '0.01', '$']
+	])('a %s user steps the price by %s, with %s in the box', async (unit, step, symbol) => {
 		vi.spyOn(settingsStore, 'settings', 'get').mockReturnValue({
 			currencyUnit: unit
 		} as UserSettings);
 		await renderCreate();
 		expect(input('purchasePrice')).toHaveAttribute('step', step);
-		expect(input('purchasePrice')).toHaveAttribute('placeholder', placeholder);
+		expect(input('purchasePrice')).not.toHaveAttribute('placeholder');
+		expect(input('purchasePrice').parentElement?.textContent?.trim()).toBe(symbol);
 	});
 });

@@ -193,6 +193,9 @@ describe('FinancingFormSection ownership', () => {
 });
 
 describe('FinancingFormSection amount inputs follow the currency', () => {
+	const currencyPrefix = (id: string) =>
+		document.getElementById(id)?.parentElement?.querySelector('[aria-hidden="true"]')
+			?.textContent?.trim();
 	const amountIds = ['originalAmount', 'paymentAmount', 'residualValue', 'excessMileageFee'];
 
 	test('a JPY user steps money in whole yen, while APR keeps its decimals', () => {
@@ -202,9 +205,7 @@ describe('FinancingFormSection amount inputs follow the currency', () => {
 			expect(document.getElementById(id)?.getAttribute('step')).toBe('1');
 		}
 		expect(document.getElementById('paymentAmount')?.getAttribute('min')).toBe('1');
-		expect(document.getElementById('originalAmount')?.getAttribute('placeholder')).toBe('0');
-		expect(document.getElementById('paymentAmount')?.getAttribute('placeholder')).toBe('0');
-		expect(document.getElementById('excessMileageFee')?.getAttribute('placeholder')).toBe('0');
+		expect(currencyPrefix('originalAmount')).toBe('¥');
 		cleanup();
 		mount({ ownershipType: 'finance' });
 		expect(document.getElementById('apr')?.getAttribute('step')).toBe('0.01');
@@ -216,8 +217,15 @@ describe('FinancingFormSection amount inputs follow the currency', () => {
 			expect(document.getElementById(id)?.getAttribute('step')).toBe('0.01');
 		}
 		expect(document.getElementById('paymentAmount')?.getAttribute('min')).toBe('0.01');
-		expect(document.getElementById('paymentAmount')?.getAttribute('placeholder')).toBe('0.00');
-		expect(document.getElementById('excessMileageFee')?.getAttribute('placeholder')).toBe('0.00');
+	});
+
+	test('each amount shows the currency symbol in the box, and no placeholder figure', () => {
+		mount({ ownershipType: 'lease' });
+		for (const id of amountIds) {
+			expect(currencyPrefix(id)).toBe('$');
+			expect(document.getElementById(id)).not.toHaveAttribute('placeholder');
+			expect(document.getElementById(id)).toHaveAttribute('inputmode', 'decimal');
+		}
 	});
 });
 
