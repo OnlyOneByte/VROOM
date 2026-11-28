@@ -34,6 +34,7 @@ import { createErrorResponse, NotFoundError } from './errors';
 import { activityTracker, bodyLimit, errorHandler, optionalAuth, rateLimiter } from './middleware';
 import { routeGuard } from './permissions/route-guard';
 import { getClientRateKey } from './utils/client-ip';
+import { redactRequestLine } from './utils/log-redaction';
 import { logger } from './utils/logger';
 
 const app = new Hono();
@@ -130,7 +131,7 @@ app.use(
 
 app.use(
   '*',
-  honoLogger((line, ...rest) => console.log(redactFeedTokens(line), ...rest))
+  honoLogger((line, ...rest) => console.log(redactRequestLine(line), ...rest))
 );
 
 if (CONFIG.env === 'development') {
