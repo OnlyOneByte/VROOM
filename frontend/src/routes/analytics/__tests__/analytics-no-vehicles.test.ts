@@ -41,7 +41,7 @@ describe('analytics with no vehicles', () => {
 			'/vehicles/new'
 		);
 		expect(screen.queryByRole('tablist')).toBeNull();
-		expect(screen.getByRole('heading', { level: 1, name: 'Analytics' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { level: 1, name: 'Explore' })).toBeInTheDocument();
 		expect(screen.queryByText('Total Vehicles')).toBeNull();
 		expect(container.querySelectorAll('[data-slot="card"]')).toHaveLength(1);
 	});
