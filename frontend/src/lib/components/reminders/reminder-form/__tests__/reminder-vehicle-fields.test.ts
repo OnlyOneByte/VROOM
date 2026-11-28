@@ -4,6 +4,7 @@ import { cleanup, render, screen } from '@testing-library/svelte';
 import ReminderVehicleFields from '../ReminderVehicleFields.svelte';
 import { ReminderFormState } from '../reminder-form-state.svelte';
 import { makeVehicle } from './reminder-form-fixtures.ts';
+import { focusFirstProblem } from '#lib/utils/focus.ts';
 
 afterEach(() => cleanup());
 
@@ -34,6 +35,24 @@ describe('ReminderVehicleFields', () => {
 		for (const box of screen.getAllByRole('checkbox')) {
 			expect(box.getAttribute('aria-invalid')).toBe('true');
 		}
+	});
+
+	test('a split error describes the split group, which then takes the focus', async () => {
+		const vehicles = [makeVehicle('v1'), makeVehicle('v2')];
+		const form = new ReminderFormState();
+		form.load(null, vehicles);
+		form.values.kind = 'expense';
+		form.values.expenseAmount = '10';
+		form.toggleVehicle('v1');
+		form.toggleVehicle('v2');
+		const { container } = render(ReminderVehicleFields, { props: { form, vehicles } });
+		form.errors = { split: 'Percentages must add up to 100%' };
+		await tick();
+
+		const group = screen.getByRole('group', { name: 'Split across vehicles' });
+		expect(group).toHaveAccessibleDescription('Percentages must add up to 100%');
+		await focusFirstProblem(container);
+		expect(document.activeElement).toBe(group);
 	});
 
 	test('the even split preview lists vehicles in the order they were ticked, as the saved split does', async () => {

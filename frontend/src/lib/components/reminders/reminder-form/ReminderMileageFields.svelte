@@ -28,12 +28,15 @@
 				placeholder="5000"
 				class="pr-10"
 				aria-invalid={!!form.errors['intervalMileage']}
+				aria-describedby={form.errors['intervalMileage']
+					? 'reminder-intervalMileage-error'
+					: undefined}
 			/>
 			<div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
 				<span class="text-muted-foreground text-sm">{unitLabel}</span>
 			</div>
 		</div>
-		{#if form.errors['intervalMileage']}<FormFieldError>
+		{#if form.errors['intervalMileage']}<FormFieldError id="reminder-intervalMileage-error">
 				{form.errors['intervalMileage']}
 			</FormFieldError>{/if}
 	</div>
@@ -48,12 +51,15 @@
 				placeholder="current"
 				class="pr-10"
 				aria-invalid={!!form.errors['lastServiceOdometer']}
+				aria-describedby={form.errors['lastServiceOdometer']
+					? 'reminder-lastServiceOdometer-error'
+					: undefined}
 			/>
 			<div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
 				<span class="text-muted-foreground text-sm">{unitLabel}</span>
 			</div>
 		</div>
-		{#if form.errors['lastServiceOdometer']}<FormFieldError>
+		{#if form.errors['lastServiceOdometer']}<FormFieldError id="reminder-lastServiceOdometer-error">
 				{form.errors['lastServiceOdometer']}
 			</FormFieldError>{/if}
 	</div>

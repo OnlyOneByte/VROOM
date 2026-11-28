@@ -1,6 +1,6 @@
 <script lang="ts">
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { Bell, BellRing, RefreshCw, Car, Plus, Check } from '@lucide/svelte';
 	import { reminderApi } from '#lib/services/reminder-api.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
@@ -8,6 +8,7 @@
 	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { isReminderTimeDue } from '#lib/utils/reminder-helpers.ts';
+	import { focusLeftOn } from '#lib/utils/focus.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
@@ -78,24 +79,43 @@
 	let upcomingReminders = $derived(reminders.filter(r => r.reminder.isActive && !isDue(r)));
 	let inactiveReminders = $derived(reminders.filter(r => !r.reminder.isActive));
 
+	async function fetchAll() {
+		const [reminderList, vehicleList, notificationList] = await Promise.all([
+			reminderApi.list(),
+			vehicleApi.getVehicles(),
+			reminderApi.getNotifications()
+		]);
+		reminders = reminderList;
+		vehicles = vehicleList;
+		notifications = notificationList;
+	}
+
 	async function load() {
 		isLoading = true;
 		loadError = null;
 		try {
-			const [reminderList, vehicleList, notificationList] = await Promise.all([
-				reminderApi.list(),
-				vehicleApi.getVehicles(),
-				reminderApi.getNotifications()
-			]);
-			reminders = reminderList;
-			vehicles = vehicleList;
-			notifications = notificationList;
+			await fetchAll();
 		} catch (error) {
 			if (import.meta.env.DEV) console.error('Failed to load reminders:', error);
 			loadError = userFacingErrorMessage(error);
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	let newReminderButton = $state<HTMLElement | null>(null);
+
+	async function afterSave() {
+		const created = editingReminder === null;
+		try {
+			await fetchAll();
+		} catch {
+			await load();
+			return;
+		}
+		if (!created) return;
+		await tick();
+		if (focusLeftOn(newReminderButton)) newReminderButton?.focus();
 	}
 
 	async function runDueReminders() {
@@ -228,7 +248,7 @@
 				</Button>
 			{/if}
 			{#if !isLoading && !loadError && reminders.length > 0 && vehicles.length > 0}
-				<Button size="lg" onclick={openCreate}>
+				<Button size="lg" bind:ref={newReminderButton} onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
 					New reminder
 				</Button>
@@ -408,7 +428,7 @@
 			</Card.Content>
 		</Card.Root>
 	{/if}
-	<ReminderForm bind:open={formOpen} reminder={editingReminder} {vehicles} onSaved={load} />
+	<ReminderForm bind:open={formOpen} reminder={editingReminder} {vehicles} onSaved={afterSave} />
 
 	<MaterializedExpensesDialog
 		bind:open={materializedOpen}

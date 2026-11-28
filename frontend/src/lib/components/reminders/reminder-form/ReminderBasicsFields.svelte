@@ -39,8 +39,11 @@
 			? 'e.g. Car insurance premium'
 			: 'e.g. Rotate tires'}
 		aria-invalid={!!form.errors['name']}
+		aria-describedby={form.errors['name'] ? 'reminder-name-error' : undefined}
 	/>
-	{#if form.errors['name']}<FormFieldError>{form.errors['name']}</FormFieldError>{/if}
+	{#if form.errors['name']}<FormFieldError id="reminder-name-error">
+			{form.errors['name']}
+		</FormFieldError>{/if}
 </div>
 
 <div class="space-y-2">

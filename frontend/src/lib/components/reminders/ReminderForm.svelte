@@ -10,6 +10,7 @@
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import DemoSaveNote, { DEMO_SAVE_NOTE_ID } from '#lib/components/common/demo-save-note.svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
+	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import type { ReminderWithVehicles, Vehicle } from '#lib/types/index.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { ReminderFormState } from './reminder-form/reminder-form-state.svelte';
@@ -33,6 +34,7 @@
 	let { open = $bindable(), reminder = null, vehicles, onSaved }: Props = $props();
 
 	const form = new ReminderFormState();
+	let formEl = $state<HTMLFormElement | null>(null);
 	let isEdit = $derived(!!reminder);
 	const demo = $derived(authStore.user?.demo === true);
 
@@ -48,7 +50,11 @@
 	});
 
 	async function handleSubmit() {
-		if (demo || !form.validate()) return;
+		if (demo) return;
+		if (!form.validate()) {
+			await focusFirstProblem(formEl);
+			return;
+		}
 		form.isSubmitting = true;
 		try {
 			const payload = form.toPayload();
@@ -65,7 +71,10 @@
 			if (import.meta.env.DEV) console.error('Failed to save reminder:', error);
 			const fieldErrors = serverFieldErrors(error);
 			const hasFieldErrors = Object.keys(fieldErrors).length > 0;
-			if (hasFieldErrors) form.errors = fieldErrors;
+			if (hasFieldErrors) {
+				form.errors = fieldErrors;
+				void focusFirstProblem(formEl);
+			}
 			appStore.addNotification({
 				type: 'error',
 				message: hasFieldErrors
@@ -90,6 +99,7 @@
 		</Dialog.Header>
 
 		<form
+			bind:this={formEl}
 			onsubmit={e => {
 				e.preventDefault();
 				handleSubmit();
