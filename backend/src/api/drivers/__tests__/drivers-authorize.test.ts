@@ -9,7 +9,13 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
-import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
+import {
+  type Members,
+  memberDriverId,
+  overrideOn,
+  seedCar,
+  seedMembers,
+} from '../../../test-helpers/members';
 
 let ctx: TestApp;
 let m: Members;
@@ -20,7 +26,8 @@ const sharing = `/api/v1/vehicles/${CAR}/car-share`;
 
 interface Driver {
   id: string;
-  userId: string | null;
+  userId?: string;
+  guest: boolean;
   name: string;
   color: string | null;
   archived: boolean;
@@ -43,7 +50,10 @@ async function listDrivers(request: RequestFn = ctx.authed): Promise<Driver[]> {
   return (await json<DataEnvelope<Driver[]>>(res)).data;
 }
 
-const driverOf = (list: Driver[], userId: string) => list.find((d) => d.userId === userId);
+async function driverOf(list: Driver[], userId: string, car = CAR): Promise<Driver | undefined> {
+  const id = await memberDriverId(ctx, car, userId);
+  return list.find((d) => d.id === id);
+}
 
 const trip = (extra: Record<string, unknown> = {}) => ({
   vehicleId: CAR,
@@ -64,10 +74,33 @@ describe('turning car sharing on and managing drivers', () => {
 
     const list = await listDrivers();
     for (const userId of [ctx.user.id, m.coOwner.id, m.editor.id, m.viewer.id]) {
-      expect(driverOf(list, userId)?.archived).toBe(false);
+      expect((await driverOf(list, userId))?.archived).toBe(false);
     }
     expect(await status(m.editor.request, 'GET', drivers)).toBe(200);
     expect(await status(m.viewer.request, 'GET', drivers)).toBe(403);
+  });
+
+  test('each member gets driver rows that mark guests and name only their own account', async () => {
+    const turnedOn = await m.coOwner.request('PUT', sharing, { enabled: true });
+    const shared = (await json<DataEnvelope<{ drivers: Driver[] }>>(turnedOn)).data.drivers;
+    await m.coOwner.request('POST', drivers, { name: 'Riley' });
+    const accounts = [ctx.user.id, m.coOwner.id, m.editor.id, m.viewer.id];
+    const callers = [
+      { me: m.coOwner.id, rows: shared },
+      { me: m.coOwner.id, rows: await listDrivers(m.coOwner.request) },
+      { me: m.editor.id, rows: await listDrivers(m.editor.request) },
+      { me: ctx.user.id, rows: await listDrivers() },
+    ];
+    for (const { me, rows } of callers) {
+      const own = await driverOf(rows, me);
+      expect(own?.userId).toBe(me);
+      expect(rows.filter((d) => d.userId !== undefined)).toEqual([own as Driver]);
+      const text = JSON.stringify(rows.filter((d) => d !== own));
+      for (const id of accounts) expect(text.includes(id)).toBe(false);
+      expect(rows.filter((d) => d.guest).map((d) => d.name)).toEqual(
+        rows === shared ? [] : ['Riley']
+      );
+    }
   });
 
   test('guests can be added, renamed, recoloured and archived; members keep their own name', async () => {
@@ -76,14 +109,15 @@ describe('turning car sharing on and managing drivers', () => {
     const added = await m.coOwner.request('POST', drivers, { name: 'Riley', color: 'chart-3' });
     expect(added.status).toBe(201);
     const guest = (await json<DataEnvelope<Driver>>(added)).data;
-    expect(guest).toMatchObject({ userId: null, name: 'Riley', color: 'chart-3' });
+    expect(guest).toMatchObject({ guest: true, name: 'Riley', color: 'chart-3' });
+    expect(guest.userId).toBeUndefined();
 
     expect(await status(ctx.authed, 'PATCH', `${drivers}/${guest.id}`, { name: 'Ri' })).toBe(200);
     expect(await status(ctx.authed, 'PATCH', `${drivers}/${guest.id}`, { color: 'red' })).toBe(400);
     expect(await status(ctx.authed, 'PATCH', `${drivers}/${guest.id}`, { archived: true })).toBe(
       200
     );
-    const member = driverOf(await listDrivers(), m.editor.id);
+    const member = await driverOf(await listDrivers(), m.editor.id);
     expect(await status(ctx.authed, 'PATCH', `${drivers}/${member?.id}`, { name: 'X' })).toBe(400);
     expect(
       await status(ctx.authed, 'PATCH', `${drivers}/${member?.id}`, { color: 'chart-5' })
@@ -94,12 +128,12 @@ describe('turning car sharing on and managing drivers', () => {
     await ctx.authed('PUT', sharing, { enabled: true });
     const newcomer = await createInvitee(ctx, 'dr-newcomer');
     await newcomer.acceptShare(CAR, 'editor');
-    expect(driverOf(await listDrivers(), newcomer.id)?.archived).toBe(false);
+    expect((await driverOf(await listDrivers(), newcomer.id))?.archived).toBe(false);
     const share = (await ctx.sql.get('SELECT id FROM vehicle_shares WHERE shared_with_id = ?', [
       newcomer.id,
     ])) as { id: string };
     expect(await status(newcomer.request, 'POST', `/api/v1/shares/${share.id}/decline`)).toBe(200);
-    expect(driverOf(await listDrivers(), newcomer.id)?.archived).toBe(true);
+    expect((await driverOf(await listDrivers(), newcomer.id))?.archived).toBe(true);
   });
 });
 
@@ -107,8 +141,8 @@ describe('recording who drove or paid', () => {
   test('an entry defaults to the person logging it, and recording someone else needs driver.record', async () => {
     await ctx.authed('PUT', sharing, { enabled: true });
     const list = await listDrivers();
-    const editorDriver = driverOf(list, m.editor.id);
-    const coOwnerDriver = driverOf(list, m.coOwner.id);
+    const editorDriver = await driverOf(list, m.editor.id);
+    const coOwnerDriver = await driverOf(list, m.coOwner.id);
 
     const mine = await m.editor.request('POST', '/api/v1/trips', trip());
     expect(mine.status).toBe(201);
@@ -152,7 +186,7 @@ describe('recording who drove or paid', () => {
 
   test('the payer is recorded on expenses and cleared when the expense moves to another car', async () => {
     await ctx.authed('PUT', sharing, { enabled: true });
-    const own = driverOf(await listDrivers(), ctx.user.id);
+    const own = await driverOf(await listDrivers(), ctx.user.id);
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId: CAR,
       category: 'maintenance',
@@ -190,7 +224,7 @@ describe('recording who drove or paid', () => {
       date: '2024-06-01T00:00:00.000Z',
     });
     const { groupId } = (await json<DataEnvelope<{ groupId: string }>>(res)).data;
-    const own = driverOf(await listDrivers(), ctx.user.id);
+    const own = await driverOf(await listDrivers(), ctx.user.id);
     await ctx.sql.run('UPDATE expenses SET paid_by_driver_id = ? WHERE group_id = ?', [
       own?.id ?? null,
       groupId,
@@ -208,7 +242,7 @@ describe('recording who drove or paid', () => {
   test("moving an expense to another car can't clear someone else's payer without driver.record", async () => {
     await ctx.authed('PUT', sharing, { enabled: true });
     await seedCarShared();
-    const own = driverOf(await listDrivers(), ctx.user.id);
+    const own = await driverOf(await listDrivers(), ctx.user.id);
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId: CAR,
       category: 'maintenance',
@@ -235,7 +269,7 @@ describe('recording who drove or paid', () => {
     });
     const legs = (await json<DataEnvelope<{ siblings: Record<string, unknown>[] }>>(res)).data
       .siblings;
-    const own = driverOf(await listDrivers(), ctx.user.id);
+    const own = await driverOf(await listDrivers(), ctx.user.id);
     expect(legs.find((leg) => leg.vehicleId === CAR)?.paidByDriverId).toBe(own?.id);
     expect(legs.find((leg) => leg.vehicleId === OTHER)?.paidByDriverId).toBeNull();
   });
@@ -243,9 +277,13 @@ describe('recording who drove or paid', () => {
   test("each split leg's payer is the logger's driver on that leg's car", async () => {
     await ctx.authed('PUT', sharing, { enabled: true });
     await ctx.authed('PUT', `/api/v1/vehicles/${OTHER}/car-share`, { enabled: true });
-    const own = driverOf(await listDrivers(), ctx.user.id);
+    const own = await driverOf(await listDrivers(), ctx.user.id);
     const otherRes = await ctx.authed('GET', `/api/v1/vehicles/${OTHER}/drivers`);
-    const otherOwn = driverOf((await json<DataEnvelope<Driver[]>>(otherRes)).data, ctx.user.id);
+    const otherOwn = await driverOf(
+      (await json<DataEnvelope<Driver[]>>(otherRes)).data,
+      ctx.user.id,
+      OTHER
+    );
     expect(own?.id).toBeDefined();
     expect(otherOwn?.id).toBeDefined();
     expect(otherOwn?.id).not.toBe(own?.id);

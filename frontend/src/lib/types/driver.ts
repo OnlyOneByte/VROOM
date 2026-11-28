@@ -1,6 +1,7 @@
 export interface Driver {
 	id: string;
-	userId: string | null;
+	userId?: string;
+	guest: boolean;
 	name: string;
 	color: string | null;
 	archived: boolean;

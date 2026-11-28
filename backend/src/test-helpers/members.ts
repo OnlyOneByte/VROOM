@@ -79,3 +79,15 @@ export async function seedMembers(
   await ctx.sql.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [members.disabled.id]);
   return members;
 }
+
+export async function memberDriverId(
+  ctx: TestApp,
+  vehicleId: string,
+  userId: string
+): Promise<string | undefined> {
+  const row = (await ctx.sql.get(
+    'SELECT id FROM vehicle_drivers WHERE vehicle_id = ? AND user_id = ?',
+    [vehicleId, userId]
+  )) as { id: string } | undefined;
+  return row?.id;
+}
