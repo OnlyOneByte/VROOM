@@ -21,13 +21,12 @@ interface PolicyBody {
   terms: Array<{ id: string }>;
 }
 
-function premiumRows(termId: string): Array<{ id: string; expense_amount: number }> {
-  return ctx.sqlite
-    .query(
-      `SELECT id, expense_amount FROM expenses
-        WHERE source_type = 'insurance_term' AND source_id = ?`
-    )
-    .all(termId) as Array<{ id: string; expense_amount: number }>;
+async function premiumRows(termId: string): Promise<Array<{ id: string; expense_amount: number }>> {
+  return (await ctx.sql.all(
+    `SELECT id, expense_amount FROM expenses
+        WHERE source_type = 'insurance_term' AND source_id = ?`,
+    [termId]
+  )) as Array<{ id: string; expense_amount: number }>;
 }
 
 async function seedCostedTerm(): Promise<{ policyId: string; termId: string }> {
@@ -47,24 +46,25 @@ async function seedCostedTerm(): Promise<{ policyId: string; termId: string }> {
   expect(res.status, JSON.stringify(body)).toBeLessThan(300);
   const termId = body.data.terms[0]?.id;
   expect(termId, 'the seeded policy must have a term').toBeTruthy();
-  expect(premiumRows(termId as string).length, 'the costed term must materialize a premium').toBe(
-    1
-  );
+  expect(
+    (await premiumRows(termId as string)).length,
+    'the costed term must materialize a premium'
+  ).toBe(1);
   return { policyId: body.data.id, termId: termId as string };
 }
 
-function attachReceipt(termId: string): void {
-  const premium = premiumRows(termId)[0]?.id ?? '';
-  ctx.sqlite.run(
+async function attachReceipt(termId: string): Promise<void> {
+  const premium = (await premiumRows(termId))[0]?.id ?? '';
+  await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
      VALUES ('premium-receipt', ?, 'expense', ?, 'r.jpg', 'image/jpeg', 1)`,
     [ctx.user.id, premium]
   );
 }
 
-const receiptCount = () =>
+const receiptCount = async () =>
   (
-    ctx.sqlite.query("SELECT COUNT(*) AS n FROM photos WHERE id = 'premium-receipt'").get() as {
+    (await ctx.sql.get("SELECT COUNT(*) AS n FROM photos WHERE id = 'premium-receipt'")) as {
       n: number;
     }
   ).n;
@@ -72,7 +72,7 @@ const receiptCount = () =>
 describe('insurance term update premium recreate failure', () => {
   test('reports the failure instead of answering 200', async () => {
     const { policyId, termId } = await seedCostedTerm();
-    attachReceipt(termId);
+    await attachReceipt(termId);
     const spy = spyOn(repos().expenses, 'createSplitExpense').mockImplementation(() => {
       throw new Error('forced recreate failure');
     });
@@ -83,13 +83,13 @@ describe('insurance term update premium recreate failure', () => {
       });
       const body = await json<{ success: boolean; error?: { message: string } }>(res);
 
-      const rows = premiumRows(termId);
+      const rows = await premiumRows(termId);
       expect(rows.length, 'the old premium row is kept when the recreate fails').toBe(1);
       expect(rows[0]?.expense_amount).toBe(120_000);
       expect(res.status, JSON.stringify(body)).toBe(500);
       expect(body.success).toBe(false);
       expect(body.error?.message).toContain('premium expense could not be updated');
-      expect(receiptCount(), 'the kept premium keeps its photo').toBe(1);
+      expect(await receiptCount(), 'the kept premium keeps its photo').toBe(1);
     } finally {
       spy.mockRestore();
     }
@@ -102,14 +102,14 @@ describe('insurance term update premium recreate failure', () => {
       totalCost: 1500,
     });
     expect(res.status).toBe(200);
-    const rows = premiumRows(termId);
+    const rows = await premiumRows(termId);
     expect(rows.length).toBe(1);
     expect(rows[0]?.expense_amount).toBe(150_000);
   });
 
   test('a currency change during the update keeps the old premium and its photo', async () => {
     const { policyId, termId } = await seedCostedTerm();
-    attachReceipt(termId);
+    await attachReceipt(termId);
     const preferences = repos().preferences;
     const read = preferences.moneyScale.bind(preferences);
     let calls = 0;
@@ -125,11 +125,11 @@ describe('insurance term update premium recreate failure', () => {
     } finally {
       spy.mockRestore();
     }
-    const saved = ctx.sqlite
-      .query('SELECT total_cost AS t FROM insurance_terms WHERE id = ?')
-      .get(termId) as { t: number };
+    const saved = (await ctx.sql.get('SELECT total_cost AS t FROM insurance_terms WHERE id = ?', [
+      termId,
+    ])) as { t: number };
     expect(saved.t, 'the term itself was saved before the premium step').toBe(150_000);
-    expect(premiumRows(termId).map((r) => r.expense_amount)).toEqual([120_000]);
-    expect(receiptCount()).toBe(1);
+    expect((await premiumRows(termId)).map((r) => r.expense_amount)).toEqual([120_000]);
+    expect(await receiptCount()).toBe(1);
   });
 });

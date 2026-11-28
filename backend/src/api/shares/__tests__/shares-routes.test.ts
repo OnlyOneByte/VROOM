@@ -51,7 +51,7 @@ describe('POST /api/v1/shares: owner invites an existing user', () => {
     expect(res.status, JSON.stringify(body)).toBe(201);
     expect(body.data.sharedWithId).toBeNull();
     expect(
-      ctx.sqlite.query('SELECT shared_with_id FROM vehicle_shares WHERE id = ?').get(body.data.id)
+      await ctx.sql.get('SELECT shared_with_id FROM vehicle_shares WHERE id = ?', [body.data.id])
     ).toEqual({ shared_with_id: bId });
     expect(body.data.ownerId).toBe(ctx.user.id);
     expect(body.data.level).toBe('viewer');
@@ -129,7 +129,7 @@ describe('PUT and DELETE /api/v1/shares/:id', () => {
 
     expect(res.status).toBe(409);
     expect(
-      ctx.sqlite.query('SELECT level FROM vehicle_shares WHERE id = ?').get(created.data.id)
+      await ctx.sql.get('SELECT level FROM vehicle_shares WHERE id = ?', [created.data.id])
     ).toEqual({ level: 'viewer' });
   });
 

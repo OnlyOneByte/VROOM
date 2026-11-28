@@ -61,26 +61,27 @@ const trip = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-const column = (table: string, field: string, id: string) =>
-  (ctx.sqlite.query(`SELECT ${field} AS v FROM ${table} WHERE id = ?`).get(id) as { v: unknown }).v;
+const column = async (table: string, field: string, id: string) =>
+  ((await ctx.sql.get(`SELECT ${field} AS v FROM ${table} WHERE id = ?`, [id])) as { v: unknown })
+    .v;
 
 describe('changing the driver on an existing entry', () => {
   test('a trip can be re-credited and cleared, and the reading it creates carries the driver', async () => {
     const guest = await addGuest();
     const id = await created(m.editor.request, '/api/v1/trips', trip({ driverId: guest }));
     expect(
-      ctx.sqlite.query('SELECT driver_id FROM odometer_entries WHERE vehicle_id = ?').get(CAR)
+      await ctx.sql.get('SELECT driver_id FROM odometer_entries WHERE vehicle_id = ?', [CAR])
     ).toEqual({ driver_id: guest });
 
     const editorDriver = await driverOf(m.editor.id);
     expect(
       await status(m.editor.request, 'PUT', `/api/v1/trips/${id}`, { driverId: editorDriver })
     ).toBe(200);
-    expect(column('trips', 'driver_id', id)).toBe(editorDriver);
+    expect(await column('trips', 'driver_id', id)).toBe(editorDriver);
     expect(await status(m.editor.request, 'PUT', `/api/v1/trips/${id}`, { driverId: null })).toBe(
       200
     );
-    expect(column('trips', 'driver_id', id)).toBeNull();
+    expect(await column('trips', 'driver_id', id)).toBeNull();
   });
 
   test("without driver.record, someone else's reading can't be re-credited", async () => {
@@ -98,7 +99,7 @@ describe('changing the driver on an existing entry', () => {
     expect(await status(m.editor.request, 'PUT', `/api/v1/odometer/${id}`, { note: 'ok' })).toBe(
       200
     );
-    expect(column('odometer_entries', 'driver_id', id)).toBe(coOwnerDriver);
+    expect(await column('odometer_entries', 'driver_id', id)).toBe(coOwnerDriver);
   });
 
   test.each([
@@ -115,7 +116,7 @@ describe('changing the driver on an existing entry', () => {
       'paidByDriverId',
     ],
   ])("a new %s can't name another car's driver", async (_kind, path, body, field) => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO vehicle_drivers (id, vehicle_id, name) VALUES ('elsewhere', ?, 'X')",
       [OTHER]
     );
@@ -135,14 +136,14 @@ describe('drivers while car sharing is off, and members who come back', () => {
     const newcomer = await createInvitee(ctx, 'de-newcomer');
     await newcomer.acceptShare(CAR, 'editor');
     const before = await driverOf(newcomer.id);
-    const share = ctx.sqlite
-      .query('SELECT id FROM vehicle_shares WHERE shared_with_id = ?')
-      .get(newcomer.id) as { id: string };
+    const share = (await ctx.sql.get('SELECT id FROM vehicle_shares WHERE shared_with_id = ?', [
+      newcomer.id,
+    ])) as { id: string };
     expect(await status(ctx.authed, 'DELETE', `/api/v1/shares/${share.id}`)).toBe(200);
-    expect(column('vehicle_drivers', 'archived_at', before)).not.toBeNull();
+    expect(await column('vehicle_drivers', 'archived_at', before)).not.toBeNull();
 
     await newcomer.acceptShare(CAR, 'editor');
     expect(await driverOf(newcomer.id)).toBe(before);
-    expect(column('vehicle_drivers', 'archived_at', before)).toBeNull();
+    expect(await column('vehicle_drivers', 'archived_at', before)).toBeNull();
   });
 });

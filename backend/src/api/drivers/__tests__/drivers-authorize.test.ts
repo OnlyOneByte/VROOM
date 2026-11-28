@@ -95,9 +95,9 @@ describe('turning car sharing on and managing drivers', () => {
     const newcomer = await createInvitee(ctx, 'dr-newcomer');
     await newcomer.acceptShare(CAR, 'editor');
     expect(driverOf(await listDrivers(), newcomer.id)?.archived).toBe(false);
-    const share = ctx.sqlite
-      .query('SELECT id FROM vehicle_shares WHERE shared_with_id = ?')
-      .get(newcomer.id) as { id: string };
+    const share = (await ctx.sql.get('SELECT id FROM vehicle_shares WHERE shared_with_id = ?', [
+      newcomer.id,
+    ])) as { id: string };
     expect(await status(newcomer.request, 'POST', `/api/v1/shares/${share.id}/decline`)).toBe(200);
     expect(driverOf(await listDrivers(), newcomer.id)?.archived).toBe(true);
   });
@@ -134,7 +134,7 @@ describe('recording who drove or paid', () => {
   test('a driver must be active and drive this car, and car sharing must be on', async () => {
     expect(await status(ctx.authed, 'POST', '/api/v1/trips', trip({ driverId: 'nope' }))).toBe(400);
     await ctx.authed('PUT', sharing, { enabled: true });
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO vehicle_drivers (id, vehicle_id, name) VALUES ('elsewhere', ?, 'X')",
       [OTHER]
     );
@@ -164,7 +164,7 @@ describe('recording who drove or paid', () => {
     expect(expense.paidByDriverId).toBe(own?.id);
     await ctx.authed('PUT', `/api/v1/expenses/${expense.id}`, { vehicleId: OTHER });
     expect(
-      ctx.sqlite.query('SELECT paid_by_driver_id FROM expenses WHERE id = ?').get(expense.id)
+      await ctx.sql.get('SELECT paid_by_driver_id FROM expenses WHERE id = ?', [expense.id])
     ).toEqual({ paid_by_driver_id: null });
   });
 
@@ -191,7 +191,7 @@ describe('recording who drove or paid', () => {
     });
     const { groupId } = (await json<DataEnvelope<{ groupId: string }>>(res)).data;
     const own = driverOf(await listDrivers(), ctx.user.id);
-    ctx.sqlite.run('UPDATE expenses SET paid_by_driver_id = ? WHERE group_id = ?', [
+    await ctx.sql.run('UPDATE expenses SET paid_by_driver_id = ? WHERE group_id = ?', [
       own?.id ?? null,
       groupId,
     ]);
@@ -207,7 +207,7 @@ describe('recording who drove or paid', () => {
 
   test("moving an expense to another car can't clear someone else's payer without driver.record", async () => {
     await ctx.authed('PUT', sharing, { enabled: true });
-    seedCarShared();
+    await seedCarShared();
     const own = driverOf(await listDrivers(), ctx.user.id);
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId: CAR,
@@ -221,7 +221,7 @@ describe('recording who drove or paid', () => {
       await status(m.editor.request, 'PUT', `/api/v1/expenses/${expense.id}`, { vehicleId: OTHER })
     ).toBe(403);
     expect(
-      ctx.sqlite.query('SELECT paid_by_driver_id FROM expenses WHERE id = ?').get(expense.id)
+      await ctx.sql.get('SELECT paid_by_driver_id FROM expenses WHERE id = ?', [expense.id])
     ).toEqual({ paid_by_driver_id: own?.id });
   });
 
@@ -264,7 +264,7 @@ describe('recording who drove or paid', () => {
 
   test('moving an expense still needs driver.record after car sharing is turned off', async () => {
     await ctx.authed('PUT', sharing, { enabled: true });
-    seedCarShared();
+    await seedCarShared();
     const created = await ctx.authed('POST', '/api/v1/expenses', {
       vehicleId: CAR,
       category: 'maintenance',
@@ -305,12 +305,12 @@ describe('recording who drove or paid', () => {
     expect(await listed(ctx.authed)).toEqual(access(true, true, true));
   });
 
-  function seedCarShared(): void {
-    ctx.sqlite.run(
+  async function seedCarShared(): Promise<void> {
+    await ctx.sql.run(
       "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status) VALUES ('other-share', ?, ?, ?, 'editor', 'accepted')",
       [OTHER, ctx.user.id, m.editor.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES ('other-ra', ?, 'builtin_editor', ?, ?)",
       [m.editor.id, OTHER, ctx.user.id]
     );

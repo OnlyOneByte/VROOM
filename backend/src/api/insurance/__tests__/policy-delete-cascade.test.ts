@@ -15,25 +15,30 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedPhoto(opts: { id: string; entityType: string; entityId: string }): void {
-  ctx.sqlite.run(
+async function seedPhoto(opts: {
+  id: string;
+  entityType: string;
+  entityId: string;
+}): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
      VALUES (?, ?, ?, ?, ?, 'image/jpeg', 1024)`,
     [opts.id, ctx.user.id, opts.entityType, opts.entityId, `${opts.id}.jpg`]
   );
 }
 
-function photoCount(entityType: string, entityId: string): number {
-  const row = ctx.sqlite
-    .query(`SELECT COUNT(*) AS n FROM photos WHERE entity_type = ? AND entity_id = ?`)
-    .get(entityType, entityId) as { n: number };
+async function photoCount(entityType: string, entityId: string): Promise<number> {
+  const row = (await ctx.sql.get(
+    `SELECT COUNT(*) AS n FROM photos WHERE entity_type = ? AND entity_id = ?`,
+    [entityType, entityId]
+  )) as { n: number };
   return row.n;
 }
 
-function insuranceExpenseCount(): number {
-  const row = ctx.sqlite
-    .query(`SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term'`)
-    .get() as { n: number };
+async function insuranceExpenseCount(): Promise<number> {
+  const row = (await ctx.sql.get(
+    `SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term'`
+  )) as { n: number };
   return row.n;
 }
 
@@ -68,20 +73,20 @@ describe('insurance policy deletion cascade', () => {
     const vehicleId = await seedVehicle(ctx);
     const { policyId, claimId } = await seedPolicyWithClaim(vehicleId);
 
-    seedPhoto({ id: 'pol-doc', entityType: 'insurance_policy', entityId: policyId });
-    seedPhoto({ id: 'claim-doc', entityType: 'insurance_claim', entityId: claimId });
-    expect(photoCount('insurance_policy', policyId)).toBe(1);
-    expect(photoCount('insurance_claim', claimId)).toBe(1);
+    await seedPhoto({ id: 'pol-doc', entityType: 'insurance_policy', entityId: policyId });
+    await seedPhoto({ id: 'claim-doc', entityType: 'insurance_claim', entityId: claimId });
+    expect(await photoCount('insurance_policy', policyId)).toBe(1);
+    expect(await photoCount('insurance_claim', claimId)).toBe(1);
 
     const del = await ctx.authed('DELETE', `/api/v1/insurance/${policyId}`);
     expect(del.status, await del.text()).toBe(200);
 
     expect(
-      photoCount('insurance_policy', policyId),
+      await photoCount('insurance_policy', policyId),
       'policy document photo rows should be cleaned up on policy delete'
     ).toBe(0);
     expect(
-      photoCount('insurance_claim', claimId),
+      await photoCount('insurance_claim', claimId),
       'claim document photo rows should be cleaned up on policy delete'
     ).toBe(0);
   });
@@ -89,14 +94,14 @@ describe('insurance policy deletion cascade', () => {
   test('deleting a single claim removes its photo rows', async () => {
     const vehicleId = await seedVehicle(ctx);
     const { policyId, claimId } = await seedPolicyWithClaim(vehicleId);
-    seedPhoto({ id: 'claim-doc-direct', entityType: 'insurance_claim', entityId: claimId });
-    expect(photoCount('insurance_claim', claimId)).toBe(1);
+    await seedPhoto({ id: 'claim-doc-direct', entityType: 'insurance_claim', entityId: claimId });
+    expect(await photoCount('insurance_claim', claimId)).toBe(1);
 
     const del = await ctx.authed('DELETE', `/api/v1/insurance/${policyId}/claims/${claimId}`);
     expect(del.status, await del.text()).toBe(200);
 
     expect(
-      photoCount('insurance_claim', claimId),
+      await photoCount('insurance_claim', claimId),
       'claim photo rows should be cleaned up on direct claim delete'
     ).toBe(0);
   });
@@ -118,13 +123,16 @@ describe('insurance policy deletion cascade', () => {
     expect(pol.status, JSON.stringify(polBody)).toBe(201);
     const policyId = polBody.data.id;
 
-    expect(insuranceExpenseCount(), 'a costed term should auto-create a premium expense').toBe(1);
+    expect(
+      await insuranceExpenseCount(),
+      'a costed term should auto-create a premium expense'
+    ).toBe(1);
 
     const del = await ctx.authed('DELETE', `/api/v1/insurance/${policyId}`);
     expect(del.status, await del.text()).toBe(200);
 
     expect(
-      insuranceExpenseCount(),
+      await insuranceExpenseCount(),
       'premium expense rows should be cleaned up on policy delete'
     ).toBe(0);
   });

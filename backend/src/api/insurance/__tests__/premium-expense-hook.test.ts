@@ -80,12 +80,11 @@ interface InsExpenseRow {
   source_id: string | null;
 }
 
-function autoExpensesForTerm(termId: string): InsExpenseRow[] {
-  return ctx.sqlite
-    .query(
-      'SELECT id, expense_amount, vehicle_id, category, tags, source_type, source_id FROM expenses WHERE source_type = ? AND source_id = ?'
-    )
-    .all('insurance_term', termId) as InsExpenseRow[];
+async function autoExpensesForTerm(termId: string): Promise<InsExpenseRow[]> {
+  return (await ctx.sql.all(
+    'SELECT id, expense_amount, vehicle_id, category, tags, source_type, source_id FROM expenses WHERE source_type = ? AND source_id = ?',
+    ['insurance_term', termId]
+  )) as InsExpenseRow[];
 }
 
 describe('insurance premium → expense hook lifecycle', () => {
@@ -94,7 +93,7 @@ describe('insurance premium → expense hook lifecycle', () => {
     const v2 = await seedVehicle('Toyota');
     const { termId } = await createPolicy([v1, v2], 1200);
 
-    const rows = autoExpensesForTerm(termId);
+    const rows = await autoExpensesForTerm(termId);
     expect(rows).toHaveLength(2);
     const total = rows.reduce((s, r) => s + r.expense_amount, 0);
     expect(total).toBe(120000);
@@ -114,7 +113,7 @@ describe('insurance premium → expense hook lifecycle', () => {
     const v3 = await seedVehicle('Mazda');
     const { termId } = await createPolicy([v1, v2, v3], 100);
 
-    const rows = autoExpensesForTerm(termId);
+    const rows = await autoExpensesForTerm(termId);
     expect(rows).toHaveLength(3);
 
     const totalCents = rows.reduce((s, r) => s + r.expense_amount, 0);
@@ -129,7 +128,7 @@ describe('insurance premium → expense hook lifecycle', () => {
     const v1 = await seedVehicle('Honda');
     const { termId } = await createMonthlyPolicy([v1], 100);
 
-    const rows = autoExpensesForTerm(termId);
+    const rows = await autoExpensesForTerm(termId);
     expect(rows).toHaveLength(1);
     expect(rows[0].expense_amount).toBe(120000);
     expect(rows[0].category).toBe('financial');
@@ -146,7 +145,7 @@ describe('insurance premium → expense hook lifecycle', () => {
       '2026-09-15T12:00:00.000Z'
     );
 
-    const rows = autoExpensesForTerm(termId);
+    const rows = await autoExpensesForTerm(termId);
     expect(rows).toHaveLength(1);
     expect(rows[0].expense_amount).toBe(60000);
   });
@@ -168,7 +167,7 @@ describe('insurance premium → expense hook lifecycle', () => {
     });
     const body = await json<DataEnvelope<PolicyRow>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
-    const rows = autoExpensesForTerm(body.data.terms[0].id);
+    const rows = await autoExpensesForTerm(body.data.terms[0].id);
     expect(rows).toHaveLength(1);
     expect(rows[0].expense_amount).toBe(120000);
   });
@@ -176,7 +175,7 @@ describe('insurance premium → expense hook lifecycle', () => {
   test('updating the term cost regenerates the auto-expenses at the new amount', async () => {
     const v1 = await seedVehicle('Honda');
     const { policyId, termId } = await createPolicy([v1], 1000);
-    const before = autoExpensesForTerm(termId);
+    const before = await autoExpensesForTerm(termId);
     expect(before).toHaveLength(1);
     expect(before[0].expense_amount).toBe(100000);
     const beforeId = before[0].id;
@@ -186,7 +185,7 @@ describe('insurance premium → expense hook lifecycle', () => {
     });
     expect(res.status, await res.text()).toBeLessThan(300);
 
-    const after = autoExpensesForTerm(termId);
+    const after = await autoExpensesForTerm(termId);
     expect(after).toHaveLength(1);
     expect(after[0].expense_amount).toBe(150000);
     expect(after[0].id).not.toBe(beforeId);
@@ -195,25 +194,25 @@ describe('insurance premium → expense hook lifecycle', () => {
   test('updating the term cost to 0 removes the auto-expenses', async () => {
     const v1 = await seedVehicle('Honda');
     const { policyId, termId } = await createPolicy([v1], 800);
-    expect(autoExpensesForTerm(termId)).toHaveLength(1);
+    expect(await autoExpensesForTerm(termId)).toHaveLength(1);
 
     const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       totalCost: 0,
     });
     expect(res.status, await res.text()).toBeLessThan(300);
 
-    expect(autoExpensesForTerm(termId)).toHaveLength(0);
+    expect(await autoExpensesForTerm(termId)).toHaveLength(0);
   });
 
   test('deleting the term removes its auto-expenses', async () => {
     const v1 = await seedVehicle('Honda');
     const { policyId, termId } = await createPolicy([v1], 900);
-    expect(autoExpensesForTerm(termId)).toHaveLength(1);
+    expect(await autoExpensesForTerm(termId)).toHaveLength(1);
 
     const res = await ctx.authed('DELETE', `/api/v1/insurance/${policyId}/terms/${termId}`);
     expect(res.status, await res.text()).toBeLessThan(300);
 
-    expect(autoExpensesForTerm(termId)).toHaveLength(0);
+    expect(await autoExpensesForTerm(termId)).toHaveLength(0);
   });
 });
 
@@ -239,21 +238,24 @@ describe('recalculating monthly premiums that were overcounted', () => {
   const YEAR_START = '2024-01-01T12:00:00.000Z';
   const YEAR_END = '2025-01-01T12:00:00.000Z';
 
-  function writeOvercountedPremium(termId: string, perVehicleCents: number[]): void {
-    const rows = autoExpensesForTerm(termId).sort((a, b) => a.id.localeCompare(b.id));
+  async function writeOvercountedPremium(termId: string, perVehicleCents: number[]): Promise<void> {
+    const rows = (await autoExpensesForTerm(termId)).sort((a, b) => a.id.localeCompare(b.id));
     const groupTotal = perVehicleCents.reduce((sum, cents) => sum + cents, 0);
-    rows.forEach((row, index) => {
-      ctx.sqlite
-        .query('UPDATE expenses SET expense_amount = ?, group_total = ? WHERE id = ?')
-        .run(perVehicleCents[index] ?? 0, groupTotal, row.id);
-    });
+    for (const [index, row] of rows.entries()) {
+      await ctx.sql.run('UPDATE expenses SET expense_amount = ?, group_total = ? WHERE id = ?', [
+        perVehicleCents[index] ?? 0,
+        groupTotal,
+        row.id,
+      ]);
+    }
   }
 
-  function groupIdsForTerm(termId: string): string[] {
+  async function groupIdsForTerm(termId: string): Promise<string[]> {
     return (
-      ctx.sqlite
-        .query('SELECT DISTINCT group_id FROM expenses WHERE source_type = ? AND source_id = ?')
-        .all('insurance_term', termId) as { group_id: string }[]
+      (await ctx.sql.all(
+        'SELECT DISTINCT group_id FROM expenses WHERE source_type = ? AND source_id = ?',
+        ['insurance_term', termId]
+      )) as { group_id: string }[]
     ).map((row) => row.group_id);
   }
 
@@ -261,28 +263,30 @@ describe('recalculating monthly premiums that were overcounted', () => {
     const v1 = await seedVehicle('Honda');
     const v2 = await seedVehicle('Toyota');
     const { termId } = await createMonthlyPolicy([v1, v2], 100, YEAR_START, YEAR_END);
-    const groupBefore = groupIdsForTerm(termId);
-    writeOvercountedPremium(termId, [65000, 65000]);
+    const groupBefore = await groupIdsForTerm(termId);
+    await writeOvercountedPremium(termId, [65000, 65000]);
 
     expect(await recalculateOvercountedMonthlyPremiums()).toBe(1);
 
-    const rows = autoExpensesForTerm(termId);
+    const rows = await autoExpensesForTerm(termId);
     expect(rows).toHaveLength(2);
     expect(rows.map((r) => r.expense_amount)).toEqual([60000, 60000]);
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2]));
-    expect(groupIdsForTerm(termId)).toEqual(groupBefore);
+    expect(await groupIdsForTerm(termId)).toEqual(groupBefore);
 
     expect(await recalculateOvercountedMonthlyPremiums()).toBe(0);
-    expect(autoExpensesForTerm(termId).map((r) => r.expense_amount)).toEqual([60000, 60000]);
+    expect((await autoExpensesForTerm(termId)).map((r) => r.expense_amount)).toEqual([
+      60000, 60000,
+    ]);
   });
 
   test('a premium whose amount matches neither count is treated as a user edit and kept', async () => {
     const v1 = await seedVehicle('Honda');
     const { termId } = await createMonthlyPolicy([v1], 100, YEAR_START, YEAR_END);
-    writeOvercountedPremium(termId, [99900]);
+    await writeOvercountedPremium(termId, [99900]);
 
     expect(await recalculateOvercountedMonthlyPremiums()).toBe(0);
-    expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(99900);
+    expect((await autoExpensesForTerm(termId))[0]?.expense_amount).toBe(99900);
   });
 
   test('a term priced by totalCost is never rewritten, even with a monthlyCost', async () => {
@@ -304,24 +308,22 @@ describe('recalculating monthly premiums that were overcounted', () => {
     const termId = body.data.terms[0].id;
 
     expect(await recalculateOvercountedMonthlyPremiums()).toBe(0);
-    expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(130000);
+    expect((await autoExpensesForTerm(termId))[0]?.expense_amount).toBe(130000);
   });
 
   test('a split whose rows no longer add up to the group total is kept', async () => {
     const v1 = await seedVehicle('Honda');
     const v2 = await seedVehicle('Toyota');
     const { termId } = await createMonthlyPolicy([v1, v2], 100, YEAR_START, YEAR_END);
-    writeOvercountedPremium(termId, [65000, 65000]);
-    const [edited] = autoExpensesForTerm(termId);
-    ctx.sqlite
-      .query('UPDATE expenses SET expense_amount = 50000 WHERE id = ?')
-      .run(edited?.id ?? '');
+    await writeOvercountedPremium(termId, [65000, 65000]);
+    const [edited] = await autoExpensesForTerm(termId);
+    await ctx.sql.run('UPDATE expenses SET expense_amount = 50000 WHERE id = ?', [
+      edited?.id ?? '',
+    ]);
 
     expect(await recalculateOvercountedMonthlyPremiums()).toBe(0);
     expect(
-      autoExpensesForTerm(termId)
-        .map((r) => r.expense_amount)
-        .sort((a, b) => a - b)
+      (await autoExpensesForTerm(termId)).map((r) => r.expense_amount).sort((a, b) => a - b)
     ).toEqual([50000, 65000]);
   });
 });
@@ -336,7 +338,7 @@ describe('term update date validation against the stored dates', () => {
     });
 
     expect(res.status, await res.text()).toBe(400);
-    expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(120000);
+    expect((await autoExpensesForTerm(termId))[0]?.expense_amount).toBe(120000);
   });
 
   test('a startDate-only update after the stored end date is rejected', async () => {
@@ -359,7 +361,7 @@ describe('term update date validation against the stored dates', () => {
     });
 
     expect(res.status, await res.text()).toBeLessThan(300);
-    expect(autoExpensesForTerm(termId)[0]?.expense_amount).toBe(60000);
+    expect((await autoExpensesForTerm(termId))[0]?.expense_amount).toBe(60000);
   });
 });
 
@@ -369,14 +371,16 @@ describe('premium split follows the order the vehicles were chosen', () => {
     return [ids[1] as string, ids[0] as string];
   }
 
-  const centsByVehicle = (termId: string) =>
-    Object.fromEntries(autoExpensesForTerm(termId).map((r) => [r.vehicle_id, r.expense_amount]));
+  const centsByVehicle = async (termId: string) =>
+    Object.fromEntries(
+      (await autoExpensesForTerm(termId)).map((r) => [r.vehicle_id, r.expense_amount])
+    );
 
   test('on create, the first chosen vehicle takes the odd cent even when its id sorts last', async () => {
     const [first, second] = await twoVehiclesOutOfIdOrder();
     const { termId } = await createPolicy([first, second], 100.01);
 
-    expect(centsByVehicle(termId)).toEqual({ [first]: 5001, [second]: 5000 });
+    expect(await centsByVehicle(termId)).toEqual({ [first]: 5001, [second]: 5000 });
   });
 
   test('on adding a term, the first chosen vehicle takes the odd cent even when its id sorts last', async () => {
@@ -391,15 +395,18 @@ describe('premium split follows the order the vehicles were chosen', () => {
     });
     const body = await json<DataEnvelope<{ terms: { id: string }[] }>>(res);
     expect(res.status, JSON.stringify(body)).toBeLessThan(300);
-    const added = body.data.terms.find((t) => autoExpensesForTerm(t.id).length === 2);
+    let added: { id: string } | undefined;
+    for (const term of body.data.terms) {
+      if ((await autoExpensesForTerm(term.id)).length === 2) added ??= term;
+    }
 
-    expect(centsByVehicle(added?.id ?? '')).toEqual({ [first]: 5001, [second]: 5000 });
+    expect(await centsByVehicle(added?.id ?? '')).toEqual({ [first]: 5001, [second]: 5000 });
   });
 
   test('on update, re-choosing the vehicles in a new order with a new cost moves the odd cent', async () => {
     const [first, second] = await twoVehiclesOutOfIdOrder();
     const { policyId, termId } = await createPolicy([second, first], 100.01);
-    expect(centsByVehicle(termId)).toEqual({ [second]: 5001, [first]: 5000 });
+    expect(await centsByVehicle(termId)).toEqual({ [second]: 5001, [first]: 5000 });
 
     const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       totalCost: 200.01,
@@ -407,20 +414,20 @@ describe('premium split follows the order the vehicles were chosen', () => {
     });
     expect(res.status, await res.text()).toBeLessThan(300);
 
-    expect(centsByVehicle(termId)).toEqual({ [first]: 10001, [second]: 10000 });
+    expect(await centsByVehicle(termId)).toEqual({ [first]: 10001, [second]: 10000 });
   });
 
   test('on update, reordering the same vehicles alone moves the odd cent', async () => {
     const [first, second] = await twoVehiclesOutOfIdOrder();
     const { policyId, termId } = await createPolicy([second, first], 100.01);
-    expect(centsByVehicle(termId)).toEqual({ [second]: 5001, [first]: 5000 });
+    expect(await centsByVehicle(termId)).toEqual({ [second]: 5001, [first]: 5000 });
 
     const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       vehicleCoverage: { vehicleIds: [first, second] },
     });
     expect(res.status, await res.text()).toBeLessThan(300);
 
-    expect(centsByVehicle(termId)).toEqual({ [first]: 5001, [second]: 5000 });
+    expect(await centsByVehicle(termId)).toEqual({ [first]: 5001, [second]: 5000 });
   });
 
   test('recalculating an over-counted monthly premium keeps the odd cent on the first chosen vehicle', async () => {
@@ -431,29 +438,30 @@ describe('premium split follows the order the vehicles were chosen', () => {
       '2024-01-01T12:00:00.000Z',
       '2024-12-01T12:00:00.000Z'
     );
-    const firstRow = autoExpensesForTerm(termId).find((r) => r.vehicle_id === first);
-    ctx.sqlite
-      .query('UPDATE expenses SET expense_amount = 60006, group_total = 120012 WHERE source_id = ?')
-      .run(termId);
-    ctx.sqlite
-      .query('UPDATE expenses SET rowid = rowid + 1000000 WHERE id = ?')
-      .run(firstRow?.id ?? '');
+    const firstRow = (await autoExpensesForTerm(termId)).find((r) => r.vehicle_id === first);
+    await ctx.sql.run(
+      'UPDATE expenses SET expense_amount = 60006, group_total = 120012 WHERE source_id = ?',
+      [termId]
+    );
+    await ctx.sql.run('UPDATE expenses SET rowid = rowid + 1000000 WHERE id = ?', [
+      firstRow?.id ?? '',
+    ]);
 
     expect(await recalculateOvercountedMonthlyPremiums()).toBe(1);
 
-    expect(centsByVehicle(termId)).toEqual({ [first]: 55006, [second]: 55005 });
+    expect(await centsByVehicle(termId)).toEqual({ [first]: 55006, [second]: 55005 });
   });
 
   test('on update, an unchanged order keeps the premium rows as they are', async () => {
     const [first, second] = await twoVehiclesOutOfIdOrder();
     const { policyId, termId } = await createPolicy([first, second], 100.01);
-    const before = autoExpensesForTerm(termId).map((r) => r.id);
+    const before = (await autoExpensesForTerm(termId)).map((r) => r.id);
 
     const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       vehicleCoverage: { vehicleIds: [first, second] },
     });
     expect(res.status, await res.text()).toBeLessThan(300);
 
-    expect(autoExpensesForTerm(termId).map((r) => r.id)).toEqual(before);
+    expect((await autoExpensesForTerm(termId)).map((r) => r.id)).toEqual(before);
   });
 });

@@ -36,11 +36,12 @@ async function seedPremium(): Promise<{ termId: string; expenseId: string }> {
     ],
   });
   const termId = (await json<DataEnvelope<PolicyBody>>(res)).data.terms[0]?.id ?? '';
-  const row = ctx.sqlite
-    .query(`SELECT id FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?`)
-    .get(termId) as { id: string } | null;
+  const row = (await ctx.sql.get(
+    `SELECT id FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?`,
+    [termId]
+  )) as { id: string } | null;
   expect(row?.id, 'the costed term must materialize a premium').toBeTruthy();
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
      VALUES ('prov-1', ?, 'storage', 'fake', 'Fake storage', 'unused', 'active')`,
     [ctx.user.id]
@@ -48,13 +49,13 @@ async function seedPremium(): Promise<{ termId: string; expenseId: string }> {
   return { termId, expenseId: row?.id ?? '' };
 }
 
-function attachPhoto(expenseId: string, id: string): void {
-  ctx.sqlite.run(
+async function attachPhoto(expenseId: string, id: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
      VALUES (?, ?, 'expense', ?, 'receipt.jpg', 'image/jpeg', 1024)`,
     [id, ctx.user.id, expenseId]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
      VALUES (?, ?, 'prov-1', ?, 'active')`,
     [`${id}-ref`, id, `receipts/${id}.jpg`]
@@ -72,11 +73,10 @@ async function recordFileDeletes() {
   const byEntity = spyOn(photoService, 'deletePhotosForEntities').mockImplementation(
     async (_type, entityIds) => {
       for (const entityId of entityIds) {
-        const refs = ctx.sqlite
-          .query(
-            `SELECT r.id FROM photo_refs r JOIN photos p ON p.id = r.photo_id WHERE p.entity_id = ?`
-          )
-          .all(entityId) as Array<{ id: string }>;
+        const refs = (await ctx.sql.all(
+          `SELECT r.id FROM photo_refs r JOIN photos p ON p.id = r.photo_id WHERE p.entity_id = ?`,
+          [entityId]
+        )) as Array<{ id: string }>;
         files.push(...refs.map((ref) => ref.id));
       }
     }
@@ -90,30 +90,30 @@ async function recordFileDeletes() {
   };
 }
 
-const photoRows = () =>
-  (ctx.sqlite.query('SELECT COUNT(*) AS n FROM photos').get() as { n: number }).n;
+const photoRows = async () =>
+  ((await ctx.sql.get('SELECT COUNT(*) AS n FROM photos')) as { n: number }).n;
 
 describe("deleting an insurance term's premium expenses", () => {
   test('the stored file of a photo attached as the delete starts is deleted with its row', async () => {
     const { termId, expenseId } = await seedPremium();
     let attached = false;
-    const attachOnce = () => {
+    const attachOnce = async () => {
       if (attached) return;
       attached = true;
-      attachPhoto(expenseId, 'late');
+      await attachPhoto(expenseId, 'late');
     };
     const db = appContext().asyncDb;
     const begin = db.transaction.bind(db);
-    const tx = spyOn(db, 'transaction').mockImplementation(((
+    const tx = spyOn(db, 'transaction').mockImplementation((async (
       ...args: Parameters<typeof db.transaction>
     ) => {
-      attachOnce();
+      await attachOnce();
       return begin(...args);
     }) as typeof db.transaction);
     const expenseRepo = repos().expenses;
     const remove = expenseRepo.deleteBySource.bind(expenseRepo);
-    const bySource = spyOn(expenseRepo, 'deleteBySource').mockImplementation((...args) => {
-      attachOnce();
+    const bySource = spyOn(expenseRepo, 'deleteBySource').mockImplementation(async (...args) => {
+      await attachOnce();
       return remove(...args);
     });
     const deletes = await recordFileDeletes();
@@ -125,13 +125,13 @@ describe("deleting an insurance term's premium expenses", () => {
       deletes.restore();
     }
     expect(attached).toBe(true);
-    expect(photoRows(), 'the photo row goes with its expense').toBe(0);
+    expect(await photoRows(), 'the photo row goes with its expense').toBe(0);
     expect(deletes.files, 'and so does its stored file').toEqual(['late-ref']);
   });
 
   test('a delete that fails keeps the expenses, their photos and their stored files', async () => {
     const { termId, expenseId } = await seedPremium();
-    attachPhoto(expenseId, 'kept');
+    await attachPhoto(expenseId, 'kept');
     const bySource = spyOn(repos().expenses, 'deleteBySource').mockImplementation(async () => {
       throw new Error('forced delete failure');
     });
@@ -144,13 +144,12 @@ describe("deleting an insurance term's premium expenses", () => {
       bySource.mockRestore();
       deletes.restore();
     }
-    const premiums = ctx.sqlite
-      .query(
-        `SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?`
-      )
-      .get(termId) as { n: number };
+    const premiums = (await ctx.sql.get(
+      `SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?`,
+      [termId]
+    )) as { n: number };
     expect(premiums.n).toBe(1);
-    expect(photoRows()).toBe(1);
+    expect(await photoRows()).toBe(1);
     expect(deletes.files, 'no stored file is deleted for expenses that stay').toEqual([]);
   });
 });

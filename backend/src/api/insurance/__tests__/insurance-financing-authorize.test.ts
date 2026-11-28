@@ -24,24 +24,24 @@ beforeEach(async () => {
   await seedCar(ctx, CAR);
   await seedCar(ctx, PRIVATE);
   m = await seedMembers(ctx, CAR, 'ins');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO vehicle_financing (id, vehicle_id, provider, original_amount, term_months, start_date, payment_amount) VALUES ('loan-1', ?, 'Bank', 1000000, 60, 1704067200, 20000)",
     [CAR]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO insurance_policies (id, user_id, company) VALUES ('pol-1', ?, 'Mutual')",
     [ctx.user.id]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO insurance_terms (id, policy_id, start_date, end_date, total_cost) VALUES ('term-1', 'pol-1', 1704067200, 1735689600, 120000)"
   );
   for (const vehicleId of [CAR, PRIVATE]) {
-    ctx.sqlite.run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [
+    await ctx.sql.run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [
       'term-1',
       vehicleId,
     ]);
   }
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size) VALUES ('pol-doc', ?, 'insurance_policy', 'pol-1', 'p.pdf', 'application/pdf', 10)",
     [ctx.user.id]
   );
@@ -114,18 +114,18 @@ describe('insurance resolves through can() for every role', () => {
   });
 
   test('policy documents need insurance read on every covered car and stay with the owner for writes', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO insurance_policies (id, user_id, company) VALUES ('pol-2', ?, 'Mutual')",
       [ctx.user.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO insurance_terms (id, policy_id, start_date, end_date, total_cost) VALUES ('term-2', 'pol-2', 1704067200, 1735689600, 90000)"
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES ('term-2', ?)",
       [CAR]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size) VALUES ('pol2-doc', ?, 'insurance_policy', 'pol-2', 'p.pdf', 'application/pdf', 10)",
       [ctx.user.id]
     );
@@ -153,7 +153,7 @@ describe('insurance resolves through can() for every role', () => {
       ['claim-shared', CAR],
       ['claim-private', PRIVATE],
     ]) {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO insurance_claims (id, policy_id, claim_date, claim_type, vehicle_id) VALUES (?, 'pol-1', 1704067200, 'collision', ?)",
         [id, vehicleId]
       );
