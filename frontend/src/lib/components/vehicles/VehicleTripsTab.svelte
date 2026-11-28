@@ -34,6 +34,7 @@
 	let unit = $derived(getDistanceUnitLabel(distanceUnit, true));
 
 	async function load() {
+		generation++;
 		isLoading = true;
 		loadError = null;
 		try {
@@ -48,11 +49,14 @@
 	}
 
 	let loadingMore = $state(false);
+	let generation = 0;
 
 	async function loadMore() {
 		loadingMore = true;
+		const started = generation;
 		try {
 			const next = await tripApi.list({ vehicleId, limit: TRIP_LIMIT, offset: trips.length });
+			if (started !== generation) return;
 			const shown = new Set(trips.map(t => t.id));
 			trips = [...trips, ...next.data.filter(t => !shown.has(t.id))];
 			totalCount = next.pagination.totalCount;

@@ -104,7 +104,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .select()
       .from(trips)
       .where(and(...conditions))
-      .orderBy(desc(trips.tripDate));
+      .orderBy(desc(trips.tripDate), desc(trips.createdAt), desc(trips.id));
   }
 
   async findReadable(readable: readonly ReadableVehicle[]): Promise<Trip[]> {
@@ -112,7 +112,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .select()
       .from(trips)
       .where(readableTripsScope(readable))
-      .orderBy(desc(trips.tripDate));
+      .orderBy(desc(trips.tripDate), desc(trips.createdAt), desc(trips.id));
   }
 
   async findReadablePaginated(
@@ -129,7 +129,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .select()
       .from(trips)
       .where(where)
-      .orderBy(desc(trips.tripDate))
+      .orderBy(desc(trips.tripDate), desc(trips.createdAt), desc(trips.id))
       .limit(limit)
       .offset(offset);
     const [result] = await this.db.select({ count: count() }).from(trips).where(where);
@@ -163,7 +163,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .select()
       .from(trips)
       .where(and(eq(trips.vehicleId, vehicleId), eq(trips.userId, userId)))
-      .orderBy(desc(trips.tripDate));
+      .orderBy(desc(trips.tripDate), desc(trips.createdAt), desc(trips.id));
   }
 
   async findByUserIdPaginated(
@@ -181,7 +181,7 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .select()
       .from(trips)
       .where(where)
-      .orderBy(desc(trips.tripDate))
+      .orderBy(desc(trips.tripDate), desc(trips.createdAt), desc(trips.id))
       .limit(limit)
       .offset(offset);
 

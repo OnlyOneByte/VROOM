@@ -102,11 +102,14 @@
 	}
 
 	let loadingMore = $state(false);
+	let generation = 0;
 
 	async function loadMore() {
 		loadingMore = true;
+		const started = generation;
 		try {
 			const next = await tripApi.list({ limit: 100, offset: trips.length });
+			if (started !== generation) return;
 			const shown = new Set(trips.map(t => t.id));
 			trips = [...trips, ...next.data.filter(t => !shown.has(t.id))];
 			totalCount = next.pagination.totalCount;
@@ -118,6 +121,7 @@
 	}
 
 	async function load() {
+		generation++;
 		isLoading = true;
 		loadError = null;
 		try {
