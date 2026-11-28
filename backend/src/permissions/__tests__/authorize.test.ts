@@ -37,7 +37,7 @@ describe('authorize()', () => {
   });
 
   test('a disabled caller is refused even on their own account', async () => {
-    ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [ctx.user.id]);
+    await ctx.sql.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [ctx.user.id]);
     const app = probe('/:entityType/:entityId', '/api/v1/photos');
     expect((await app.request('/api/v1/photos/vehicle/v1')).status).toBe(403);
   });

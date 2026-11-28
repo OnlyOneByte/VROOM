@@ -56,8 +56,8 @@ async function get(ctx: TestApp, path: string): Promise<unknown> {
     : text.replace(/\b[a-z0-9]{24,}\b/g, '<id>');
 }
 
-function idsOf(ctx: TestApp, sql: string): string[] {
-  const rows = ctx.sqlite.query(sql).all(ctx.user.id) as { id: string }[];
+async function idsOf(ctx: TestApp, sql: string): Promise<string[]> {
+  const rows = (await ctx.sql.all(sql, [ctx.user.id])) as { id: string }[];
   return rows.map((row) => row.id);
 }
 
@@ -93,14 +93,14 @@ async function captureGarage(ctx: TestApp): Promise<Record<string, unknown>> {
   ];
   const out: Record<string, unknown> = {};
   for (const path of paths) out[path] = await get(ctx, path);
-  const policies = idsOf(
+  const policies = await idsOf(
     ctx,
     'SELECT id FROM insurance_policies WHERE user_id = ? ORDER BY company'
   );
   for (const [index, id] of policies.entries()) {
     out[`policy ${index} claims`] = await get(ctx, `/insurance/${id}/claims`);
   }
-  const vehicles = idsOf(
+  const vehicles = await idsOf(
     ctx,
     'SELECT id FROM vehicles WHERE user_id = ? ORDER BY make, model, year'
   );
@@ -119,14 +119,14 @@ async function captureGarage(ctx: TestApp): Promise<Record<string, unknown>> {
   return out;
 }
 
-function toWholeYen(ctx: TestApp): void {
-  ctx.sqlite.run('UPDATE user_preferences SET currency_unit = ? WHERE user_id = ?', [
+async function toWholeYen(ctx: TestApp): Promise<void> {
+  await ctx.sql.run('UPDATE user_preferences SET currency_unit = ? WHERE user_id = ?', [
     'JPY',
     ctx.user.id,
   ]);
   for (const [table, columns] of Object.entries(MONEY_COLUMNS)) {
     const set = columns.map((c) => `${c} = CAST(ROUND(${c} / 100.0) AS INTEGER)`).join(', ');
-    ctx.sqlite.run(`UPDATE ${table} SET ${set}`);
+    await ctx.sql.run(`UPDATE ${table} SET ${set}`);
   }
 }
 
@@ -143,7 +143,7 @@ beforeAll(async () => {
   usd.close();
   const jpy = await createTestApp();
   await seedGarage(jpy.user.id);
-  toWholeYen(jpy);
+  await toWholeYen(jpy);
   captured.JPY = await captureGarage(jpy);
   jpy.close();
   if (UPDATE) {

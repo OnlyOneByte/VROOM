@@ -41,36 +41,39 @@ const ALLOWED: Record<string, Exception> = {
 
 const KNOWN_GAPS: Record<string, Exception> = {};
 
-function seedMemberRecords(ctx: TestApp, members: Members): void {
-  const run = (sql: string, params: (string | number)[]) => ctx.sqlite.run(sql, params);
+async function seedMemberRecords(ctx: TestApp, members: Members): Promise<void> {
+  const run = (sql: string, params: (string | number)[]) => ctx.sql.run(sql, params);
   const owner = ctx.user.id;
   for (const [tag, author] of [
     ['editor', members.editor.id],
     ['co', members.coOwner.id],
   ] as const) {
     const id = `${VEHICLE_ID}-by-${tag}`;
-    run(
+    await run(
       "INSERT INTO expenses (id, vehicle_id, category, date, expense_amount, user_id, created_by) VALUES (?, ?, 'fuel', 1717300000, 20, ?, ?)",
       [id, VEHICLE_ID, owner, author]
     );
-    run(
+    await run(
       'INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at, created_by) VALUES (?, ?, ?, 1200, 1717300000, ?)',
       [id, VEHICLE_ID, owner, author]
     );
-    run(
+    await run(
       "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, created_by) VALUES (?, ?, ?, 1100, 1100, 'personal', 1717300000, ?)",
       [id, VEHICLE_ID, owner, author]
     );
-    run(
+    await run(
       "INSERT INTO reminders (id, user_id, name, type, frequency, start_date, created_by) VALUES (?, ?, 'Member', 'notification', 'monthly', 1717300000, ?)",
       [id, owner, author]
     );
-    run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [id, VEHICLE_ID]);
-    run(
+    await run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [
+      id,
+      VEHICLE_ID,
+    ]);
+    await run(
       "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size, created_by) VALUES (?, ?, 'vehicle', ?, 'm.jpg', 'image/jpeg', 4, ?)",
       [id, owner, VEHICLE_ID, author]
     );
-    run('INSERT INTO vehicle_drivers (id, vehicle_id, user_id, name) VALUES (?, ?, ?, ?)', [
+    await run('INSERT INTO vehicle_drivers (id, vehicle_id, user_id, name) VALUES (?, ?, ?, ?)', [
       id,
       VEHICLE_ID,
       author,
@@ -146,7 +149,7 @@ describe('responses to members of a shared car', () => {
     ctx = await createTestApp();
     sweepConfig(true);
     members = await seedSweepCar(ctx);
-    seedMemberRecords(ctx, members);
+    await seedMemberRecords(ctx, members);
     setPushSenderForTest(quietPush);
   }, SETUP_TIMEOUT_MS);
   afterEach(() => {
@@ -160,7 +163,7 @@ describe('responses to members of a shared car', () => {
     const unexpected = new Set<string>();
     const gapsSeen = new Set<string>();
     const invites = [`${VEHICLE_ID}-accept`, `${VEHICLE_ID}-decline`];
-    ctx.sqlite.run('UPDATE vehicle_shares SET shared_with_id = ? WHERE id IN (?, ?)', [
+    await ctx.sql.run('UPDATE vehicle_shares SET shared_with_id = ? WHERE id IN (?, ?)', [
       members[role].id,
       ...invites,
     ]);

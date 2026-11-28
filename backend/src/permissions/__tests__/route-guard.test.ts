@@ -85,14 +85,14 @@ describe('routes that check inside really refuse', () => {
   test('an account without a server role gets 403 from each of them', async () => {
     const ctx = await createTestApp();
     try {
-      ctx.sqlite.run(
-        `INSERT INTO roles (id, scope, name, built_in) VALUES ('${SERVER_ROLE}', 'server', 'Probe', 0)`
+      await ctx.sql.run(
+        `INSERT INTO roles (id, scope, name, built_in) VALUES ('${SERVER_ROLE}', 'server', 'Probe', FALSE)`
       );
-      ctx.sqlite.run(
-        `INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES ('${LIBRARY_ROLE}', 'vehicle', 'Probe', 0, ?)`,
+      await ctx.sql.run(
+        `INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES ('${LIBRARY_ROLE}', 'vehicle', 'Probe', FALSE, ?)`,
         [ctx.user.id]
       );
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO users (id, email, display_name) VALUES ('no-role', 'n@x.test', 'N')"
       );
       const caller = await requestAs(ctx, 'no-role');
@@ -112,11 +112,11 @@ describe('routes that check inside really refuse', () => {
   test("a member can't reach another owner's vehicle roles", async () => {
     const ctx = await createTestApp();
     try {
-      ctx.sqlite.run(
-        `INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES ('${LIBRARY_ROLE}', 'vehicle', 'Probe', 0, ?)`,
+      await ctx.sql.run(
+        `INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES ('${LIBRARY_ROLE}', 'vehicle', 'Probe', FALSE, ?)`,
         [ctx.user.id]
       );
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO users (id, email, display_name) VALUES ('other-owner', 'o@x.test', 'O')"
       );
       await assignServerRole(appContext().asyncDb, 'other-owner', 'member');
@@ -205,11 +205,11 @@ describe('the Demo role on its own garage', () => {
   test('reads its own cars but never acts as their owner', async () => {
     const ctx = await createTestApp();
     try {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO users (id, email, display_name) VALUES ('demo-probe', 'd@x.test', 'D')"
       );
       await assignServerRole(appContext().asyncDb, 'demo-probe', 'demo');
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('demo-car', 'demo-probe', 'Kia', 'Rio', 2020)"
       );
       const car = { kind: 'vehicle' as const, vehicleId: 'demo-car' };
@@ -223,7 +223,7 @@ describe('the Demo role on its own garage', () => {
       expect(resolver.can('vehicle.expense.read', own).allow).toBe(true);
       expect(resolver.can('vehicle.expense.write', own).allow).toBe(false);
       expect((await resolverFor(ctx.user.id, [car])).can('vehicle.read', car).allow).toBe(false);
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('own-car', ?, 'Kia', 'Rio', 2020)",
         [ctx.user.id]
       );
@@ -244,14 +244,14 @@ describe('the roles routes check by scope', () => {
   test('a custom server role with only server.roles.manage lists server roles', async () => {
     const ctx = await createTestApp();
     try {
-      ctx.sqlite.run(
-        "INSERT INTO roles (id, scope, name, built_in) VALUES ('role-managers', 'server', 'Role managers', 0)"
+      await ctx.sql.run(
+        "INSERT INTO roles (id, scope, name, built_in) VALUES ('role-managers', 'server', 'Role managers', FALSE)"
       );
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO role_permissions (role_id, permission) VALUES ('role-managers', 'server.roles.manage')"
       );
-      ctx.sqlite.run('DELETE FROM role_assignments WHERE user_id = ?', [ctx.user.id]);
-      ctx.sqlite.run(
+      await ctx.sql.run('DELETE FROM role_assignments WHERE user_id = ?', [ctx.user.id]);
+      await ctx.sql.run(
         "INSERT INTO role_assignments (id, user_id, role_id) VALUES ('ra-managers', ?, 'role-managers')",
         [ctx.user.id]
       );
@@ -277,10 +277,10 @@ describe('the Demo role stays with the demo garage', () => {
     const ctx = await createTestApp();
     try {
       const other = 'demo-target';
-      ctx.sqlite.run("INSERT INTO users (id, email, display_name) VALUES (?, 't@x.test', 'T')", [
+      await ctx.sql.run("INSERT INTO users (id, email, display_name) VALUES (?, 't@x.test', 'T')", [
         other,
       ]);
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO role_assignments (id, user_id, role_id) VALUES ('ra-admin', ?, 'builtin_admin')",
         [ctx.user.id]
       );

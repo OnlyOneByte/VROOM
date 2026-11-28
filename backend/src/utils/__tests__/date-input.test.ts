@@ -211,9 +211,11 @@ describe('date fields reject values that would be saved as 1970', () => {
     expect(created.status, JSON.stringify(reminder)).toBe(201);
     const id = reminder.data.reminder.id;
     const farFuture = Date.UTC(2160, 0, 1) / 1000;
-    ctx.sqlite
-      .query('UPDATE reminders SET start_date = ?, end_date = ? WHERE id = ?')
-      .run(farFuture - 1, farFuture, id);
+    await ctx.sql.run('UPDATE reminders SET start_date = ?, end_date = ? WHERE id = ?', [
+      farFuture - 1,
+      farFuture,
+      id,
+    ]);
     for (const body of [{ isActive: false }, { name: 'Old reminder' }]) {
       const res = await ctx.authed('PUT', `/api/v1/reminders/${id}`, body);
       expect(res.status, `${JSON.stringify(body)}: ${await res.text()}`).toBe(200);
