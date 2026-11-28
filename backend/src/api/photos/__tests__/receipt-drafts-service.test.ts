@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { SyncError, SyncErrorCode } from '../../../errors';
+import { PayloadTooLargeError, SyncError, SyncErrorCode } from '../../../errors';
 import type { ReceiptDraft } from '../../providers/domains/vlm/prompt';
 import type { PhotosMediaItem } from '../../providers/services/google-photos-service';
 import {
@@ -141,6 +141,21 @@ describe('stageReceiptDrafts', () => {
       ['big', true],
     ]);
     expect(downloaded).toEqual(['empty', 'big']);
+  });
+
+  test('a photo the download refuses as too large is marked unread and the run goes on', async () => {
+    const deps = makeDeps({
+      listReceiptPhotos: async () => [photo('big'), photo('ok')],
+      downloadPhoto: async (id) => {
+        if (id === 'big') throw new PayloadTooLargeError('The file is larger than the 8 MB limit');
+        return Buffer.from(id);
+      },
+    });
+    const drafts = await stageReceiptDrafts(deps);
+    expect(drafts.map((d) => [d.photoId, d.failed ?? false])).toEqual([
+      ['big', true],
+      ['ok', false],
+    ]);
   });
 
   test.each<[string, Error, ScanStopReason]>([

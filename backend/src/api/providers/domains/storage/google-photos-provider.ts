@@ -2,6 +2,7 @@ import { logger } from '../../../../utils/logger';
 import { assertSafeStoragePath } from '../../../../utils/paths';
 import { GooglePhotosService } from '../../services/google-photos-service';
 import type {
+  DownloadOptions,
   StorageCapabilities,
   StorageFileInfo,
   StorageProvider,
@@ -34,8 +35,8 @@ export class GooglePhotosProvider implements StorageProvider {
     };
   }
 
-  async download(ref: StorageRef): Promise<Buffer> {
-    return this.service.download(ref.externalId);
+  async download(ref: StorageRef, options?: DownloadOptions): Promise<Buffer> {
+    return this.service.download(ref.externalId, options);
   }
 
   // Library API cannot delete; the photo stays in the user's Google Photos library.
