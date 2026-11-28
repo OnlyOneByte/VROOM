@@ -4,7 +4,7 @@
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import DatePicker from '#lib/components/common/date-picker.svelte';
-	import { capitalize } from '#lib/utils/formatters.ts';
+	import { capitalize, toDateInputValue } from '#lib/utils/formatters.ts';
 	import type { ReminderFormState } from './reminder-form-state.svelte';
 	import { FREQUENCIES, INTERVAL_UNITS } from './reminder-form-model';
 
@@ -17,6 +17,30 @@
 	let pluralSuffix = $derived(
 		form.values.intervalValue && parseInt(form.values.intervalValue, 10) > 1 ? 's' : ''
 	);
+
+	const EVERY: Record<string, string> = {
+		weekly: 'every week',
+		monthly: 'every month',
+		yearly: 'every year'
+	};
+	let every = $derived(
+		EVERY[form.values.frequency] ??
+			(parseInt(form.values.intervalValue, 10) > 0
+				? `every ${parseInt(form.values.intervalValue, 10)} ${form.values.intervalUnit}${pluralSuffix}`
+				: null)
+	);
+	// A new reminder's start date is its first due date, so today means due the moment it's saved.
+	let startHint = $derived.by(() => {
+		if (!form.isNew || !form.values.startDate) return null;
+		const isExpense = form.values.kind === 'expense';
+		const first = isExpense ? 'The first expense is added' : 'It’s first due';
+		const then = every ? `, then ${every}` : '';
+		if (form.values.startDate !== toDateInputValue(new Date()))
+			return `${first} on this date${then}.`;
+		return isExpense
+			? `${first} today${then}, so it’s added right away. Pick a later date if the first one isn’t due yet.`
+			: `${first} today${then}, so it’s due as soon as you save. Pick a later date if it isn’t due yet.`;
+	});
 </script>
 
 <div class="space-y-2">
@@ -73,7 +97,11 @@
 		id="reminder-start"
 		bind:value={form.values.startDate}
 		placeholder="Select start date"
+		aria-describedby={startHint ? 'reminder-start-hint' : undefined}
 	/>
+	{#if startHint}
+		<p id="reminder-start-hint" class="text-sm text-muted-foreground">{startHint}</p>
+	{/if}
 </div>
 
 <div class="space-y-2">

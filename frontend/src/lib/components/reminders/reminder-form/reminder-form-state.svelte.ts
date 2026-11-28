@@ -17,6 +17,7 @@ export class ReminderFormState {
 	values = $state<ReminderDraft>(emptyReminderDraft([], new SvelteDate()));
 	errors = $state<Record<string, string>>({});
 	isSubmitting = $state(false);
+	isNew = $state(true);
 	vehicles = $state<Vehicle[]>([]);
 	currency = $derived(
 		this.vehicles.find(v => v.id === this.values.selectedVehicleIds[0])?.ownerCurrency
@@ -28,6 +29,7 @@ export class ReminderFormState {
 
 	load(reminder: ReminderWithVehicles | null, vehicles: Vehicle[]) {
 		this.errors = {};
+		this.isNew = reminder === null;
 		this.vehicles = vehicles;
 		this.values = reminder
 			? draftFromReminder(reminder)
