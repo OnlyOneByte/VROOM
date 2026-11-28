@@ -67,4 +67,41 @@ describe('marking a reminder serviced on its due day', () => {
     )) as { d: number };
     expect(row.d * 1000).toBeGreaterThanOrEqual(nextDay.getTime());
   });
+
+  test('pausing and resuming after it fired today does not fire it again', async () => {
+    const zone = 'Pacific/Kiritimati';
+    const vehicleId = await seedVehicle(ctx);
+    const { nextDay } = zonedDayWindow(new Date(), zone);
+    const dueToday = Math.floor((nextDay.getTime() - 1000) / 1000);
+    await ctx.sql.run(
+      `INSERT INTO reminders
+         (id, user_id, name, type, action_mode, frequency, trigger_mode, expense_amount,
+          expense_category, start_date, next_due_date, is_active)
+       VALUES ('rem-fee', ?, 'Fee', 'expense', 'automatic', 'weekly', 'time', 2500,
+          'misc', ?, ?, TRUE)`,
+      [ctx.user.id, dueToday, dueToday]
+    );
+    await ctx.sql.run(
+      "INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('rem-fee', ?)",
+      [vehicleId]
+    );
+    const trigger = async () =>
+      expect((await ctx.authed('POST', `/api/v1/reminders/trigger?timeZone=${zone}`)).status).toBe(
+        200
+      );
+    const setActive = async (isActive: boolean) =>
+      expect(
+        (await ctx.authed('PUT', '/api/v1/reminders/rem-fee', { isActive, timeZone: zone })).status
+      ).toBe(200);
+
+    await trigger();
+    await setActive(false);
+    await setActive(true);
+    await trigger();
+
+    const booked = (await ctx.sql.get(
+      "SELECT COUNT(*) AS n FROM expenses WHERE source_id = 'rem-fee'"
+    )) as { n: number };
+    expect(booked.n).toBe(1);
+  });
 });

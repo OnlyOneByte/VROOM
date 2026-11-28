@@ -340,7 +340,7 @@ export function startOfDayIn(instant: Date, timeZone: string | undefined): Date 
     : new Date(instant.getFullYear(), instant.getMonth(), instant.getDate());
 }
 
-function endOfDayIn(now: Date, timeZone: string | undefined): Date {
+export function endOfDayIn(now: Date, timeZone: string | undefined): Date {
   const nextDay = timeZone
     ? zonedDayWindow(now, timeZone).nextDay
     : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
