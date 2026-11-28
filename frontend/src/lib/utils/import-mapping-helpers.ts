@@ -54,20 +54,27 @@ const GUESSES: Array<[NativeImportField, Array<RegExp>, RegExp?]> = [
 		[/categor/, /\btype\b/, /\bkind\b/],
 		/fuel|gas|oil|payment|vehicle|\bcar\b|charger|plug/
 	],
-	['vehicle', [/vehicle/, /\bcar\b/]],
+	['vehicle', [/vehicle/, /\bcar\b/], /\btype\b/],
 	['description', [/note/, /description/, /comment/]],
 	['tags', [/\btags?\b/]]
 ];
+
+function headerWords(header: string): string {
+	return header
+		.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+		.replace(/[_\-.]+/g, ' ')
+		.toLowerCase();
+}
 
 export function guessManualColumns(headers: string[]): Partial<Record<NativeImportField, string>> {
 	const guess: Partial<Record<NativeImportField, string>> = {};
 	const claimed = new Set<string>();
 	for (const [field, needles, exclude] of GUESSES) {
-		const open = headers.filter(h => !claimed.has(h) && !exclude?.test(h.toLowerCase()));
+		const open = headers.filter(h => !claimed.has(h) && !exclude?.test(headerWords(h)));
 		const ranked =
 			field === 'amount' ? [...open].sort((a, b) => unitPriceRank(a) - unitPriceRank(b)) : open;
 		const match = needles
-			.map(needle => ranked.find(h => needle.test(h.toLowerCase())))
+			.map(needle => ranked.find(h => needle.test(headerWords(h))))
 			.find(Boolean);
 		if (match) {
 			guess[field] = match;
@@ -78,7 +85,7 @@ export function guessManualColumns(headers: string[]): Partial<Record<NativeImpo
 }
 
 function unitPriceRank(header: string): number {
-	return UNIT_PRICE.test(header.toLowerCase()) ? 1 : 0;
+	return UNIT_PRICE.test(headerWords(header)) ? 1 : 0;
 }
 
 export function presetImportMapping(

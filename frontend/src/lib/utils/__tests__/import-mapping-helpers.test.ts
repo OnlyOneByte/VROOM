@@ -161,6 +161,29 @@ describe('guessManualColumns', () => {
 		}
 	});
 
+	test('snake_case and camelCase headers are split into words before matching', () => {
+		expect(
+			guessManualColumns(['date', 'car_name', 'expense_type', 'amount', 'expense_tags'])
+		).toEqual({
+			date: 'date',
+			vehicle: 'car_name',
+			category: 'expense_type',
+			amount: 'amount',
+			tags: 'expense_tags'
+		});
+		expect(guessManualColumns(['purchaseDate', 'carName', 'expenseType', 'totalCost'])).toEqual({
+			date: 'purchaseDate',
+			vehicle: 'carName',
+			category: 'expenseType',
+			amount: 'totalCost'
+		});
+	});
+
+	test('a vehicle or car type column is not the vehicle', () => {
+		expect(guessManualColumns(['Date', 'Vehicle type', 'Amount']).vehicle).toBeUndefined();
+		expect(guessManualColumns(['Date', 'Car type', 'Car', 'Amount']).vehicle).toBe('Car');
+	});
+
 	test('an un-guessable header set leaves fields unmapped (no invented columns)', () => {
 		expect(guessManualColumns(['col1', 'col2', 'xyz'])).toEqual({});
 	});

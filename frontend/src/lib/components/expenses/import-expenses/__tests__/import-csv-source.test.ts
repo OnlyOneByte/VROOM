@@ -66,6 +66,23 @@ describe('ImportCsvSource', () => {
 		expect(onFileChange).toHaveBeenCalledWith(file);
 	});
 
+	test('clears the chosen file so choosing the same file again fires a new change', async () => {
+		const { onFileChange } = renderSource();
+		const file = new File(['date,amount'], 'log.csv', { type: 'text/csv' });
+		const cleared = vi.fn();
+		Object.defineProperty(fileInput(), 'files', { value: [file], configurable: true });
+		Object.defineProperty(fileInput(), 'value', {
+			get: () => 'C:\\fakepath\\log.csv',
+			set: cleared,
+			configurable: true
+		});
+
+		await fireEvent.change(fileInput());
+
+		expect(onFileChange).toHaveBeenCalledWith(file);
+		expect(cleared).toHaveBeenCalledWith('');
+	});
+
 	test('ignores a change with no file selected', async () => {
 		const { onFileChange } = renderSource();
 		Object.defineProperty(fileInput(), 'files', { value: [], configurable: true });
