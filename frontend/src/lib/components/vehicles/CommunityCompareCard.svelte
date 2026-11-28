@@ -240,7 +240,8 @@
 			/>
 		{:else if awaitingRefresh}
 			<p class="text-sm text-muted-foreground" data-testid="community-compare-awaiting">
-				You're in. Comparisons appear after the next daily refresh includes your vehicles.
+				You're in. Group figures are updated about once a month, and comparisons appear once an
+				update includes your vehicles.
 			</p>
 		{:else if optInRequired}
 			<div class="space-y-3" data-testid="community-compare-opt-in">

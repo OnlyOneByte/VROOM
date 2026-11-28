@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { CONFIG } from '../../../config';
 import { getColumnNames } from '../../../db/__tests__/migration-helpers';
 import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { logger } from '../../../utils/logger';
@@ -20,6 +21,7 @@ import { CommunityStatsRepository } from '../repository';
 import { NO_NOISE, NOW } from './community-fixtures';
 
 const DAY = 86_400_000;
+const PERIOD = CONFIG.communityStats.releasePeriodMs;
 let db: TestDb;
 let repository: CommunityStatsRepository;
 
@@ -56,6 +58,20 @@ function efficiencyRows() {
     .all() as { n_published: number }[];
 }
 
+function memberRows() {
+  return db.sqlite
+    .query("SELECT * FROM community_release_members WHERE scope = 'local'")
+    .all() as Record<string, unknown>[];
+}
+
+const RELEASE_DUE = {
+  noiseKey: async () => 'key',
+  lastRefreshedAt: async () => null,
+  releasedWithoutMembers: async () => false,
+};
+
+const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);
+
 function setOptIn(id: string, optIn: boolean): void {
   db.sqlite.run('UPDATE user_preferences SET community_stats_opt_in = ? WHERE user_id = ?', [
     optIn ? 1 : 0,
@@ -80,24 +96,68 @@ describe('community stats refresh against the database', () => {
     const result = await refreshCommunityStats(repository, NOW, NO_NOISE);
 
     expect(efficiencyRows()).toEqual([]);
-    expect(result.suppressed).toBeGreaterThan(0);
+    expect(result?.suppressed).toBeGreaterThan(0);
   });
 
-  test('opting in shows up on the next run, and a withdrawal drops out on the next run', async () => {
+  test('opting in counts from the next release, and opting out withdraws the groups on the next run', async () => {
     for (let i = 0; i < 29; i++) seedOwner(db.sqlite, `in-${i}`, true);
     seedOwner(db.sqlite, 'late', false);
     await refreshCommunityStats(repository, NOW, NO_NOISE);
     expect(efficiencyRows()).toEqual([]);
 
     setOptIn('late', true);
+    await refreshCommunityStats(repository, at(DAY), NO_NOISE);
     expect(efficiencyRows()).toEqual([]);
-    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    await refreshCommunityStats(repository, at(PERIOD), NO_NOISE);
     expect(efficiencyRows()).toEqual([{ n_published: 30 }]);
 
     setOptIn('in-0', false);
     expect(efficiencyRows()).toEqual([{ n_published: 30 }]);
-    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    await refreshCommunityStats(repository, at(PERIOD + DAY), NO_NOISE);
     expect(efficiencyRows()).toEqual([]);
+    expect(memberRows()).toEqual([]);
+    expect(await repository.lastRefreshedAt('local')).toEqual(at(PERIOD));
+  });
+
+  test('a deleted account withdraws its groups on the next run', async () => {
+    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    expect(efficiencyRows()).toEqual([{ n_published: 30 }]);
+
+    db.sqlite.run("DELETE FROM users WHERE id = 'in-3'");
+    await refreshCommunityStats(repository, at(DAY), NO_NOISE);
+    expect(efficiencyRows()).toEqual([]);
+  });
+
+  test("a group's figures stay as released until the period ends, even when its data changes", async () => {
+    for (let i = 0; i < 40; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    const snapshot = () =>
+      db.sqlite
+        .query('SELECT bucket_key, n_published, mean FROM community_stats ORDER BY bucket_key')
+        .all();
+    await refreshCommunityStats(repository, NOW);
+    const released = snapshot();
+    expect(released.length).toBeGreaterThan(0);
+
+    for (let i = 40; i < 60; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (const day of [DAY, 7 * DAY, PERIOD - DAY]) {
+      expect(await refreshCommunityStats(repository, at(day))).toBeNull();
+      expect(snapshot()).toEqual(released);
+    }
+    expect(await repository.lastRefreshedAt('local')).toEqual(NOW);
+
+    expect(await refreshCommunityStats(repository, at(PERIOD))).not.toBeNull();
+    expect(await repository.lastRefreshedAt('local')).toEqual(at(PERIOD));
+  });
+
+  test('rows released before groups recorded their owners are released again on the next run', async () => {
+    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    db.sqlite.run('DELETE FROM community_release_members');
+
+    expect(await refreshCommunityStats(repository, at(DAY), NO_NOISE)).not.toBeNull();
+    expect(new Set(memberRows().map((row) => row.member_tag)).size).toBe(30);
+    expect(await repository.lastRefreshedAt('local')).toEqual(at(DAY));
   });
 
   test('the noise key is made once per scope, kept across runs, and never stored with the stats', async () => {
@@ -135,7 +195,8 @@ describe('community stats refresh against the database', () => {
     >[];
     expect(rows.length).toBeGreaterThan(0);
     expect(new Set(rows.map((row) => row.bucket_key)).size).toBe(rows.length);
-    const text = JSON.stringify(rows);
+    const text = JSON.stringify([rows, memberRows()]);
+    expect(memberRows().length).toBeGreaterThan(0);
     for (const secret of ['in-0', 'VINin', 'PLATE-', 'example.com']) {
       expect(text).not.toContain(secret);
     }
@@ -163,7 +224,7 @@ describe('community stats refresh against the database', () => {
         missedFillup: false,
       });
     }
-    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    await refreshCommunityStats(repository, at(PERIOD), NO_NOISE);
     expect(maintenance()).toEqual([{ n_published: 30 }]);
   });
 
@@ -277,6 +338,7 @@ describe('community stats refresh against the database', () => {
 
   test('a failed run logs only the database cause, never the query or its ids', async () => {
     const failing = {
+      ...RELEASE_DUE,
       loadOptedIn: () =>
         Promise.reject(
           new Error('Failed query: select ... params: owner-secret-id,vehicle-secret-id', {
@@ -298,6 +360,7 @@ describe('community stats refresh against the database', () => {
 
   test('a failure without a cause logs only the error name', async () => {
     const failing = {
+      ...RELEASE_DUE,
       loadOptedIn: () => Promise.reject(new TypeError('owner-secret-id is not a thing')),
     } as unknown as CommunityStatsRepository;
     const errorSpy = spyOn(logger, 'error').mockImplementation(() => {});
@@ -310,14 +373,15 @@ describe('community stats refresh against the database', () => {
     }
   });
 
-  test('every refresh records its time, even one that publishes nothing', async () => {
+  test('every release records its time, even one that publishes nothing, and runs between releases do not', async () => {
     expect(await repository.lastRefreshedAt('local')).toBeNull();
     await refreshCommunityStats(repository, NOW);
     expect(db.sqlite.query('SELECT COUNT(*) AS n FROM community_stats').get()).toEqual({ n: 0 });
     expect(await repository.lastRefreshedAt('local')).toEqual(NOW);
-    const later = new Date(NOW.getTime() + DAY);
-    await refreshCommunityStats(repository, later);
-    expect(await repository.lastRefreshedAt('local')).toEqual(later);
+    await refreshCommunityStats(repository, at(DAY));
+    expect(await repository.lastRefreshedAt('local')).toEqual(NOW);
+    await refreshCommunityStats(repository, at(PERIOD));
+    expect(await repository.lastRefreshedAt('local')).toEqual(at(PERIOD));
   });
 
   test('the table has no user id column', () => {

@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, getTableColumns, gte, inArray, lte, min } from 'drizzle-orm';
+import { and, eq, getTableColumns, gte, inArray, isNull, lte, min } from 'drizzle-orm';
 import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { firstRow } from '../../db/first-row';
 import {
   type CommunityStat,
   communityNoiseKeys,
   communityRefreshes,
+  communityReleaseMembers,
   communityStats,
   expenses,
   insurancePolicies,
@@ -305,12 +306,75 @@ export class CommunityStatsRepository {
     return row?.refreshedAt ?? null;
   }
 
-  async replaceScope(scope: string, rows: NewCommunityStat[], refreshedAt: Date): Promise<void> {
+  async releasedWithoutMembers(scope: string): Promise<boolean> {
+    const row = await this.db
+      .select({ bucketKey: communityStats.bucketKey })
+      .from(communityStats)
+      .leftJoin(
+        communityReleaseMembers,
+        and(
+          eq(communityReleaseMembers.scope, communityStats.scope),
+          eq(communityReleaseMembers.bucketKey, communityStats.bucketKey)
+        )
+      )
+      .where(and(eq(communityStats.scope, scope), isNull(communityReleaseMembers.memberTag)))
+      .limit(1)
+      .then(firstRow);
+    return row !== undefined;
+  }
+
+  async withdrawLeavers(scope: string, tagOf: (ownerId: string) => string): Promise<number> {
+    const owners = await this.db
+      .select({ userId: userPreferences.userId })
+      .from(userPreferences)
+      .where(eq(userPreferences.communityStatsOptIn, true));
+    const current = new Set(owners.map((owner) => tagOf(owner.userId)));
+    const members = await this.db
+      .select({
+        bucketKey: communityReleaseMembers.bucketKey,
+        memberTag: communityReleaseMembers.memberTag,
+      })
+      .from(communityReleaseMembers)
+      .where(eq(communityReleaseMembers.scope, scope));
+    const left = [
+      ...new Set(members.filter((m) => !current.has(m.memberTag)).map((m) => m.bucketKey)),
+    ];
+    if (left.length === 0) return 0;
+    await this.db.transaction(async (tx) => {
+      for (const keys of chunk(left)) {
+        await tx
+          .delete(communityStats)
+          .where(and(eq(communityStats.scope, scope), inArray(communityStats.bucketKey, keys)));
+        await tx
+          .delete(communityReleaseMembers)
+          .where(
+            and(
+              eq(communityReleaseMembers.scope, scope),
+              inArray(communityReleaseMembers.bucketKey, keys)
+            )
+          );
+      }
+    });
+    return left.length;
+  }
+
+  async replaceScope(
+    scope: string,
+    rows: NewCommunityStat[],
+    members: { bucketKey: string; memberTag: string }[],
+    refreshedAt: Date
+  ): Promise<void> {
     await this.db.transaction(async (tx) => {
       await tx.delete(communityStats).where(eq(communityStats.scope, scope));
+      await tx.delete(communityReleaseMembers).where(eq(communityReleaseMembers.scope, scope));
       const perInsert = rowsPerInsert(Object.keys(getTableColumns(communityStats)).length);
       for (const batch of chunk(rows, perInsert)) {
         await tx.insert(communityStats).values(batch);
+      }
+      for (const batch of chunk(members, rowsPerInsert(3))) {
+        await tx
+          .insert(communityReleaseMembers)
+          .values(batch.map((member) => ({ scope, ...member })));
       }
       await tx
         .insert(communityRefreshes)

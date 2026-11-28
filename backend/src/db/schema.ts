@@ -86,6 +86,10 @@ export const pushSubscriptions = active(sqlite.pushSubscriptions, pg.pushSubscri
 export const communityStats = active(sqlite.communityStats, pg.communityStats);
 export const communityRefreshes = active(sqlite.communityRefreshes, pg.communityRefreshes);
 export const communityNoiseKeys = active(sqlite.communityNoiseKeys, pg.communityNoiseKeys);
+export const communityReleaseMembers = active(
+  sqlite.communityReleaseMembers,
+  pg.communityReleaseMembers
+);
 export const moneyUnitMigrations = active(sqlite.moneyUnitMigrations, pg.moneyUnitMigrations);
 export const serverSettings = active(sqlite.serverSettings, pg.serverSettings);
 export const serverInvites = active(sqlite.serverInvites, pg.serverInvites);

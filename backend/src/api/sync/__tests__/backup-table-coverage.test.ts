@@ -13,6 +13,7 @@ const EXCLUDED_BY_DESIGN = [
   'community_stats',
   'community_refreshes',
   'community_noise_keys',
+  'community_release_members',
   'calendar_feeds',
   'roles',
   'role_permissions',

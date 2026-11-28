@@ -182,6 +182,7 @@ export const pushSubscriptions = pgTwin(sqlite.pushSubscriptions);
 export const communityStats = pgTwin(sqlite.communityStats);
 export const communityRefreshes = pgTwin(sqlite.communityRefreshes);
 export const communityNoiseKeys = pgTwin(sqlite.communityNoiseKeys);
+export const communityReleaseMembers = pgTwin(sqlite.communityReleaseMembers);
 export const moneyUnitMigrations = pgTwin(sqlite.moneyUnitMigrations);
 export const serverSettings = pgTwin(sqlite.serverSettings);
 export const serverInvites = pgTwin(sqlite.serverInvites);

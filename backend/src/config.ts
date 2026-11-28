@@ -258,6 +258,7 @@ export const CONFIG = {
     enabled: env.COMMUNITY_STATS !== 'off' && env.NODE_ENV !== 'test',
     minGroup: env.COMMUNITY_STATS_MIN_GROUP,
     refreshIntervalMs: 24 * 60 * 60 * 1000,
+    releasePeriodMs: 30 * 24 * 60 * 60 * 1000,
     maxJitterMs: 60 * 60 * 1000,
     slowRunWarnMs: 30_000,
   },

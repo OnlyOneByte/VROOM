@@ -823,6 +823,18 @@ export const communityNoiseKeys = sqliteTable('community_noise_keys', {
   noiseKey: text('noise_key').notNull(),
 });
 
+export const communityReleaseMembers = sqliteTable(
+  'community_release_members',
+  {
+    scope: text('scope').notNull(),
+    bucketKey: text('bucket_key').notNull(),
+    memberTag: text('member_tag').notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.scope, table.bucketKey, table.memberTag] }),
+  })
+);
+
 export const moneyUnitMigrations = sqliteTable('money_unit_migrations', {
   name: text('name').primaryKey(),
 });

@@ -101,6 +101,7 @@ export interface AggregateOptions {
 
 export interface AggregateResult {
   rows: NewCommunityStat[];
+  members: { bucketKey: string; ownerIds: string[] }[];
   published: number;
   suppressed: number;
 }
@@ -357,25 +358,56 @@ export function aggregate(
 ): AggregateResult {
   const uniform =
     options.uniform ?? keyedUniform(options.noiseKey ?? randomBytes(32).toString('hex'));
+  const rows: NewCommunityStat[] = [];
+  const members: AggregateResult['members'] = [];
   const buckets = collectBuckets(vehicles, options.now);
-  const rows = buckets.flatMap((bucket) => publishBucket(bucket, options, uniform) ?? []);
-  return { rows, published: rows.length, suppressed: buckets.length - rows.length };
+  for (const bucket of buckets) {
+    const row = publishBucket(bucket, options, uniform);
+    if (!row) continue;
+    rows.push(row);
+    members.push({ bucketKey: row.bucketKey, ownerIds: [...bucket.byOwner.keys()] });
+  }
+  return { rows, members, published: rows.length, suppressed: buckets.length - rows.length };
+}
+
+export function memberTagger(noiseKey: string): (ownerId: string) => string {
+  return (ownerId) => createHmac('sha256', noiseKey).update(`member|${ownerId}`).digest('hex');
+}
+
+export function releaseDue(lastRelease: Date | null, now: Date): boolean {
+  return (
+    lastRelease === null ||
+    now.getTime() - lastRelease.getTime() >= CONFIG.communityStats.releasePeriodMs
+  );
 }
 
 export async function refreshCommunityStats(
   repository: CommunityStatsRepository = repos().communityStats,
   now: Date = new Date(),
   uniform?: NoiseSource
-): Promise<AggregateResult> {
+): Promise<AggregateResult | null> {
   const started = performance.now();
+  const noiseKey = await repository.noiseKey(LOCAL_SCOPE);
+  const tagOf = memberTagger(noiseKey);
+  const due =
+    releaseDue(await repository.lastRefreshedAt(LOCAL_SCOPE), now) ||
+    (await repository.releasedWithoutMembers(LOCAL_SCOPE));
+  if (!due) {
+    const withdrawn = await repository.withdrawLeavers(LOCAL_SCOPE, tagOf);
+    logger.info(`community stats kept until the next release: ${withdrawn} buckets withdrawn`);
+    return null;
+  }
   const input = await repository.loadOptedIn(new Date(now.getTime() - COMMUNITY_WINDOW_MS), now);
   const result = aggregate(input.vehicles, {
     now,
     minGroup: CONFIG.communityStats.minGroup,
-    noiseKey: await repository.noiseKey(LOCAL_SCOPE),
+    noiseKey,
     uniform,
   });
-  await repository.replaceScope(LOCAL_SCOPE, result.rows, now);
+  const members = result.members.flatMap(({ bucketKey, ownerIds }) =>
+    ownerIds.map((ownerId) => ({ bucketKey, memberTag: tagOf(ownerId) }))
+  );
+  await repository.replaceScope(LOCAL_SCOPE, result.rows, members, now);
   const ms = Math.round(performance.now() - started);
   logger.info(
     `community stats refreshed: ${result.published} buckets published, ${result.suppressed} below the threshold, ${input.optedInOwners} opted-in owners, ${ms} ms`
