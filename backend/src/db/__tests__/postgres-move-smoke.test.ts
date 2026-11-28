@@ -4,7 +4,14 @@ import AdmZip from 'adm-zip';
 import { CONFIG } from '../../config';
 import { seedGarage } from '../../db/seed';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../test-helpers/http-client';
-import { compareBackups, exportBackup, MOVE_ORIGIN, restoreBackup } from '../postgres-move-smoke';
+import {
+  compareBackups,
+  exportBackup,
+  MOVE_ORIGIN,
+  restoreBackup,
+  rowCounts,
+  signUpSession,
+} from '../postgres-move-smoke';
 
 let ctx: TestApp;
 let server: ReturnType<typeof Bun.serve>;
@@ -34,6 +41,24 @@ describe('the SQLite to Postgres move script', () => {
     await restoreBackup(base, session, before);
     await exportBackup(base, session, after);
     expect(compareBackups(before, after)).toEqual([]);
+  }, 60_000);
+
+  test('the account to move into comes from the sign-up path with a working session', async () => {
+    const dir = process.env.KIROCREW_SCRATCH ?? process.env.TMPDIR ?? '/tmp';
+    const empty = join(dir, `move-signup-${process.pid}.zip`);
+    const moved = await signUpSession();
+    const me = await fetch(`${base}/api/v1/auth/me`, {
+      headers: { Cookie: `auth_session=${moved}`, Origin: MOVE_ORIGIN },
+    });
+    expect(me.status).toBe(200);
+    const body = (await me.json()) as {
+      data: { user: { id: string; email: string }; pendingApproval: boolean };
+    };
+    expect(body.data.user.id).not.toBe(ctx.user.id);
+    expect(body.data.user.email).toMatch(/^move-\w+@vroom\.test$/);
+    expect(body.data.pendingApproval).toBe(false);
+    await exportBackup(base, moved, empty);
+    expect(rowCounts(empty)['vehicles.csv'] ?? 0).toBe(0);
   }, 60_000);
 
   test('a backup with rows missing after the move is reported table by table', async () => {
