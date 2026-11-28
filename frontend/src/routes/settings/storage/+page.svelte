@@ -142,9 +142,7 @@
 			return warning ? [{ id, warning }] : [];
 		});
 		if (warnings.length === 0) return null;
-		const who = names(warnings.map(w => w.id));
-		if (warnings.length === 1) return `${who}: ${warnings[0]?.warning}`;
-		return `Old backups couldn't be removed from ${who}. Each one's card under Connected says why.`;
+		return `${names(warnings.map(w => w.id))}: ${warnings[0]?.warning}`;
 	}
 
 	function backupProblem(

@@ -240,7 +240,7 @@ describe('Backups and storage page backups', () => {
 				zip: {
 					success: true,
 					warning:
-						"Old backups couldn't be removed. VROOM needs permission to list and delete files in this storage."
+						"Old backups couldn't be removed. VROOM needs permission to list and delete files there."
 				}
 			}
 		} as never;
@@ -248,13 +248,13 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 2 places. Office S3: Old backups couldn't be removed. VROOM needs permission to list and delete files in this storage.",
+			"Backed up to 2 places. Office S3: Old backups couldn't be removed. VROOM needs permission to list and delete files there.",
 			{ id: 'toast-1' }
 		);
 		expect(toast.success).not.toHaveBeenCalled();
 	});
 
-	test('when cleanup failed on two providers, the warning names both and points to their cards', async () => {
+	test('when cleanup failed on two providers, the warning names both and still gives the reason', async () => {
 		getProviders.mockResolvedValue([
 			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
 			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo
@@ -266,7 +266,7 @@ describe('Backups and storage page backups', () => {
 				zip: {
 					success: true,
 					warning:
-						"Old backups couldn't be removed. VROOM needs permission to list and delete files in this storage."
+						"Old backups couldn't be removed. VROOM needs permission to list and delete files there."
 				}
 			}
 		} as never;
@@ -276,7 +276,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 2 places. Old backups couldn't be removed from Family Drive and Office S3. Each one's card under Connected says why.",
+			"Backed up to 2 places. Family Drive and Office S3: Old backups couldn't be removed. VROOM needs permission to list and delete files there.",
 			{ id: 'toast-1' }
 		);
 	});
