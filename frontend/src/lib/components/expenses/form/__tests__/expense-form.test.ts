@@ -715,7 +715,6 @@ describe('ExpenseForm edit mode', () => {
 
 		await vi.waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(1));
 		expect(updateExpense.mock.calls[0]?.[1]).toMatchObject({ amount: 60 });
-		resetPendingEdits();
 	});
 
 	test('a car whose owner counts in yen opens its amount with no decimals', async () => {
@@ -780,7 +779,6 @@ describe('ExpenseForm edit mode', () => {
 		await renderEdit();
 
 		await vi.waitFor(() => expect(field('amount').value).toBe('85.00'));
-		resetPendingEdits();
 	});
 
 	test('saving returns at once, and a refused update is reported once with its reason and Retry', async () => {
@@ -798,7 +796,6 @@ describe('ExpenseForm edit mode', () => {
 		const refusal = appStore.notifications.find(n => n.type === 'error');
 		expect(refusal?.description).toBe('Mileage must be less than 30,500 (from later entry).');
 		expect(refusal?.action?.label).toBe('Retry');
-		resetPendingEdits();
 	});
 
 	test('validation guards updates too', async () => {

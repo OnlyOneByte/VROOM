@@ -457,16 +457,13 @@
 		}
 	});
 
+	// A vehicle field's error clears as soon as its value is valid; new errors still wait for Save.
 	$effect(() => {
-		if (errors['vin'] && vehicleForm.vin) {
-			const vinRegex = /^[A-Z0-9]+$/i;
-			if (
-				vinRegex.test(vehicleForm.vin) &&
-				vehicleForm.vin.length >= 11 &&
-				vehicleForm.vin.length <= 17
-			) {
-				delete errors['vin'];
-			}
+		const shown = Object.keys(errors).filter(key => key in vehicleForm);
+		if (shown.length === 0) return;
+		const current = validateVehicleFields(vehicleForm);
+		for (const key of shown) {
+			if (!(key in current)) delete errors[key as keyof typeof errors];
 		}
 	});
 

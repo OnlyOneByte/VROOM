@@ -278,6 +278,31 @@ describe('VehicleForm create mode', () => {
 		await vi.waitFor(() => expect(errorText('vin')).toBeNull());
 	});
 
+	test('make and model errors clear as each is filled in, without another Save', async () => {
+		await renderCreate();
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
+		expect(errorText('make')).toBe('Make is required');
+		expect(errorText('model')).toBe('Model is required');
+
+		await type('make', 'Toyota');
+		await vi.waitFor(() => expect(errorText('make')).toBeNull());
+		expect(input('make').getAttribute('aria-invalid')).not.toBe('true');
+		expect(errorText('model')).toBe('Model is required');
+
+		await type('model', 'Corolla');
+		await vi.waitFor(() => expect(errorText('model')).toBeNull());
+	});
+
+	test('a field that becomes invalid while typing waits for Save before it is flagged', async () => {
+		await renderCreate();
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
+		await type('make', 'Toyota');
+		await type('year', '1899');
+
+		await vi.waitFor(() => expect(errorText('make')).toBeNull());
+		expect(errorText('year')).toBeNull();
+	});
+
 	test('rejects a negative initial mileage', async () => {
 		await renderCreate();
 		await fillRequired();
