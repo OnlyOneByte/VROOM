@@ -77,8 +77,12 @@ describe('mileage expense reminders', () => {
     await addOdometerReading(ctx, vehicleId, 15300);
     await trigger();
 
-    expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE source_id = 'rem-ending'")).toBe(1);
-    const row = (await ctx.sql.get("SELECT is_active AS a FROM reminders WHERE id = 'rem-ending'")) as {
+    expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE source_id = 'rem-ending'")).toBe(
+      1
+    );
+    const row = (await ctx.sql.get(
+      "SELECT is_active AS a FROM reminders WHERE id = 'rem-ending'"
+    )) as {
       a: number | boolean;
     };
     expect(Boolean(row.a)).toBe(false);
