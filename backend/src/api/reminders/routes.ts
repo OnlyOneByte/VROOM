@@ -514,11 +514,13 @@ routes.get(
       return financialAccessOf(resolver, expense.vehicleId).read || !isFinancialExpense(expense);
     });
     const scale = await repos().preferences.moneyScale(existing.reminder.userId);
+    const isOwner = c.get('user').id === existing.reminder.userId;
     return c.json({
       success: true,
-      data: readable.map((expense) =>
-        hideDriverFields(c, expense.vehicleId, expenseToApi(expense, scale))
-      ),
+      data: readable.map((expense) => {
+        const row = hideDriverFields(c, expense.vehicleId, expenseToApi(expense, scale));
+        return isOwner ? row : { ...row, groupTotal: null, splitMethod: null };
+      }),
     });
   }
 );

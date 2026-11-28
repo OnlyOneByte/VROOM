@@ -120,4 +120,45 @@ describe('reminder details for someone a car is shared with', () => {
     expect(body.data[0].reminder.expenseAmount).toBe(300);
     expect(body.data[0].vehicleIds.sort()).toEqual([shared, other].sort());
   });
+
+  test('a percentage split shows the shared car’s booked share', async () => {
+    await reminder({
+      vehicleIds: [shared, other],
+      expenseAmount: 100,
+      expenseSplitConfig: {
+        method: 'percentage',
+        allocations: [
+          { vehicleId: shared, percentage: 33.33 },
+          { vehicleId: other, percentage: 66.67 },
+        ],
+      },
+    });
+
+    const [row] = await viewersList();
+
+    expect(row.reminder.expenseAmount).toBe(33.33);
+    expect(JSON.stringify(row)).not.toContain(other);
+  });
+
+  test('the booked expenses of a fired reminder show only the shared car’s share', async () => {
+    const created = await reminder({
+      startDate: '2024-01-01T00:00:00.000Z',
+      vehicleIds: [shared, other],
+      expenseAmount: 100,
+      expenseSplitConfig: { method: 'even', vehicleIds: [shared, other] },
+    });
+    const id = (created as { reminder: { id: string } }).reminder.id;
+    expect((await ctx.authed('POST', '/api/v1/reminders/trigger')).status).toBe(200);
+
+    const res = await viewer.request('GET', `/api/v1/reminders/${id}/expenses`);
+    const body = await json<DataEnvelope<Array<Record<string, unknown>>>>(res);
+
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.length).toBeGreaterThan(0);
+    for (const expense of body.data) {
+      expect(expense.vehicleId).toBe(shared);
+      expect(expense.groupTotal ?? null).toBeNull();
+      expect(expense.splitMethod ?? null).toBeNull();
+    }
+  });
 });
