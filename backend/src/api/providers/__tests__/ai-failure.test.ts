@@ -2,17 +2,14 @@ import { describe, expect, test } from 'bun:test';
 import { type AppError, PayloadTooLargeError, ValidationError } from '../../../errors';
 import { EndpointNotAllowedError } from '../../../utils/outbound-url';
 import { aiFailure, loadAiProvider } from '../ai-failure';
-import {
-  ANTHROPIC_MAX_IMAGE_BYTES,
-  anthropicMaxTokens,
-  assertAnthropicImageSize,
-} from '../domains/model/anthropic-limits';
+import { anthropicMaxTokens, assertAnthropicImageSize } from '../domains/model/anthropic-limits';
 
 describe('aiFailure', () => {
-  test("the server's own address policy is passed on as a 400 with its message", () => {
-    const failure = aiFailure(new EndpointNotAllowedError('Only public https:// addresses'), 'x');
-    expect(failure).toBeInstanceOf(ValidationError);
-    expect(failure.message).toBe('Only public https:// addresses');
+  test.each([
+    new EndpointNotAllowedError('Only public https:// addresses'),
+    new ValidationError('The provider host could not be resolved'),
+  ])('our own address check is passed on as a 400 with its message', (error) => {
+    expect(aiFailure(error, 'x')).toBe(error);
   });
 
   test('an image too large for the provider keeps its own 413', () => {
@@ -52,10 +49,8 @@ describe('Anthropic limits', () => {
     expect(anthropicMaxTokens(model)).toBe(cap);
   });
 
-  test('an image over 5 MB is refused before it is sent', () => {
-    expect(() => assertAnthropicImageSize(ANTHROPIC_MAX_IMAGE_BYTES)).not.toThrow();
-    expect(() => assertAnthropicImageSize(ANTHROPIC_MAX_IMAGE_BYTES + 1)).toThrow(
-      PayloadTooLargeError
-    );
+  test('an image whose encoded size is over 10 MB is refused before it is sent', () => {
+    expect(() => assertAnthropicImageSize(7_500_000)).not.toThrow();
+    expect(() => assertAnthropicImageSize(7_500_003)).toThrow(PayloadTooLargeError);
   });
 });

@@ -1,10 +1,10 @@
 import { AppError, PayloadTooLargeError, ValidationError } from '../../errors';
-import { EndpointNotAllowedError } from '../../utils/outbound-url';
+import { extractErrorMessage } from '../../utils/error-handling';
+import { logger } from '../../utils/logger';
 import { healthCodeOf } from './provider-status';
 
 export function aiFailure(error: unknown, unreachableMessage: string): AppError {
-  if (error instanceof EndpointNotAllowedError) return new ValidationError(error.message);
-  if (error instanceof PayloadTooLargeError) return error;
+  if (error instanceof ValidationError || error instanceof PayloadTooLargeError) return error;
   const message = error instanceof Error ? error.message : '';
   if (/HTTP 429\b/.test(message)) {
     return new AppError(
@@ -21,7 +21,7 @@ export function aiFailure(error: unknown, unreachableMessage: string): AppError 
       );
     case 'config':
       return new AppError(
-        "The AI provider didn't accept the request. Check the model name in Settings.",
+        "The AI provider didn't accept the request. Check the key and model name in Settings.",
         502
       );
     default:
@@ -34,6 +34,7 @@ export async function loadAiProvider<T>(load: () => Promise<T>): Promise<T> {
     return await load();
   } catch (error) {
     if (error instanceof AppError) throw error;
+    logger.warn('AI provider could not be loaded', { error: extractErrorMessage(error) });
     throw new AppError("The saved AI key can't be read. Enter it again in Settings.", 502);
   }
 }

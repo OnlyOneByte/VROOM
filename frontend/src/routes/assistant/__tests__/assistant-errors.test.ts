@@ -92,12 +92,14 @@ describe('assistant page errors', () => {
 
 	test('a failed send is announced, and Retry sends the same question again', async () => {
 		sendMessage
-			.mockRejectedValueOnce(new ApiError('upstream 502', 502))
+			.mockRejectedValueOnce(
+				new ApiError('The assistant provider could not be reached. Try again.', 502)
+			)
 			.mockResolvedValueOnce({ reply: 'You spent $120.', toolsUsed: [] });
 		await ask('How much did I spend?');
 
 		expect(await screen.findByRole('alert')).toHaveTextContent(
-			"The AI provider couldn't be reached."
+			'The assistant provider could not be reached.'
 		);
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
@@ -106,15 +108,14 @@ describe('assistant page errors', () => {
 		expect(sendMessage).toHaveBeenLastCalledWith('How much did I spend?', []);
 	});
 
-	test('an unreachable provider says so', async () => {
-		sendMessage.mockRejectedValue(new ApiError('upstream 502', 502));
+	test.each([
+		[502, "The AI provider didn't accept its key. Check it in Settings, then try again."],
+		[503, 'The AI provider is limiting requests right now. Try again in a few minutes.']
+	])('a provider failure (%i) shows what the server says went wrong', async (status, message) => {
+		sendMessage.mockRejectedValue(new ApiError(message, status));
 		await ask('How much did I spend?');
 
-		expect(
-			await screen.findByText(
-				"The AI provider couldn't be reached. Check the key and model in Settings, then try again."
-			)
-		).toBeInTheDocument();
+		expect(await screen.findByText(message)).toBeInTheDocument();
 	});
 
 	test("a missing provider shows the server's reason", async () => {

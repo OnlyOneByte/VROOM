@@ -170,9 +170,20 @@ describe('ReceiptScanButton: errors', () => {
 			"Couldn't read the receipt. No image file provided. Or fill it in manually."
 		],
 		[
-			'unreachable provider (502)',
-			new ApiError('Bad Gateway', 502),
-			"Couldn't reach the AI provider. Check the key and model, or fill it in manually."
+			'a rejected key (502)',
+			new ApiError(
+				"The AI provider didn't accept its key. Check it in Settings, then try again.",
+				502
+			),
+			"The AI provider didn't accept its key. Check it in Settings, then try again. Or fill it in manually."
+		],
+		[
+			'an image too large for the provider (413)',
+			new ApiError(
+				'This receipt image is too large for the AI provider. Use a smaller photo.',
+				413
+			),
+			'This receipt image is too large for the AI provider. Use a smaller photo. Or fill it in manually.'
 		],
 		[
 			'built-in reader found no text (422)',

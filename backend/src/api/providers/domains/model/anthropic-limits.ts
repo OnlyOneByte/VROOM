@@ -1,6 +1,6 @@
 import { PayloadTooLargeError } from '../../../../errors';
 
-export const ANTHROPIC_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const ANTHROPIC_MAX_ENCODED_IMAGE_BYTES = 10_000_000;
 
 export function anthropicMaxTokens(model: string): number {
   if (/^claude-3-[57]-/.test(model)) return 8192;
@@ -9,9 +9,9 @@ export function anthropicMaxTokens(model: string): number {
 }
 
 export function assertAnthropicImageSize(bytes: number): void {
-  if (bytes > ANTHROPIC_MAX_IMAGE_BYTES) {
+  if (Math.ceil(bytes / 3) * 4 > ANTHROPIC_MAX_ENCODED_IMAGE_BYTES) {
     throw new PayloadTooLargeError(
-      "This receipt image is over the AI provider's 5 MB limit. Use a smaller photo."
+      'This receipt image is too large for the AI provider. Use a smaller photo.'
     );
   }
 }

@@ -134,7 +134,7 @@ describe('POST /api/v1/receipts/parse', () => {
 
   test.each([
     [401, 502, "didn't accept its key"],
-    [404, 502, 'Check the model name'],
+    [404, 502, 'Check the key and model name'],
     [429, 503, 'limiting requests'],
     [500, 502, 'could not be reached'],
   ])('a provider HTTP %i answers %i saying what went wrong', async (upstream, status, text) => {
