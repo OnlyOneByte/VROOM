@@ -291,7 +291,7 @@
 							{#if managesServer}
 								<a
 									href={resolve(routes.settingsServer)}
-									class="group flex items-center justify-between gap-4 py-3"
+									class="group flex items-center justify-between gap-4 rounded-md py-3 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 									data-testid="settings-server-link"
 								>
 									<span class="min-w-0">
@@ -317,7 +317,7 @@
 						<CardContent data-testid="settings-storage-summary">
 							<a
 								href={resolve(routes.settingsStorage)}
-								class="group flex items-center justify-between gap-4 pb-3"
+								class="group flex items-center justify-between gap-4 rounded-md pb-3 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 								data-testid="settings-storage-link"
 							>
 								<span class="min-w-0">
@@ -338,7 +338,7 @@
 						<CardContent data-testid="settings-ai-summary">
 							<a
 								href={resolve(routes.settingsAi)}
-								class="group flex items-center justify-between gap-4 pb-3"
+								class="group flex items-center justify-between gap-4 rounded-md pb-3 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 								data-testid="settings-ai-link"
 							>
 								<span class="min-w-0">

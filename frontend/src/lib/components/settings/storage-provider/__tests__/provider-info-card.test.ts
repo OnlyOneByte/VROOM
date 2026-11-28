@@ -91,6 +91,19 @@ describe('ProviderInfoCard header', () => {
 		expect(screen.getByText(label)).toBeInTheDocument();
 	});
 
+	test('the status and last-backup badges sit on their own line, outside the inline action row', async () => {
+		await mount({ lastBackupAt: '2026-05-10T00:00:00.000Z' });
+		const actionRow = screen.getByRole('button', { name: 'Edit My Drive' }).parentElement
+			?.parentElement as HTMLElement;
+		const backup = screen.getByText('Last backup 12 hours ago');
+		const status = screen.getByText('Connected');
+		expect(actionRow).toHaveTextContent('My Drive');
+		expect(actionRow).not.toContainElement(backup);
+		expect(actionRow).not.toContainElement(status);
+		expect(backup.parentElement).toBe(status.parentElement);
+		expect(backup.parentElement?.className).toMatch(/(^|\s)flex-wrap(\s|$)/);
+	});
+
 	test('an unexpected status is shown verbatim', async () => {
 		await mount({ provider: provider({ status: 'pending' as UserProviderInfo['status'] }) });
 		expect(screen.getByText('pending')).toBeInTheDocument();

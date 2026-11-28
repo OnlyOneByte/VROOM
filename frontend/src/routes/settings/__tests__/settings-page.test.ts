@@ -335,6 +335,8 @@ describe('Settings page loading', () => {
 			expect(row.className).toMatch(/(^|\s)flex(\s|$)/);
 			expect(row.className).toMatch(/(^|\s)justify-between(\s|$)/);
 			expect(row.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+			expect(row.className).toContain('focus-visible:ring-[3px]');
+			expect(row.className).toContain('focus-visible:ring-ring/50');
 		}
 	});
 

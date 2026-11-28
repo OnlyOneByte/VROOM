@@ -158,13 +158,7 @@
 					<Icon class="size-5 text-foreground" />
 				</div>
 				<div class="min-w-0">
-					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-						<p class="min-w-0 font-medium break-words">{provider.displayName}</p>
-						<ProviderStatusBadge status={provider.status} />
-						{#if lastBackupAt}
-							<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
-						{/if}
-					</div>
+					<p class="min-w-0 font-medium break-words">{provider.displayName}</p>
 					<p class="text-sm text-muted-foreground truncate">
 						{#if provider.config?.['accountEmail']}
 							{provider.config['accountEmail']} ·
@@ -207,6 +201,12 @@
 					{/if}
 				</Button>
 			</div>
+		</div>
+		<div class="mt-2 flex flex-wrap items-center gap-2 pl-14" data-slot="provider-badges">
+			<ProviderStatusBadge status={provider.status} />
+			{#if lastBackupAt}
+				<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
+			{/if}
 		</div>
 	</div>
 
