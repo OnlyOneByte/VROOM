@@ -237,3 +237,13 @@ describe('only the navigation for the screen width is rendered', () => {
 		});
 	});
 });
+
+describe('tap targets', () => {
+	it('the header account avatar is a 40px target', () => {
+		render(Navigation);
+
+		const avatar = screen.getByRole('link', { name: /Profile$/ });
+		expect(avatar).toHaveClass('size-10');
+		expect(avatar).not.toHaveClass('size-9');
+	});
+});

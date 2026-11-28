@@ -323,6 +323,17 @@ describe('Settings page loading', () => {
 		expect(screen.getByTestId('settings-storage-summary')).toHaveTextContent(summary);
 	});
 
+	test('the section header links are 40px tap targets', async () => {
+		await mount();
+		for (const name of ['Profile', 'Manage backups and storage', 'Manage AI helpers']) {
+			expect(screen.getByRole('link', { name })).toHaveClass(
+				'inline-flex',
+				'min-h-10',
+				'items-center'
+			);
+		}
+	});
+
 	test('an old link to the storage section goes to the Backups and storage page', async () => {
 		window.history.replaceState(null, '', '/settings#settings-connections');
 		await mount();
