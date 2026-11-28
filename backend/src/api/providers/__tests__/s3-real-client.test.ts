@@ -145,8 +145,9 @@ describe('the real S3 client through the outbound request handler', () => {
       );
 
       const direct = await fetch(`http://127.0.0.1:${server.port}/photos/Backups/unsized.bin`);
-      expect(direct.headers.get('content-length')).toBeNull();
+      const contentLength = direct.headers.get('content-length');
       await direct.arrayBuffer();
+      expect(contentLength).toBeNull();
 
       const unsized = { providerType: 's3', externalId: 'Backups/unsized.bin' };
       expect((await provider.download(unsized, { maxBytes: 64 })).length).toBe(64);

@@ -137,11 +137,12 @@
 		);
 
 	function cleanupProblem(results: BackupOrchestratorResult['results']): string | null {
-		const warned = Object.entries(results)
-			.filter(([, result]) => Object.values(result.capabilities).some(c => c.warning))
-			.map(([id]) => id);
-		if (warned.length === 0) return null;
-		return `Old backups couldn't be removed from ${names(warned)}. VROOM needs permission to list and delete files there.`;
+		const warnings = Object.entries(results).flatMap(([id, result]) => {
+			const warning = Object.values(result.capabilities).find(c => c.warning)?.warning;
+			return warning ? [{ id, warning }] : [];
+		});
+		if (warnings.length === 0) return null;
+		return `${names(warnings.map(w => w.id))}: ${warnings[0]?.warning}`;
 	}
 
 	function backupProblem(

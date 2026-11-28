@@ -236,13 +236,19 @@ describe('Backups and storage page backups', () => {
 		const result = orchestratorResult('success', { p1: true, p2: true });
 		result.results['p2'] = {
 			success: true,
-			capabilities: { zip: { success: true, warning: 'cleanup failed' } }
+			capabilities: {
+				zip: {
+					success: true,
+					warning:
+						"Old backups couldn't be removed. VROOM needs permission to list and delete files in this storage."
+				}
+			}
 		} as never;
 		settingsStoreFake.executeSync.mockResolvedValue(result);
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 2 places. Old backups couldn't be removed from Office S3. VROOM needs permission to list and delete files there.",
+			"Backed up to 2 places. Office S3: Old backups couldn't be removed. VROOM needs permission to list and delete files in this storage.",
 			{ id: 'toast-1' }
 		);
 		expect(toast.success).not.toHaveBeenCalled();
