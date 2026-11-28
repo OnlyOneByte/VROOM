@@ -59,7 +59,7 @@
 
 {#if energyMode === 'fuel'}
 	<div class="space-y-2">
-		<Label for="fuelType">Fuel type / octane</Label>
+		<Label for="fuelType">Fuel type / octane (optional)</Label>
 		<Select.Root
 			type="single"
 			value={showCustomFuelType ? 'other' : fuelType || ''}
@@ -79,7 +79,7 @@
 				{:else if fuelType}
 					{fuelType}
 				{:else}
-					Select fuel type (optional)
+					Select fuel type
 				{/if}
 			</Select.Trigger>
 			<Select.Content>

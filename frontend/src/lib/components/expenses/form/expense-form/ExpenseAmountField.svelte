@@ -40,7 +40,7 @@
 			<span
 				class="mt-1.5 text-3xl leading-none sm:mt-2 sm:text-5xl {amount
 					? ''
-					: 'text-muted-foreground'}"
+					: 'text-border-strong'}"
 				aria-hidden="true"
 			>
 				{currencySymbol}
@@ -54,7 +54,7 @@
 				min="0"
 				bind:value={amount}
 				placeholder={amountPlaceholder(currency)}
-				class="h-auto min-w-[3ch] py-0 text-center text-7xl leading-none tabular-nums caret-needle placeholder:text-muted-foreground [field-sizing:content] sm:h-auto sm:text-8xl md:text-8xl {numberClass}"
+				class="h-auto min-w-[3ch] py-0 text-center text-7xl leading-none tabular-nums caret-needle placeholder:text-border-strong [field-sizing:content] sm:h-auto sm:text-8xl md:text-8xl {numberClass}"
 				onblur={onAmountBlur}
 				aria-invalid={!!amountError}
 				aria-describedby={amountError ? 'amount-error' : undefined}

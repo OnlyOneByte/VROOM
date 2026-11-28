@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { GitBranch } from '@lucide/svelte';
+	import { Split } from '@lucide/svelte';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -70,11 +70,11 @@
 	<Button
 		type="button"
 		variant="outline"
-		size="icon-lg"
-		class="shrink-0 rounded-full"
+		class="h-10 shrink-0 rounded-full px-3"
 		onclick={onSplit}
 		aria-label="Split cost across vehicles"
 	>
-		<GitBranch class="h-4 w-4" />
+		<Split class="h-4 w-4" />
+		Split
 	</Button>
 {/if}
