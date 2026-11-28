@@ -336,6 +336,7 @@ describe('vehicle detail page overview', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
 		const menuShare = (await screen.findAllByRole('button', { name: 'Share' }))[1];
 		expect(menuShare).toBeDefined();
+		expect(screen.getByRole('dialog', { name: 'Vehicle actions' })).toBeInTheDocument();
 
 		await fireEvent.click(menuShare as HTMLElement);
 
@@ -671,6 +672,15 @@ describe('vehicle detail page tabs', () => {
 		await openTab('Odometer');
 
 		expect(captured['odometer']?.['canWrite']).toBe(false);
+	});
+
+	test('the Expenses tab heading follows the page h1 without skipping a level', async () => {
+		await mount();
+		await openTab('Expenses');
+
+		await waitFor(() =>
+			expect(document.getElementById('vehicle-expenses-heading')?.tagName).toBe('H2')
+		);
 	});
 
 	test('the Expenses tab shows a loading state, not "no expenses", until its first page answers', async () => {

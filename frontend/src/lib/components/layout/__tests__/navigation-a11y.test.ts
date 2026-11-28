@@ -123,6 +123,10 @@ describe('one navigation landmark, every item labelled in text', () => {
 		const add = within(bar).getByRole('link', { name: 'Add expense' });
 		expect(add).toHaveAttribute('href', '/expenses/new');
 		expect(bar).toHaveClass('bg-bar', 'text-bar-fg');
+		expect(add.querySelector('span')).toHaveClass(
+			'group-focus-visible:ring-bar-on',
+			'group-focus-visible:outline-foreground'
+		);
 	});
 
 	it('on a phone, the bottom bar has a top hairline in dark mode', () => {

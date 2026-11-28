@@ -351,7 +351,7 @@
 				aria-label="Add expense"
 			>
 				<span
-					class="-mt-[26px] grid size-[58px] place-items-center short:mt-0 short:size-11 rounded-full bg-accent-fill text-accent-fill-foreground shadow-[0_0_0_4px_var(--bar),var(--shadow-pop)] group-focus-visible:ring-2 group-focus-visible:ring-bar-on group-focus-visible:ring-offset-4 group-focus-visible:ring-offset-bar"
+					class="-mt-[26px] grid size-[58px] place-items-center short:mt-0 short:size-11 rounded-full bg-accent-fill text-accent-fill-foreground shadow-[0_0_0_4px_var(--bar),var(--shadow-pop)] group-focus-visible:ring-2 group-focus-visible:ring-bar-on group-focus-visible:ring-offset-4 group-focus-visible:ring-offset-bar group-focus-visible:outline-2 group-focus-visible:outline-offset-[6px] group-focus-visible:outline-foreground"
 					aria-hidden="true"
 				>
 					<Plus class="h-[26px] w-[26px]" />

@@ -9,6 +9,7 @@
 		sideOffset?: number;
 		children?: Snippet;
 		onOpenAutoFocus?: (_event: Event) => void;
+		'aria-label'?: string;
 	}
 
 	let {

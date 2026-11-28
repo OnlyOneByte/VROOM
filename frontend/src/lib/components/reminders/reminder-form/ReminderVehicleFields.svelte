@@ -55,7 +55,7 @@
 		<div
 			role="group"
 			tabindex="-1"
-			class="rounded-md"
+			class="rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 			aria-labelledby="reminder-split-label"
 			aria-describedby={form.errors['split'] ? 'reminder-split-error' : undefined}
 			data-invalid={form.errors['split'] ? 'true' : undefined}
