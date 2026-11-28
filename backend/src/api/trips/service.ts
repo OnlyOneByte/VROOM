@@ -136,6 +136,9 @@ export async function updateTrip(
       .where(and(eq(trips.id, id), eq(trips.userId, userId)))
       .returning();
     if (!row) throw new NotFoundError('Trip');
+    if (data.driverId !== undefined && data.driverId !== existing.driverId) {
+      await repos().odometer.setTripEntryDriver(id, userId, row.driverId, tx);
+    }
     if (!resync) return { updated: row, removedEntryIds: [] };
     const otherAtOld = await repos().trips.findOtherAtOdometerKey(
       {

@@ -78,10 +78,18 @@ describe('changing the driver on an existing entry', () => {
       await status(m.editor.request, 'PUT', `/api/v1/trips/${id}`, { driverId: editorDriver })
     ).toBe(200);
     expect(await column('trips', 'driver_id', id)).toBe(editorDriver);
+    const readingDriver = async () =>
+      (
+        (await ctx.sql.get('SELECT driver_id AS v FROM odometer_entries WHERE source_trip_id = ?', [
+          id,
+        ])) as { v: string | null }
+      ).v;
+    expect(await readingDriver()).toBe(editorDriver);
     expect(await status(m.editor.request, 'PUT', `/api/v1/trips/${id}`, { driverId: null })).toBe(
       200
     );
     expect(await column('trips', 'driver_id', id)).toBeNull();
+    expect(await readingDriver()).toBeNull();
   });
 
   test("without driver.record, someone else's reading can't be re-credited", async () => {
