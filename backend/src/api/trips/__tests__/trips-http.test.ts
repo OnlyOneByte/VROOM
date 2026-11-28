@@ -381,15 +381,15 @@ describe('a trip’s end reading must fit the odometer timeline', () => {
 
   test('moving a trip to the next day with the same end reading is refused while another trip holds it', async () => {
     const vehicleId = await seedVehicle(ctx);
-    const trip = async (tripDate: string) => {
+    const trip = async (tripDate: string, startOdometer = 5000) => {
       const res = await ctx.authed('POST', '/api/v1/trips', {
-        ...VALID(vehicleId, { startOdometer: 4800, endOdometer: 5000, tripDate }),
+        ...VALID(vehicleId, { startOdometer, endOdometer: 5000, tripDate }),
         timeZone: 'UTC',
       });
       expect(res.status, await res.clone().text()).toBe(201);
       return (await json<DataEnvelope<{ id: string }>>(res)).data.id;
     };
-    await trip('2024-06-20T08:00:00.000Z');
+    await trip('2024-06-20T08:00:00.000Z', 4800);
     const evening = await trip('2024-06-20T19:00:00.000Z');
 
     const put = await ctx.authed('PUT', `/api/v1/trips/${evening}`, {
@@ -541,7 +541,11 @@ describe('GET /api/v1/trips (list)', () => {
   test('filters by purpose', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { purpose: 'business' }));
-    await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { purpose: 'personal' }));
+    await ctx.authed(
+      'POST',
+      '/api/v1/trips',
+      VALID(vehicleId, { purpose: 'personal', startOdometer: 1080, endOdometer: 1100 })
+    );
 
     const res = await ctx.authed('GET', '/api/v1/trips?purpose=personal');
     const body = await json<{ data: { purpose: string }[] }>(res);
@@ -977,7 +981,7 @@ describe('trip-linked odometer lifecycle', () => {
   test('deleting one of two trips that share an odometer entry keeps the entry', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const a = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
-    await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
+    await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { startOdometer: 1080 }));
     const { data: tripA } = await json<DataEnvelope<{ id: string }>>(a);
     expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
 
@@ -991,7 +995,7 @@ describe('trip-linked odometer lifecycle', () => {
   test('deleting the last trip that shares an odometer entry removes the entry', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const a = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
-    const b = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
+    const b = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { startOdometer: 1080 }));
     const { data: tripA } = await json<DataEnvelope<{ id: string }>>(a);
     const { data: tripB } = await json<DataEnvelope<{ id: string }>>(b);
 
@@ -1072,7 +1076,7 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
   test('a shared entry passes to the other trip when its first trip is deleted, kept or not', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const first = await createTrip(vehicleId, { endOdometer: 1080 });
-    const second = await createTrip(vehicleId, { endOdometer: 1080 });
+    const second = await createTrip(vehicleId, { startOdometer: 1080 });
 
     await ctx.authed('DELETE', `/api/v1/trips/${first}`);
     await renameEntryNote(vehicleId, 1080, 'Fuel stop');
@@ -1084,7 +1088,7 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
   test('a shared entry stays with the other trip when its first trip moves away', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const first = await createTrip(vehicleId, { endOdometer: 1080 });
-    const second = await createTrip(vehicleId, { endOdometer: 1080 });
+    const second = await createTrip(vehicleId, { startOdometer: 1080 });
 
     await ctx.authed('PUT', `/api/v1/trips/${first}`, { endOdometer: 1200 });
     await ctx.authed('DELETE', `/api/v1/trips/${first}?keepOdometer=false`);

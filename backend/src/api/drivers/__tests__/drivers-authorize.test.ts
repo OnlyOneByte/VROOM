@@ -47,7 +47,7 @@ const driverOf = (list: Driver[], userId: string) => list.find((d) => d.userId =
 
 const trip = (extra: Record<string, unknown> = {}) => ({
   vehicleId: CAR,
-  startOdometer: 100,
+  startOdometer: 150,
   endOdometer: 150,
   purpose: 'personal',
   tripDate: '2024-03-01',
