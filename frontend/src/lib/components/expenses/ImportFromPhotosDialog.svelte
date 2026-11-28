@@ -194,7 +194,11 @@
 							data-testid="photos-import-row"
 						>
 							<div class="flex items-start pt-1">
-								<Checkbox bind:checked={row.include} aria-label="Include this receipt" />
+								<Checkbox
+									bind:checked={row.include}
+									aria-label="Include this receipt"
+									aria-describedby={row.unread ? `photo-${row.photoId}-unread` : undefined}
+								/>
 							</div>
 
 							<div class="h-20 w-20 shrink-0 overflow-hidden rounded-md border bg-muted">
@@ -215,10 +219,11 @@
 							<div class="grid flex-1 grid-cols-2 gap-2">
 								{#if row.unread}
 									<p
+										id={`photo-${row.photoId}-unread`}
 										class="col-span-2 text-xs text-muted-foreground"
 										data-testid="photos-import-unread"
 									>
-										Couldn't read this receipt. Fill it in to add it, or leave it out.
+										Couldn't read this receipt. Tick it and fill in the details to add it.
 									</p>
 								{/if}
 								<div class="space-y-1">

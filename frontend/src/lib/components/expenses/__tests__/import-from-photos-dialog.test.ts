@@ -205,9 +205,13 @@ describe('ImportFromPhotosDialog: loading drafts', () => {
 		await waitFor(() => expect(rows()).toHaveLength(2));
 		const [unread, read] = rows() as HTMLElement[];
 		expect(within(unread as HTMLElement).getByTestId('photos-import-unread')).toHaveTextContent(
-			"Couldn't read this receipt. Fill it in to add it, or leave it out."
+			"Couldn't read this receipt. Tick it and fill in the details to add it."
 		);
-		expect(within(unread as HTMLElement).getByRole('checkbox')).not.toBeChecked();
+		const box = within(unread as HTMLElement).getByRole('checkbox');
+		expect(box).not.toBeChecked();
+		expect(box).toHaveAccessibleDescription(
+			"Couldn't read this receipt. Tick it and fill in the details to add it."
+		);
 		expect(within(read as HTMLElement).queryByTestId('photos-import-unread')).toBeNull();
 	});
 
