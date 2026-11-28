@@ -154,7 +154,7 @@ describe('ZIP backups to an S3 provider', () => {
     expect(names[0]?.startsWith(backupFilePrefix(ctx.user.id))).toBe(true);
   });
 
-  test('in a shared folder, retention keeps other accounts’ backups and untagged older ones', async () => {
+  test("in a shared folder, retention keeps other accounts' backups and untagged older ones", async () => {
     const file = (name: string) => ({
       key: `VROOM/Backups/${name}`,
       name,
@@ -175,12 +175,11 @@ describe('ZIP backups to an S3 provider', () => {
     expect(names).toContain(untagged);
     expect(names).toHaveLength(3);
 
-    const listed = await ctx.authed('GET', '/api/v1/sync/backups/providers?providerId=p-s3');
-    const listedNames = ((await listed.json()) as { data: { fileName: string }[] }).data.map(
-      (b) => b.fileName
-    );
+    const listed = (await listedBackups()).find((p) => p.providerId === 'p-s3');
+    const listedNames = listed?.backups.map((b) => b.fileName) ?? [];
     expect(listedNames).toContain(untagged);
-    expect(listedNames).not.toContain(otherAccount);
+    expect(listedNames).toContain(otherAccount);
+    expect(listedNames).toHaveLength(3);
   });
 
   test('a stale ZIP setting on a photo-only provider is ignored, so the run still succeeds', async () => {

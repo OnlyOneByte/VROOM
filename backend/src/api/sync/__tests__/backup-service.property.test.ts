@@ -87,6 +87,16 @@ const backupFileArb: fc.Arbitrary<StorageFileInfo> = fc
     lastModified: new Date(BASE_MS).toISOString(),
   }));
 
+const untaggedBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc
+  .stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{3}Z$/)
+  .map((ts) => ({
+    key: 'unused',
+    name: `vroom-backup-${ts}.zip`,
+    size: 1,
+    createdTime: new Date(BASE_MS).toISOString(),
+    lastModified: new Date(BASE_MS).toISOString(),
+  }));
+
 const nonBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc
   .oneof(
     fc.stringMatching(/^photo-[a-z0-9]{4,8}\.(jpg|png)$/),
@@ -106,19 +116,14 @@ const nonBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc
 const retentionCountArb = fc.integer({ min: 1, max: 100 });
 
 describe('listBackups: the backup listing', () => {
-  test("lists only this account's backup files, newest first, with exactly one marked latest", async () => {
+  test('lists every backup file in the folder, newest first, with exactly one marked latest', async () => {
     const { backupService } = await import('../backup');
     await fc.assert(
       fc.asyncProperty(
         fc.array(backupFileArb, { minLength: 0, maxLength: 12 }),
         fc.array(nonBackupFileArb, { minLength: 0, maxLength: 12 }),
-        fc.array(backupFileArb, { minLength: 0, maxLength: 6 }),
-        async (backups, nonBackups, foreign) => {
-          const files = uniqueFiles([
-            ...ownedBy(backups, ctx.user.id),
-            ...nonBackups,
-            ...ownedBy(foreign, 'another-account'),
-          ]);
+        async (backups, nonBackups) => {
+          const files = uniqueFiles([...backups, ...nonBackups]);
           const backupKeys = new Set(files.slice(0, backups.length).map((f) => f.key));
           const lastModifiedByKey = new Map(files.map((f) => [f.key, f.lastModified]));
           await seedRetention(10);
@@ -146,7 +151,7 @@ describe('listBackups: the backup listing', () => {
 });
 
 describe('enforceRetention: the retention sweep', () => {
-  test("deletes exactly the backups beyond the retention count, oldest first, and no other file or other account's backup", async () => {
+  test("deletes exactly the backups beyond the retention count, oldest first, and no other file, other account's or untagged backup", async () => {
     const { backupService } = await import('../backup');
     await fc.assert(
       fc.asyncProperty(
@@ -154,11 +159,13 @@ describe('enforceRetention: the retention sweep', () => {
         fc.array(nonBackupFileArb, { minLength: 0, maxLength: 6 }),
         retentionCountArb,
         fc.array(backupFileArb, { minLength: 0, maxLength: 6 }),
-        async (backups, nonBackups, retentionCount, foreign) => {
+        fc.array(untaggedBackupFileArb, { minLength: 0, maxLength: 6 }),
+        async (backups, nonBackups, retentionCount, foreign, untagged) => {
           const files = uniqueFiles([
             ...ownedBy(backups, ctx.user.id),
             ...nonBackups,
             ...ownedBy(foreign, 'another-account'),
+            ...untagged,
           ]);
           const backupKeys = new Set(files.slice(0, backups.length).map((f) => f.key));
           const nonBackupKeys = new Set(files.slice(backups.length).map((f) => f.key));

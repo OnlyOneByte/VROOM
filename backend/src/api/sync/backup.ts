@@ -428,14 +428,12 @@ export function backupFilePrefix(userId: string): string {
   return `vroom-backup-${account}-`;
 }
 
-const UNTAGGED_BACKUP_NAME = /^vroom-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.zip$/;
-
 function isOwnBackup(name: string, userId: string): boolean {
   return name.startsWith(backupFilePrefix(userId)) && name.endsWith('.zip');
 }
 
-function isListedBackup(name: string, userId: string): boolean {
-  return isOwnBackup(name, userId) || UNTAGGED_BACKUP_NAME.test(name);
+function isBackupFile(name: string): boolean {
+  return name.startsWith('vroom-backup-') && name.endsWith('.zip');
 }
 
 class BackupService {
@@ -510,7 +508,7 @@ class BackupService {
     const files = await provider.list(folderPath);
 
     const backups = files
-      .filter((f) => isListedBackup(f.name, userId))
+      .filter((f) => isBackupFile(f.name))
       .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
       .map((f, i) => ({
         providerId,
