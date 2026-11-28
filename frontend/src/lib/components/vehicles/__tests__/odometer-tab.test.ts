@@ -107,23 +107,23 @@ describe('OdometerTab load states', () => {
 		expect(getHistory).toHaveBeenCalledWith('v1', { limit: 20, offset: 0 });
 	});
 
-	test('an empty history shows the empty state with an Add Reading link for writers', async () => {
+	test('an empty history shows the empty state with an Add reading link for writers', async () => {
 		mount();
 		await settle();
 
 		expect(screen.getByText('No odometer readings yet')).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Add Reading' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'Add reading' })).toHaveAttribute(
 			'href',
 			'/vehicles/v1/odometer/new'
 		);
 	});
 
-	test('a read-only viewer sees the empty state without Add Reading', async () => {
+	test('a read-only viewer sees the empty state without Add reading', async () => {
 		mount({ canWrite: false });
 		await settle();
 
 		expect(screen.getByText('No odometer readings yet')).toBeInTheDocument();
-		expect(screen.queryByRole('link', { name: 'Add Reading' })).toBeNull();
+		expect(screen.queryByRole('link', { name: 'Add reading' })).toBeNull();
 	});
 
 	test('a load failure shows the error and Retry reloads from the first page', async () => {
@@ -140,7 +140,7 @@ describe('OdometerTab load states', () => {
 
 		expect(getHistory).toHaveBeenCalledTimes(2);
 		expect(getHistory).toHaveBeenLastCalledWith('v1', { limit: 20, offset: 0 });
-		expect(screen.getByText('Readings (1)')).toBeInTheDocument();
+		expect(screen.getByText('1 reading')).toBeInTheDocument();
 	});
 
 	test('a non-Error failure falls back to the generic message', async () => {
@@ -161,7 +161,7 @@ describe('OdometerTab entry list', () => {
 		mount();
 		await settle();
 
-		expect(screen.getByText('Readings (1)')).toBeInTheDocument();
+		expect(screen.getByText('1 reading')).toBeInTheDocument();
 		expect(screen.getByText(/45,210\s+mi/)).toBeInTheDocument();
 		expect(screen.getByText('Mar 15, 2026')).toBeInTheDocument();
 		expect(screen.getByText('Oil change visit')).toBeInTheDocument();
@@ -175,13 +175,13 @@ describe('OdometerTab entry list', () => {
 		expect(screen.getByText(/72,000\s+km/)).toBeInTheDocument();
 	});
 
-	test('writers get Add Reading, edit and delete actions with an edit link back to the vehicle', async () => {
+	test('writers get Add reading, a row that opens the reading with a link back to the vehicle, and Delete', async () => {
 		getHistory.mockResolvedValue(page([entry({ sourceId: 'o7' })]));
 		mount();
 		await settle();
 
-		expect(screen.getByRole('link', { name: 'Add Reading' })).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Edit reading' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'Add reading' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: /45,000\s+mi/ })).toHaveAttribute(
 			'href',
 			'/vehicles/v1/odometer/o7/edit?returnTo=/vehicles/v1'
 		);
@@ -193,10 +193,42 @@ describe('OdometerTab entry list', () => {
 		mount({ canWrite: false });
 		await settle();
 
-		expect(screen.getByText('Readings (1)')).toBeInTheDocument();
-		expect(screen.queryByRole('link', { name: 'Add Reading' })).toBeNull();
-		expect(screen.queryByRole('link', { name: 'Edit reading' })).toBeNull();
+		expect(screen.getByText('1 reading')).toBeInTheDocument();
+		expect(screen.queryAllByRole('link')).toHaveLength(0);
 		expect(screen.queryByRole('button', { name: 'Delete reading' })).toBeNull();
+	});
+
+	test('the latest reading is the newest one, and each row shows the distance since the one before it', async () => {
+		history([
+			entry({ sourceId: 'c', odometer: 40360, recordedAt: '2026-11-13T12:00:00.000Z' }),
+			entry({ sourceId: 'b', odometer: 40040, recordedAt: '2026-11-03T12:00:00.000Z' }),
+			entry({ sourceId: 'a', odometer: 39720, recordedAt: '2026-10-24T12:00:00.000Z' })
+		]);
+		mount();
+		await settle();
+
+		expect(screen.getByText('Latest reading').nextElementSibling).toHaveTextContent(/40,360\s+mi/);
+		const rows = within(screen.getByRole('region', { name: '3 readings' })).getAllByRole(
+			'listitem'
+		);
+		expect(rows.map(row => row.textContent?.match(/\+[\d,]+/)?.[0] ?? null)).toEqual([
+			'+320',
+			'+320',
+			null
+		]);
+	});
+
+	test('rows carry no source badge, and only expense rows say where they came from', async () => {
+		history([
+			entry({ sourceId: 'm', odometer: 40360 }),
+			entry({ source: 'expense', sourceId: 'e', odometer: 40040 })
+		]);
+		mount();
+		await settle();
+
+		expect(screen.queryByText('manual')).toBeNull();
+		expect(screen.queryByText('expense')).toBeNull();
+		expect(screen.getAllByText(/from an expense/)).toHaveLength(1);
 	});
 
 	test('a single reading does not draw the mileage chart', async () => {
@@ -235,8 +267,8 @@ describe('OdometerTab expense mileage', () => {
 		await settle();
 
 		expect(screen.queryByText('No odometer readings yet')).toBeNull();
-		expect(screen.getByText('Readings (2)')).toBeInTheDocument();
-		expect(screen.getAllByText('expense')).toHaveLength(2);
+		expect(screen.getByText('2 readings')).toBeInTheDocument();
+		expect(screen.getAllByText(/from an expense/)).toHaveLength(2);
 		const data = chartProps?.['data'] as { odometer: number }[];
 		expect(data.map(d => d.odometer)).toEqual([29800, 30120]);
 	});
@@ -246,11 +278,10 @@ describe('OdometerTab expense mileage', () => {
 		mount();
 		await settle();
 
-		expect(screen.getByRole('link', { name: 'Open expense' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: /30,120\s+mi/ })).toHaveAttribute(
 			'href',
 			'/expenses/e2/edit?returnTo=/vehicles/v1'
 		);
-		expect(screen.queryByRole('link', { name: 'Edit reading' })).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Delete reading' })).toBeNull();
 	});
 
@@ -259,7 +290,7 @@ describe('OdometerTab expense mileage', () => {
 		mount({ canWrite: false });
 		await settle();
 
-		expect(screen.queryByRole('link', { name: 'Open expense' })).toBeNull();
+		expect(screen.queryAllByRole('link')).toHaveLength(0);
 	});
 
 	test('the chart y axis fits the readings instead of starting at 0', async () => {
@@ -383,7 +414,9 @@ describe('OdometerTab pagination', () => {
 		await settle();
 
 		expect(container.querySelector('.animate-spin')).not.toBeNull();
-		expect(screen.queryByText(/1,000/)).toBeNull();
+		expect(
+			within(screen.getByRole('region', { name: /readings/ })).queryByText(/1,000/)
+		).toBeNull();
 		expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
 	});
 });
@@ -527,7 +560,7 @@ describe('OdometerTab chart range', () => {
 		mount();
 		await settle();
 
-		expect(screen.getByText('Readings (3)')).toBeInTheDocument();
+		expect(screen.getByText('3 readings')).toBeInTheDocument();
 		expect(chartProps?.['error']).toBe('Server unavailable.');
 		expect(chartProps?.['data']).toEqual([]);
 	});
@@ -613,7 +646,10 @@ describe('OdometerTab in the demo', () => {
 			mount();
 			await settle();
 
-			expect(screen.getByRole('link', { name: 'Edit reading' })).toBeInTheDocument();
+			expect(screen.getByRole('link', { name: /45,000\s+mi/ })).toHaveAttribute(
+				'href',
+				'/vehicles/v1/odometer/o7/edit?returnTo=/vehicles/v1'
+			);
 			expect(screen.queryByRole('button', { name: 'Delete reading' })).toBeNull();
 		} finally {
 			signOut();

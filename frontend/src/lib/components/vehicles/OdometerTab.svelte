@@ -39,18 +39,8 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { paramRoutes } from '#lib/routes.ts';
-	import {
-		Plus,
-		LoaderCircle,
-		Gauge,
-		ChevronLeft,
-		ChevronRight,
-		Pencil,
-		Receipt,
-		Trash2
-	} from '@lucide/svelte';
+	import { Plus, LoaderCircle, Gauge, ChevronLeft, ChevronRight, Trash2 } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import * as Card from '#lib/components/ui/card/index.ts';
 	import type { ChartConfig } from '#lib/components/ui/chart/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { AppLineChart } from '#lib/components/charts/index.ts';
@@ -180,8 +170,28 @@
 		}
 	}
 
+	let latest = $derived(chartEntries[0] ?? (offset === 0 ? entries[0] : undefined));
+
 	function formatOdometer(value: number): string {
 		return formatNumber(value, 0);
+	}
+
+	function gainSince(index: number): number | null {
+		const older = entries[index + 1];
+		const entry = entries[index];
+		if (!older || !entry) return null;
+		const gain = entry.odometer - older.odometer;
+		return gain > 0 ? gain : null;
+	}
+
+	function rowHref(entry: OdometerHistoryEntry): string {
+		const returnTo = `?returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`;
+		return entry.source === 'expense'
+			? resolve(paramRoutes.expenseEdit, { id: entry.sourceId }) + returnTo
+			: resolve(paramRoutes.vehicleOdometerEntryEdit, {
+					id: vehicleId,
+					entryId: entry.sourceId
+				}) + returnTo;
 	}
 
 	function openDeleteDialog(entry: OdometerHistoryEntry) {
@@ -242,21 +252,30 @@
 			{#if canWrite}
 				<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
 					<Plus class="h-4 w-4 mr-2" />
-					Add Reading
+					Add reading
 				</Button>
 			{/if}
 		{/snippet}
 	</EmptyState>
 {:else}
 	<div class="space-y-6">
-		{#if canWrite}
-			<div class="flex justify-end">
-				<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
+		<div class="flex items-end justify-between gap-4">
+			{#if latest}
+				<div>
+					<p class="text-sm text-muted-foreground">Latest reading</p>
+					<p class="font-(family-name:--font-fig) text-3xl leading-none font-bold tabular-nums">
+						{formatOdometer(latest.odometer)}
+						<span class="text-base font-semibold text-muted-foreground">{distLabel}</span>
+					</p>
+				</div>
+			{/if}
+			{#if canWrite}
+				<Button class="ml-auto" href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
 					<Plus class="h-4 w-4 mr-2" />
-					Add Reading
+					Add reading
 				</Button>
-			</div>
-		{/if}
+			{/if}
+		</div>
 
 		{#if chartError || chartData.length >= MIN_CHART_POINTS}
 			<AppLineChart
@@ -280,99 +299,68 @@
 			/>
 		{/if}
 
-		<Card.Root>
-			<Card.Header>
-				<Card.Title level={2}>Readings ({totalCount})</Card.Title>
-			</Card.Header>
-			<Card.Content class="space-y-3">
-				{#if isPageLoading}
-					<div class="flex justify-center py-6">
-						<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
-					</div>
-				{:else}
-					{#each entries as entry (`${entry.source}-${entry.sourceId}`)}
-						<div class="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
-							<div class="flex items-start gap-3">
-								<div
-									class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10"
-								>
-									<Gauge class="h-4 w-4 text-primary" />
-								</div>
-
-								<div class="min-w-0">
-									<div class="flex items-center gap-2">
-										<span class="font-semibold text-foreground">
-											{formatOdometer(entry.odometer)}
-											{distLabel}
-										</span>
-										<span
-											class={cn(
-												'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-												entry.source === 'manual'
-													? 'bg-primary/10 text-primary'
-													: 'bg-muted text-muted-foreground'
-											)}
-										>
-											{entry.source}
-										</span>
-									</div>
-
-									<p class="text-sm text-muted-foreground">
-										{formatDate(entry.recordedAt)}
-									</p>
-
+		<section aria-labelledby="odometer-readings-heading" class="space-y-3">
+			<h2 class="text-base font-semibold" id="odometer-readings-heading">
+				{formatNumber(totalCount, 0)}
+				{totalCount === 1 ? 'reading' : 'readings'}
+			</h2>
+			{#if isPageLoading}
+				<div class="flex justify-center py-6">
+					<LoaderCircle class="h-6 w-6 animate-spin text-muted-foreground" />
+				</div>
+			{:else}
+				<ul class="divide-y border-y">
+					{#each entries as entry, i (`${entry.source}-${entry.sourceId}`)}
+						{@const href = canWrite ? rowHref(entry) : undefined}
+						{@const gain = gainSince(i)}
+						<li class="flex items-center gap-3">
+							<svelte:element
+								this={href ? 'a' : 'div'}
+								{href}
+								class={cn(
+									'flex min-w-0 flex-1 items-center justify-between gap-4 py-3',
+									href &&
+										'-mx-2 rounded-md px-2 outline-none hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50'
+								)}
+							>
+								<span class="min-w-0">
+									<span class="block font-semibold tabular-nums text-foreground">
+										{formatOdometer(entry.odometer)}
+										{distLabel}
+									</span>
+									<span class="block text-sm text-muted-foreground">
+										{formatDate(entry.recordedAt)}{entry.source === 'expense'
+											? ' · from an expense'
+											: ''}
+									</span>
 									{#if entry.note}
-										<p class="mt-1 text-sm text-muted-foreground">{entry.note}</p>
+										<span class="mt-1 block text-sm text-muted-foreground">{entry.note}</span>
 									{/if}
-								</div>
-							</div>
-
-							{#if canWrite && entry.source === 'expense'}
+								</span>
+								{#if gain !== null}
+									<span class="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
+										+{formatOdometer(gain)}
+										{distLabel}
+									</span>
+								{/if}
+							</svelte:element>
+							{#if canWrite && entry.source === 'manual' && authStore.user?.demo !== true}
 								<Button
 									variant="ghost"
 									size="icon"
-									class="h-8 w-8 shrink-0"
-									aria-label="Open expense"
-									title="Open expense"
-									href={resolve(paramRoutes.expenseEdit, { id: entry.sourceId }) +
-										`?returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+									class="h-10 w-10 shrink-0 text-destructive hover:text-destructive"
+									aria-label="Delete reading"
+									title="Delete reading"
+									onclick={() => openDeleteDialog(entry)}
 								>
-									<Receipt class="h-3.5 w-3.5" />
+									<Trash2 class="h-4 w-4" />
 								</Button>
-							{:else if canWrite}
-								<div class="flex shrink-0 gap-1">
-									<Button
-										variant="ghost"
-										size="icon"
-										class="h-8 w-8"
-										aria-label="Edit reading"
-										title="Edit reading"
-										href={resolve(paramRoutes.vehicleOdometerEntryEdit, {
-											id: vehicleId,
-											entryId: entry.sourceId
-										}) + `?returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-									>
-										<Pencil class="h-3.5 w-3.5" />
-									</Button>
-									{#if authStore.user?.demo !== true}
-										<Button
-											variant="ghost"
-											size="icon"
-											class="h-8 w-8 text-destructive hover:text-destructive"
-											aria-label="Delete reading"
-											title="Delete reading"
-											onclick={() => openDeleteDialog(entry)}
-										>
-											<Trash2 class="h-3.5 w-3.5" />
-										</Button>
-									{/if}
-								</div>
 							{/if}
-						</div>
+						</li>
 					{/each}
-				{/if}
-			</Card.Content>
-		</Card.Root>
+				</ul>
+			{/if}
+		</section>
 
 		{#if totalPages > 1}
 			<div class="flex items-center justify-center gap-4">
