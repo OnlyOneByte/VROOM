@@ -280,6 +280,38 @@ describe('applyMapping output imports through buildImportPlan', () => {
   });
 });
 
+describe('applyMapping — a target vehicle picked by id', () => {
+  const twins: ImportVehicle[] = [
+    { id: 'veh-a', make: 'Honda', model: 'Civic', year: 2019, nickname: null },
+    { id: 'veh-b', make: 'Honda', model: 'Civic', year: 2019, nickname: null },
+  ];
+  const mappingFor = (targetVehicle: string): ColumnMapping => ({
+    columns: { date: 'Date', amount: 'Total' },
+    targetVehicle,
+    dateFormat: 'iso',
+    defaultCategory: 'misc',
+  });
+  const csv = ['Date,Total', '2024-03-01,42.10'].join('\n');
+
+  test('resolves to that vehicle even when two of your vehicles share a name', () => {
+    const native = applyMapping(csv, mappingFor('veh-b'), () => ({}));
+    const plan = buildImportPlan(native.csv, twins);
+
+    expect(plan.errorCount).toBe(0);
+    expect(plan.rows[0].expense?.vehicleId).toBe('veh-b');
+    expect(plan.rows[0].expense?.category).toBe('misc');
+  });
+
+  test('an id that is not one of your vehicles matches nothing', () => {
+    const native = applyMapping(csv, mappingFor('someone-elses-vehicle'), () => ({}));
+    const plan = buildImportPlan(native.csv, twins);
+
+    expect(plan.readyCount).toBe(0);
+    expect(plan.rows[0].status).toBe('error');
+    expect(plan.rows[0].expense).toBeUndefined();
+  });
+});
+
 describe('normalizeForeignDate — an ISO value with an explicit timezone is an absolute instant', () => {
   test('a Z-suffixed ISO timestamp is honored as-is (NOT re-interpreted in local time)', () => {
     const iso = '2024-03-15T08:30:00.000Z';

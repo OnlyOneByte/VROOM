@@ -87,7 +87,7 @@ describe('ImportExpensesForm: loading a file', () => {
 		expect(mocks.importExpensesCsv).toHaveBeenCalledWith(
 			FUEL_CSV,
 			true,
-			expect.objectContaining({ source: 'fuelly', targetVehicle: '2020 Toyota Camry' })
+			expect.objectContaining({ source: 'fuelly', targetVehicle: 'v1' })
 		);
 		expect(form.preview?.readyCount).toBe(2);
 	});
@@ -150,7 +150,7 @@ describe('ImportExpensesForm: loading a file', () => {
 		expect(mocks.importExpensesCsv).toHaveBeenCalledWith(
 			FUEL_CSV,
 			true,
-			expect.objectContaining({ targetVehicle: '2020 Toyota RAV4' })
+			expect.objectContaining({ targetVehicle: 'v2' })
 		);
 	});
 
@@ -191,7 +191,7 @@ describe('ImportExpensesForm: loading a file', () => {
 		expect(mocks.importExpensesCsv).toHaveBeenCalledWith(
 			FUELIO_EXPORT,
 			true,
-			expect.objectContaining({ source: 'fuelio', targetVehicle: '2020 Toyota Camry' })
+			expect.objectContaining({ source: 'fuelio', targetVehicle: 'v1' })
 		);
 	});
 });
@@ -445,7 +445,7 @@ describe('ImportExpensesForm: presets-only mode and stale results', () => {
 		expect(mocks.importExpensesCsv).toHaveBeenLastCalledWith(
 			FUEL_CSV,
 			true,
-			expect.objectContaining({ source: 'fuelly', targetVehicle: '2020 Toyota RAV4' })
+			expect.objectContaining({ source: 'fuelly', targetVehicle: 'v2' })
 		);
 	});
 

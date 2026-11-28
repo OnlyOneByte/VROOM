@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { appContext } from '../../../app-context';
+import { users } from '../../../db/schema';
+import { assignServerRole } from '../../../permissions/grants';
 import {
   createTestApp,
   json,
+  requestAs,
   SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
@@ -395,5 +399,57 @@ describe('POST /import/detect and a detected format through /import', () => {
     expect(body.data.imported).toBe(1);
     const [row] = await listExpenses();
     expect(row.category).toBe('fuel');
+  });
+});
+
+describe('POST /import — the target vehicle picked by id', () => {
+  const csv = ['Date,Total', '2024-03-01,42.10'].join('\n');
+  const mapping = (targetVehicle: string) => ({
+    columns: { date: 'Date', amount: 'Total' },
+    targetVehicle,
+    dateFormat: 'iso' as const,
+    defaultCategory: 'misc' as const,
+  });
+
+  test('imports into the picked vehicle when two of yours share a name', async () => {
+    await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2019 });
+    const second = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2019 });
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv,
+      mapping: mapping(second),
+    });
+    const body = await json<ImportResponse>(res);
+
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.imported).toBe(1);
+    const listed = await ctx.authed('GET', `/api/v1/expenses?vehicleId=${second}&limit=10`);
+    expect((await json<{ data: unknown[] }>(listed)).data).toHaveLength(1);
+  });
+
+  test("another account's vehicle id matches nothing and writes nothing", async () => {
+    await seedVehicle(ctx);
+    const otherId = 'import-other-user';
+    await appContext()
+      .asyncDb.insert(users)
+      .values({ id: otherId, email: 'other@example.com', displayName: 'Other' });
+    await assignServerRole(appContext().asyncDb, otherId, 'member');
+    const other = await requestAs(ctx, otherId);
+    const created = await other.request('POST', '/api/v1/vehicles', {
+      make: 'Mazda',
+      model: 'MX-5',
+      year: 2020,
+    });
+    const theirs = (await json<{ data: { id: string } }>(created)).data.id;
+
+    const res = await ctx.authed('POST', '/api/v1/expenses/import', {
+      csv,
+      mapping: mapping(theirs),
+    });
+    const body = await json<ImportResponse>(res);
+
+    expect(body.data.imported).toBe(0);
+    expect(body.data.rows[0]?.status).toBe('error');
+    const theirExpenses = await other.request('GET', '/api/v1/expenses?limit=10');
+    expect((await json<{ data: unknown[] }>(theirExpenses)).data).toHaveLength(0);
   });
 });

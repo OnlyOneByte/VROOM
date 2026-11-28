@@ -115,6 +115,35 @@ describe('guessManualColumns', () => {
 		expect(guess.volume).toBe('Fuel (litres)');
 	});
 
+	test('each header is guessed for at most one field', () => {
+		expect(guessManualColumns(['Date', 'Odometer', 'Fill Amount', 'Total Cost'])).toEqual({
+			date: 'Date',
+			mileage: 'Odometer',
+			volume: 'Fill Amount',
+			amount: 'Total Cost'
+		});
+		for (const headers of [
+			['Date', 'Odometer', 'Fill Amount', 'Total Cost'],
+			['Date', 'Odometer', 'Fuel Type', 'Price per gallon', 'Total'],
+			['Date', 'Payment card', 'Amount', 'Gallons', 'Total']
+		]) {
+			const fields = Object.values(guessManualColumns(headers));
+			expect(new Set(fields).size).toBe(fields.length);
+		}
+	});
+
+	test('a unit price, a fuel type or a payment card is not taken for amount, category or vehicle', () => {
+		const guess = guessManualColumns(['Date', 'Fuel Type', 'Price per gallon', 'Total']);
+		expect(guess.amount).toBe('Total');
+		expect(guess.volume).toBeUndefined();
+		expect(guess.category).toBeUndefined();
+		expect(guessManualColumns(['Date', 'Payment card', 'Amount']).vehicle).toBeUndefined();
+		expect(guessManualColumns(['Date', 'Car', 'Type', 'Amount'])).toMatchObject({
+			vehicle: 'Car',
+			category: 'Type'
+		});
+	});
+
 	test('an un-guessable header set leaves fields unmapped (no invented columns)', () => {
 		expect(guessManualColumns(['col1', 'col2', 'xyz'])).toEqual({});
 	});

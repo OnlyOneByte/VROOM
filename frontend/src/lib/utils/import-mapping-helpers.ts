@@ -38,23 +38,47 @@ export function isNativeImportHeaders(headers: string[]): boolean {
 	return NATIVE_HEADERS.every(h => lower.has(h));
 }
 
+const UNIT_PRICE = /\bper\b|\/\s*(gal|l|litre|liter)\b|unit price/;
+
+const GUESSES: Array<[NativeImportField, Array<RegExp>, RegExp?]> = [
+	['date', [/date/]],
+	['mileage', [/odometer/, /mileage/, /\bodo\b/]],
+	[
+		'volume',
+		[/volume/, /gallon/, /litre|liter/, /fuel amount/, /\bfill/],
+		/price|cost|total|paid|spent/
+	],
+	[
+		'amount',
+		[/total/, /amount/, /cost/, /spent/, /paid/, /price/],
+		/volume|gallon|litre|liter|fill/
+	],
+	['category', [/categor/, /^(expense )?type$/, /\bkind\b/]],
+	['vehicle', [/vehicle/, /\bcar\b/]],
+	['description', [/note/, /description/, /comment/]],
+	['tags', [/\btags?\b/]]
+];
+
 export function guessManualColumns(headers: string[]): Partial<Record<NativeImportField, string>> {
 	const guess: Partial<Record<NativeImportField, string>> = {};
-	const find = (...needles: string[]) =>
-		headers.find(h => needles.some(n => h.toLowerCase().includes(n)));
-	const set = (field: NativeImportField, ...needles: string[]) => {
-		const m = find(...needles);
-		if (m) guess[field] = m;
-	};
-	set('date', 'date');
-	set('amount', 'amount', 'price', 'cost', 'spent', 'paid', 'total');
-	set('category', 'category', 'type', 'kind');
-	set('vehicle', 'vehicle', 'car');
-	set('mileage', 'odometer', 'mileage', 'odo');
-	set('volume', 'volume', 'gallon', 'litre', 'liter', 'fuel amount', 'fill');
-	set('description', 'note', 'description', 'comment');
-	set('tags', 'tag');
+	const claimed = new Set<string>();
+	for (const [field, needles, exclude] of GUESSES) {
+		const open = headers.filter(h => !claimed.has(h) && !exclude?.test(h.toLowerCase()));
+		const ranked =
+			field === 'amount' ? [...open].sort((a, b) => unitPriceRank(a) - unitPriceRank(b)) : open;
+		const match = needles
+			.map(needle => ranked.find(h => needle.test(h.toLowerCase())))
+			.find(Boolean);
+		if (match) {
+			guess[field] = match;
+			claimed.add(match);
+		}
+	}
 	return guess;
+}
+
+function unitPriceRank(header: string): number {
+	return UNIT_PRICE.test(header.toLowerCase()) ? 1 : 0;
 }
 
 export function presetImportMapping(

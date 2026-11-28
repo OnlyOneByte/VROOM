@@ -9,7 +9,7 @@ import {
 } from '../import-mapping';
 import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 
-const civic: TargetVehicle = { year: 2019, make: 'Honda', model: 'Civic' };
+const civic: TargetVehicle = { id: 'civic-1' };
 
 const fuellyPreset: DetectedImportFormat = {
 	id: 'fuelly',
@@ -63,7 +63,7 @@ describe('buildImportMapping', () => {
 		expect(mapping).toEqual({
 			source: 'fuelly',
 			columns: {},
-			targetVehicle: '2019 Honda Civic',
+			targetVehicle: 'civic-1',
 			dateFormat: 'iso',
 			categoryMap: { gas: 'fuel' }
 		});
@@ -80,12 +80,22 @@ describe('buildImportMapping', () => {
 
 		expect(mapping).toEqual({
 			columns: { date: 'Date', amount: 'Total', vehicle: 'Car' },
-			dateFormat: 'dmy'
+			dateFormat: 'dmy',
+			defaultCategory: 'misc'
 		});
 		expect(mapping).not.toHaveProperty('targetVehicle');
 	});
 
-	test('a manual mapping without a vehicle column stamps the target vehicle name on every row', () => {
+	test('a manual mapping with no category column files rows as misc; a mapped one sends no default', () => {
+		expect(buildImportMapping(input())).toMatchObject({ defaultCategory: 'misc' });
+		expect(
+			buildImportMapping(
+				input({ manual: { ...manualBase, columns: { ...manualBase.columns, category: 'Type' } } })
+			)
+		).not.toHaveProperty('defaultCategory');
+	});
+
+	test('a manual mapping without a vehicle column stamps the picked vehicle id on every row', () => {
 		const mapping = buildImportMapping(
 			input({
 				targetVehicle: civic,
@@ -96,7 +106,8 @@ describe('buildImportMapping', () => {
 		expect(mapping).toEqual({
 			columns: { date: 'Date', amount: 'Total' },
 			dateFormat: 'dmy',
-			targetVehicle: '2019 Honda Civic'
+			defaultCategory: 'misc',
+			targetVehicle: 'civic-1'
 		});
 	});
 
