@@ -279,7 +279,7 @@ class RestoreService {
     if (mode === 'merge') {
       return { success: true, ...mergeCounts(summary, imported), ...skipped };
     }
-    return { success: true, imported: summary, ...skipped };
+    return { success: true, imported, ...skipped };
   }
 
   private async accountCurrency(
@@ -850,9 +850,9 @@ class RestoreService {
       Boolean(sets[String(row.entityType)]?.has(String(row.entityId)));
     const stamped = this.stampUserId(data.photos, userId);
     const photoRows = this.keepMemberAuthors(
-      (merge ? stamped.filter((row) => onEntity(row, entities)) : stamped).map((row) =>
-        coverOnlyOnNew(row, merge, onEntity(row, newEntities))
-      ),
+      stamped
+        .filter((row) => onEntity(row, entities))
+        .map((row) => coverOnlyOnNew(row, merge, onEntity(row, newEntities))),
       consentedShares,
       (row) => [photoVehicle(row)]
     );
@@ -870,7 +870,7 @@ class RestoreService {
     const refs = (data.photoRefs ?? []) as Row[];
     const refRows = await this.relinkPhotoRefs(
       tx,
-      merge ? refs.filter((ref) => photoOk.has(String(ref.photoId))) : refs,
+      refs.filter((ref) => photoOk.has(String(ref.photoId))),
       data.metadata.storageProviders ?? {},
       userId
     );
