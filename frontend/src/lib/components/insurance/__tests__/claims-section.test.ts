@@ -266,6 +266,17 @@ describe('ClaimsSection filing a claim', () => {
 		expect(screen.queryByRole('option', { name: '2019 Honda Civic' })).toBeNull();
 	});
 
+	test('editing a claim keeps its car in the picker after coverage moved', async () => {
+		getClaims.mockResolvedValue([claim({ vehicleId: 'v2' })]);
+		mount({ vehicles: VEHICLES, coveredVehicleIds: ['v1'] });
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit claim' }));
+		await fireEvent.click(document.getElementById('claim-vehicle-p1') as HTMLElement);
+		await settle();
+
+		expect(screen.getByRole('option', { name: '2019 Honda Civic' })).toBeInTheDocument();
+	});
+
 	test('files a fully populated claim, refetches and closes the form', async () => {
 		createClaim.mockResolvedValue(claim({ id: 'new' }));
 		mount({ vehicles: VEHICLES });

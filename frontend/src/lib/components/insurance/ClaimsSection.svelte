@@ -73,7 +73,9 @@
 
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 	let claimableVehicles = $derived(
-		coveredVehicleIds ? vehicles.filter(v => coveredVehicleIds.includes(v.id)) : vehicles
+		coveredVehicleIds
+			? vehicles.filter(v => coveredVehicleIds.includes(v.id) || v.id === editingVehicleId)
+			: vehicles
 	);
 
 	let claims = $state<InsuranceClaim[]>([]);
@@ -87,6 +89,7 @@
 	}
 
 	let editingId = $state<string | null>(null);
+	let editingVehicleId = $state<string | null>(null);
 	let isSaving = $state(false);
 
 	onMount(() => trackPendingSave(() => isSaving));
@@ -137,6 +140,7 @@
 
 	function resetForm() {
 		editingId = null;
+		editingVehicleId = null;
 		claimDate = '';
 		vehicleId = '';
 		claimType = 'collision';
@@ -153,6 +157,7 @@
 
 	function openEdit(claim: InsuranceClaim) {
 		editingId = claim.id;
+		editingVehicleId = claim.vehicleId ?? null;
 		claimDate = claim.claimDate ? toDateInputValue(claim.claimDate) : '';
 		vehicleId = claim.vehicleId ?? '';
 		claimType = claim.claimType;

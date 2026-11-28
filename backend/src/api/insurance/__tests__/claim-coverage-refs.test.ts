@@ -81,4 +81,37 @@ describe('claim car and term', () => {
 
     expect(res.status).toBe(400);
   });
+
+  test('a claim whose car is no longer covered still saves when the car is unchanged', async () => {
+    const created = await file({ vehicleId: other, termId: termB });
+    const claimId = (await json<DataEnvelope<{ id: string }>>(created)).data.id;
+    await ctx.sql.run('DELETE FROM insurance_term_vehicles WHERE term_id = ?', [termB]);
+    await ctx.sql.run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [
+      termB,
+      covered,
+    ]);
+
+    const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/${claimId}`, {
+      status: 'settled',
+      vehicleId: other,
+      termId: termB,
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  test('clearing the car, or giving only a term, is accepted', async () => {
+    const created = await file({ vehicleId: covered });
+    const claimId = (await json<DataEnvelope<{ id: string }>>(created)).data.id;
+
+    const cleared = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/${claimId}`, {
+      vehicleId: null,
+    });
+    const termOnly = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/claims/${claimId}`, {
+      termId: termB,
+    });
+
+    expect(cleared.status).toBe(200);
+    expect(termOnly.status).toBe(200);
+  });
 });

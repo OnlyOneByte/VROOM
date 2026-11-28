@@ -120,7 +120,7 @@ async function validateClaimRefs(
   if (!data.vehicleId && !data.termId) return;
   const policy = await repos().insurancePolicies.findById(policyId);
   if (data.termId && !policy?.terms.some((t) => t.id === data.termId)) {
-    throw new ValidationError('Claim termId does not belong to this policy');
+    throw new ValidationError('That term is not on this policy');
   }
   if (!data.vehicleId) return;
   const covers = (policy?.termVehicleCoverage ?? []).some(
@@ -462,8 +462,12 @@ routes.put(
     const { id, claimId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
-    if (updates.vehicleId !== undefined || updates.termId !== undefined) {
-      const existing = await repos().insuranceClaims.findById(id, claimId);
+    const existing = await repos().insuranceClaims.findById(id, claimId);
+    const carChanged =
+      updates.vehicleId !== undefined && (updates.vehicleId ?? null) !== existing.vehicleId;
+    const termChanged =
+      updates.termId !== undefined && (updates.termId ?? null) !== existing.termId;
+    if (carChanged || termChanged) {
       await validateClaimRefs(
         {
           vehicleId: updates.vehicleId !== undefined ? updates.vehicleId : existing.vehicleId,
