@@ -132,6 +132,26 @@ describe('sign-in page', () => {
 		}
 	);
 
+	test('a returning visitor is welcomed back', async () => {
+		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+		render(AuthPage);
+		expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Welcome back');
+		expect(screen.getByText(/Use the account you signed up with/)).toBeInTheDocument();
+	});
+
+	test('arriving from Get started, a new visitor is not welcomed back and learns sign-in creates the garage', async () => {
+		page.url = new URL('https://app.example/auth?start');
+		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
+		authApi.getSignupInfo.mockResolvedValue({ mode: 'open', domainRestricted: false });
+		render(AuthPage);
+		expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Let’s go');
+		expect(screen.queryByText(/Welcome back|signed up with/)).not.toBeInTheDocument();
+		expect(screen.getByText(/There’s no separate sign-up/)).toBeInTheDocument();
+		expect(await screen.findByTestId('signup-mode-line')).toHaveTextContent(
+			/^Signing in creates your garage\.$/
+		);
+	});
+
 	test('when the sign-up mode cannot load, the page makes no promise about new accounts', async () => {
 		authApi.getProviders.mockResolvedValue([{ id: 'google', displayName: 'Google' }]);
 		authApi.getSignupInfo.mockRejectedValue(new ApiError('Network error', 0));

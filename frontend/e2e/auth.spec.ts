@@ -18,6 +18,16 @@ test.describe('Signed out', () => {
 		await expect(page.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/auth');
 	});
 
+	test('Get started opens a sign-in page for someone with no account yet', async ({ page }) => {
+		await page.goto('/');
+		await page.getByRole('link', { name: 'Get started' }).click();
+
+		await expect(page).toHaveURL(/\/auth\?start$/);
+		await expect(page.getByRole('heading', { name: 'Let’s go' })).toBeVisible();
+		await expect(page.getByText('Welcome back')).toHaveCount(0);
+		await expect(page.getByRole('button', { name: /Continue with Google/i })).toBeEnabled();
+	});
+
 	test('sign-in page lists the providers the backend reports', async ({ page }) => {
 		await page.goto('/auth');
 

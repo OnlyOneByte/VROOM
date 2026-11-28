@@ -87,7 +87,7 @@
 				honest number: cost per mile, all in.
 			</p>
 			<div class="flex flex-wrap gap-3 pt-2">
-				<Button size="lg" href={resolve(routes.auth)}>Get started</Button>
+				<Button size="lg" href={`${resolve(routes.auth)}?start`}>Get started</Button>
 				{#if demoAvailable}
 					<Button
 						size="lg"
