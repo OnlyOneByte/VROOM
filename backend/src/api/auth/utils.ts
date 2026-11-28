@@ -18,6 +18,11 @@ export interface OAuthStateEntry {
   userId?: string;
   flowType?: 'provider' | 'auth-link';
   nonce?: string;
+  authProviderId?: string;
+}
+
+export function oauthStateExpired(entry: Pick<OAuthStateEntry, 'createdAt'>): boolean {
+  return Date.now() - entry.createdAt > CONFIG.auth.oauthStateExpiry;
 }
 
 // Shared by every write and delete: a browser only clears a cookie whose attributes match the write.
@@ -54,11 +59,13 @@ export function clearSessionCookie(c: Context, cookieName: string): void {
 export function consumeOAuthState(
   store: Map<string, OAuthStateEntry>,
   stateParam: string | null,
-  expectedFlow: OAuthStateEntry['flowType']
+  expectedFlow: OAuthStateEntry['flowType'],
+  expectedProvider?: string
 ): OAuthStateEntry | null {
   const entry = stateParam ? store.get(stateParam) : undefined;
   const flowOk = expectedFlow ? entry?.flowType === expectedFlow : !entry?.flowType;
-  if (!stateParam || !entry || !flowOk) {
+  const providerOk = expectedProvider === undefined || entry?.authProviderId === expectedProvider;
+  if (!stateParam || !entry || !flowOk || !providerOk || oauthStateExpired(entry)) {
     if (stateParam) store.delete(stateParam);
     return null;
   }

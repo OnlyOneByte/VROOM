@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
@@ -69,6 +69,27 @@ describe('GET /auth/providers/connect/google', () => {
     );
     expect(location.pathname).toBe('/settings/providers/new');
     expect(location.searchParams.get('provider_error')).toBe('cancelled');
+  });
+
+  test('a connect state older than the sign-in window is refused', async () => {
+    const connect = await ctx.authed(
+      'GET',
+      '/api/v1/auth/providers/connect/google?returnTo=%2Fsettings%2Fproviders%2Fnew&nonce=abc'
+    );
+    const state = new URL(connect.headers.get('location') ?? '').searchParams.get('state') ?? '';
+    const { CONFIG } = await import('../../../config');
+    const later = Date.now() + CONFIG.auth.oauthStateExpiry + 1000;
+    const clock = spyOn(Date, 'now').mockReturnValue(later);
+    try {
+      const callback = await ctx.authed(
+        'GET',
+        `/api/v1/auth/callback/provider/google?code=c&state=${encodeURIComponent(state)}`
+      );
+      const location = new URL(callback.headers.get('location') ?? '');
+      expect(location.searchParams.get('provider_error')).toBe('invalid_state');
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   test('a provider error on the connect callback is reported as a failed exchange', async () => {

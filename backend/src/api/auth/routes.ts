@@ -44,6 +44,7 @@ import { IDP_TIMEOUT_MS, NoVerifiedEmailError, type OAuthFlow } from './provider
 import {
   clearSessionCookie,
   consumeOAuthState,
+  oauthStateExpired,
   setSessionCookie,
   validateAndRefreshSession,
 } from './utils';
@@ -78,6 +79,7 @@ const oauthStateStore = new Map<
     providerId?: string;
     providerType?: string;
     nonce?: string;
+    authProviderId?: string;
   }
 >();
 
@@ -211,6 +213,7 @@ routes.get('/login/:authProvider', authRateLimiter, async (c) => {
   oauthStateStore.set(state, {
     codeVerifier,
     createdAt: Date.now(),
+    authProviderId,
   });
 
   const url = providerConfig.createAuthorizationURL(state, codeVerifier, 'login');
@@ -241,6 +244,7 @@ routes.get(
       createdAt: Date.now(),
       userId: user.id,
       flowType: 'auth-link',
+      authProviderId,
     });
 
     const url = providerConfig.createAuthorizationURL(state, codeVerifier, 'link');
@@ -427,14 +431,18 @@ export async function resolveNewUser(
   }
 }
 
-function validateLinkState(stateParam: string | null) {
-  const storedData = consumeOAuthState(oauthStateStore, stateParam, 'auth-link');
+function validateLinkState(stateParam: string | null, authProviderId: string) {
+  const storedData = consumeOAuthState(oauthStateStore, stateParam, 'auth-link', authProviderId);
   return storedData ? { data: storedData } : { error: 'invalid_state' as const };
 }
 
 // A link or provider state must never be accepted as a login state.
-function validateLoginState(stateParam: string | null, stateCookie: string | undefined) {
-  const storedData = consumeOAuthState(oauthStateStore, stateParam, undefined);
+function validateLoginState(
+  stateParam: string | null,
+  stateCookie: string | undefined,
+  authProviderId: string
+) {
+  const storedData = consumeOAuthState(oauthStateStore, stateParam, undefined, authProviderId);
   return storedData && stateCookie === stateParam
     ? { data: storedData }
     : { error: 'invalid_state' as const };
@@ -486,7 +494,7 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
     return c.redirect(profileRedirect(`link_error=${noCodeReason(url, authProviderId)}`));
   }
 
-  const stateResult = validateLinkState(stateParam);
+  const stateResult = validateLinkState(stateParam, authProviderId);
   if ('error' in stateResult) return c.redirect(profileRedirect('link_error=invalid_state'));
   const storedData = stateResult.data;
 
@@ -583,7 +591,7 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
     return c.redirect(authRedirect(`auth_error=${noCodeReason(url, authProviderId)}`));
   }
 
-  const stateResult = validateLoginState(stateParam, stateCookie);
+  const stateResult = validateLoginState(stateParam, stateCookie, authProviderId);
   if ('error' in stateResult) return c.redirect(authRedirect('auth_error=invalid_state'));
 
   const providerConfig = getProvider(authProviderId);
@@ -963,7 +971,12 @@ function resolveProviderState(
     return { error: providerNoCodeError(url), returnTo };
   }
 
-  if (!stateParam || !storedData || storedData.flowType !== 'provider') {
+  if (
+    !stateParam ||
+    !storedData ||
+    storedData.flowType !== 'provider' ||
+    oauthStateExpired(storedData)
+  ) {
     if (stateParam) oauthStateStore.delete(stateParam);
     return { error: 'invalid_state', returnTo };
   }

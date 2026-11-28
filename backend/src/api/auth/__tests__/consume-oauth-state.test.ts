@@ -1,12 +1,17 @@
 import { describe, expect, test } from 'bun:test';
+import { CONFIG } from '../../../config';
 import { consumeOAuthState, type OAuthStateEntry } from '../utils';
 
 function store(...entries: [string, OAuthStateEntry][]): Map<string, OAuthStateEntry> {
   return new Map(entries);
 }
-const loginEntry: OAuthStateEntry = { createdAt: 1 };
-const linkEntry: OAuthStateEntry = { createdAt: 1, flowType: 'auth-link', userId: 'u1' };
-const providerEntry: OAuthStateEntry = { createdAt: 1, flowType: 'provider', userId: 'u1' };
+const loginEntry: OAuthStateEntry = { createdAt: Date.now() };
+const linkEntry: OAuthStateEntry = { createdAt: Date.now(), flowType: 'auth-link', userId: 'u1' };
+const providerEntry: OAuthStateEntry = {
+  createdAt: Date.now(),
+  flowType: 'provider',
+  userId: 'u1',
+};
 
 describe('consumeOAuthState — single use', () => {
   test('a valid login state is returned once, then gone (replay rejected)', () => {
@@ -55,5 +60,25 @@ describe('consumeOAuthState — failed lookup still deletes the state', () => {
     expect(consumeOAuthState(s, null, undefined)).toBeNull();
     expect(consumeOAuthState(s, 'unknown', undefined)).toBeNull();
     expect(s.has('x')).toBe(true);
+  });
+});
+
+describe('consumeOAuthState — where and when', () => {
+  test('a state started for one provider is not accepted at another', () => {
+    const s = store(['st', { ...loginEntry, authProviderId: 'google' }]);
+    expect(consumeOAuthState(s, 'st', undefined, 'github')).toBeNull();
+    expect(s.has('st')).toBe(false);
+  });
+
+  test('a state is accepted at the provider it was started for', () => {
+    const entry = { ...loginEntry, authProviderId: 'google' };
+    expect(consumeOAuthState(store(['st', entry]), 'st', undefined, 'google')).toEqual(entry);
+  });
+
+  test('a state older than the sign-in window is refused and removed', () => {
+    const old = { ...linkEntry, createdAt: Date.now() - CONFIG.auth.oauthStateExpiry - 1000 };
+    const s = store(['st', old]);
+    expect(consumeOAuthState(s, 'st', 'auth-link')).toBeNull();
+    expect(s.has('st')).toBe(false);
   });
 });
