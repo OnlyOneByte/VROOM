@@ -174,6 +174,28 @@ describe('ZIP backups to an S3 provider', () => {
     expect(await lastBackupDate()).toBeTruthy();
   });
 
+  test('a key that can list but not delete also gets the cleanup warning', async () => {
+    bucket = new FakeStorageProvider([
+      {
+        key: 'VROOM/Backups/vroom-backup-old.zip',
+        name: 'vroom-backup-old.zip',
+        size: 1,
+        createdTime: '1969-12-31T00:00:00.000Z',
+        lastModified: '1969-12-31T00:00:00.000Z',
+      },
+    ]);
+    spyOn(bucket, 'delete').mockRejectedValue(new Error('AccessDenied: DeleteObject'));
+    await setBackupConfig({ 'p-s3': { ...zipOn, retentionCount: 1 } });
+
+    const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+    const body =
+      await json<DataEnvelope<{ outcome: string; results: Record<string, { warning?: string }> }>>(
+        res
+      );
+    expect(body.data.outcome).toBe('success');
+    expect(body.data.results['p-s3']?.warning).toBe(RETENTION_WARNING);
+  });
+
   test('a stale ZIP setting on a photo-only provider is ignored, so the run still succeeds', async () => {
     await seedProvider('p-photos', 'google-photos');
     await setBackupConfig({ 'p-s3': zipOn, 'p-photos': zipOn });

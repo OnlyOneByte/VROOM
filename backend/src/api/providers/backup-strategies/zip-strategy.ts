@@ -10,7 +10,7 @@ import { storageProviderRegistry } from '../domains/storage/registry';
 import type { StorageProvider } from '../domains/storage/storage-provider';
 
 export const RETENTION_WARNING =
-  "Older backups couldn't be cleaned up. Give the storage key permission to list and delete files.";
+  "Older backups couldn't be cleaned up, so they'll keep piling up. Check that VROOM may list and delete files in this storage.";
 
 async function enforceRetentionSafely(
   context: BackupStrategyContext

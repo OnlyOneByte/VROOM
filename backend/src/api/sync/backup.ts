@@ -470,6 +470,9 @@ class BackupService {
       }
     }
 
+    if (deletedCount < toDelete.length) {
+      throw new Error(`Couldn't delete ${toDelete.length - deletedCount} old backups`);
+    }
     return deletedCount;
   }
 
