@@ -128,7 +128,8 @@ export async function listAllAlbums(
   return albums;
 }
 
-const QUOTA_REASONS = /RESOURCE_EXHAUSTED|rateLimitExceeded|userRateLimitExceeded|quota/i;
+const QUOTA_REASONS =
+  /RESOURCE_EXHAUSTED|RATE_LIMIT_EXCEEDED|rateLimitExceeded|userRateLimitExceeded|quotaExceeded/;
 
 export function classifyPhotosApiError(status: number, body: string): SyncError {
   const message = `Google Photos API ${status}: ${body}`;
@@ -182,13 +183,7 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
         body: new Uint8Array(buffer),
       });
       if (!res.ok) {
-        // Raw upload bypasses authedFetch; keep the 401/403 mapping or expired tokens retry as network errors.
-        throw new SyncError(
-          res.status === 401 || res.status === 403
-            ? SyncErrorCode.AUTH_INVALID
-            : SyncErrorCode.NETWORK_ERROR,
-          `Google Photos upload failed: ${res.status}`
-        );
+        throw classifyPhotosApiError(res.status, await res.text().catch(() => res.statusText));
       }
       return res.text();
     },

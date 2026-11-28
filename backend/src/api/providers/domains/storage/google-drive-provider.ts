@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { logger } from '../../../../utils/logger';
 import { assertSafeStoragePath } from '../../../../utils/paths';
 import { GoogleDriveService } from '../../services/google-drive-service';
@@ -10,13 +11,16 @@ import type {
 } from './storage-provider';
 import { credentialFailureOf } from './storage-provider';
 
+const folderLookups = new Map<string, Promise<string>>();
+
 export class GoogleDriveProvider implements StorageProvider {
   readonly type = 'google-drive';
   private driveService: GoogleDriveService;
-  private readonly folderLookups = new Map<string, Promise<string>>();
+  private readonly account: string;
 
   constructor(refreshToken: string, driveService?: GoogleDriveService) {
     this.driveService = driveService ?? new GoogleDriveService(refreshToken);
+    this.account = createHash('sha256').update(refreshToken).digest('hex');
   }
 
   async upload(params: UploadParams): Promise<StorageRef> {
@@ -92,15 +96,15 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   private findOrCreateFolder(name: string, parentId: string | undefined): Promise<string> {
-    const key = `${parentId ?? 'root'}/${name}`;
-    const pending = this.folderLookups.get(key);
+    const key = `${this.account}/${parentId ?? 'root'}/${name}`;
+    const pending = folderLookups.get(key);
     if (pending) return pending;
     const lookup = (async () => {
       const existing = await this.driveService.findFolder(name, parentId);
       return existing ? existing.id : (await this.driveService.createFolder(name, parentId)).id;
     })();
-    this.folderLookups.set(key, lookup);
-    const forget = () => this.folderLookups.delete(key);
+    folderLookups.set(key, lookup);
+    const forget = () => folderLookups.delete(key);
     lookup.then(forget, forget);
     return lookup;
   }

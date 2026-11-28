@@ -111,9 +111,14 @@ describe('GoogleDriveProvider', () => {
       expect(store.files.get(result.externalId)?.parents).not.toEqual([nested]);
     });
 
-    test('uploads running at the same time share one new folder instead of creating two', async () => {
+    test('uploads for one account through separate providers share one new folder', async () => {
+      const providerFor = () =>
+        new GoogleDriveProvider(
+          'same-account-token',
+          new GoogleDriveService('same-account-token', makeFakeDrive(store))
+        );
       const upload = (fileName: string) =>
-        provider.upload({
+        providerFor().upload({
           fileName,
           buffer: Buffer.from(fileName),
           mimeType: 'image/jpeg',

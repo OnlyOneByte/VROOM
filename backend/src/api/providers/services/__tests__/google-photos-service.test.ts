@@ -132,6 +132,17 @@ describe('Google Photos API errors', () => {
     expect(classifyPhotosApiError(403, denied).code).toBe(SyncErrorCode.PERMISSION_DENIED);
   });
 
+  test('a 403 that only mentions a quota project is a permission failure, not throttling', () => {
+    const body =
+      '{"error":{"code":403,"status":"PERMISSION_DENIED","message":"This API requires a quota project"}}';
+    expect(classifyPhotosApiError(403, body).code).toBe(SyncErrorCode.PERMISSION_DENIED);
+  });
+
+  test('a newer RATE_LIMIT_EXCEEDED reason is throttling', () => {
+    const body = '{"error":{"code":403,"details":[{"reason":"RATE_LIMIT_EXCEEDED"}]}}';
+    expect(classifyPhotosApiError(403, body).code).toBe(SyncErrorCode.QUOTA_EXCEEDED);
+  });
+
   test('other statuses are network errors', () => {
     expect(classifyPhotosApiError(500, 'oops').code).toBe(SyncErrorCode.NETWORK_ERROR);
   });
