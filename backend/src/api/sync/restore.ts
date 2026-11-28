@@ -529,7 +529,10 @@ class RestoreService {
     return added;
   }
 
-  private expenseGroupsTaken(tx: AsyncHandle, rows: Record<string, unknown>[]): Promise<Set<string>> {
+  private expenseGroupsTaken(
+    tx: AsyncHandle,
+    rows: Record<string, unknown>[]
+  ): Promise<Set<string>> {
     const groupIds = rows.flatMap((row) => (row.groupId ? [String(row.groupId)] : []));
     return this.mineAmong(tx, expenses, expenses.groupId, expenses.userId, groupIds, () => true);
   }

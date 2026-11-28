@@ -162,21 +162,21 @@ describe('restore merge with records that depend on other records', () => {
     ).toBe(1);
   });
 
-  test.each([
-    'merge',
-    'replace',
-  ] as const)("%s never adds an expense to another account's split group", async (mode) => {
-    const car = await createCar('GRP-1');
-    insertExpense('my-split', car.id, ctx.user.id, null, 'my-group');
-    const zip = await retag(await exportZip(), 'my-group', 'their-group');
-    seedOtherAccountGroup();
-    ctx.sqlite.run("DELETE FROM expenses WHERE id = 'my-split'");
+  test.each(['merge', 'replace'] as const)(
+    "%s never adds an expense to another account's split group",
+    async (mode) => {
+      const car = await createCar('GRP-1');
+      insertExpense('my-split', car.id, ctx.user.id, null, 'my-group');
+      const zip = await retag(await exportZip(), 'my-group', 'their-group');
+      seedOtherAccountGroup();
+      ctx.sqlite.run("DELETE FROM expenses WHERE id = 'my-split'");
 
-    const { restoreService } = await import('../restore');
-    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, mode);
+      const { restoreService } = await import('../restore');
+      const result = await restoreService.restoreFromBackup(ctx.user.id, zip, mode);
 
-    expect(result.success).toBe(true);
-    expect(count("SELECT COUNT(*) AS n FROM expenses WHERE group_id = 'their-group'")).toBe(2);
-    expect(count("SELECT COUNT(*) AS n FROM expenses WHERE id = 'my-split'")).toBe(0);
-  });
+      expect(result.success).toBe(true);
+      expect(count("SELECT COUNT(*) AS n FROM expenses WHERE group_id = 'their-group'")).toBe(2);
+      expect(count("SELECT COUNT(*) AS n FROM expenses WHERE id = 'my-split'")).toBe(0);
+    }
+  );
 });
