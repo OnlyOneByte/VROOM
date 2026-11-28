@@ -19,7 +19,7 @@ import { VehicleShareRepository } from './api/shares/repository';
 import { TripRepository } from './api/trips/repository';
 import { VehicleRepository } from './api/vehicles/repository';
 import { CONFIG } from './config';
-import type { AsyncPgDatabase } from './db/async-postgres';
+import { type AsyncPgDatabase, portableDatabase } from './db/async-postgres';
 import { type AsyncAppDatabase, openAsyncDatabase } from './db/async-sqlite';
 import { getDb } from './db/connection';
 import { ACTIVE_DIALECT } from './db/dialect/active';
@@ -30,7 +30,7 @@ export function createAppContext(sqlite: Database) {
 }
 
 export function createPostgresAppContext(db: AsyncPgDatabase): AppContext {
-  return contextOn(db as unknown as AsyncAppDatabase, createLucia(db, 'pg'));
+  return contextOn(portableDatabase(db), createLucia(db, 'pg'));
 }
 
 function contextOn(asyncDb: AsyncAppDatabase, lucia: ReturnType<typeof createLucia>) {

@@ -115,9 +115,30 @@ export function openAsyncDatabase(sqlite: Database) {
   return handle;
 }
 
-export type AsyncAppDatabase = ReturnType<typeof openAsyncDatabase>['db'];
-export type AsyncHandle = BaseSQLiteDatabase<'async', SqliteRemoteResult, typeof schema>;
-export type AsyncTransaction = Parameters<Parameters<AsyncAppDatabase['transaction']>[0]>[0];
+export const sqliteOnlyMethods = ['all', 'get', 'run', 'values', 'batch', '$client'] as const;
+type SqliteOnly = (typeof sqliteOnlyMethods)[number];
+
+type Narrowed = SqliteOnly | 'transaction';
+
+interface PortableTransactions {
+  transaction<T>(
+    callback: (tx: AsyncTransaction) => Promise<T>,
+    config?: { behavior?: 'deferred' | 'immediate' | 'exclusive' }
+  ): Promise<T>;
+}
+
+export type SqliteAppDatabase = ReturnType<typeof openAsyncDatabase>['db'];
+export type AsyncAppDatabase = Omit<SqliteAppDatabase, Narrowed> & PortableTransactions;
+export type AsyncHandle = Omit<
+  BaseSQLiteDatabase<'async', SqliteRemoteResult, typeof schema>,
+  Narrowed
+> &
+  PortableTransactions;
+export type AsyncTransaction = Omit<
+  Parameters<Parameters<SqliteAppDatabase['transaction']>[0]>[0],
+  Narrowed
+> &
+  PortableTransactions;
 
 function createAsyncDatabase(sqlite: Database) {
   type Scope = {
