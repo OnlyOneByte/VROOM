@@ -2,6 +2,7 @@
 	import Input from '#lib/components/ui/input/input.svelte';
 	import Label from '#lib/components/ui/label/label.svelte';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
+	import MoneyInput from '#lib/components/common/MoneyInput.svelte';
 	import { amountPlaceholder, amountStep, getCurrencySymbol } from '#lib/utils/formatters.ts';
 
 	interface Props {
@@ -60,31 +61,15 @@
 			/>
 		</div>
 	{:else}
-		<div class="relative">
-			<span
-				class="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-base md:text-sm {amount
-					? 'text-foreground'
-					: 'text-muted-foreground'}"
-				aria-hidden="true"
-			>
-				{currencySymbol}
-			</span>
-			<Input
-				bind:ref
-				id="amount"
-				type="number"
-				inputmode="decimal"
-				step={amountStep(currency)}
-				min="0"
-				bind:value={amount}
-				placeholder={amountPlaceholder(currency)}
-				style="padding-left: calc(1.125rem + {currencySymbol.length}ch)"
-				class="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-				onblur={onAmountBlur}
-				aria-invalid={!!amountError}
-				aria-describedby={amountError ? 'amount-error' : undefined}
-			/>
-		</div>
+		<MoneyInput
+			bind:ref
+			id="amount"
+			{currency}
+			bind:value={amount}
+			onblur={onAmountBlur}
+			aria-invalid={!!amountError}
+			aria-describedby={amountError ? 'amount-error' : undefined}
+		/>
 	{/if}
 	{#if amountError}
 		<FormFieldError id="amount-error">{amountError}</FormFieldError>

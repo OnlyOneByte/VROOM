@@ -37,10 +37,10 @@ const input = fc
   });
 
 describe('split rules', () => {
-  test('allocate hands out every cent, in whole cents', () => {
+  test('allocate hands out every cent, in whole cents, refunds included', () => {
     fc.assert(
       fc.property(
-        fc.integer({ min: 0, max: 10_000_000 }),
+        fc.integer({ min: -10_000_000, max: 10_000_000 }),
         fc.array(fc.nat(100), { minLength: 1 }),
         (total, ws) => {
           const weights = new Map(ws.map((w, i) => [`d${i}`, w]));
@@ -67,6 +67,22 @@ describe('split rules', () => {
         const { owed, unassigned } = splitGroup(r, i);
         const paid = i.total - (i.paidBy.get(null) ?? 0);
         return unassigned !== 0 || sumOf(owed) === paid;
+      })
+    );
+  });
+
+  test('split evenly or by fixed shares, nothing is unassigned and a refund is shared as a refund', () => {
+    const shared = fc.constantFrom<GroupRule>(
+      { kind: 'equal' },
+      { kind: 'fixed', shares: { a: 70, b: 20, c: 10 } }
+    );
+    fc.assert(
+      fc.property(shared, input, (r, i) => {
+        const { owed, unassigned } = splitGroup(r, i);
+        const sign = Math.sign(i.total - (i.paidBy.get(null) ?? 0));
+        return (
+          unassigned === 0 && [...owed.values()].every((v) => v === 0 || Math.sign(v) === sign)
+        );
       })
     );
   });

@@ -91,14 +91,14 @@ describe('ReminderRow status', () => {
 		expect(rowText()).not.toContain('on the odometer');
 	});
 
-	test('within 1,000 of the reading it turns to the warning colour, in the car’s unit', () => {
+	function renderUpcoming(currentOdometer: number, distanceLabel: string, servicing = false) {
 		render(ReminderRow, {
 			props: {
-				item: odometerOnly(42200),
+				item: odometerOnly(currentOdometer),
 				group: 'upcoming',
 				vehicleNames: new Map(),
-				servicing: false,
-				distanceLabel: 'km',
+				servicing,
+				distanceLabel,
 				now: NOW,
 				onEdit: vi.fn(),
 				onDelete: vi.fn(),
@@ -107,7 +107,24 @@ describe('ReminderRow status', () => {
 				onViewExpenses: vi.fn()
 			}
 		});
-		expect(screen.getByText('In 800 km')).toHaveClass('text-warning');
+	}
+
+	test('it turns to the warning colour within about 1,000 miles, so 1,600 km on a metric car', () => {
+		renderUpcoming(41800, 'mi');
+		expect(screen.getByText('In 1,200 mi')).toHaveClass('text-muted-foreground');
+		cleanup();
+
+		renderUpcoming(41800, 'km');
+		expect(screen.getByText('In 1,200 km')).toHaveClass('text-warning');
+		cleanup();
+
+		renderUpcoming(41300, 'km');
+		expect(screen.getByText('In 1,700 km')).toHaveClass('text-muted-foreground');
+	});
+
+	test('while it is being marked serviced from the menu, the row says so', () => {
+		renderUpcoming(40360, 'mi', true);
+		expect(screen.getByRole('status')).toHaveTextContent('Marking serviced…');
 	});
 
 	test('with no reading yet it names the target reading', () => {

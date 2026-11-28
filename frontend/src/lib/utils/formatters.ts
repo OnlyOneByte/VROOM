@@ -124,14 +124,23 @@ export function getCurrencySymbol(currency?: string): string {
 
 const currencyNames = new Map<string, Intl.DisplayNames>();
 
-export function currencyLabel(code: string): string {
+function currencyDisplayName(code: string): string | undefined {
 	const locale = currentLocale();
 	let names = currencyNames.get(locale);
 	if (!names) {
 		names = new Intl.DisplayNames(locale, { type: 'currency' });
 		currencyNames.set(locale, names);
 	}
-	const name = names.of(code);
+	return names.of(code);
+}
+
+export function currencyName(currency?: string): string {
+	const code = userCurrency(currency);
+	return currencyDisplayName(code) ?? code;
+}
+
+export function currencyLabel(code: string): string {
+	const name = currencyDisplayName(code);
 	const symbol = getCurrencySymbol(code);
 	const named = name && name !== code ? `${code} – ${name}` : code;
 	return symbol === code ? named : `${named} (${symbol})`;

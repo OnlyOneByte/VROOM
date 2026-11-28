@@ -840,7 +840,9 @@ describe('VehicleForm financing on create', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
 
 		expect(errorText('purchasePrice')).toBe('Purchase price cannot be negative');
-		expect(input('purchasePrice').getAttribute('aria-describedby')).toBe('purchasePrice-error');
+		expect(input('purchasePrice').getAttribute('aria-describedby')).toBe(
+			'purchasePrice-error purchasePrice-currency'
+		);
 		expect(createVehicle).not.toHaveBeenCalled();
 	});
 });
@@ -1074,6 +1076,10 @@ describe('VehicleForm purchase price follows the currency', () => {
 		await renderCreate();
 		expect(input('purchasePrice')).toHaveAttribute('step', step);
 		expect(input('purchasePrice')).not.toHaveAttribute('placeholder');
-		expect(input('purchasePrice').parentElement?.textContent?.trim()).toBe(symbol);
+		expect(
+			input('purchasePrice')
+				.parentElement?.querySelector('[aria-hidden="true"]')
+				?.textContent?.trim()
+		).toBe(symbol);
 	});
 });
