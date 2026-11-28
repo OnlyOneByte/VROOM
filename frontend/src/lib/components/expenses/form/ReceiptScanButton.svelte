@@ -98,10 +98,10 @@
 	>
 		{#if isScanning}
 			<LoaderCircle class="h-4 w-4 animate-spin" />
-			<span>Reading<span class="max-sm:sr-only">{' receipt'}</span>…</span>
+			<span>Reading<span class="max-sm:sr-only">&nbsp;receipt</span>…</span>
 		{:else}
 			<ScanText class="h-4 w-4" />
-			<span>Scan<span class="max-sm:sr-only">{' receipt'}</span></span>
+			<span>Scan<span class="max-sm:sr-only">&nbsp;receipt</span></span>
 		{/if}
 	</Button>
 
