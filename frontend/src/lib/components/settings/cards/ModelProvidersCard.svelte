@@ -379,6 +379,7 @@
 										<ProviderStatusBadge
 											status={provider.status}
 											lastCheckedAt={provider.lastCheckedAt}
+											lastErrorCode={provider.lastErrorCode}
 										/>
 									</div>
 									<p class="text-sm break-words text-muted-foreground">

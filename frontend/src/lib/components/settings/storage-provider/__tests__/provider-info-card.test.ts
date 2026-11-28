@@ -192,6 +192,38 @@ describe('ProviderInfoCard header', () => {
 			.getAllByText("Couldn't reach the provider.")
 			.filter(el => !el.classList.contains('sr-only'));
 		expect(shown).toHaveLength(1);
+		expect(screen.getByText('Check failed')).toBeInTheDocument();
+		expect(screen.queryByText('Connected')).toBeNull();
+	});
+
+	test('a new provider whose first check fails goes from Added to Check failed, never Connected', async () => {
+		testProvider.mockResolvedValue({ ok: false, code: 'unreachable', message: 'Offline.' });
+		getProviders.mockResolvedValue([
+			provider({
+				status: 'active',
+				lastErrorCode: 'unreachable',
+				lastCheckedAt: '2026-05-10T11:59:00.000Z'
+			})
+		]);
+		const view = await mount({
+			provider: provider({ status: 'active', lastCheckedAt: null }),
+			onUpdated: (p: UserProviderInfo) => view.rerender({ provider: p })
+		});
+		expect(screen.getByText('Added')).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: 'Test connection to My Drive' }));
+		await settle();
+		expect(screen.getByText('Check failed')).toBeInTheDocument();
+		expect(screen.queryByText('Connected')).toBeNull();
+	});
+
+	test('an active provider whose last check passed reads Connected', async () => {
+		await mount({
+			provider: provider({
+				status: 'active',
+				lastErrorCode: null,
+				lastCheckedAt: '2026-05-10T11:55:00.000Z'
+			})
+		});
 		expect(screen.getByText('Connected')).toBeInTheDocument();
 	});
 

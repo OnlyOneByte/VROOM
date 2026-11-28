@@ -373,8 +373,8 @@
 							<CircleAlert aria-hidden="true" />
 							<AlertTitle class="line-clamp-none">
 								{unhealthyBackupProviders.length === 1
-									? 'Backups to 1 place need attention.'
-									: `Backups to ${unhealthyBackupProviders.length} places need attention.`}
+									? '1 backup needs attention.'
+									: `${unhealthyBackupProviders.length} backups need attention.`}
 							</AlertTitle>
 							<AlertDescription class="text-foreground!">
 								Your backups may not reach {new Intl.ListFormat('en', {

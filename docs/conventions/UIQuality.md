@@ -197,7 +197,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   on open. Fields with a sensible default are prefilled: the vehicle from the last entry and the
   date as today, both shown as chips, and the category from that vehicle's last entry, selected
   in its chip row. Optional fields sit under one "More details" disclosure, open when editing or
-  when a field inside it is invalid. Add Expense is the reference.
+  when a field inside it is invalid. Add expense is the reference.
 - Long forms keep Save/Cancel reachable (a sticky bar at the bottom on mobile), and that bar
   never covers the last field: pad the form by the bar's height.
 - **One save model per page.** Settings that apply instantly need no Save button; when a page
@@ -254,7 +254,7 @@ Every view that loads or mutates data handles all of these:
    sentence-case title that says what's missing, one line on why it matters, and the primary
    action that fills it. NOT a bare "No data". `/reminders` is the reference.
    With no vehicles, every page whose content needs one shows the no-vehicle `EmptyState` with
-   Add Vehicle as its action (`/trips` is the reference). Don't render zero-value stat tiles,
+   Add vehicle as its action (`/trips` is the reference). Don't render zero-value stat tiles,
    filters or charts over no data. While an empty state shows its action, the page shows no second
    button for the same action under another label.
 3. **Error** — a visible, recoverable message, never a silent `catch {}` that leaves the user on

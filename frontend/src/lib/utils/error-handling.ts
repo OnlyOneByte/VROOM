@@ -82,7 +82,7 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
 	PAYLOAD_TOO_LARGE: "That's too large to upload. Try a smaller file.",
 	BACKUP_IN_PROGRESS: 'A backup is already running. Try again once it finishes.',
 	BACKUP_FAILED:
-		"The backup didn't reach any of your storage providers. Check them in Settings → Backups and storage, then try again.",
+		"The backup didn't reach any of your storage. Check it in Settings → Backups and storage, then try again.",
 	AUTH_INVALID:
 		'Your storage account needs to be reconnected. Reconnect it in Settings → Backups and storage.',
 	PUSH_NOT_CONFIGURED: "Push notifications aren't set up on this server."
