@@ -169,7 +169,7 @@ test.describe('Expense list accessibility — compact layout', () => {
 		expect(await axeViolationIds(page, testInfo, 'compact-collapsed')).toEqual([]);
 
 		await page
-			.getByRole('button', { name: /Costco fill-up|Fuel & Charging/ })
+			.getByRole('button', { name: /Costco fill-up|Fuel & charging/ })
 			.first()
 			.click();
 		await expect(page.getByRole('link', { name: 'Edit' }).first()).toBeVisible();

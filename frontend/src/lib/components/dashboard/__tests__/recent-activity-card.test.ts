@@ -36,7 +36,7 @@ describe('RecentActivityCard', () => {
 
 		const [row] = screen.getAllByRole('listitem');
 		expect(within(row!).getByText('Arco')).toHaveClass('font-medium');
-		expect(rows()).toEqual(['Arco Fuel & Charging · Weekend Car · Nov 20 $28.99']);
+		expect(rows()).toEqual(['Arco Fuel & charging · Weekend Car · Nov 20 $28.99']);
 	});
 
 	test('falls back to the location, then the category, when there is no description', () => {
@@ -49,7 +49,7 @@ describe('RecentActivityCard', () => {
 			}
 		});
 
-		expect(rows()[0]).toMatch(/^Shell, Main St Fuel & Charging/);
+		expect(rows()[0]).toMatch(/^Shell, Main St Fuel & charging/);
 		expect(rows()[1]).toMatch(/^Misc Weekend Car · Nov 20/);
 	});
 
@@ -84,7 +84,7 @@ describe('RecentActivityCard', () => {
 		});
 
 		expect(screen.getByRole('heading', { name: 'Recent expenses' })).toBeInTheDocument();
-		expect(rows()).toEqual(['Arco Fuel & Charging · Nov 20 $28.99']);
+		expect(rows()).toEqual(['Arco Fuel & charging · Nov 20 $28.99']);
 		const seeAll = screen.getByRole('button', { name: 'See all 61 expenses' });
 		await fireEvent.click(seeAll);
 		expect(onSeeAll).toHaveBeenCalledOnce();

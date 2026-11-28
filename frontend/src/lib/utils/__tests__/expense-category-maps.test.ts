@@ -37,7 +37,7 @@ describe('expense-category display maps — exhaustiveness', () => {
 
 describe('expense-category display maps — known values + fallback', () => {
 	test('a few representative mappings are stable', () => {
-		expect(categoryLabels.fuel).toBe('Fuel & Charging');
+		expect(categoryLabels.fuel).toBe('Fuel & charging');
 		expect(categoryLabels.misc).toBe('Misc');
 		expect(getCategoryBadgeClasses('fuel')).toBe('text-chart-1 bg-chart-1/10');
 		expect(getCategoryBadgeClasses('misc')).toBe('text-muted-foreground bg-muted');

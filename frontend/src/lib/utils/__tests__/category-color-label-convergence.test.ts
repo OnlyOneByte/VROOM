@@ -250,8 +250,8 @@ describe('one category → label map', () => {
 	});
 
 	test('the fuel label names charging on every surface', () => {
-		expect(categoryLabels.fuel).toBe('Fuel & Charging');
-		expect(CATEGORY_LABELS.fuel).toBe('Fuel & Charging');
+		expect(categoryLabels.fuel).toBe('Fuel & charging');
+		expect(CATEGORY_LABELS.fuel).toBe('Fuel & charging');
 	});
 
 	test('no second category → label map exists anywhere under src', () => {
@@ -284,7 +284,7 @@ describe('one category → label map', () => {
 			`Raw category enum rendered at: ${JSON.stringify(offenders)}. ` +
 				'Render `getCategoryLabel(x.category)` (string-keyed, falls back to the raw key) or ' +
 				'`categoryLabels[x.category]` — a bare interpolation shows "fuel" where every other ' +
-				'surface shows "Fuel & Charging".'
+				'surface shows "Fuel & charging".'
 		).toEqual([]);
 	});
 

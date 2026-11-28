@@ -597,7 +597,7 @@
 									<Card.Content class="p-6">
 										<div class="mb-4 flex items-center gap-2">
 											<Droplet class="h-5 w-5 text-muted-foreground" />
-											<h4 class="font-semibold text-foreground">Fill-up Details</h4>
+											<h4 class="font-semibold text-foreground">Fill-up details</h4>
 										</div>
 
 										<div class="border-b pb-4 text-center">

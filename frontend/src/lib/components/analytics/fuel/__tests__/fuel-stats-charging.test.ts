@@ -133,7 +133,7 @@ describe('FuelStatsTab charging series', () => {
 		expect(screen.getByText('Per session')).toBeTruthy();
 		expect(screen.queryByText('Per fill-up')).toBeNull();
 		expect(screen.queryByText('Fill-ups')).toBeNull();
-		expect(screen.queryByText('Fill-up Details')).toBeNull();
+		expect(screen.queryByRole('heading', { level: 4, name: 'Fill-up details' })).toBeNull();
 	});
 
 	test('an EV-only fleet does not get empty gas-only charts', () => {
@@ -170,6 +170,7 @@ describe('FuelStatsTab charging series', () => {
 			fuelAdvanced: advanced
 		});
 		expect(screen.getByText('Fill-ups')).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 4, name: 'Fill-up details' })).toBeTruthy();
 		expect(screen.queryByText('Charging sessions')).toBeNull();
 	});
 });

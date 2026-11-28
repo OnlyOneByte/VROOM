@@ -154,7 +154,7 @@ describe('/expenses filters in the URL', () => {
 		expect(lastListParams()).toMatchObject({ category: 'fuel,maintenance' });
 		await waitFor(() => expect(tableProps['activeCategory']).toBe('fuel,maintenance'));
 		expect(await screen.findByTestId('active-filter-summary')).toHaveTextContent(
-			'Filtered by Fuel & Charging, Maintenance · Oct 1, 2026 – Oct 31, 2026'
+			'Filtered by Fuel & charging, Maintenance · Oct 1, 2026 – Oct 31, 2026'
 		);
 	});
 

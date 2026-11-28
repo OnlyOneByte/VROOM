@@ -24,7 +24,7 @@ interface ExpenseCategoryInfo {
 
 export const EXPENSE_CATEGORY_INFO: Record<ExpenseCategory, ExpenseCategoryInfo> = {
 	fuel: {
-		label: 'Fuel & Charging',
+		label: 'Fuel & charging',
 		shortLabel: 'Fuel',
 		description: 'Gas, diesel, and EV charging',
 		colorToken: 'chart-1',
