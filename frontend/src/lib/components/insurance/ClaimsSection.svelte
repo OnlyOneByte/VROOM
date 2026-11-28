@@ -48,6 +48,7 @@
 	interface Props {
 		policyId: string;
 		vehicles?: Vehicle[];
+		coveredVehicleIds?: string[];
 		readOnly?: boolean;
 		level?: 4 | 5;
 		compact?: boolean;
@@ -60,6 +61,7 @@
 	let {
 		policyId,
 		vehicles = [],
+		coveredVehicleIds,
 		readOnly = false,
 		level = 4,
 		compact = false,
@@ -70,6 +72,11 @@
 	}: Props = $props();
 
 	let vehicleNameMap = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
+	let claimableVehicles = $derived(
+		coveredVehicleIds
+			? vehicles.filter(v => coveredVehicleIds.includes(v.id) || v.id === editingVehicleId)
+			: vehicles
+	);
 
 	let claims = $state<InsuranceClaim[]>([]);
 	let isLoading = $state(true);
@@ -82,6 +89,7 @@
 	}
 
 	let editingId = $state<string | null>(null);
+	let editingVehicleId = $state<string | null>(null);
 	let isSaving = $state(false);
 
 	onMount(() => trackPendingSave(() => isSaving));
@@ -132,6 +140,7 @@
 
 	function resetForm() {
 		editingId = null;
+		editingVehicleId = null;
 		claimDate = '';
 		vehicleId = '';
 		claimType = 'collision';
@@ -148,6 +157,7 @@
 
 	function openEdit(claim: InsuranceClaim) {
 		editingId = claim.id;
+		editingVehicleId = claim.vehicleId ?? null;
 		claimDate = claim.claimDate ? toDateInputValue(claim.claimDate) : '';
 		vehicleId = claim.vehicleId ?? '';
 		claimType = claim.claimType;
@@ -440,7 +450,7 @@
 						</Select.Content>
 					</Select.Root>
 				</div>
-				{#if vehicles.length > 0}
+				{#if claimableVehicles.length > 0}
 					<div class="space-y-1 sm:col-span-2">
 						<Label for={`claim-vehicle-${policyId}`}>Vehicle (optional)</Label>
 						<Select.Root type="single" value={vehicleId} onValueChange={v => (vehicleId = v ?? '')}>
@@ -451,7 +461,7 @@
 							</Select.Trigger>
 							<Select.Content>
 								<Select.Item value="" label="Not specified">Not specified</Select.Item>
-								{#each vehicles as v (v.id)}
+								{#each claimableVehicles as v (v.id)}
 									<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
 										{getVehicleDisplayName(v)}
 									</Select.Item>
