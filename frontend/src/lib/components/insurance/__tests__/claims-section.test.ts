@@ -88,7 +88,9 @@ function localNoonISO(year: number, monthIndex: number, day: number): string {
 	return new Date(year, monthIndex, day, 12, 0, 0).toISOString();
 }
 
-function mount(props: { vehicles?: Vehicle[]; readOnly?: boolean } = {}) {
+function mount(
+	props: { vehicles?: Vehicle[]; coveredVehicleIds?: string[]; readOnly?: boolean } = {}
+) {
 	return render(ClaimsSection, { props: { policyId: 'p1', ...props } });
 }
 
@@ -251,6 +253,17 @@ describe('ClaimsSection filing a claim', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
 		expect(document.getElementById('claim-vehicle-p1')).toBeNull();
 		expect(document.getElementById('claim-fault-p1')).toHaveTextContent('Not specified');
+	});
+
+	test('the vehicle picker offers only the cars the policy covers', async () => {
+		mount({ vehicles: VEHICLES, coveredVehicleIds: ['v1'] });
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: /file claim/i }));
+		await fireEvent.click(document.getElementById('claim-vehicle-p1') as HTMLElement);
+		await settle();
+
+		expect(screen.getByRole('option', { name: 'Daily' })).toBeInTheDocument();
+		expect(screen.queryByRole('option', { name: '2019 Honda Civic' })).toBeNull();
 	});
 
 	test('files a fully populated claim, refetches and closes the form', async () => {

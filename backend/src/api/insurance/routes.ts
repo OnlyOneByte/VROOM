@@ -117,12 +117,21 @@ async function validateClaimRefs(
   if (data.vehicleId) {
     await requireVehicleAccess(data.vehicleId, userId, 'owner');
   }
-  if (data.termId) {
-    const policy = await repos().insurancePolicies.findById(policyId);
-    const onThisPolicy = policy?.terms.some((t) => t.id === data.termId);
-    if (!onThisPolicy) {
-      throw new ValidationError('Claim termId does not belong to this policy');
-    }
+  if (!data.vehicleId && !data.termId) return;
+  const policy = await repos().insurancePolicies.findById(policyId);
+  if (data.termId && !policy?.terms.some((t) => t.id === data.termId)) {
+    throw new ValidationError('Claim termId does not belong to this policy');
+  }
+  if (!data.vehicleId) return;
+  const covers = (policy?.termVehicleCoverage ?? []).some(
+    (tc) => tc.vehicleId === data.vehicleId && (!data.termId || tc.termId === data.termId)
+  );
+  if (!covers) {
+    throw new ValidationError(
+      data.termId
+        ? 'That term does not cover this vehicle'
+        : 'This policy does not cover this vehicle'
+    );
   }
 }
 
@@ -453,7 +462,17 @@ routes.put(
     const { id, claimId } = c.req.valid('param');
     await validateInsuranceOwnership(id, user.id);
     const updates = c.req.valid('json');
-    await validateClaimRefs(updates, id, user.id);
+    if (updates.vehicleId !== undefined || updates.termId !== undefined) {
+      const existing = await repos().insuranceClaims.findById(id, claimId);
+      await validateClaimRefs(
+        {
+          vehicleId: updates.vehicleId !== undefined ? updates.vehicleId : existing.vehicleId,
+          termId: updates.termId !== undefined ? updates.termId : existing.termId,
+        },
+        id,
+        user.id
+      );
+    }
     const scale = await ownScale(c);
     const claim = await repos().preferences.writeAtScale(user.id, scale, () =>
       repos().insuranceClaims.update(id, claimId, insuranceClaimFromApi(updates, scale))

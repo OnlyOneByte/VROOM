@@ -258,6 +258,7 @@
 				bind:this={claimsSection}
 				policyId={policy.id}
 				{vehicles}
+				coveredVehicleIds={policy.vehicleIds}
 				{readOnly}
 				level={childLevel}
 				compact
