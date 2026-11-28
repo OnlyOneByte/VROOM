@@ -217,6 +217,20 @@ describe('ModelProvidersCard', () => {
 		expect(screen.getByText(/Anthropic \(Claude\)/)).toBeInTheDocument();
 	});
 
+	test('an active provider whose last check failed shows Check failed, not Connected', async () => {
+		getProviders.mockResolvedValue([
+			provider('llm', 'Work Claude', {
+				lastErrorCode: 'unreachable',
+				lastCheckedAt: '2026-05-10T11:59:00.000Z'
+			})
+		]);
+		render(ModelProvidersCard, { props: { domain: 'llm' } });
+
+		const row = await screen.findByTestId('llm-provider-row');
+		expect(within(row).getByText('Check failed')).toBeInTheDocument();
+		expect(within(row).queryByText('Connected')).toBeNull();
+	});
+
 	test('a provider’s edit and delete icons are 40px tap targets on phones, 8px apart', async () => {
 		getProviders.mockResolvedValue([provider('llm', 'Work Claude')]);
 		render(ModelProvidersCard, { props: { domain: 'llm' } });
