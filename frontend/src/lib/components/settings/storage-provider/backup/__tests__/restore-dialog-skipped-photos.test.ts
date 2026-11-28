@@ -33,7 +33,7 @@ async function previewFromSheets(result: RestoreResult): Promise<void> {
 		}
 	});
 	await fireEvent.click(await screen.findByText('Restore from provider'));
-	await screen.findByText('Import Summary');
+	await screen.findByText('In this backup');
 }
 
 beforeEach(() => {
