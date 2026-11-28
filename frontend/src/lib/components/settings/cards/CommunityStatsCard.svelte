@@ -83,8 +83,8 @@
 				region is used only if you set one below.
 			</li>
 			<li>
-				Dates and odometer readings only pick the 12 months and measure distance. They're never
-				shown or stored in the stats.
+				Dates and odometer readings are used to work these out, for example the 12 months, how long
+				you've had the vehicle, and the distance driven. They're never shown or stored in the stats.
 			</li>
 			<li>Never used: VIN, plate, nickname, notes, photos or locations.</li>
 			<li>You can turn this off at any time. You'll be left out from the next daily refresh.</li>

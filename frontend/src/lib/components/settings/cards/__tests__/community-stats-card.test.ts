@@ -70,7 +70,7 @@ describe('CommunityStatsCard', () => {
 		).toBeInTheDocument();
 		expect(
 			screen.getByText(
-				"Dates and odometer readings only pick the 12 months and measure distance. They're never shown or stored in the stats."
+				"Dates and odometer readings are used to work these out, for example the 12 months, how long you've had the vehicle, and the distance driven. They're never shown or stored in the stats."
 			)
 		).toBeInTheDocument();
 		expect(
