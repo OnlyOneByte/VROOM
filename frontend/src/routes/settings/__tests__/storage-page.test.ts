@@ -254,6 +254,33 @@ describe('Backups and storage page backups', () => {
 		expect(toast.success).not.toHaveBeenCalled();
 	});
 
+	test('when cleanup failed on two providers, the warning names both and points to their cards', async () => {
+		getProviders.mockResolvedValue([
+			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
+			{ id: 'p2', displayName: 'Office S3' } as UserProviderInfo
+		]);
+		const result = orchestratorResult('success', { p1: true, p2: true });
+		const warned = {
+			success: true,
+			capabilities: {
+				zip: {
+					success: true,
+					warning:
+						"Old backups couldn't be removed. VROOM needs permission to list and delete files in this storage."
+				}
+			}
+		} as never;
+		result.results['p1'] = warned;
+		result.results['p2'] = warned;
+		settingsStoreFake.executeSync.mockResolvedValue(result);
+		await mount();
+		await backUpNow();
+		expect(toast.warning).toHaveBeenCalledWith(
+			"Backed up to 2 places. Old backups couldn't be removed from Family Drive and Office S3. Each one's card under Connected says why.",
+			{ id: 'toast-1' }
+		);
+	});
+
 	test('a partial run names the failed provider and says the rest succeeded', async () => {
 		getProviders.mockResolvedValue([
 			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,
