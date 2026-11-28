@@ -292,7 +292,7 @@ describe('ProviderInfoCard header', () => {
 
 describe('ProviderInfoCard backup cleanup warning', () => {
 	const warning =
-		"Old backups couldn't be removed. VROOM needs permission to list and delete files in this storage.";
+		"Old backups couldn't be removed. VROOM needs permission to list and delete files there.";
 
 	test('a stored warning shows a badge next to the last backup and the reason under ZIP backup', async () => {
 		await mount({

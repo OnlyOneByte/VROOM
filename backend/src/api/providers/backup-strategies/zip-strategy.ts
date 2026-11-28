@@ -16,7 +16,7 @@ import { credentialCodeOf, type StorageProvider } from '../domains/storage/stora
 import { healthFailure } from '../provider-status';
 
 export const RETENTION_WARNING =
-  "Old backups couldn't be removed. VROOM needs permission to list and delete files in this storage.";
+  "Old backups couldn't be removed. VROOM needs permission to list and delete files there.";
 
 export async function uploadZipBackup(
   context: BackupStrategyContext,
