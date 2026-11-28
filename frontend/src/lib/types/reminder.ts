@@ -40,6 +40,7 @@ export interface ReminderWithVehicles {
 	reminder: Reminder;
 	vehicleIds: string[];
 	mileageDue?: boolean;
+	currentOdometer?: number | null;
 }
 
 export interface ReminderNotification {

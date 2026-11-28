@@ -3,8 +3,9 @@ import type { ReminderWithVehicles } from './repository';
 
 export async function withMileageDue<T extends ReminderWithVehicles>(
   rows: T[],
-  fullVehicleIds: Map<string, string[]>
-): Promise<(T & { mileageDue: boolean })[]> {
+  fullVehicleIds: Map<string, string[]>,
+  viewerId: string
+): Promise<(T & { mileageDue: boolean; currentOdometer: number | null })[]> {
   const readings = new Map<string, Promise<number | null>>();
   const reading = (vehicleId: string, ownerId: string) => {
     const key = `${ownerId}:${vehicleId}`;
@@ -29,10 +30,14 @@ export async function withMileageDue<T extends ReminderWithVehicles>(
         vehicleId === undefined ||
         !row.vehicleIds.includes(vehicleId)
       ) {
-        return { ...row, mileageDue: false };
+        return { ...row, mileageDue: false, currentOdometer: null };
       }
       const current = await reading(vehicleId, reminder.userId);
-      return { ...row, mileageDue: current !== null && current >= milestone };
+      return {
+        ...row,
+        mileageDue: current !== null && current >= milestone,
+        currentOdometer: reminder.userId === viewerId ? current : null,
+      };
     })
   );
 }

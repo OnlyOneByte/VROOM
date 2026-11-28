@@ -135,6 +135,9 @@ describe('/reminders error copy', () => {
 		api.markServiced.mockImplementation(failure);
 		render(Page);
 
+		await fireEvent.click(
+			await screen.findByRole('button', { name: 'More actions for Oil change' })
+		);
 		await fireEvent.click(await screen.findByRole('button', { name: 'Mark serviced' }));
 		await expectToast("Couldn't mark the reminder as serviced.");
 	});

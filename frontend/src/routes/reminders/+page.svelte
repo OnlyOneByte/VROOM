@@ -9,6 +9,8 @@
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { isReminderTimeDue } from '#lib/utils/reminder-helpers.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
+	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -61,6 +63,14 @@
 	}
 
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
+	let distanceUnits = $derived(
+		new Map(vehicles.map(v => [v.id, v.unitPreferences?.distanceUnit ?? null]))
+	);
+
+	function distanceLabel(item: ReminderWithVehicles): string {
+		const unit = distanceUnits.get(item.vehicleIds[0] ?? '');
+		return getDistanceUnitLabel(unit ?? settingsStore.unitPreferences.distanceUnit, true);
+	}
 
 	const isDue = (r: ReminderWithVehicles) => isReminderTimeDue(r.reminder) || r.mileageDue === true;
 
@@ -281,6 +291,7 @@
 								{group}
 								{vehicleNames}
 								servicing={servicingId === item.reminder.id}
+								distanceLabel={distanceLabel(item)}
 								onEdit={openEdit}
 								onDelete={requestDeleteReminder}
 								onToggleActive={toggleActive}

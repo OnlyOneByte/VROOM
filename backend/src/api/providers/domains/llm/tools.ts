@@ -210,11 +210,15 @@ const TOOL_LIST: AssistantTool[] = [
   defineTool({
     name: 'getUpcomingReminders',
     description:
-      'Active reminders (service intervals, registration, etc.) and when they are next due. mileageDue is true once the car has reached the reminder mileage.',
+      'Active reminders (service intervals, registration, etc.) and when they are next due. mileageDue is true once the car has reached the reminder mileage; currentOdometer is the car reading it was compared with.',
     schema: emptyArgs,
     read: async (_args, userId) => {
       const rows = await repos().reminders.findByUserId(userId, { isActive: true });
-      return withMileageDue(rows, new Map(rows.map((row) => [row.reminder.id, row.vehicleIds])));
+      return withMileageDue(
+        rows,
+        new Map(rows.map((row) => [row.reminder.id, row.vehicleIds])),
+        userId
+      );
     },
     toApi: (rows, scale) => rows.map((row) => reminderWithVehiclesToApi(row, scale)),
   }),
