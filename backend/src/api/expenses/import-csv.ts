@@ -77,7 +77,6 @@ function makeCellGetter(record: Record<string, string>): CellGetter {
   return (k: string) => denormalizeCsvCell((record[k] ?? '').trim());
 }
 
-// A semicolon file comes from a decimal-comma locale, so "40,50" there means 40.50.
 function toNumber(raw: string, decimalComma: boolean): number {
   return Number(decimalComma && /^\d+,\d+$/.test(raw) ? raw.replace(',', '.') : raw);
 }
@@ -153,7 +152,7 @@ function parseDate(raw: string, timeZone?: string): { value: Date } | { error: s
   if (!buildCalendarDate(year, month, day)) return invalid;
   const time = hh === undefined ? undefined : clockTime(hh, mm, ss);
   if (time === null) return invalid;
-  // new Date() reads a date or a date-time without an offset as UTC, which would shift it.
+  // new Date("YYYY-MM-DD") parses as UTC and would shift the day west of UTC.
   if (!offset) {
     const date = buildImportDate(year, month, day, timeZone, time);
     return date ? { value: date } : invalid;

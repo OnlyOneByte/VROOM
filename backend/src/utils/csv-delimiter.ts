@@ -2,7 +2,6 @@ export type CsvDelimiter = ',' | ';' | '\t';
 
 const CANDIDATES: CsvDelimiter[] = [',', ';', '\t'];
 
-/** The delimiter used most often outside quotes on the first non-empty line; a comma on a tie. */
 export function csvDelimiter(text: string): CsvDelimiter {
   const line = text.split(/\r?\n/).find((l) => l.trim() !== '') ?? '';
   const counts = new Map<string, number>();

@@ -7,7 +7,6 @@ export const DETECT_SAMPLE_LENGTH = 8192;
 
 const DELIMITERS = [',', ';', '\t'] as const;
 
-/** The delimiter used most often outside quotes on the first non-empty line; a comma on a tie. */
 export function csvDelimiter(csvText: string): string {
 	const line = csvText.split(/\r?\n/).find(l => l.trim() !== '') ?? '';
 	const counts = new Map<string, number>();
