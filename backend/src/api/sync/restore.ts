@@ -265,7 +265,7 @@ class RestoreService {
       if (error instanceof MergePreviewRollback) {
         return { success: true, preview: summary, merge: error.counts, ...skipped };
       }
-      if (mode === 'preview') {
+      if (mode === 'preview' && !signal?.aborted) {
         logger.warn('Merge preview failed; returning the plain preview', { error });
         return { success: true, preview: summary, ...skipped };
       }
@@ -529,22 +529,9 @@ class RestoreService {
     return added;
   }
 
-  private async expenseGroupsHere(
-    tx: AsyncHandle,
-    rows: Record<string, unknown>[],
-    userId: string,
-    merge: boolean
-  ): Promise<Set<string>> {
-    if (!merge) return new Set();
+  private expenseGroupsTaken(tx: AsyncHandle, rows: Record<string, unknown>[]): Promise<Set<string>> {
     const groupIds = rows.flatMap((row) => (row.groupId ? [String(row.groupId)] : []));
-    return this.mineAmong(
-      tx,
-      expenses,
-      expenses.groupId,
-      expenses.userId,
-      groupIds,
-      (owner) => owner === userId
-    );
+    return this.mineAmong(tx, expenses, expenses.groupId, expenses.userId, groupIds, () => true);
   }
 
   private async lastTermVehiclePosition(tx: AsyncHandle, merge: boolean): Promise<number> {
@@ -734,16 +721,13 @@ class RestoreService {
       financing: financingOk,
       insurance_term: termOk,
     };
-    const groupsHere = await this.expenseGroupsHere(tx, data.expenses ?? [], userId, merge);
+    const groupsTaken = await this.expenseGroupsTaken(tx, data.expenses ?? []);
     const expenseRows = this.keepMemberAuthors(
       gate(
         this.stampUserId(data.expenses, userId),
         (row) =>
-          onCar(row) &&
-          optional(driverOk, row.paidByDriverId) &&
-          linksToOwnSource(row, sources) &&
-          !groupsHere.has(String(row.groupId ?? ''))
-      ),
+          onCar(row) && optional(driverOk, row.paidByDriverId) && linksToOwnSource(row, sources)
+      ).filter((row) => !groupsTaken.has(String(row.groupId ?? ''))),
       consentedShares,
       (row) => [String(row.vehicleId)]
     );

@@ -54,12 +54,27 @@ async function merge(zip: Buffer) {
   return restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
 }
 
-function insertExpense(id: string, vehicleId: string, userId: string, driverId: string | null) {
+function insertExpense(
+  id: string,
+  vehicleId: string,
+  userId: string,
+  driverId: string | null,
+  groupId: string | null = null
+) {
   ctx.sqlite.run(
-    `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, missed_fillup, paid_by_driver_id)
-     VALUES (?, ?, ?, 'fuel', 1600000000, 2500, 0, ?)`,
-    [id, vehicleId, userId, driverId]
+    `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, missed_fillup, paid_by_driver_id, group_id)
+     VALUES (?, ?, ?, 'fuel', 1600000000, 2500, 0, ?, ?)`,
+    [id, vehicleId, userId, driverId, groupId]
   );
+}
+
+function seedOtherAccountGroup() {
+  ctx.sqlite.run("INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')");
+  ctx.sqlite.run(
+    "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('their-car', 'them', 'Kia', 'Rio', 2020)"
+  );
+  insertExpense('their-1', 'their-car', 'them', null, 'their-group');
+  insertExpense('their-2', 'their-car', 'them', null, 'their-group');
 }
 
 describe('restore merge with records that depend on other records', () => {
@@ -145,5 +160,23 @@ describe('restore merge with records that depend on other records', () => {
     expect(
       count('SELECT COUNT(*) AS n FROM vehicles WHERE id = ? AND user_id = ?', theirCar, owner.id)
     ).toBe(1);
+  });
+
+  test.each([
+    'merge',
+    'replace',
+  ] as const)("%s never adds an expense to another account's split group", async (mode) => {
+    const car = await createCar('GRP-1');
+    insertExpense('my-split', car.id, ctx.user.id, null, 'my-group');
+    const zip = await retag(await exportZip(), 'my-group', 'their-group');
+    seedOtherAccountGroup();
+    ctx.sqlite.run("DELETE FROM expenses WHERE id = 'my-split'");
+
+    const { restoreService } = await import('../restore');
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, mode);
+
+    expect(result.success).toBe(true);
+    expect(count("SELECT COUNT(*) AS n FROM expenses WHERE group_id = 'their-group'")).toBe(2);
+    expect(count("SELECT COUNT(*) AS n FROM expenses WHERE id = 'my-split'")).toBe(0);
   });
 });
