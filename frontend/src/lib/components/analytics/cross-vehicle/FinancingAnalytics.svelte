@@ -12,9 +12,11 @@
 
 	let kind = $derived.by(() => {
 		const { loanCount, leaseCount } = financing.summary;
-		if (leaseCount === 0) return loanCount === 1 ? 'one loan' : `${loanCount} loans`;
-		if (loanCount === 0) return leaseCount === 1 ? 'one lease' : `${leaseCount} leases`;
-		return `${loanCount + leaseCount} loans and leases`;
+		const loans = loanCount === 1 ? 'a loan' : `${loanCount} loans`;
+		const leases = leaseCount === 1 ? 'a lease' : `${leaseCount} leases`;
+		if (leaseCount === 0) return loanCount === 1 ? 'one loan' : loans;
+		if (loanCount === 0) return leaseCount === 1 ? 'one lease' : leases;
+		return `${loans} and ${leases}`;
 	});
 
 	let ownedText = $derived(
@@ -28,7 +30,10 @@
 	);
 
 	function meta(v: FinancingResponse['vehicleDetails'][number]): string {
-		const left = `${v.monthsRemaining} ${v.monthsRemaining === 1 ? 'payment' : 'payments'} to go`;
+		const left =
+			v.monthsRemaining > 0
+				? `${v.monthsRemaining} ${v.monthsRemaining === 1 ? 'payment' : 'payments'} to go`
+				: null;
 		return [
 			v.financingType === 'lease' ? 'Lease' : 'Loan',
 			v.financingType === 'loan' && v.apr != null ? `${formatNumber(v.apr, 1)}% APR` : null,

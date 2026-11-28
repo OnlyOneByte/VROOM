@@ -72,6 +72,14 @@ describe('Cross-vehicle loan and premium charts', () => {
 		expect(screen.queryByText('Financing Type Distribution')).toBeNull();
 	});
 
+	test('with no cars in Loans, Insurance takes the full width', async () => {
+		const { container } = render(CrossVehicleTab, {});
+		await screen.findByRole('region', { name: 'Insurance' });
+		expect(container.querySelector('[data-loans-insurance]')?.className).not.toContain(
+			'md:grid-cols-2'
+		);
+	});
+
 	test('the Loans and Insurance sections come before More detail', async () => {
 		render(CrossVehicleTab, {});
 		const insurance = await screen.findByRole('region', { name: 'Insurance' });
