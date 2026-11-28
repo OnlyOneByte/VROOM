@@ -202,6 +202,7 @@ src/api/vehicles/__tests__/vehicles-http.test.ts
 src/api/vehicles/__tests__/vehicles-list-financing-contract.test.ts
 src/db/__tests__/database-startup.test.ts
 src/permissions/__tests__/shadow-vehicle-access.test.ts
+src/scripts/__tests__/postgres-move-smoke.test.ts
 src/test-helpers/__tests__/http-client.smoke.test.ts
 src/test-helpers/__tests__/test-sql.test.ts
 src/utils/__tests__/request-body.test.ts

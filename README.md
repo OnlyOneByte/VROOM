@@ -58,7 +58,7 @@ Screenshots show the demo data from `bun run db:seed`.
 | Layer | Technologies |
 |---|---|
 | Frontend | SvelteKit, Svelte 5 (runes), Tailwind CSS v4, shadcn-svelte, layerchart, Zod, Vitest + Playwright |
-| Backend | Hono on Bun, Drizzle ORM + SQLite, Lucia Auth, Biome |
+| Backend | Hono on Bun, Drizzle ORM + SQLite (or opt-in Postgres, see [docs/deployment.md](docs/deployment.md#postgres-opt-in)), Lucia Auth, Biome |
 | Infra | Docker, GitHub Actions CI/CD, GitHub Container Registry |
 
 ## Quick Start
