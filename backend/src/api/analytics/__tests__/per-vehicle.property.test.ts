@@ -1,50 +1,50 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
-  expenseArb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedInsurancePolicy,
   seedUser,
   seedVehicle,
-  type TestDb,
+} from './analytics-test-db';
+import {
+  expenseArb,
   type TestExpense,
   type TestInsurancePolicy,
   type TestVehicle,
 } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 const TEST_YEAR = 2024;
 
-function resetDb(): void {
-  testDb.sqlite.close();
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+async function resetDb(): Promise<void> {
+  testDb.close();
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 }
 
-function setupUserAndVehicle(opts?: {
+async function setupUserAndVehicle(opts?: {
   purchasePrice?: number | null;
   purchaseDate?: Date | null;
-}): { userId: string; vehicle: TestVehicle } {
+}): Promise<{ userId: string; vehicle: TestVehicle }> {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-  testDb.sqlite.run('INSERT OR IGNORE INTO users (id, email, display_name) VALUES (?, ?, ?)', [
-    user.id,
-    user.email,
-    user.displayName,
-  ]);
+  await testDb.sql.run(
+    'INSERT INTO users (id, email, display_name) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
+    [user.id, user.email, user.displayName]
+  );
 
   const v: TestVehicle = {
     id: 'vehicle-user-1-0',
@@ -53,12 +53,12 @@ function setupUserAndVehicle(opts?: {
     model: 'Camry',
     year: 2022,
   };
-  seedVehicle(testDb.sqlite, v);
+  await seedVehicle(testDb.sql, v);
 
   if (opts?.purchasePrice != null || opts?.purchaseDate != null) {
     const priceVal = opts?.purchasePrice ?? null;
     const dateVal = opts?.purchaseDate ? Math.floor(opts.purchaseDate.getTime() / 1000) : null;
-    testDb.sqlite.run('UPDATE vehicles SET purchase_price = ?, purchase_date = ? WHERE id = ?', [
+    await testDb.sql.run('UPDATE vehicles SET purchase_price = ?, purchase_date = ? WHERE id = ?', [
       priceVal,
       dateVal,
       v.id,
@@ -68,11 +68,11 @@ function setupUserAndVehicle(opts?: {
   return { userId: user.id, vehicle: v };
 }
 
-function seedMaintenanceWithDates(vehicleId: string, dates: Date[]): void {
+async function seedMaintenanceWithDates(vehicleId: string, dates: Date[]): Promise<void> {
   for (let i = 0; i < dates.length; i++) {
     const d = dates[i];
     if (!d) continue;
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: `maint-${i}`,
       vehicleId,
       category: 'maintenance',
@@ -86,12 +86,12 @@ function seedMaintenanceWithDates(vehicleId: string, dates: Date[]): void {
   }
 }
 
-function seedMaintenanceWithMileages(vehicleId: string, mileages: number[]): void {
+async function seedMaintenanceWithMileages(vehicleId: string, mileages: number[]): Promise<void> {
   const baseDate = new Date(TEST_YEAR, 0, 1);
   for (let i = 0; i < mileages.length; i++) {
     const m = mileages[i];
     if (m == null) continue;
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: `maint-mile-${i}`,
       vehicleId,
       category: 'maintenance',
@@ -105,12 +105,12 @@ function seedMaintenanceWithMileages(vehicleId: string, mileages: number[]): voi
   }
 }
 
-function seedRandomExpenses(vehicleId: string, count: number): void {
+async function seedRandomExpenses(vehicleId: string, count: number): Promise<void> {
   const generated = fc.sample(expenseArb(vehicleId, 0, TEST_YEAR), count);
   for (let i = 0; i < generated.length; i++) {
     const e = generated[i];
     if (!e) continue;
-    seedExpense(testDb.sqlite, { ...e, id: `expense-${i}` } as TestExpense);
+    await seedExpense(testDb.sql, { ...e, id: `expense-${i}` } as TestExpense);
   }
 }
 
@@ -121,23 +121,27 @@ describe('Health score formula', () => {
         fc.integer({ min: 0, max: 6 }),
         fc.boolean(),
         async (expenseCount, hasInsurance) => {
-          resetDb();
+          await resetDb();
 
           let policyId: string | null = null;
           if (hasInsurance) {
             policyId = 'policy-1';
-            seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+            await seedUser(testDb.sql, {
+              id: 'user-1',
+              email: 'test@test.com',
+              displayName: 'Test',
+            });
             const policy: TestInsurancePolicy = {
               id: policyId,
               userId: 'user-1',
               company: 'Test Insurance',
               isActive: true,
             };
-            seedInsurancePolicy(testDb.sqlite, policy);
+            await seedInsurancePolicy(testDb.sql, policy);
           }
 
-          const { userId, vehicle } = setupUserAndVehicle({});
-          seedRandomExpenses(vehicle.id, expenseCount);
+          const { userId, vehicle } = await setupUserAndVehicle({});
+          await seedRandomExpenses(vehicle.id, expenseCount);
 
           const result = await repo.getVehicleHealth(userId, vehicle.id);
 
@@ -166,20 +170,20 @@ describe('Insurance coverage is binary', () => {
   test('100 with active policy, 0 without', async () => {
     await fc.assert(
       fc.asyncProperty(fc.boolean(), fc.boolean(), async (hasPolicy, isActive) => {
-        resetDb();
+        await resetDb();
 
-        const { userId, vehicle } = setupUserAndVehicle({});
+        const { userId, vehicle } = await setupUserAndVehicle({});
 
         if (hasPolicy) {
           const policyId = 'policy-1';
           const termId = 'term-1';
-          seedInsurancePolicy(testDb.sqlite, {
+          await seedInsurancePolicy(testDb.sql, {
             id: policyId,
             userId,
             company: 'Test Co',
             isActive,
           });
-          testDb.sqlite.run(
+          await testDb.sql.run(
             'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
             [
               termId,
@@ -188,7 +192,7 @@ describe('Insurance coverage is binary', () => {
               Math.floor(Date.now() / 1000) + 86400 * 365,
             ]
           );
-          testDb.sqlite.run(
+          await testDb.sql.run(
             'INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)',
             [termId, vehicle.id]
           );
@@ -214,8 +218,8 @@ describe('Maintenance regularity penalizes large gaps', () => {
         fc.integer({ min: 0, max: 5 }),
         fc.integer({ min: 0, max: 5 }),
         async (goodGapCount, badGapCount) => {
-          resetDb();
-          const { userId, vehicle } = setupUserAndVehicle();
+          await resetDb();
+          const { userId, vehicle } = await setupUserAndVehicle();
 
           const totalRecords = goodGapCount + badGapCount + 1;
           const dates: Date[] = [];
@@ -231,7 +235,7 @@ describe('Maintenance regularity penalizes large gaps', () => {
             dates.push(current);
           }
 
-          seedMaintenanceWithDates(vehicle.id, dates);
+          await seedMaintenanceWithDates(vehicle.id, dates);
 
           const result = await repo.getVehicleHealth(userId, vehicle.id);
 
@@ -259,8 +263,8 @@ describe('Mileage adherence scores good intervals', () => {
         fc.integer({ min: 0, max: 5 }),
         fc.integer({ min: 0, max: 5 }),
         async (goodIntervalCount, badIntervalCount) => {
-          resetDb();
-          const { userId, vehicle } = setupUserAndVehicle();
+          await resetDb();
+          const { userId, vehicle } = await setupUserAndVehicle();
 
           const totalRecords = goodIntervalCount + badIntervalCount + 1;
           const mileages: number[] = [];
@@ -276,7 +280,7 @@ describe('Mileage adherence scores good intervals', () => {
             mileages.push(currentMileage);
           }
 
-          seedMaintenanceWithMileages(vehicle.id, mileages);
+          await seedMaintenanceWithMileages(vehicle.id, mileages);
 
           const result = await repo.getVehicleHealth(userId, vehicle.id);
 
@@ -301,16 +305,16 @@ describe('TCO total equals sum of components', () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 0, max: 8 }),
-        fc.option(fc.double({ min: 1000, max: 100000, noNaN: true, noDefaultInfinity: true }), {
+        fc.option(fc.integer({ min: 1000, max: 100000 }), {
           nil: null,
         }),
         async (expenseCount, purchasePrice) => {
-          resetDb();
-          const { userId, vehicle } = setupUserAndVehicle({
+          await resetDb();
+          const { userId, vehicle } = await setupUserAndVehicle({
             purchasePrice,
             purchaseDate: new Date(2020, 0, 1),
           });
-          seedRandomExpenses(vehicle.id, expenseCount);
+          await seedRandomExpenses(vehicle.id, expenseCount);
 
           const result = await repo.getVehicleTCO(userId, vehicle.id);
 
@@ -331,8 +335,13 @@ describe('TCO total equals sum of components', () => {
 });
 
 describe('financed vehicle TCO does not double-count principal', () => {
-  function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): void {
-    testDb.sqlite.run(
+  async function seedFinancingPayment(
+    vehicleId: string,
+    id: string,
+    amount: number,
+    date: Date
+  ): Promise<void> {
+    await testDb.sql.run(
       'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         id,
@@ -348,14 +357,14 @@ describe('financed vehicle TCO does not double-count principal', () => {
   }
 
   test('purchasePrice counted → financing-payment rows are EXCLUDED from the total (no double-count)', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({
+    const { userId, vehicle } = await setupUserAndVehicle({
       purchasePrice: 30000,
       purchaseDate: new Date(2020, 0, 1),
     });
-    seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(2024, 0, 15));
-    seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(2024, 1, 15));
-    seedFinancingPayment(vehicle.id, 'fin-3', 500, new Date(2024, 2, 15));
-    seedExpense(testDb.sqlite, {
+    await seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(2024, 0, 15));
+    await seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(2024, 1, 15));
+    await seedFinancingPayment(vehicle.id, 'fin-3', 500, new Date(2024, 2, 15));
+    await seedExpense(testDb.sql, {
       id: 'fuel-1',
       vehicleId: vehicle.id,
       category: 'fuel',
@@ -382,12 +391,12 @@ describe('financed vehicle TCO does not double-count principal', () => {
   });
 
   test('NO purchasePrice → financing payments ARE counted (they are the only acquisition signal)', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({
+    const { userId, vehicle } = await setupUserAndVehicle({
       purchasePrice: null,
       purchaseDate: new Date(2020, 0, 1),
     });
-    seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(2024, 0, 15));
-    seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(2024, 1, 15));
+    await seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(2024, 0, 15));
+    await seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(2024, 1, 15));
 
     const result = await repo.getVehicleTCO(userId, vehicle.id);
 
@@ -397,13 +406,13 @@ describe('financed vehicle TCO does not double-count principal', () => {
 });
 
 describe('TCO buckets financial rows by sourceType (recurring/manual → otherCosts, not financing)', () => {
-  function seedFinancialRow(
+  async function seedFinancialRow(
     vehicleId: string,
     id: string,
     amount: number,
     sourceType: string | null
-  ): void {
-    testDb.sqlite.run(
+  ): Promise<void> {
+    await testDb.sql.run(
       'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         id,
@@ -419,11 +428,11 @@ describe('TCO buckets financial rows by sourceType (recurring/manual → otherCo
   }
 
   test('a recurring (reminder) + a manual (null) financial row land in otherCosts, not financingInterest', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({ purchasePrice: null });
-    seedFinancialRow(vehicle.id, 'fin', 200, 'financing');
-    seedFinancialRow(vehicle.id, 'ins', 75, 'insurance_term');
-    seedFinancialRow(vehicle.id, 'rem', 100, 'reminder');
-    seedFinancialRow(vehicle.id, 'man', 50, null);
+    const { userId, vehicle } = await setupUserAndVehicle({ purchasePrice: null });
+    await seedFinancialRow(vehicle.id, 'fin', 200, 'financing');
+    await seedFinancialRow(vehicle.id, 'ins', 75, 'insurance_term');
+    await seedFinancialRow(vehicle.id, 'rem', 100, 'reminder');
+    await seedFinancialRow(vehicle.id, 'man', 50, null);
 
     const result = await repo.getVehicleTCO(userId, vehicle.id);
 
@@ -434,8 +443,8 @@ describe('TCO buckets financial rows by sourceType (recurring/manual → otherCo
   });
 
   test('PRICED + a recurring financial row → the recurring cost survives in otherCosts', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({ purchasePrice: 30000 });
-    seedFinancialRow(vehicle.id, 'rem', 100, 'reminder');
+    const { userId, vehicle } = await setupUserAndVehicle({ purchasePrice: 30000 });
+    await seedFinancialRow(vehicle.id, 'rem', 100, 'reminder');
 
     const result = await repo.getVehicleTCO(userId, vehicle.id);
 
@@ -446,8 +455,13 @@ describe('TCO buckets financial rows by sourceType (recurring/manual → otherCo
 });
 
 describe('year-scoped: purchasePrice excluded from a year window; that year financing kept', () => {
-  function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): void {
-    testDb.sqlite.run(
+  async function seedFinancingPayment(
+    vehicleId: string,
+    id: string,
+    amount: number,
+    date: Date
+  ): Promise<void> {
+    await testDb.sql.run(
       'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         id,
@@ -463,13 +477,13 @@ describe('year-scoped: purchasePrice excluded from a year window; that year fina
   }
 
   test('PRICED + financed, year-scoped: purchasePrice is EXCLUDED, the year financing IS counted', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({
+    const { userId, vehicle } = await setupUserAndVehicle({
       purchasePrice: 30000,
       purchaseDate: new Date(2020, 0, 1),
     });
-    seedFinancingPayment(vehicle.id, 'fin-in-1', 500, new Date(TEST_YEAR, 0, 15));
-    seedFinancingPayment(vehicle.id, 'fin-in-2', 500, new Date(TEST_YEAR, 5, 15));
-    seedFinancingPayment(vehicle.id, 'fin-out', 999, new Date(TEST_YEAR - 1, 11, 15));
+    await seedFinancingPayment(vehicle.id, 'fin-in-1', 500, new Date(TEST_YEAR, 0, 15));
+    await seedFinancingPayment(vehicle.id, 'fin-in-2', 500, new Date(TEST_YEAR, 5, 15));
+    await seedFinancingPayment(vehicle.id, 'fin-out', 999, new Date(TEST_YEAR - 1, 11, 15));
 
     const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
 
@@ -486,12 +500,12 @@ describe('year-scoped: purchasePrice excluded from a year window; that year fina
   });
 
   test('UNPRICED + financed, year-scoped: the year financing IS counted', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({
+    const { userId, vehicle } = await setupUserAndVehicle({
       purchasePrice: null,
       purchaseDate: new Date(2020, 0, 1),
     });
-    seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(TEST_YEAR, 2, 1));
-    seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(TEST_YEAR, 8, 1));
+    await seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(TEST_YEAR, 2, 1));
+    await seedFinancingPayment(vehicle.id, 'fin-2', 500, new Date(TEST_YEAR, 8, 1));
 
     const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
 
@@ -500,11 +514,11 @@ describe('year-scoped: purchasePrice excluded from a year window; that year fina
   });
 
   test('year-scoped costPerMonth divides by months owned in that year, not full ownership', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({
+    const { userId, vehicle } = await setupUserAndVehicle({
       purchasePrice: 30000,
       purchaseDate: new Date(2020, 0, 1),
     });
-    seedFinancingPayment(vehicle.id, 'fin-cpm', 1200, new Date(TEST_YEAR, 5, 15));
+    await seedFinancingPayment(vehicle.id, 'fin-cpm', 1200, new Date(TEST_YEAR, 5, 15));
 
     const result = await repo.getVehicleTCO(userId, vehicle.id, TEST_YEAR);
 
@@ -514,12 +528,12 @@ describe('year-scoped: purchasePrice excluded from a year window; that year fina
   });
 
   test('year-scoped total = the windowed buckets (financing + fuel), purchasePrice NOT added', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({
+    const { userId, vehicle } = await setupUserAndVehicle({
       purchasePrice: 30000,
       purchaseDate: new Date(2020, 0, 1),
     });
-    seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(TEST_YEAR, 0, 15));
-    seedExpense(testDb.sqlite, {
+    await seedFinancingPayment(vehicle.id, 'fin-1', 500, new Date(TEST_YEAR, 0, 15));
+    await seedExpense(testDb.sql, {
       id: 'fuel-yr',
       vehicleId: vehicle.id,
       category: 'fuel',
@@ -551,15 +565,15 @@ describe('Cost per month formula', () => {
         fc.integer({ min: 0, max: 5 }),
         fc.integer({ min: 1, max: 48 }),
         async (expenseCount, monthsAgo) => {
-          resetDb();
+          await resetDb();
           const now = new Date();
           const purchaseDate = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
 
-          const { userId, vehicle } = setupUserAndVehicle({
+          const { userId, vehicle } = await setupUserAndVehicle({
             purchasePrice: 25000,
             purchaseDate,
           });
-          seedRandomExpenses(vehicle.id, expenseCount);
+          await seedRandomExpenses(vehicle.id, expenseCount);
 
           const result = await repo.getVehicleTCO(userId, vehicle.id);
 
@@ -587,13 +601,13 @@ const VEHICLE_HEALTH_KEYS = [
 
 describe('getVehicleHealth — response shape matches the frontend contract', () => {
   test('the response has exactly the frontend VehicleHealthResponse top-level keys', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({});
+    const { userId, vehicle } = await setupUserAndVehicle({});
     const result = await repo.getVehicleHealth(userId, vehicle.id);
     expect(Object.keys(result).sort()).toEqual(VEHICLE_HEALTH_KEYS);
   });
 
   test('every score field is a finite number (no NaN escape on a no-data vehicle)', async () => {
-    const { userId, vehicle } = setupUserAndVehicle({});
+    const { userId, vehicle } = await setupUserAndVehicle({});
     const result = await repo.getVehicleHealth(userId, vehicle.id);
     for (const k of [
       'overallScore',

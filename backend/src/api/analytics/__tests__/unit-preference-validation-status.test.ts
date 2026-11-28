@@ -35,7 +35,7 @@ const INVALID_UNIT_PREFERENCES = '{"distanceUnit":"mi","volumeUnit":"gal","charg
 describe('unparseable vehicle unit preferences', () => {
   test('answer 400 naming the vehicle on every unit-reading endpoint', async () => {
     const vehicleId = await seedVehicle(ctx, { nickname: 'Imported' });
-    ctx.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await ctx.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       INVALID_UNIT_PREFERENCES,
       vehicleId,
     ]);
