@@ -90,7 +90,7 @@ routes.post('/parse', receiptScanLimiter, scansAtOnce, authorize(ownAccount), as
   const draft = parseExtraction(raw);
   if (Object.keys(draft).length === 0) {
     throw new UnprocessableEntityError(
-      "Couldn't read anything on this receipt. Try a sharper, well-lit photo, or enter it by hand."
+      "Couldn't read anything on this receipt. Try a sharper, well-lit photo."
     );
   }
 
