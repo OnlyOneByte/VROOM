@@ -14,7 +14,7 @@ describe('the app error page', () => {
 		render(ErrorPage);
 
 		expect(screen.getByRole('heading', { level: 1, name: 'Wrong turn' })).toBeInTheDocument();
-		expect(document.title).toBe('Page Not Found - VROOM Car Tracker');
+		expect(document.title).toBe('Page not found - VROOM Car Tracker');
 		const dashboardLink = screen.getByRole('link', { name: 'Go to the dashboard' });
 		expect(dashboardLink).toHaveAttribute('href', '/dashboard');
 		expect(dashboardLink).toHaveClass('h-10');
@@ -28,7 +28,7 @@ describe('the app error page', () => {
 		expect(
 			screen.getByRole('heading', { level: 1, name: "This page couldn't load" })
 		).toBeInTheDocument();
-		expect(document.title).toBe('Page Unavailable - VROOM Car Tracker');
+		expect(document.title).toBe('Page unavailable - VROOM Car Tracker');
 		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Go to the dashboard' })).toBeInTheDocument();
 	});

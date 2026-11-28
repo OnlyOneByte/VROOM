@@ -194,7 +194,7 @@ test.describe('Analytics', () => {
 
 		await openFillupDetails(page);
 		await expect(page.getByRole('heading', { name: 'Fill-ups', exact: true })).toBeVisible();
-		await expect(page.getByRole('heading', { name: 'Fuel Consumption' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Fuel consumption' })).toBeVisible();
 		const fillups = ANALYTICS_SUMMARY.fuelStats.fillups.currentYear;
 		await expect(page.getByText(String(fillups), { exact: true }).first()).toBeVisible();
 	});
@@ -532,7 +532,7 @@ test.describe('Analytics', () => {
 		const insights = page.getByRole('region', { name: 'Things we noticed' });
 		await insights.scrollIntoViewIfNeeded();
 		await expect(insights.getByText('150 days')).toBeVisible();
-		await insights.getByRole('button', { name: 'Show in Chart: Repair-free streak' }).click();
+		await insights.getByRole('button', { name: 'Show in chart: Repair-free streak' }).click();
 		await expect(page).toHaveURL(/range=all/);
 		await expect(page).toHaveURL(/cars=vehicle-civic/);
 		await expect(
@@ -546,7 +546,7 @@ test.describe('Analytics', () => {
 		await page.mouse.move(640, 600);
 		const insights = page.getByRole('region', { name: 'Things we noticed' });
 		await insights.scrollIntoViewIfNeeded();
-		await insights.getByRole('button', { name: 'Show in Chart: Record month' }).click();
+		await insights.getByRole('button', { name: 'Show in chart: Record month' }).click();
 		await expect(page).toHaveURL(/sel=2026-08/);
 		await expect(page.getByRole('dialog').getByRole('heading', { name: 'Aug ’26' })).toBeVisible();
 	});

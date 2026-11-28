@@ -79,7 +79,7 @@
 			{#if !readOnly}
 				<Button onclick={handleAddPolicy}>
 					<Plus class="mr-2 h-4 w-4" />
-					Add Policy
+					Add policy
 				</Button>
 			{/if}
 		{/snippet}
@@ -87,11 +87,11 @@
 {:else}
 	<div class="space-y-4">
 		<div class="flex items-center justify-between gap-3">
-			<h2 class="text-lg font-semibold text-foreground">Insurance Policies</h2>
+			<h2 class="text-lg font-semibold text-foreground">Insurance policies</h2>
 			{#if !readOnly}
 				<Button variant="outline" onclick={handleAddPolicy}>
 					<Plus class="mr-2 h-4 w-4" />
-					Add Policy
+					Add policy
 				</Button>
 			{/if}
 		</div>

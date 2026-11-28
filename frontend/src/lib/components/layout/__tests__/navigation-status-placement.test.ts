@@ -112,7 +112,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 			await waitFor(() => expect(authStore.sessionUnverified).toBe(false));
 		});
 
-		it('offers Sync Now, with the pending count on the status badge', async () => {
+		it('offers Sync now, with the pending count on the status badge', async () => {
 			authStore.setUser(alice);
 			offlineExpenseQueue.current = [
 				{
@@ -131,7 +131,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 
 			expect(screen.getByLabelText('1 pending items')).toHaveTextContent('1');
 			const panel = await openSyncPanel();
-			await fireEvent.click(within(panel).getByRole('button', { name: 'Sync Now' }));
+			await fireEvent.click(within(panel).getByRole('button', { name: 'Sync now' }));
 			const { syncManager } = await import('#lib/utils/sync/sync-manager.ts');
 			expect(syncManager.syncAll).toHaveBeenCalled();
 		});
@@ -155,11 +155,11 @@ describe('the sync status indicator lives in the navigation, never floating over
 			render(Navigation);
 
 			const trigger = screen.getByRole('button', {
-				name: 'Sync status: A backup provider needs attention'
+				name: 'Sync status: Backup storage needs attention'
 			});
 			expect(screen.queryByText('Up to date')).toBeNull();
 			expect(screen.getByTestId('sync-status-announcement')).toHaveTextContent(
-				'A backup provider needs attention'
+				'Backup storage needs attention'
 			);
 
 			await fireEvent.click(trigger);

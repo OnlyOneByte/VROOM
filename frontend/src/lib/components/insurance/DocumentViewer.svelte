@@ -200,7 +200,7 @@
 
 <MediaCaptureDialog
 	bind:open={uploadOpen}
-	title="Upload Documents"
+	title="Upload documents"
 	description="Upload or capture insurance documents (JPEG, PNG, WebP, PDF up to 10MB)"
 	acceptedTypes={ALLOWED_TYPES}
 	onUpload={file => insuranceApi.uploadEntityDocument(entityType, entityId, file)}

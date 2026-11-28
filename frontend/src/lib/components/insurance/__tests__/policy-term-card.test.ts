@@ -16,7 +16,7 @@ afterEach(() => {
 describe('PolicyTermCard content', () => {
 	test('a current term shows only its expiry date', () => {
 		render(PolicyTermCard, { props: { term: term({ endDate: '2099-06-01' }), isCurrent: true } });
-		expect(screen.getByText('Current Term')).toBeInTheDocument();
+		expect(screen.getByText('Current term')).toBeInTheDocument();
 		expect(screen.getByText('Expires')).toBeInTheDocument();
 		expect(screen.getByText('Jun 1, 2099')).toBeInTheDocument();
 		expect(screen.queryByText('Start')).toBeNull();
@@ -24,7 +24,7 @@ describe('PolicyTermCard content', () => {
 
 	test('a past term shows both start and end dates', () => {
 		render(PolicyTermCard, { props: { term: term() } });
-		expect(screen.getByText('Past Term')).toBeInTheDocument();
+		expect(screen.getByText('Past term')).toBeInTheDocument();
 		expect(screen.getByText('Start')).toBeInTheDocument();
 		expect(screen.getByText('Jun 1, 2025')).toBeInTheDocument();
 		expect(screen.getByText('End')).toBeInTheDocument();
@@ -47,13 +47,13 @@ describe('PolicyTermCard content', () => {
 
 	test('a zero total cost is still shown', () => {
 		render(PolicyTermCard, { props: { term: term({ totalCost: 0 }) } });
-		expect(screen.getByText('Total Cost')).toBeInTheDocument();
+		expect(screen.getByText('Total cost')).toBeInTheDocument();
 		expect(screen.getByText('$0.00')).toBeInTheDocument();
 	});
 
 	test('omits cost, vehicle and coverage rows when the data is absent', () => {
 		render(PolicyTermCard, { props: { term: term() } });
-		expect(screen.queryByText('Total Cost')).toBeNull();
+		expect(screen.queryByText('Total cost')).toBeNull();
 		expect(screen.queryByText('Monthly')).toBeNull();
 		expect(screen.queryByText('Vehicles')).toBeNull();
 	});

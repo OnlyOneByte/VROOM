@@ -59,7 +59,7 @@ describe('FuelCharts vehicle colours', () => {
 			);
 
 		const expected = { 'v-civic': 'var(--chart-1)', 'v-niro': 'var(--chart-2)' };
-		expect(colours('Total Odometer')).toEqual(expected);
+		expect(colours('Total odometer')).toEqual(expected);
 		expect(colours('Cost/mi')).toEqual(expected);
 	});
 

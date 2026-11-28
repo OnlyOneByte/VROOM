@@ -35,7 +35,7 @@ async function settle(): Promise<void> {
 	}
 }
 
-const TITLE = 'Sync Conflict Detected';
+const TITLE = 'Sync conflict detected';
 
 beforeEach(() => {
 	vi.clearAllMocks();

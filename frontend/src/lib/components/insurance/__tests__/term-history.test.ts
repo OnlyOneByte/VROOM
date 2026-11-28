@@ -29,7 +29,7 @@ afterEach(() => {
 describe('TermHistory', () => {
 	test('shows a placeholder when there are no past terms', () => {
 		render(TermHistory, { props: { terms: [], policyId: 'p1' } });
-		expect(screen.getByText('Past Terms')).toBeInTheDocument();
+		expect(screen.getByText('Past terms')).toBeInTheDocument();
 		expect(screen.getByText('No past terms.')).toBeInTheDocument();
 	});
 
@@ -37,7 +37,7 @@ describe('TermHistory', () => {
 		render(TermHistory, { props: { terms: [OLDER, NEWER], policyId: 'p1' } });
 		const ends = screen.getAllByText('End').map(label => label.nextElementSibling?.textContent);
 		expect(ends).toEqual(['Jan 1, 2025', 'Jan 1, 2024']);
-		expect(screen.getAllByText('Past Term')).toHaveLength(2);
+		expect(screen.getAllByText('Past term')).toHaveLength(2);
 	});
 
 	test('names covered vehicles, falling back to the id when the vehicle is unknown', () => {

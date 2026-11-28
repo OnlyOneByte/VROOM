@@ -57,7 +57,7 @@ export function getSyncStatusInfo(params: SyncStatusParams): SyncStatusInfo {
 		return {
 			color: 'text-warning',
 			icon: TriangleAlert,
-			text: 'A backup provider needs attention'
+			text: 'Backup storage needs attention'
 		};
 	}
 

@@ -37,7 +37,7 @@
 	{#if grouped.active.length > 0}
 		<div class="space-y-3">
 			<svelte:element this={`h${level}`} class="text-sm font-medium text-muted-foreground">
-				Active Policies
+				Active policies
 			</svelte:element>
 			{#each grouped.active as policy (policy.id)}
 				<PolicyCard
@@ -56,7 +56,7 @@
 	{#if grouped.inactive.length > 0}
 		<div class="space-y-3">
 			<svelte:element this={`h${level}`} class="text-sm font-medium text-muted-foreground">
-				Inactive Policies
+				Inactive policies
 			</svelte:element>
 			{#each grouped.inactive as policy (policy.id)}
 				<PolicyCard

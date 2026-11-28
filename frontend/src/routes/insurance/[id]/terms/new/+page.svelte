@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>{renewFrom ? 'Renew Term' : 'Add Term'} - VROOM Car Tracker</title>
+	<title>{renewFrom ? 'Renew term' : 'Add term'} - VROOM Car Tracker</title>
 </svelte:head>
 
 <InsuranceTermForm {policyId} {renewFrom} {returnTo} />

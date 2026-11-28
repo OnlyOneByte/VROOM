@@ -63,11 +63,11 @@ describe('FuelCharts monthly x-axis', () => {
 		render(FuelCharts, { props: { fuelStats, group: 'primary' } });
 		render(FuelCharts, { props: { fuelStats, group: 'comparisons' } });
 		const monthly = [
-			'Fuel Efficiency',
-			'Fuel Bought',
-			'Fill-up Cost by Vehicle',
+			'Fuel efficiency',
+			'Fuel bought',
+			'Fill-up cost by vehicle',
 			'Cost/mi',
-			'Total Odometer'
+			'Total odometer'
 		];
 		for (const title of monthly) {
 			const chart = charts.find(c => c.title === title);

@@ -47,7 +47,7 @@
 
 <div class="space-y-3">
 	<svelte:element this={`h${level}`} class="text-sm font-medium text-foreground">
-		Past Terms
+		Past terms
 	</svelte:element>
 
 	{#if sortedTerms.length === 0}

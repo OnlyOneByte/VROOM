@@ -226,9 +226,9 @@
 	let healthParts = $derived(
 		health
 			? [
-					{ label: 'Maintenance Regularity', score: health.maintenanceRegularity },
-					{ label: 'Mileage Adherence', score: health.mileageIntervalAdherence },
-					{ label: 'Insurance Coverage', score: health.insuranceCoverage }
+					{ label: 'Maintenance regularity', score: health.maintenanceRegularity },
+					{ label: 'Mileage adherence', score: health.mileageIntervalAdherence },
+					{ label: 'Insurance coverage', score: health.insuranceCoverage }
 				]
 			: []
 	);
@@ -266,7 +266,7 @@
 {:else if vehicles.length === 0}
 	<div class="rounded-lg border bg-card p-6 text-center">
 		<p class="text-muted-foreground mb-4">No vehicles found. Add a vehicle to see analytics.</p>
-		<Button href={resolve(routes.vehicleNew)}>Add Vehicle</Button>
+		<Button href={resolve(routes.vehicleNew)}>Add vehicle</Button>
 	</div>
 {:else}
 	<div class="space-y-6 md:space-y-8">
@@ -436,7 +436,7 @@
 	<div class="space-y-4 md:space-y-6">
 		<Card.Root>
 			<Card.Header>
-				<Card.Title {level}>Vehicle Health Score</Card.Title>
+				<Card.Title {level}>Vehicle health score</Card.Title>
 				<Card.Description>{health.vehicleName}</Card.Description>
 			</Card.Header>
 			<Card.Content>
@@ -452,7 +452,7 @@
 							</span>
 						</div>
 						<div>
-							<p class="text-sm text-muted-foreground">Overall Score</p>
+							<p class="text-sm text-muted-foreground">Overall score</p>
 							<p class="text-lg font-medium">
 								{getScoreLabel(health.overallScore)} · out of 100
 							</p>

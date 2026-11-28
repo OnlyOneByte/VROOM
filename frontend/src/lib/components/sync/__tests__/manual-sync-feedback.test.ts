@@ -66,7 +66,7 @@ function messages(): string[] {
 
 async function syncNow(): Promise<void> {
 	render(SyncStatusInline);
-	await fireEvent.click(screen.getByRole('button', { name: 'Sync Now' }));
+	await fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
 }
 
 beforeEach(() => {
@@ -77,7 +77,7 @@ beforeEach(() => {
 	appStore.clearNotifications();
 });
 
-describe('SyncStatusInline — Sync Now tells the user what happened', () => {
+describe('SyncStatusInline — Sync now tells the user what happened', () => {
 	it('reports a failed delivery', async () => {
 		syncAll.mockResolvedValueOnce(result({ success: false, failed: 1, errors: ['Server Error'] }));
 		await syncNow();

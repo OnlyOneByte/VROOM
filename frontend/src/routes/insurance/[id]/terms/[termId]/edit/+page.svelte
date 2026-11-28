@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>Edit Term - VROOM Car Tracker</title>
+	<title>Edit term - VROOM Car Tracker</title>
 </svelte:head>
 
 <InsuranceTermForm {policyId} {termId} {returnTo} />

@@ -77,13 +77,13 @@ describe('FuelCharts unit descriptions', () => {
 			const units = { distanceUnit: 'miles', volumeUnit, chargeUnit: 'kwh' } as const;
 			render(FuelCharts, { props: { fuelStats: { ...fuelStats, units }, group: 'primary' } });
 
-			expect(charts.find(c => c.title === 'Gas Price on Fill-up')?.description).toBe(
+			expect(charts.find(c => c.title === 'Gas price on fill-up')?.description).toBe(
 				`${price} by fuel type, per month`
 			);
-			expect(charts.find(c => c.title === 'Fuel Efficiency')?.description).toBe(
+			expect(charts.find(c => c.title === 'Fuel efficiency')?.description).toBe(
 				`Monthly ${efficiency}`
 			);
-			expect(charts.find(c => c.title === 'Fuel Bought')?.description).toBe(
+			expect(charts.find(c => c.title === 'Fuel bought')?.description).toBe(
 				`Monthly ${volume} bought`
 			);
 		}
@@ -93,12 +93,12 @@ describe('FuelCharts unit descriptions', () => {
 		charts.length = 0;
 		render(FuelCharts, { props: { fuelStats, group: 'primary' } });
 
-		expect(charts.find(c => c.title === 'Fuel Efficiency')?.y).toBe('efficiency');
-		expect(charts.find(c => c.title === 'Fuel Bought')?.y).toBe('volume');
-		expect(charts.some(c => c.title === 'Fuel Consumption')).toBe(false);
+		expect(charts.find(c => c.title === 'Fuel efficiency')?.y).toBe('efficiency');
+		expect(charts.find(c => c.title === 'Fuel bought')?.y).toBe('volume');
+		expect(charts.some(c => c.title === 'Fuel consumption')).toBe(false);
 	});
 
-	test('Fuel Bought leaves out months with no fuel', () => {
+	test('Fuel bought leaves out months with no fuel', () => {
 		charts.length = 0;
 		const monthlyConsumption = [
 			{ month: '2026-06', efficiency: null, volume: 12 },
@@ -109,7 +109,7 @@ describe('FuelCharts unit descriptions', () => {
 			props: { fuelStats: { ...fuelStats, monthlyConsumption }, group: 'primary' }
 		});
 
-		const bars = charts.find(c => c.title === 'Fuel Bought')?.data as { volume: number }[];
+		const bars = charts.find(c => c.title === 'Fuel bought')?.data as { volume: number }[];
 		expect(bars.map(b => b.volume)).toEqual([12, 9]);
 	});
 });

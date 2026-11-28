@@ -138,8 +138,8 @@ describe('InsuranceTab policy list', () => {
 		getPoliciesForVehicle.mockResolvedValue([policy]);
 		mount();
 		await settle();
-		expect(screen.getByRole('heading', { name: 'Insurance Policies' })).toBeInTheDocument();
-		expect(screen.getByText('Active Policies')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Insurance policies' })).toBeInTheDocument();
+		expect(screen.getByText('Active policies')).toBeInTheDocument();
 		await fireEvent.click(screen.getByRole('button', { name: /add policy/i }));
 		expect(goto).toHaveBeenCalledWith(`/insurance/new?vehicleId=v1&returnTo=${RETURN_TO}`);
 	});
@@ -152,8 +152,8 @@ describe('InsuranceTab policy list', () => {
 		await settle();
 
 		expect(screen.getAllByRole('heading').map(h => [h.tagName, h.textContent?.trim()])).toEqual([
-			['H2', 'Insurance Policies'],
-			['H3', 'Active Policies'],
+			['H2', 'Insurance policies'],
+			['H3', 'Active policies'],
 			['H4', 'Acme Mutual'],
 			['H5', 'Documents'],
 			['H5', 'Claims']

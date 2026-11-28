@@ -174,7 +174,7 @@
 				>
 					{#if expanded}
 						<ChevronUp />
-						Hide History
+						Hide history
 					{:else}
 						<ChevronDown />
 						{pastTerms.length} past term{pastTerms.length !== 1 ? 's' : ''}
@@ -218,7 +218,7 @@
 						</Button>
 						<Button variant="outline" size="sm" class="h-10" onclick={() => (claimFormOpen = true)}>
 							<Plus />
-							File Claim
+							File claim
 						</Button>
 						{#if latestTerm}
 							<Button variant="outline" size="sm" class="h-10" onclick={handleRenew}>

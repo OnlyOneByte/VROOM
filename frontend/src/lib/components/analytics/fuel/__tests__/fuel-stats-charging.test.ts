@@ -72,11 +72,11 @@ describe('FuelStatsTab with nothing in the window', () => {
 		expect(await screen.findByText('No fill-ups in the last 12 months')).toBeTruthy();
 		expect(getAllExpenses).toHaveBeenCalledWith({ category: 'fuel', limit: 1 });
 		expect(screen.queryByText(/No fuel data yet/)).toBeNull();
-		expect(screen.getByRole('link', { name: 'View Expenses' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'View expenses' })).toHaveAttribute(
 			'href',
 			'/expenses'
 		);
-		expect(screen.getByRole('button', { name: 'Log a Fill-up' })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Log a fill-up' })).toBeTruthy();
 	});
 
 	test('with no fill-up ever logged, keeps the first-run empty state', async () => {
@@ -84,8 +84,8 @@ describe('FuelStatsTab with nothing in the window', () => {
 		expect(await screen.findByText('No fuel data yet')).toBeTruthy();
 		expect(screen.queryByText('No fill-ups in the last 12 months')).toBeNull();
 		expect(screen.queryByRole('heading', { name: /fill-ups/i })).toBeNull();
-		expect(screen.queryByRole('link', { name: 'View Expenses' })).toBeNull();
-		expect(screen.getByRole('button', { name: 'Log a Fill-up' })).toHaveClass('h-10');
+		expect(screen.queryByRole('link', { name: 'View expenses' })).toBeNull();
+		expect(screen.getByRole('button', { name: 'Log a fill-up' })).toHaveClass('h-10');
 	});
 
 	test('shows neither empty state until the history check answers', async () => {
@@ -94,7 +94,7 @@ describe('FuelStatsTab with nothing in the window', () => {
 		await vi.waitFor(() => expect(getAllExpenses).toHaveBeenCalled());
 		expect(screen.queryByText('No fuel data yet')).toBeNull();
 		expect(screen.queryByText('No fill-ups in the last 12 months')).toBeNull();
-		expect(screen.queryByRole('button', { name: 'Log a Fill-up' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Log a fill-up' })).toBeNull();
 	});
 
 	test('when the history check fails, falls back to the 12-month wording, which is always true', async () => {
@@ -119,32 +119,32 @@ describe('FuelStatsTab charging series', () => {
 	test('an EV-only fleet sees its charging cards instead of the empty state or zeroed gas cards', () => {
 		render(FuelStatsTab, { fuelStats: stats({ charging }), fuelAdvanced: advanced });
 		expect(screen.queryByText('No fill-ups in the last 12 months')).toBeNull();
-		expect(screen.getByText('Charging Sessions')).toBeTruthy();
+		expect(screen.getByText('Charging sessions')).toBeTruthy();
 		expect(screen.getByText('Energy (kWh)')).toBeTruthy();
 		expect(screen.getAllByText('Average mi/kWh')).toHaveLength(2);
 		expect(screen.getByText('Worst mi/kWh')).toBeTruthy();
-		expect(screen.getByText('Charging Details')).toBeTruthy();
+		expect(screen.getByText('Charging details')).toBeTruthy();
 		expect(screen.getByText('18.0 kWh')).toBeTruthy();
 		expect(screen.getAllByText('$0.467')).toHaveLength(2);
 		expect(screen.getByRole('region', { name: 'Fuel and charging overview' }).textContent).toMatch(
 			/\$0\.467\s+per kWh on average across/
 		);
-		expect(screen.getByText('Average Cost')).toBeTruthy();
-		expect(screen.getByText('Per Session')).toBeTruthy();
-		expect(screen.queryByText('Per Fill-up')).toBeNull();
+		expect(screen.getByText('Average cost')).toBeTruthy();
+		expect(screen.getByText('Per session')).toBeTruthy();
+		expect(screen.queryByText('Per fill-up')).toBeNull();
 		expect(screen.queryByText('Fill-ups')).toBeNull();
 		expect(screen.queryByText('Fill-up Details')).toBeNull();
 	});
 
 	test('an EV-only fleet does not get empty gas-only charts', () => {
 		render(FuelStatsTab, { fuelStats: stats({ charging }), fuelAdvanced: advanced });
-		expect(screen.getByText('Charging Price')).toBeTruthy();
-		expect(screen.queryByText('Gas Price on Fill-up')).toBeNull();
-		expect(screen.queryByText('Fill-up Cost by Vehicle')).toBeNull();
-		expect(screen.queryByText('Fill-up Patterns by Day of Week')).toBeNull();
-		expect(screen.queryByText('Fuel Efficiency')).toBeNull();
-		expect(screen.queryByText('Fuel Bought')).toBeNull();
-		expect(screen.getByText('Total Odometer')).toBeTruthy();
+		expect(screen.getByText('Charging price')).toBeTruthy();
+		expect(screen.queryByText('Gas price on fill-up')).toBeNull();
+		expect(screen.queryByText('Fill-up cost by vehicle')).toBeNull();
+		expect(screen.queryByText('Fill-up patterns by day of week')).toBeNull();
+		expect(screen.queryByText('Fuel efficiency')).toBeNull();
+		expect(screen.queryByText('Fuel bought')).toBeNull();
+		expect(screen.getByText('Total odometer')).toBeTruthy();
 	});
 
 	test('a plug-in hybrid fleet sees both the gas and the charging cards', () => {
@@ -156,9 +156,9 @@ describe('FuelStatsTab charging series', () => {
 			fuelAdvanced: advanced
 		});
 		expect(screen.getByText('Fill-ups')).toBeTruthy();
-		expect(screen.getByText('Charging Sessions')).toBeTruthy();
-		expect(screen.getByText('Gas Price on Fill-up')).toBeTruthy();
-		expect(screen.getByText('Charging Price')).toBeTruthy();
+		expect(screen.getByText('Charging sessions')).toBeTruthy();
+		expect(screen.getByText('Gas price on fill-up')).toBeTruthy();
+		expect(screen.getByText('Charging price')).toBeTruthy();
 	});
 
 	test('a gas-only fleet shows no charging cards', () => {
@@ -170,7 +170,7 @@ describe('FuelStatsTab charging series', () => {
 			fuelAdvanced: advanced
 		});
 		expect(screen.getByText('Fill-ups')).toBeTruthy();
-		expect(screen.queryByText('Charging Sessions')).toBeNull();
+		expect(screen.queryByText('Charging sessions')).toBeNull();
 	});
 });
 
@@ -271,10 +271,10 @@ describe('FuelStatsTab summary and groups', () => {
 		expect(screen.getAllByText('N/A').length).toBeGreaterThan(0);
 	});
 
-	test('hides the Last Period row when there is nothing to compare with', () => {
+	test('hides the Last period row when there is nothing to compare with', () => {
 		render(FuelStatsTab, { fuelStats: stats(gas), fuelAdvanced: advanced });
-		expect(screen.queryByText('Last Period')).toBeNull();
-		expect(screen.getAllByText('Last Month').length).toBeGreaterThan(0);
+		expect(screen.queryByText('Last period')).toBeNull();
+		expect(screen.getAllByText('Last month').length).toBeGreaterThan(0);
 	});
 
 	test('puts the tiles and charts under More detail, with details, patterns and comparisons nested, all closed below lg', () => {

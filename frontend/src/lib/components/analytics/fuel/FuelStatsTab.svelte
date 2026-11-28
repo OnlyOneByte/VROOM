@@ -279,12 +279,12 @@
 
 			<div class="space-y-3 border-b pb-3">
 				<div class="flex items-baseline justify-between">
-					<span class="text-xs text-muted-foreground">This Period</span>
+					<span class="text-xs text-muted-foreground">This period</span>
 					<span class="text-2xl font-bold">{formatNumber(counts.currentYear, decimals)}</span>
 				</div>
 				{#if counts.previousYear > 0}
 					<div class="flex items-center justify-between">
-						<span class="text-xs text-muted-foreground">Last Period</span>
+						<span class="text-xs text-muted-foreground">Last period</span>
 						<div class="flex items-center gap-2">
 							<span class="text-sm text-muted-foreground">
 								{formatNumber(counts.previousYear, decimals)}
@@ -297,11 +297,11 @@
 
 			<div class="space-y-3 pt-3">
 				<div class="flex items-baseline justify-between">
-					<span class="text-xs text-muted-foreground">This Month</span>
+					<span class="text-xs text-muted-foreground">This month</span>
 					<span class="text-2xl font-bold">{formatNumber(counts.currentMonth, decimals)}</span>
 				</div>
 				<div class="flex items-center justify-between">
-					<span class="text-xs text-muted-foreground">Last Month</span>
+					<span class="text-xs text-muted-foreground">Last month</span>
 					<div class="flex items-center gap-2">
 						<span class="text-sm text-muted-foreground">
 							{formatNumber(counts.previousMonth, decimals)}
@@ -365,16 +365,16 @@
 		{#snippet action()}
 			{#if hasOlderFuel}
 				<div class="flex flex-col gap-3 sm:flex-row">
-					<Button variant="outline" size="lg" href={resolve(routes.expenses)}>View Expenses</Button>
+					<Button variant="outline" size="lg" href={resolve(routes.expenses)}>View expenses</Button>
 					<Button size="lg" onclick={logFillup}>
 						<Fuel class="mr-2 h-4 w-4" />
-						Log a Fill-up
+						Log a fill-up
 					</Button>
 				</div>
 			{:else}
 				<Button size="lg" onclick={logFillup}>
 					<Fuel class="mr-2 h-4 w-4" />
-					Log a Fill-up
+					Log a fill-up
 				</Button>
 			{/if}
 		{/snippet}
@@ -423,7 +423,7 @@
 									<Card.Content class="p-6">
 										<div class="mb-4 flex items-center gap-2">
 											<Gauge class="h-5 w-5 text-muted-foreground" />
-											<h4 class="font-semibold text-foreground">Fuel Consumption</h4>
+											<h4 class="font-semibold text-foreground">Fuel consumption</h4>
 										</div>
 
 										<div class="border-b pb-3 text-center">
@@ -478,14 +478,14 @@
 
 						{#if charging && hasChargeData}
 							<div class="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
-								{@render periodCard('Charging Sessions', BatteryCharging, charging.sessions, 0)}
+								{@render periodCard('Charging sessions', BatteryCharging, charging.sessions, 0)}
 								{@render periodCard(`Energy (${chargeLabel})`, Zap, charging.energy, 1)}
 
 								<Card.Root>
 									<Card.Content class="p-6">
 										<div class="mb-4 flex items-center gap-2">
 											<Gauge class="h-5 w-5 text-muted-foreground" />
-											<h4 class="font-semibold text-foreground">Charging Efficiency</h4>
+											<h4 class="font-semibold text-foreground">Charging efficiency</h4>
 										</div>
 
 										<div class="border-b pb-3 text-center">
@@ -540,11 +540,11 @@
 									<Card.Content class="p-6">
 										<div class="mb-4 flex items-center gap-2">
 											<Plug class="h-5 w-5 text-muted-foreground" />
-											<h4 class="font-semibold text-foreground">Charging Details</h4>
+											<h4 class="font-semibold text-foreground">Charging details</h4>
 										</div>
 
 										<div class="border-b pb-4 text-center">
-											<span class="text-xs text-muted-foreground"> Average Session </span>
+											<span class="text-xs text-muted-foreground"> Average session </span>
 											<p class="text-3xl font-bold">
 												{charging.sessionDetails.avgEnergy != null
 													? formatNumber(charging.sessionDetails.avgEnergy, 1) + ' ' + chargeLabel
@@ -554,7 +554,7 @@
 
 										<div class="space-y-2 pt-3">
 											<div class="flex items-center justify-between text-sm">
-												<span class="text-muted-foreground">Min Session</span>
+												<span class="text-muted-foreground">Min session</span>
 												<span class="font-semibold">
 													{charging.sessionDetails.minEnergy != null
 														? formatNumber(charging.sessionDetails.minEnergy, 1) + ' ' + chargeLabel
@@ -562,7 +562,7 @@
 												</span>
 											</div>
 											<div class="flex items-center justify-between text-sm">
-												<span class="text-muted-foreground">Max Session</span>
+												<span class="text-muted-foreground">Max session</span>
 												<span class="font-semibold">
 													{charging.sessionDetails.maxEnergy != null
 														? formatNumber(charging.sessionDetails.maxEnergy, 1) + ' ' + chargeLabel
@@ -578,7 +578,7 @@
 												</span>
 											</div>
 											<div class="flex items-center justify-between text-sm">
-												<span class="text-muted-foreground">Cost per Session</span>
+												<span class="text-muted-foreground">Cost per session</span>
 												<span class="font-semibold">
 													{charging.averageCost.perSession != null
 														? formatCurrency(charging.averageCost.perSession)
@@ -601,7 +601,7 @@
 										</div>
 
 										<div class="border-b pb-4 text-center">
-											<span class="text-xs text-muted-foreground"> Average Fill-up </span>
+											<span class="text-xs text-muted-foreground"> Average fill-up </span>
 											<p class="text-3xl font-bold">
 												{fuelStats.fillupDetails.avgVolume != null
 													? formatNumber(fuelStats.fillupDetails.avgVolume, 1) + ' ' + volLabelShort
@@ -611,7 +611,7 @@
 
 										<div class="space-y-2 pt-3">
 											<div class="flex items-center justify-between text-sm">
-												<span class="text-muted-foreground">Min Fill-up</span>
+												<span class="text-muted-foreground">Min fill-up</span>
 												<span class="font-semibold">
 													{fuelStats.fillupDetails.minVolume != null
 														? formatNumber(fuelStats.fillupDetails.minVolume, 1) +
@@ -621,7 +621,7 @@
 												</span>
 											</div>
 											<div class="flex items-center justify-between text-sm">
-												<span class="text-muted-foreground">Max Fill-up</span>
+												<span class="text-muted-foreground">Max fill-up</span>
 												<span class="font-semibold">
 													{fuelStats.fillupDetails.maxVolume != null
 														? formatNumber(fuelStats.fillupDetails.maxVolume, 1) +
@@ -639,12 +639,12 @@
 								<Card.Content class="p-6">
 									<div class="mb-4 flex items-center gap-2">
 										<DollarSign class="h-5 w-5 text-muted-foreground" />
-										<h4 class="font-semibold text-foreground">Average Cost</h4>
+										<h4 class="font-semibold text-foreground">Average cost</h4>
 									</div>
 
 									<div class="border-b pb-4 text-center">
 										<span class="text-xs text-muted-foreground">
-											{showGasCards ? 'Per Fill-up' : 'Per Session'}
+											{showGasCards ? 'Per fill-up' : 'Per session'}
 										</span>
 										<p class="text-3xl font-bold">
 											{perVisitCost != null ? formatCurrency(perVisitCost) : 'N/A'}
@@ -670,7 +670,7 @@
 										</div>
 										{#if fuelStats.averageCost.avgCostPerDay != null}
 											<div class="flex items-center justify-between text-sm">
-												<span class="text-muted-foreground">Avg Cost/Day</span>
+												<span class="text-muted-foreground">Avg cost/day</span>
 												<span class="font-semibold">
 													{formatCurrency(fuelStats.averageCost.avgCostPerDay)}
 												</span>
@@ -688,7 +688,7 @@
 									</div>
 
 									<div class="border-b pb-4 text-center">
-										<span class="text-xs text-muted-foreground"> Total Distance </span>
+										<span class="text-xs text-muted-foreground"> Total distance </span>
 										<p class="text-3xl font-bold">
 											{formatNumberUpTo(fuelStats.distance.totalDistance, 1)}
 											{distLabelShort}
@@ -697,7 +697,7 @@
 
 									<div class="space-y-2 pt-3">
 										<div class="flex items-center justify-between text-sm">
-											<span class="text-muted-foreground">Avg/Day</span>
+											<span class="text-muted-foreground">Avg/day</span>
 											<span class="font-semibold">
 												{fuelStats.distance.avgPerDay != null
 													? formatNumber(fuelStats.distance.avgPerDay, 1) + ' ' + distLabelShort
@@ -705,7 +705,7 @@
 											</span>
 										</div>
 										<div class="flex items-center justify-between text-sm">
-											<span class="text-muted-foreground">Avg/Month</span>
+											<span class="text-muted-foreground">Avg/month</span>
 											<span class="font-semibold">
 												{fuelStats.distance.avgPerMonth != null
 													? formatNumber(fuelStats.distance.avgPerMonth, 0) + ' ' + distLabelShort

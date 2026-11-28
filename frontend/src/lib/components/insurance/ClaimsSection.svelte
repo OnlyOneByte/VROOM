@@ -242,7 +242,7 @@
 			{#if !readOnly && !compact}
 				<Button variant="outline" size="sm" class="h-10" onclick={openNew}>
 					<Plus />
-					File Claim
+					File claim
 				</Button>
 			{/if}
 		</div>
@@ -483,7 +483,7 @@
 					{#if isSaving}
 						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 					{/if}
-					{editingId ? 'Save' : 'File Claim'}
+					{editingId ? 'Save' : 'File claim'}
 				</Button>
 			</Dialog.Footer>
 		</form>

@@ -76,7 +76,7 @@
 				<div class="flex items-center gap-3">
 					<TriangleAlert class="h-6 w-6 text-warning" />
 					<div>
-						<DialogTitle>Sync Conflict Detected</DialogTitle>
+						<DialogTitle>Sync conflict detected</DialogTitle>
 						<DialogDescription>
 							{syncConflicts.current.length} conflict{syncConflicts.current.length !== 1 ? 's' : ''}
 							need{syncConflicts.current.length === 1 ? 's' : ''} resolution
@@ -100,7 +100,7 @@
 						<div class="border border-primary/30 rounded-lg p-4">
 							<div class="flex items-center gap-2 mb-3">
 								<div class="w-3 h-3 bg-primary rounded-full"></div>
-								<h4 class="font-medium">Your Version (Local)</h4>
+								<h4 class="font-medium">Your version (local)</h4>
 							</div>
 
 							<div class="space-y-2 text-sm">
@@ -150,7 +150,7 @@
 						<div class="border border-chart-2/30 rounded-lg p-4">
 							<div class="flex items-center gap-2 mb-3">
 								<div class="w-3 h-3 bg-chart-2 rounded-full"></div>
-								<h4 class="font-medium">Server Version</h4>
+								<h4 class="font-medium">Server version</h4>
 							</div>
 
 							<div class="space-y-2 text-sm">
@@ -201,7 +201,7 @@
 			<div class="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
 				<Button onclick={() => resolveConflict('keep_local')} disabled={resolving} class="flex-1">
 					<Check class="h-4 w-4 mr-2" />
-					Keep My Version
+					Keep my version
 				</Button>
 
 				<Button
@@ -211,7 +211,7 @@
 					class="flex-1"
 				>
 					<Check class="h-4 w-4 mr-2" />
-					Keep Server Version
+					Keep server version
 				</Button>
 
 				<Button variant="ghost" onclick={closeModal} disabled={resolving}>

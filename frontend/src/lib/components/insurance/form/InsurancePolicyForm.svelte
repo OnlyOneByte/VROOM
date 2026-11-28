@@ -104,7 +104,7 @@
 	let formEl = $state<HTMLFormElement | null>(null);
 
 	let loadError = $state<string | null>(null);
-	let pageTitle = $derived(isEditMode ? 'Edit Policy' : 'New Insurance Policy');
+	let pageTitle = $derived(isEditMode ? 'Edit policy' : 'New insurance policy');
 
 	onMount(loadData);
 
@@ -336,13 +336,13 @@
 			<form bind:this={formEl} onsubmit={handleSubmit} class="space-y-8">
 				<Card variant="section">
 					<CardHeader>
-						<CardTitle level={2}>Policy Information</CardTitle>
+						<CardTitle level={2}>Policy information</CardTitle>
 						<CardDescription>Basic details about the insurance policy</CardDescription>
 					</CardHeader>
 					<CardContent class="space-y-6">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="company">Insurance Company *</Label>
+								<Label for="company">Insurance company *</Label>
 								<Input
 									id="company"
 									placeholder="e.g. State Farm, GEICO"
@@ -357,7 +357,7 @@
 							</div>
 
 							<div class="flex items-center justify-between md:justify-start md:gap-4 md:pt-6">
-								<Label for="policy-active">Active Policy</Label>
+								<Label for="policy-active">Active policy</Label>
 								<Switch
 									id="policy-active"
 									checked={isActive}
@@ -381,7 +381,7 @@
 				{#if !isEditMode}
 					<Card variant="section">
 						<CardHeader>
-							<CardTitle level={2}>Initial Term</CardTitle>
+							<CardTitle level={2}>Initial term</CardTitle>
 							<CardDescription>
 								Coverage period, vehicles, policy details, and costs for the first term
 							</CardDescription>
@@ -389,7 +389,7 @@
 						<CardContent class="space-y-6">
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 								<div class="space-y-2">
-									<Label for="start-date">Start Date *</Label>
+									<Label for="start-date">Start date *</Label>
 									<DatePicker
 										id="start-date"
 										bind:value={startDate}
@@ -403,7 +403,7 @@
 									{/if}
 								</div>
 								<div class="space-y-2">
-									<Label for="end-date">End Date *</Label>
+									<Label for="end-date">End date *</Label>
 									<DatePicker
 										id="end-date"
 										bind:value={endDate}
@@ -419,7 +419,7 @@
 							</div>
 
 							<div class="space-y-2">
-								<Label>Covered Vehicles *</Label>
+								<Label>Covered vehicles *</Label>
 								<div class="rounded-md border border-input p-3 space-y-2">
 									{#each vehicles as v (v.id)}
 										<label class="flex min-h-10 items-center gap-2 cursor-pointer">
@@ -439,10 +439,10 @@
 							</div>
 
 							<div class="border-t border-border pt-6">
-								<h3 class="text-sm font-medium text-foreground mb-4">Policy Details</h3>
+								<h3 class="text-sm font-medium text-foreground mb-4">Policy details</h3>
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 									<div class="space-y-2">
-										<Label for="policy-number">Policy Number</Label>
+										<Label for="policy-number">Policy number</Label>
 										<Input
 											id="policy-number"
 											placeholder="e.g. SF-12345"
@@ -469,7 +469,7 @@
 								</div>
 
 								<div class="space-y-2 mt-4">
-									<Label for="coverage-desc">Coverage Description</Label>
+									<Label for="coverage-desc">Coverage description</Label>
 									<Textarea
 										id="coverage-desc"
 										placeholder="Describe coverage details"
@@ -480,7 +480,7 @@
 
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
 									<div class="space-y-2">
-										<Label for="coverage-limit">Coverage Limit ({currencySymbol})</Label>
+										<Label for="coverage-limit">Coverage limit ({currencySymbol})</Label>
 										<Input
 											id="coverage-limit"
 											type="number"
@@ -497,28 +497,28 @@
 										{/if}
 									</div>
 									<div class="space-y-2">
-										<Label for="agent-name">Agent Name</Label>
+										<Label for="agent-name">Agent name</Label>
 										<Input id="agent-name" bind:value={agentName} />
 									</div>
 								</div>
 
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
 									<div class="space-y-2">
-										<Label for="agent-phone">Agent Phone</Label>
+										<Label for="agent-phone">Agent phone</Label>
 										<Input id="agent-phone" type="tel" bind:value={agentPhone} />
 									</div>
 									<div class="space-y-2">
-										<Label for="agent-email">Agent Email</Label>
+										<Label for="agent-email">Agent email</Label>
 										<Input id="agent-email" type="email" bind:value={agentEmail} />
 									</div>
 								</div>
 							</div>
 
 							<div class="border-t border-border pt-6">
-								<h3 class="text-sm font-medium text-foreground mb-4">Finance Details</h3>
+								<h3 class="text-sm font-medium text-foreground mb-4">Finance details</h3>
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 									<div class="space-y-2">
-										<Label for="total-cost">Total Cost ({currencySymbol})</Label>
+										<Label for="total-cost">Total cost ({currencySymbol})</Label>
 										<Input
 											id="total-cost"
 											type="number"
@@ -533,7 +533,7 @@
 										{/if}
 									</div>
 									<div class="space-y-2">
-										<Label for="monthly-cost">Monthly Cost ({currencySymbol})</Label>
+										<Label for="monthly-cost">Monthly cost ({currencySymbol})</Label>
 										<Input
 											id="monthly-cost"
 											type="number"
@@ -546,7 +546,7 @@
 
 								<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
 									<div class="space-y-2">
-										<Label for="payment-amount">Payment Amount ({currencySymbol})</Label>
+										<Label for="payment-amount">Payment amount ({currencySymbol})</Label>
 										<Input
 											id="payment-amount"
 											type="number"
@@ -556,7 +556,7 @@
 										/>
 									</div>
 									<div class="space-y-2">
-										<Label for="premium-frequency">Premium Frequency</Label>
+										<Label for="premium-frequency">Premium frequency</Label>
 										<Select.Root
 											type="single"
 											value={premiumFrequency}
@@ -626,7 +626,7 @@
 							<LoaderCircle class="size-4 animate-spin" />
 							{isEditMode ? 'Updating…' : 'Creating…'}
 						{:else}
-							{isEditMode ? 'Update' : 'Create'} Policy
+							{isEditMode ? 'Update' : 'Create'} policy
 						{/if}
 					</Button>
 				</div>
@@ -636,7 +636,7 @@
 		<AlertDialog bind:open={showDeleteConfirm}>
 			<AlertDialogContent>
 				<AlertDialogHeader>
-					<AlertDialogTitle>Delete Policy</AlertDialogTitle>
+					<AlertDialogTitle>Delete policy</AlertDialogTitle>
 					<AlertDialogDescription>
 						Are you sure you want to delete this insurance policy? This permanently removes the
 						policy and everything under it — all terms, filed claims, and uploaded documents. This
@@ -672,7 +672,7 @@
 							Deleting...
 						{:else}
 							<Trash2 class="h-4 w-4 mr-2" />
-							Delete Policy
+							Delete policy
 						{/if}
 					</AlertDialogAction>
 				</AlertDialogFooter>

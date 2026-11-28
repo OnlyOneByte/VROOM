@@ -65,31 +65,31 @@ describe('a waiting account whose waiting page fails to load', () => {
 
 		expect(await screen.findByText("Couldn't load this page")).toBeVisible();
 		expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Sign Out' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
 		expect(screen.queryByText('Page content')).toBeNull();
 		expect(screen.queryByRole('link', { name: 'Skip to content' })).toBeNull();
 	});
 
-	it('a failed Sign Out says so and stays on the page, with the button usable again', async () => {
+	it('a failed Sign out says so and stays on the page, with the button usable again', async () => {
 		logoutFails = true;
 		const assign = stubLocation();
 		const showError = vi.spyOn(appStore, 'showError');
 		render(Layout, { children: pageContent });
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Sign Out' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
 
 		await waitFor(() =>
 			expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Couldn’t sign out\./))
 		);
 		expect(assign).not.toHaveBeenCalled();
-		expect(screen.getByRole('button', { name: 'Sign Out' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled();
 	});
 
-	it('a Sign Out that works goes to the sign-in page', async () => {
+	it('a Sign out that works goes to the sign-in page', async () => {
 		const assign = stubLocation();
 		render(Layout, { children: pageContent });
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Sign Out' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
 
 		await waitFor(() => expect(assign).toHaveBeenCalledWith('/auth'));
 	});
