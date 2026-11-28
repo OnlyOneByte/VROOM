@@ -51,6 +51,31 @@ describe('PolicyTermCard content', () => {
 		expect(screen.getByText('$0.00')).toBeInTheDocument();
 	});
 
+	test('blank costs show nothing rather than $0.00', () => {
+		render(PolicyTermCard, {
+			props: { term: term({ totalCost: null, monthlyCost: null }), isCurrent: true }
+		});
+		expect(screen.queryByText('Total cost')).toBeNull();
+		expect(screen.queryByText('Monthly')).toBeNull();
+		expect(screen.queryByText(/\$0\.00/)).toBeNull();
+	});
+
+	test('a monthly-only term shows the total its premium expense books', () => {
+		render(PolicyTermCard, {
+			props: { term: term({ totalCost: null, monthlyCost: 100 }), isCurrent: true }
+		});
+		expect(screen.getByText('$1,200.00')).toBeInTheDocument();
+		expect(screen.getByText('$100.00/mo')).toBeInTheDocument();
+	});
+
+	test('with both costs, the monthly figure follows the total, as analytics does', () => {
+		render(PolicyTermCard, {
+			props: { term: term({ totalCost: 1200, monthlyCost: 150 }), isCurrent: true }
+		});
+		expect(screen.getByText('$1,200.00')).toBeInTheDocument();
+		expect(screen.getByText('$100.00/mo')).toBeInTheDocument();
+	});
+
 	test('omits cost, vehicle and coverage rows when the data is absent', () => {
 		render(PolicyTermCard, { props: { term: term() } });
 		expect(screen.queryByText('Total cost')).toBeNull();

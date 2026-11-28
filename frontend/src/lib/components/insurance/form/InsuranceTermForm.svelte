@@ -417,6 +417,7 @@
 										{premiumFrequency || 'Select frequency'}
 									</Select.Trigger>
 									<Select.Content>
+										<Select.Item value="" label="Not specified">Not specified</Select.Item>
 										<Select.Item value="Monthly" label="Monthly">Monthly</Select.Item>
 										<Select.Item value="Quarterly" label="Quarterly">Quarterly</Select.Item>
 										<Select.Item value="Semi-Annual" label="Semi-Annual">Semi-Annual</Select.Item>
