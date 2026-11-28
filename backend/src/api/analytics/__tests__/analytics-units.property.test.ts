@@ -1,20 +1,21 @@
-import type { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { ChargeUnit, DistanceUnit, type UnitPreferences, VolumeUnit } from '../../../types';
 import { convertDistance, convertEfficiency } from '../../../utils/unit-conversions';
 import type { CrossVehicleData } from '../repository';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
   seedExpense,
   seedUser,
-  type TestDb,
+  openAnalyticsTestDb,
+  type AnalyticsTestDb,
+} from './analytics-test-db';
+import {
   type TestExpense,
   type TestVehicle,
   yearToRange,
 } from './analytics-test-generators';
+import type { TestSql } from '../../../test-helpers/test-sql';
 
 const distanceUnitArb = fc.constantFrom(DistanceUnit.MILES, DistanceUnit.KILOMETERS);
 const volumeUnitArb = fc.constantFrom(
@@ -33,15 +34,15 @@ const mixedUnitPairArb: fc.Arbitrary<[UnitPreferences, UnitPreferences]> = fc
   .tuple(unitPreferencesArb, unitPreferencesArb)
   .filter(([a, b]) => a.distanceUnit !== b.distanceUnit || a.volumeUnit !== b.volumeUnit);
 
-function seedUserSettings(db: Database, userId: string, units: UnitPreferences): void {
-  db.run('INSERT INTO user_preferences (user_id, unit_preferences) VALUES (?, ?)', [
+async function seedUserSettings(db: TestSql, userId: string, units: UnitPreferences): Promise<void> {
+  await db.run('INSERT INTO user_preferences (user_id, unit_preferences) VALUES (?, ?)', [
     userId,
     JSON.stringify(units),
   ]);
 }
 
-function seedVehicleWithUnits(db: Database, vehicle: TestVehicle, units: UnitPreferences): void {
-  db.run(
+async function seedVehicleWithUnits(db: TestSql, vehicle: TestVehicle, units: UnitPreferences): Promise<void> {
+  await db.run(
     'INSERT INTO vehicles (id, user_id, make, model, year, unit_preferences) VALUES (?, ?, ?, ?, ?, ?)',
     [vehicle.id, vehicle.userId, vehicle.make, vehicle.model, vehicle.year, JSON.stringify(units)]
   );
@@ -58,7 +59,7 @@ function makeFuelExpense(
     id: `expense-${vehicleId}-${index}`,
     vehicleId,
     category: 'fuel',
-    expenseAmount: volume * 3.5,
+    expenseAmount: Math.round(volume * 350),
     date,
     mileage,
     volume,
@@ -71,38 +72,38 @@ function makeTestVehicle(id: string, userId: string, make: string, model: string
   return { id, userId, make, model, year: 2022 };
 }
 
-function seedFuelExpensesForVehicle(
-  db: Database,
+async function seedFuelExpensesForVehicle(
+  db: TestSql,
   vehicleId: string,
   mileageIncrement: number,
   volume: number,
   baseMileage: number,
   dateOffsetMs: number
-): void {
+): Promise<void> {
   const baseDate = new Date(TEST_YEAR, 3, 1);
   for (let i = 0; i < 3; i++) {
     const date = new Date(baseDate.getTime() + i * 30 * 86400000 + dateOffsetMs);
-    seedExpense(
+    await seedExpense(
       db,
       makeFuelExpense(vehicleId, i, baseMileage + i * mileageIncrement * 100, volume, date)
     );
   }
 }
 
-function setupMixedUnitScenario(
-  db: Database,
+async function setupMixedUnitScenario(
+  db: TestSql,
   userUnits: UnitPreferences,
   vehicleAUnits: UnitPreferences,
   vehicleBUnits: UnitPreferences
-): { userId: string; vehicleA: TestVehicle; vehicleB: TestVehicle } {
+): Promise<{ userId: string; vehicleA: TestVehicle; vehicleB: TestVehicle }> {
   const userId = 'user-1';
-  seedUser(db, { id: userId, email: 'test@test.com', displayName: 'Test' });
-  seedUserSettings(db, userId, userUnits);
+  await seedUser(db, { id: userId, email: 'test@test.com', displayName: 'Test' });
+  await seedUserSettings(db, userId, userUnits);
 
   const vehicleA = makeTestVehicle('vehicle-A', userId, 'Toyota', 'Camry');
   const vehicleB = makeTestVehicle('vehicle-B', userId, 'Honda', 'Civic');
-  seedVehicleWithUnits(db, vehicleA, vehicleAUnits);
-  seedVehicleWithUnits(db, vehicleB, vehicleBUnits);
+  await seedVehicleWithUnits(db, vehicleA, vehicleAUnits);
+  await seedVehicleWithUnits(db, vehicleB, vehicleBUnits);
 
   return { userId, vehicleA, vehicleB };
 }
@@ -160,23 +161,23 @@ function assertEfficiencyConverted(
   }
 }
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 const TEST_YEAR = 2024;
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
-function resetDb(): void {
-  testDb.sqlite.close();
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+async function resetDb(): Promise<void> {
+  testDb.close();
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 }
 
 describe('Cross-vehicle analytics conversion', () => {
@@ -190,16 +191,16 @@ describe('Cross-vehicle analytics conversion', () => {
         fc.double({ min: 1, max: 20, noNaN: true, noDefaultInfinity: true }),
         fc.double({ min: 1, max: 20, noNaN: true, noDefaultInfinity: true }),
         async (userUnits, [vAUnits, vBUnits], mileIncrA, mileIncrB, fuelA, fuelB) => {
-          resetDb();
-          const { userId, vehicleA, vehicleB } = setupMixedUnitScenario(
-            testDb.sqlite,
+          await resetDb();
+          const { userId, vehicleA, vehicleB } = await setupMixedUnitScenario(
+            testDb.sql,
             userUnits,
             vAUnits,
             vBUnits
           );
 
-          seedFuelExpensesForVehicle(testDb.sqlite, vehicleA.id, mileIncrA, fuelA, 1000, 0);
-          seedFuelExpensesForVehicle(testDb.sqlite, vehicleB.id, mileIncrB, fuelB, 2000, 86400000);
+          await seedFuelExpensesForVehicle(testDb.sql, vehicleA.id, mileIncrA, fuelA, 1000, 0);
+          await seedFuelExpensesForVehicle(testDb.sql, vehicleB.id, mileIncrB, fuelB, 2000, 86400000);
 
           const result = await repo.getCrossVehicle(userId, yearToRange(TEST_YEAR));
 
@@ -253,16 +254,16 @@ describe('Cross-vehicle analytics conversion', () => {
         unitPreferencesArb,
         mixedUnitPairArb,
         async (userUnits, [vAUnits, vBUnits]) => {
-          resetDb();
-          const { userId, vehicleA, vehicleB } = setupMixedUnitScenario(
-            testDb.sqlite,
+          await resetDb();
+          const { userId, vehicleA, vehicleB } = await setupMixedUnitScenario(
+            testDb.sql,
             userUnits,
             vAUnits,
             vBUnits
           );
 
-          seedFuelExpensesForVehicle(testDb.sqlite, vehicleA.id, 20, 10, 1000, 0);
-          seedFuelExpensesForVehicle(testDb.sqlite, vehicleB.id, 30, 12, 5000, 86400000);
+          await seedFuelExpensesForVehicle(testDb.sql, vehicleA.id, 20, 10, 1000, 0);
+          await seedFuelExpensesForVehicle(testDb.sql, vehicleB.id, 30, 12, 5000, 86400000);
 
           const result = await repo.getQuickStats(userId, yearToRange(TEST_YEAR));
 

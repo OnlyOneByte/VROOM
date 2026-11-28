@@ -30,13 +30,13 @@ interface Items {
   items: Array<{ vehicleId: string; category: string; amount: number }>;
 }
 
-function expense(
+async function expense(
   vehicleId: string,
   category: string,
   cents: number,
   sourceType: string | null = null
-): void {
-  ctx.sqlite.run(
+): Promise<void> {
+  await ctx.sql.run(
     'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [
       `qs-${vehicleId}-${category}-${cents}`,
@@ -54,11 +54,11 @@ beforeEach(async () => {
   ctx = await createTestApp();
   await seedCar(ctx, SHARED);
   await seedCar(ctx, PRIVATE);
-  expense(SHARED, 'maintenance', 8000);
-  expense(SHARED, 'financial', 40000, 'financing');
-  expense(SHARED, 'financial', 120000, 'insurance_term');
-  expense(SHARED, 'financial', 5000);
-  expense(PRIVATE, 'maintenance', 70000);
+  await expense(SHARED, 'maintenance', 8000);
+  await expense(SHARED, 'financial', 40000, 'financing');
+  await expense(SHARED, 'financial', 120000, 'insurance_term');
+  await expense(SHARED, 'financial', 5000);
+  await expense(PRIVATE, 'maintenance', 70000);
   viewer = await createInvitee(ctx, 'qs-viewer');
   stranger = await createInvitee(ctx, 'qs-stranger');
   await shareCar(ctx, SHARED, viewer, 'viewer');
@@ -145,7 +145,7 @@ describe('analytics query for a car shared with the viewer', () => {
   });
 
   test('a share that is not accepted yet gives nothing', async () => {
-    ctx.sqlite.run("UPDATE vehicle_shares SET status = 'pending' WHERE shared_with_id = ?", [
+    await ctx.sql.run("UPDATE vehicle_shares SET status = 'pending' WHERE shared_with_id = ?", [
       viewer.id,
     ]);
     expect((await query(viewer.request, `interval=none&vehicleIds=${SHARED}`)).totals.value).toBe(
@@ -154,7 +154,7 @@ describe('analytics query for a car shared with the viewer', () => {
   });
 
   test("a shared car kept in another currency is left out rather than summed with the viewer's", async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO user_preferences (user_id, currency_unit) VALUES (?, 'EUR') ON CONFLICT(user_id) DO UPDATE SET currency_unit = 'EUR'",
       [ctx.user.id]
     );
@@ -197,7 +197,7 @@ describe('analytics query follows the per-car permissions of a share', () => {
   });
 
   test('a viewer denied trip reads gets the costs but no trips', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date) VALUES ('qs-trip', ?, ?, 100, 200, 'personal', ?)",
       [SHARED, ctx.user.id, JUNE]
     );
@@ -216,11 +216,11 @@ describe('analytics query follows the per-car permissions of a share', () => {
   });
 
   test('a viewer who may not see drivers gets the costs without who paid them', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO vehicle_drivers (id, vehicle_id, user_id, name) VALUES ('qs-driver', ?, NULL, 'Alice')",
       [SHARED]
     );
-    ctx.sqlite.run('UPDATE expenses SET paid_by_driver_id = ? WHERE vehicle_id = ?', [
+    await ctx.sql.run('UPDATE expenses SET paid_by_driver_id = ? WHERE vehicle_id = ?', [
       'qs-driver',
       SHARED,
     ]);
@@ -243,7 +243,7 @@ describe('analytics query follows the per-car permissions of a share', () => {
   });
 
   test('hidden financial rows do not move counts or the start of the range', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
       ['qs-early-loan', SHARED, ctx.user.id, 'financial', 9900, 1609459200, 'financing']
     );
@@ -284,8 +284,8 @@ describe('the query and its items report the cars they covered', () => {
 
   const sorted = (c: Coverage) => ({ ...c, vehicleIds: [...c.vehicleIds].sort() });
 
-  function ownerCurrency(currency: string): void {
-    ctx.sqlite.run(
+  async function ownerCurrency(currency: string): Promise<void> {
+    await ctx.sql.run(
       'INSERT INTO user_preferences (user_id, currency_unit) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET currency_unit = excluded.currency_unit',
       [ctx.user.id, currency]
     );
@@ -306,7 +306,7 @@ describe('the query and its items report the cars they covered', () => {
   });
 
   test('a shared car in another currency is named as left out for its currency', async () => {
-    ownerCurrency('EUR');
+    await ownerCurrency('EUR');
     for (const body of await coverage(viewer.request)) {
       expect(body).toEqual({
         vehicleIds: [OWN],
@@ -319,7 +319,7 @@ describe('the query and its items report the cars they covered', () => {
   test('a shared car without expense access is never named, whatever the currency', async () => {
     await overrideOn(ctx, SHARED, viewer, 'vehicle.expense.read', 'deny');
     for (const currency of ['USD', 'EUR']) {
-      ownerCurrency(currency);
+      await ownerCurrency(currency);
       for (const body of await coverage(viewer.request, '', [PRIVATE, SHARED])) {
         expect(body, currency).toEqual({ vehicleIds: [OWN], otherCurrency: [], unavailable: 0 });
       }

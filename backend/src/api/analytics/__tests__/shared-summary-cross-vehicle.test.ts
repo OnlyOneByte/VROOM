@@ -28,8 +28,8 @@ interface Summary {
   quickStats: { vehicleCount: number; ytdSpending: number };
 }
 
-function expense(vehicleId: string, category: string, cents: number, source: string | null = null) {
-  ctx.sqlite.run(
+async function expense(vehicleId: string, category: string, cents: number, source: string | null = null) {
+  await ctx.sql.run(
     'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [`ssc-${vehicleId}-${category}-${cents}`, vehicleId, ctx.user.id, category, cents, JUNE, source]
   );
@@ -39,10 +39,10 @@ beforeEach(async () => {
   ctx = await createTestApp();
   await seedCar(ctx, SHARED);
   await seedCar(ctx, PRIVATE);
-  expense(SHARED, 'maintenance', 8000);
-  expense(SHARED, 'financial', 5000);
-  expense(SHARED, 'financial', 40000, 'financing');
-  expense(PRIVATE, 'maintenance', 70000);
+  await expense(SHARED, 'maintenance', 8000);
+  await expense(SHARED, 'financial', 5000);
+  await expense(SHARED, 'financial', 40000, 'financing');
+  await expense(PRIVATE, 'maintenance', 70000);
   viewer = await createInvitee(ctx, 'ssc-viewer');
   stranger = await createInvitee(ctx, 'ssc-stranger');
   await shareCar(ctx, SHARED, viewer, 'viewer');
@@ -98,7 +98,7 @@ describe('summary and Cross-vehicle cover cars shared with you, as each share al
   });
 
   test('a shared car kept in another currency is left out', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO user_preferences (user_id, currency_unit) VALUES (?, 'EUR') ON CONFLICT(user_id) DO UPDATE SET currency_unit = 'EUR'",
       [ctx.user.id]
     );
@@ -221,7 +221,7 @@ describe('financing and insurance cover shared cars only where the share shows t
     expect(policy.status).toBeLessThan(300);
     for (const car of [SHARED, 'ssc-other']) {
       for (const permission of ['vehicle.financing.read', 'vehicle.insurance.read']) {
-        ctx.sqlite.run(
+        await ctx.sql.run(
           "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect) VALUES (?, ?, 'vehicle', ?, ?, 'allow')",
           [`ssc-po-${car}-${permission}`, viewer.id, car, permission]
         );
@@ -244,7 +244,7 @@ describe('financing and insurance cover shared cars only where the share shows t
   });
 
   test("an owner's policy whose cars were all removed from it still counts, as before", async () => {
-    ctx.sqlite.run('DELETE FROM insurance_term_vehicles');
+    await ctx.sql.run('DELETE FROM insurance_term_vehicles');
     const data = await insurance(ctx.authed);
     expect(data.summary.totalAnnualPremiums).toBeCloseTo(2400);
   });

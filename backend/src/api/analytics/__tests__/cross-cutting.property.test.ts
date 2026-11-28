@@ -1,41 +1,42 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
-  expenseArb,
-  expenseListArb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
+  openAnalyticsTestDb,
+  type AnalyticsTestDb,
+} from './analytics-test-db';
+import {
+  expenseArb,
+  expenseListArb,
   type TestExpense,
   type TestVehicle,
   vehicleArb,
   yearToRange,
 } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
-function resetDb(): void {
-  testDb.sqlite.close();
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+async function resetDb(): Promise<void> {
+  testDb.close();
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 }
 
-function seedUserAndVehicle(userId: string, email: string, name: string): TestVehicle {
-  seedUser(testDb.sqlite, { id: userId, email, displayName: name });
+async function seedUserAndVehicle(userId: string, email: string, name: string): Promise<TestVehicle> {
+  await seedUser(testDb.sql, { id: userId, email, displayName: name });
   const v: TestVehicle = {
     id: `vehicle-${userId}-0`,
     userId,
@@ -43,55 +44,55 @@ function seedUserAndVehicle(userId: string, email: string, name: string): TestVe
     model: 'Camry',
     year: 2022,
   };
-  seedVehicle(testDb.sqlite, v);
+  await seedVehicle(testDb.sql, v);
   return v;
 }
 
-function seedSampledExpenses(
+async function seedSampledExpenses(
   vehicleId: string,
   count: number,
   year: number,
   idPrefix: string
-): TestExpense[] {
+): Promise<TestExpense[]> {
   const generated = fc.sample(expenseArb(vehicleId, 0, year), count);
   const seeded: TestExpense[] = [];
   for (let i = 0; i < generated.length; i++) {
     const e = generated[i];
     if (!e) continue;
     const exp = { ...e, id: `${idPrefix}-${i}` };
-    seedExpense(testDb.sqlite, exp);
+    await seedExpense(testDb.sql, exp);
     seeded.push(exp);
   }
   return seeded;
 }
 
-function seedVehiclesWithRandomExpenses(userId: string, vehicleCount: number): TestVehicle[] {
+async function seedVehiclesWithRandomExpenses(userId: string, vehicleCount: number): Promise<TestVehicle[]> {
   const result: TestVehicle[] = [];
   for (let i = 0; i < vehicleCount; i++) {
     const v = fc.sample(vehicleArb(userId, i), 1)[0];
     if (!v) continue;
-    seedVehicle(testDb.sqlite, v);
+    await seedVehicle(testDb.sql, v);
     result.push(v);
 
     const exps =
       fc.sample(expenseListArb(v.id, { minLength: 1, maxLength: 3, yearConstraint: 2024 }), 1)[0] ??
       [];
     for (const e of exps) {
-      seedExpense(testDb.sqlite, e);
+      await seedExpense(testDb.sql, e);
     }
   }
   return result;
 }
 
-function seedVehiclesWithDistinctiveExpenses(userId: string, vehicleCount: number): TestVehicle[] {
+async function seedVehiclesWithDistinctiveExpenses(userId: string, vehicleCount: number): Promise<TestVehicle[]> {
   const result: TestVehicle[] = [];
   for (let i = 0; i < vehicleCount; i++) {
     const v = fc.sample(vehicleArb(userId, i), 1)[0];
     if (!v) continue;
-    seedVehicle(testDb.sqlite, v);
+    await seedVehicle(testDb.sql, v);
     result.push(v);
 
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: `${userId}-exp-${i}`,
       vehicleId: v.id,
       category: 'maintenance',
@@ -110,12 +111,12 @@ describe('Vehicle ownership validation', () => {
   test('per-vehicle endpoints return empty/zero data for non-owned vehicleId', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 4 }), async (expenseCount) => {
-        resetDb();
+        await resetDb();
 
         const user1 = { id: 'user-1', email: 'u1@test.com', displayName: 'User 1' };
         const user2 = { id: 'user-2', email: 'u2@test.com', displayName: 'User 2' };
-        seedUser(testDb.sqlite, user1);
-        seedUser(testDb.sqlite, user2);
+        await seedUser(testDb.sql, user1);
+        await seedUser(testDb.sql, user2);
 
         const vehicle1: TestVehicle = {
           id: 'vehicle-user-1-0',
@@ -131,14 +132,14 @@ describe('Vehicle ownership validation', () => {
           model: 'Civic',
           year: 2023,
         };
-        seedVehicle(testDb.sqlite, vehicle1);
-        seedVehicle(testDb.sqlite, vehicle2);
+        await seedVehicle(testDb.sql, vehicle1);
+        await seedVehicle(testDb.sql, vehicle2);
 
         const expenses = fc.sample(expenseArb(vehicle2.id, 0, 2024), expenseCount);
         for (let i = 0; i < expenses.length; i++) {
           const e = expenses[i];
           if (!e) continue;
-          seedExpense(testDb.sqlite, { ...e, id: `exp-${i}` });
+          await seedExpense(testDb.sql, { ...e, id: `exp-${i}` });
         }
 
         const health = await repo.getVehicleHealth(user1.id, vehicle2.id);
@@ -169,14 +170,14 @@ describe('Year scoping filters correctly', () => {
         fc.integer({ min: 1, max: 5 }),
         fc.integer({ min: 1, max: 5 }),
         async (targetYear, targetCount, otherCount) => {
-          resetDb();
+          await resetDb();
 
-          const vehicle = seedUserAndVehicle('user-1', 'test@test.com', 'Test');
+          const vehicle = await seedUserAndVehicle('user-1', 'test@test.com', 'Test');
 
-          const targetExpenses = seedSampledExpenses(vehicle.id, targetCount, targetYear, 'target');
+          const targetExpenses = await seedSampledExpenses(vehicle.id, targetCount, targetYear, 'target');
 
           const otherYear = targetYear === 2024 ? 2022 : targetYear + 1;
-          seedSampledExpenses(vehicle.id, otherCount, otherYear, 'other');
+          await seedSampledExpenses(vehicle.id, otherCount, otherYear, 'other');
 
           const stats = await repo.getQuickStats('user-1', yearToRange(targetYear));
           const expectedSum = targetExpenses.reduce((sum, e) => sum + e.expenseAmount, 0);
@@ -217,13 +218,13 @@ describe('User data isolation', () => {
         fc.integer({ min: 1, max: 3 }),
         fc.integer({ min: 1, max: 3 }),
         async (user1VehicleCount, user2VehicleCount) => {
-          resetDb();
+          await resetDb();
 
-          seedUser(testDb.sqlite, { id: 'user-1', email: 'u1@test.com', displayName: 'User 1' });
-          seedUser(testDb.sqlite, { id: 'user-2', email: 'u2@test.com', displayName: 'User 2' });
+          await seedUser(testDb.sql, { id: 'user-1', email: 'u1@test.com', displayName: 'User 1' });
+          await seedUser(testDb.sql, { id: 'user-2', email: 'u2@test.com', displayName: 'User 2' });
 
-          const user1Vehicles = seedVehiclesWithRandomExpenses('user-1', user1VehicleCount);
-          const user2Vehicles = seedVehiclesWithDistinctiveExpenses('user-2', user2VehicleCount);
+          const user1Vehicles = await seedVehiclesWithRandomExpenses('user-1', user1VehicleCount);
+          const user2Vehicles = await seedVehiclesWithDistinctiveExpenses('user-2', user2VehicleCount);
 
           const stats1 = await repo.getQuickStats('user-1', yearToRange(2024));
           expect(stats1.vehicleCount).toBe(user1VehicleCount);
@@ -256,10 +257,10 @@ describe("Vehicle ID filtering returns only that vehicle's data", () => {
         fc.integer({ min: 1, max: 4 }),
         fc.integer({ min: 1, max: 4 }),
         async (v1ExpCount, v2ExpCount) => {
-          resetDb();
+          await resetDb();
 
           const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-          seedUser(testDb.sqlite, user);
+          await seedUser(testDb.sql, user);
 
           const vehicle1: TestVehicle = {
             id: 'vehicle-user-1-0',
@@ -275,11 +276,11 @@ describe("Vehicle ID filtering returns only that vehicle's data", () => {
             model: 'Civic',
             year: 2023,
           };
-          seedVehicle(testDb.sqlite, vehicle1);
-          seedVehicle(testDb.sqlite, vehicle2);
+          await seedVehicle(testDb.sql, vehicle1);
+          await seedVehicle(testDb.sql, vehicle2);
 
           for (let i = 0; i < v1ExpCount; i++) {
-            seedExpense(testDb.sqlite, {
+            await seedExpense(testDb.sql, {
               id: `v1-fuel-${i}`,
               vehicleId: vehicle1.id,
               category: 'fuel',
@@ -293,7 +294,7 @@ describe("Vehicle ID filtering returns only that vehicle's data", () => {
           }
 
           for (let i = 0; i < v2ExpCount; i++) {
-            seedExpense(testDb.sqlite, {
+            await seedExpense(testDb.sql, {
               id: `v2-fuel-${i}`,
               vehicleId: vehicle2.id,
               category: 'fuel',
