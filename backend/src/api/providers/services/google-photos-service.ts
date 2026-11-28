@@ -3,7 +3,11 @@ import { google } from 'googleapis';
 import { CONFIG } from '../../../config';
 import { SyncError, SyncErrorCode } from '../../../errors';
 import { OPERATION_TIMEOUTS } from '../../../utils/timeout';
-import { credentialFailureOf } from '../domains/storage/storage-provider';
+import {
+  credentialFailureOf,
+  type DownloadOptions,
+  readWithinSize,
+} from '../domains/storage/storage-provider';
 
 const PHOTOS_API = 'https://photoslibrary.googleapis.com';
 export const VROOM_ALBUM_TITLE = 'VROOM';
@@ -29,7 +33,7 @@ export interface PhotosClient {
   uploadBytes(buffer: Buffer, mimeType: string, fileName: string): Promise<string>;
   batchCreate(albumId: string, uploadToken: string, fileName: string): Promise<PhotosMediaItem>;
   getMediaItem(mediaItemId: string): Promise<PhotosMediaItem>;
-  downloadMediaItem(mediaItemId: string): Promise<Buffer>;
+  downloadMediaItem(mediaItemId: string, options?: DownloadOptions): Promise<Buffer>;
   listAlbums(): Promise<PhotosAlbum[]>;
   createAlbum(title: string): Promise<PhotosAlbum>;
   searchMediaItems?(albumId: string, pageToken?: string): Promise<PhotosSearchPage>;
@@ -71,8 +75,8 @@ export class GooglePhotosService {
     return item.baseUrl ?? null;
   }
 
-  async download(mediaItemId: string): Promise<Buffer> {
-    return this.client.downloadMediaItem(mediaItemId);
+  async download(mediaItemId: string, options?: DownloadOptions): Promise<Buffer> {
+    return this.client.downloadMediaItem(mediaItemId, options);
   }
 
   async listReceiptPhotos(maxItems: number): Promise<PhotosMediaItem[]> {
@@ -223,7 +227,7 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
       return (await res.json()) as PhotosMediaItem;
     },
 
-    async downloadMediaItem(mediaItemId) {
+    async downloadMediaItem(mediaItemId, options) {
       const res = await authedFetch(`${PHOTOS_API}/v1/mediaItems/${mediaItemId}`, {
         method: 'GET',
       });
@@ -241,7 +245,12 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
           `Google Photos download failed: ${bytes.status}`
         );
       }
-      return Buffer.from(await bytes.arrayBuffer());
+      if (options?.maxBytes === undefined || !bytes.body) {
+        return Buffer.from(await bytes.arrayBuffer());
+      }
+      const declared = Number(bytes.headers.get('content-length') ?? 0);
+      const body = bytes.body;
+      return readWithinSize(body, declared, options, () => void body.cancel().catch(() => {}));
     },
 
     listAlbums() {

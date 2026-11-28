@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+import { PayloadTooLargeError } from '../../../errors';
 import {
   FakePhotosStore,
   makeFakePhotosClient,
@@ -48,6 +49,20 @@ describe('GooglePhotosProvider', () => {
       pathHint: '',
     });
     expect((await provider.download(ref)).equals(bytes)).toBe(true);
+  });
+
+  test('download passes the size limit on to Google Photos', async () => {
+    const ref = await provider.upload({
+      fileName: 'a.jpg',
+      buffer: Buffer.from([9, 8, 7]),
+      mimeType: 'image/jpeg',
+      entityType: 'vehicle',
+      entityId: 'v-1',
+      pathHint: '',
+    });
+    await expect(provider.download(ref, { maxBytes: 2 })).rejects.toBeInstanceOf(
+      PayloadTooLargeError
+    );
   });
 
   test('getExternalUrl returns a FRESH url (re-fetched, not the stored one)', async () => {

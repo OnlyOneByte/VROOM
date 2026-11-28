@@ -1,3 +1,4 @@
+import { assertWithinSize } from '../api/providers/domains/storage/storage-provider';
 import type {
   PhotosAlbum,
   PhotosClient,
@@ -131,11 +132,12 @@ export function makeFakePhotosClient(store: FakePhotosStore): PhotosClient {
       } satisfies PhotosMediaItem);
     },
 
-    downloadMediaItem(mediaItemId) {
+    async downloadMediaItem(mediaItemId, options) {
       store.maybeFail('downloadMediaItem');
       const m = store.media.get(mediaItemId);
-      if (!m) return Promise.reject(photosApiError(404, `Media item not found: ${mediaItemId}`));
-      return Promise.resolve(m.bytes);
+      if (!m) throw photosApiError(404, `Media item not found: ${mediaItemId}`);
+      assertWithinSize(m.bytes.length, options);
+      return m.bytes;
     },
 
     listAlbums() {

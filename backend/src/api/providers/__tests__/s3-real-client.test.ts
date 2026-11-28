@@ -61,8 +61,9 @@ function fakeS3() {
       if (key.endsWith('/unsized.bin')) {
         let sent = 0;
         const chunked = new ReadableStream<Uint8Array>({
-          pull(controller) {
+          async pull(controller) {
             if (sent >= 64) return controller.close();
+            await Bun.sleep(5);
             sent += 16;
             controller.enqueue(new Uint8Array(16));
           },
@@ -142,6 +143,10 @@ describe('the real S3 client through the outbound request handler', () => {
       await expect(provider.download(ref, { maxBytes: 32 })).rejects.toBeInstanceOf(
         PayloadTooLargeError
       );
+
+      const direct = await fetch(`http://127.0.0.1:${server.port}/photos/Backups/unsized.bin`);
+      expect(direct.headers.get('content-length')).toBeNull();
+      await direct.arrayBuffer();
 
       const unsized = { providerType: 's3', externalId: 'Backups/unsized.bin' };
       expect((await provider.download(unsized, { maxBytes: 64 })).length).toBe(64);
