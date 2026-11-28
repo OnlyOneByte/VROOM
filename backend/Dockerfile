@@ -12,7 +12,7 @@ FROM oven/bun:1.3.14-alpine AS production
 
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init
+RUN apk upgrade --no-cache && apk add --no-cache dumb-init
 
 COPY --chown=bun:bun package.json bun.lock* ./
 RUN bun install --production --frozen-lockfile && \
