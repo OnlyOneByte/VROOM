@@ -26,15 +26,21 @@ interface Balances {
 let owner = '';
 let editor = '';
 
-function trip(id: string, start: number, end: number, driverId: string) {
-  ctx.sqlite.run(
+async function trip(id: string, start: number, end: number, driverId: string) {
+  await ctx.sql.run(
     "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, driver_id) VALUES (?, ?, ?, ?, ?, 'personal', ?, ?)",
     [id, CAR, ctx.user.id, start, end, at('2024-03-05'), driverId]
   );
 }
 
-function expense(id: string, category: string, cents: number, payer: string, source?: string) {
-  ctx.sqlite.run(
+async function expense(
+  id: string,
+  category: string,
+  cents: number,
+  payer: string,
+  source?: string
+) {
+  await ctx.sql.run(
     'INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, paid_by_driver_id, source_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [id, CAR, ctx.user.id, category, at('2024-03-10'), cents, payer, source ?? null]
   );
@@ -50,7 +56,7 @@ async function balances(as: { request: TestApp['authed'] } | null = null): Promi
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'sp');
   await ctx.authed('PUT', `/api/v1/vehicles/${CAR}/car-share`, { enabled: true });
   const list = (
@@ -58,10 +64,10 @@ beforeEach(async () => {
   ).data;
   owner = list.find((d) => d.userId === ctx.user.id)?.id ?? '';
   editor = list.find((d) => d.userId === m.editor.id)?.id ?? '';
-  trip('sp-t1', 1000, 1300, owner);
-  trip('sp-t2', 1300, 1400, editor);
-  expense('sp-fuel', 'fuel', 8000, owner);
-  expense('sp-ins', 'financial', 12000, owner, 'insurance_term');
+  await trip('sp-t1', 1000, 1300, owner);
+  await trip('sp-t2', 1300, 1400, editor);
+  await expense('sp-fuel', 'fuel', 8000, owner);
+  await expense('sp-ins', 'financial', 12000, owner, 'insurance_term');
 }, 20_000);
 afterEach(() => ctx.close());
 
@@ -86,7 +92,7 @@ describe('split rules and balances', () => {
     expect((await balances()).transfers).toEqual([
       expect.objectContaining({ fromDriverId: editor, toDriverId: owner, amount: 80 }),
     ]);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
     expect((await balances(m.coOwner)).transfers).toEqual([
       expect.objectContaining({ fromDriverId: editor, toDriverId: owner, amount: 20 }),
     ]);
@@ -145,7 +151,7 @@ describe('split rules and balances', () => {
   });
 
   test('balances need permission to see costs', async () => {
-    overrideOn(ctx, CAR, m.editor, 'vehicle.expense.read', 'deny');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.expense.read', 'deny');
     expect((await m.editor.request('GET', `${base}/balances${PERIOD}`)).status).toBe(403);
   });
 });

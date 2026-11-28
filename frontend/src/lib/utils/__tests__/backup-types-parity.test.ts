@@ -83,7 +83,7 @@ describe('backup types parity with the backend', () => {
 			'RestoreResult',
 			'restore.ts',
 			'RestoreResponse',
-			['preview', 'imported', 'conflicts', 'grants']
+			['preview', 'merge', 'imported', 'kept', 'grants']
 		]
 	])(
 		'%s matches the backend %s, except where the backend names a type (%s)',

@@ -59,7 +59,7 @@
 			if (g.members.length === 1) return { ...g, x: mid };
 			const half = Math.max(GROUP_HALF_WIDTH, pillWidth(g) / 2 + 2);
 			const edge = laneWidth > 0 ? laneWidth - half : Infinity;
-			return { ...g, x: Math.min(Math.max(mid, half), edge) };
+			return { ...g, x: Math.max(Math.min(mid, edge), half) };
 		};
 		const out: Group[] = [];
 		for (const run of runs) {
@@ -86,6 +86,14 @@
 	let activeGroup = $derived(
 		active === null ? undefined : groups.find(g => g.members.includes(active as number))
 	);
+	const TIP_MONTHS = 3;
+	let tipMembers = $derived.by(() => {
+		const members = activeGroup?.members ?? [];
+		const at = Math.max(0, members.indexOf(active as number));
+		const from = Math.min(Math.max(0, at - 1), Math.max(0, members.length - TIP_MONTHS));
+		const shown = members.slice(from, from + TIP_MONTHS);
+		return { shown, hidden: members.length - shown.length };
+	});
 
 	function describe(index: number): string {
 		const marker = markers[index];
@@ -179,7 +187,7 @@
 			aria-hidden="true"
 			data-annotation-group-tip
 		>
-			{#each activeGroup.members as index (index)}
+			{#each tipMembers.shown as index (index)}
 				{@const marker = markers[index]}
 				{#if marker}
 					<div class={index === active ? 'font-medium' : ''}>
@@ -189,6 +197,9 @@
 					</div>
 				{/if}
 			{/each}
+			{#if tipMembers.hidden > 0}
+				<div class="text-muted-foreground">+{tipMembers.hidden} more</div>
+			{/if}
 		</div>
 	{:else if shown}
 		{@const x = left(shown.at)}

@@ -11,10 +11,11 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function indexActiveStatuses(): string[] {
-  const row = ctx.sqlite
-    .query(`SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?`)
-    .get('vehicle_shares_active_idx') as { sql: string } | null;
+async function indexActiveStatuses(): Promise<string[]> {
+  const row = (await ctx.sql.get(
+    `SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?`,
+    ['vehicle_shares_active_idx']
+  )) as { sql: string } | null;
   expect(row?.sql).toBeString();
 
   const where = /where\s+status\s+in\s*\(([^)]*)\)/i.exec(row?.sql ?? '');
@@ -25,24 +26,29 @@ function indexActiveStatuses(): string[] {
     .sort();
 }
 
-function seedShare(id: string, status: string, vehicleId: string, sharedWithId: string): void {
-  ctx.sqlite.run(
+async function seedShare(
+  id: string,
+  status: string,
+  vehicleId: string,
+  sharedWithId: string
+): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at)
      VALUES (?, ?, ?, ?, 'viewer', ?, unixepoch())`,
     [id, vehicleId, ctx.user.id, sharedWithId, status]
   );
 }
 
-function seedVehicle(id: string): void {
-  ctx.sqlite.run(
+async function seedVehicle(id: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year, created_at, updated_at)
      VALUES (?, ?, 'Honda', 'Civic', 2020, unixepoch(), unixepoch())`,
     [id, ctx.user.id]
   );
 }
 
-function seedInvitee(id: string): void {
-  ctx.sqlite.run(`INSERT INTO users (id, email, display_name) VALUES (?, ?, 'Invitee')`, [
+async function seedInvitee(id: string): Promise<void> {
+  await ctx.sql.run(`INSERT INTO users (id, email, display_name) VALUES (?, ?, 'Invitee')`, [
     id,
     `${id}@example.com`,
   ]);
@@ -52,7 +58,7 @@ describe('active-share status pairing', () => {
   test('the partial unique index lists exactly ACTIVE_SHARE_STATUSES', async () => {
     const { ACTIVE_SHARE_STATUSES } = await import('../repository');
 
-    expect(indexActiveStatuses()).toEqual([...ACTIVE_SHARE_STATUSES].sort());
+    expect(await indexActiveStatuses()).toEqual([...ACTIVE_SHARE_STATUSES].sort());
   });
 
   test('isActiveShareStatus accepts every listed status and nothing else', async () => {
@@ -67,13 +73,13 @@ describe('active-share status pairing', () => {
   });
 
   test('the dup-invite gate admits exactly the statuses the index reserves a slot for', async () => {
-    const slotHolders = indexActiveStatuses();
+    const slotHolders = await indexActiveStatuses();
 
-    seedVehicle('veh-1');
+    await seedVehicle('veh-1');
     for (const status of ['pending', 'accepted', 'declined', 'revoked']) {
       const invitee = `invitee-${status}`;
-      seedInvitee(invitee);
-      seedShare(`share-${status}`, status, 'veh-1', invitee);
+      await seedInvitee(invitee);
+      await seedShare(`share-${status}`, status, 'veh-1', invitee);
 
       const found = await repos().vehicleShares.findActiveInvite(
         'veh-1',
@@ -85,10 +91,10 @@ describe('active-share status pairing', () => {
   });
 
   test('"shared with me" surfaces exactly the active statuses', async () => {
-    seedInvitee('invitee-multi');
+    await seedInvitee('invitee-multi');
     for (const status of ['pending', 'accepted', 'declined', 'revoked']) {
-      seedVehicle(`veh-${status}`);
-      seedShare(`recv-${status}`, status, `veh-${status}`, 'invitee-multi');
+      await seedVehicle(`veh-${status}`);
+      await seedShare(`recv-${status}`, status, `veh-${status}`, 'invitee-multi');
     }
 
     const received = await repos().vehicleShares.findReceivedByUser('invitee-multi');

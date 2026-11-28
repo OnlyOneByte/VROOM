@@ -21,27 +21,27 @@ interface PolicyView {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
-  seedCar(ctx, PRIVATE);
+  await seedCar(ctx, CAR);
+  await seedCar(ctx, PRIVATE);
   m = await seedMembers(ctx, CAR, 'ins');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO vehicle_financing (id, vehicle_id, provider, original_amount, term_months, start_date, payment_amount) VALUES ('loan-1', ?, 'Bank', 1000000, 60, 1704067200, 20000)",
     [CAR]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO insurance_policies (id, user_id, company) VALUES ('pol-1', ?, 'Mutual')",
     [ctx.user.id]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO insurance_terms (id, policy_id, start_date, end_date, total_cost) VALUES ('term-1', 'pol-1', 1704067200, 1735689600, 120000)"
   );
   for (const vehicleId of [CAR, PRIVATE]) {
-    ctx.sqlite.run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [
+    await ctx.sql.run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [
       'term-1',
       vehicleId,
     ]);
   }
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size) VALUES ('pol-doc', ?, 'insurance_policy', 'pol-1', 'p.pdf', 'application/pdf', 10)",
     [ctx.user.id]
   );
@@ -68,16 +68,16 @@ describe('financing resolves through can() for every role', () => {
     expect(await status(m.viewer.request, 'GET', loan)).toBe(403);
     expect(await status(m.stranger.request, 'GET', loan)).toBe(404);
     expect(await status(m.disabled.request, 'GET', loan)).toBe(403);
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.financing.read', 'allow');
     expect(await status(m.viewer.request, 'GET', loan)).toBe(200);
   });
 
   test('writes: a co-owner changes the loan; an editor needs an allow override; a deny wins', async () => {
     expect(await status(m.coOwner.request, 'PATCH', amount, { paymentAmount: 210 })).toBe(200);
     expect(await status(m.editor.request, 'PATCH', amount, { paymentAmount: 220 })).toBe(403);
-    overrideOn(ctx, CAR, m.editor, 'vehicle.financing.write', 'allow');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.financing.write', 'allow');
     expect(await status(m.editor.request, 'PATCH', amount, { paymentAmount: 220 })).toBe(200);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.financing.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.financing.read', 'deny');
     expect(await status(m.coOwner.request, 'PUT', '/api/v1/financing/loan-1/payoff')).toBe(403);
     expect(await status(m.stranger.request, 'DELETE', '/api/v1/financing/loan-1')).toBe(404);
   });
@@ -106,7 +106,7 @@ describe('insurance resolves through can() for every role', () => {
     const viewers = (await policies(m.viewer.request))[0];
     expect(viewers?.vehicleIds).toEqual([CAR]);
     expect(viewers?.terms[0]?.totalCost).toBeUndefined();
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
     expect((await policies(m.viewer.request))[0]?.terms[0]?.totalCost).toBeTruthy();
     expect(
       await status(m.stranger.request, 'GET', `/api/v1/insurance/vehicles/${CAR}/policies`)
@@ -114,18 +114,18 @@ describe('insurance resolves through can() for every role', () => {
   });
 
   test('policy documents need insurance read on every covered car and stay with the owner for writes', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO insurance_policies (id, user_id, company) VALUES ('pol-2', ?, 'Mutual')",
       [ctx.user.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO insurance_terms (id, policy_id, start_date, end_date, total_cost) VALUES ('term-2', 'pol-2', 1704067200, 1735689600, 90000)"
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES ('term-2', ?)",
       [CAR]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size) VALUES ('pol2-doc', ?, 'insurance_policy', 'pol-2', 'p.pdf', 'application/pdf', 10)",
       [ctx.user.id]
     );
@@ -138,11 +138,11 @@ describe('insurance resolves through can() for every role', () => {
     expect(await status(m.viewer.request, 'GET', shared)).toBe(403);
     expect(await status(m.disabled.request, 'GET', shared)).toBe(403);
     expect(await status(m.stranger.request, 'GET', shared)).toBe(404);
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
     expect(await status(m.viewer.request, 'GET', shared)).toBe(200);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
     expect(await status(m.coOwner.request, 'GET', shared)).toBe(403);
-    overrideOn(ctx, CAR, m.editor, 'vehicle.insurance.write', 'allow');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.insurance.write', 'allow');
     expect(await status(m.editor.request, 'DELETE', `${shared}/pol2-doc`)).toBe(404);
     expect(await status(m.coOwner.request, 'DELETE', `${multiCar}/pol-doc`)).toBe(404);
     expect(await status(ctx.authed, 'DELETE', `${shared}/pol2-doc`)).toBe(204);
@@ -153,7 +153,7 @@ describe('insurance resolves through can() for every role', () => {
       ['claim-shared', CAR],
       ['claim-private', PRIVATE],
     ]) {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO insurance_claims (id, policy_id, claim_date, claim_type, vehicle_id) VALUES (?, 'pol-1', 1704067200, 'collision', ?)",
         [id, vehicleId]
       );
@@ -177,10 +177,10 @@ describe('insurance resolves through can() for every role', () => {
     expect(await status(m.viewer.request, 'GET', docs('claim-shared'))).toBe(403);
     expect(await status(ctx.authed, 'GET', docs('claim-private'))).toBe(200);
 
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
     expect(await claimIds(m.viewer.request)).toEqual(['claim-shared']);
     expect(await status(m.viewer.request, 'GET', docs('claim-shared'))).toBe(200);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
     expect(await claimIds(m.coOwner.request)).toEqual([]);
     expect(await status(m.coOwner.request, 'GET', docs('claim-shared'))).toBe(403);
   });

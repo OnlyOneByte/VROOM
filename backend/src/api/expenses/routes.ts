@@ -346,7 +346,10 @@ const fromSplitBody: ResourceOf = async (c) => {
 };
 
 const fromSplitGroup: ResourceOf = async (c) => {
-  const group = await repos().expenses.getSplitGroupAccessInfo(c.req.param('id') ?? '');
+  const group = await repos().expenses.getSplitGroupAccessInfo(
+    c.req.param('id') ?? '',
+    c.get('user').id
+  );
   if (!group) throw new NotFoundError('Split expense');
   const [only, ...others] = group.authors;
   const author = others.length === 0 ? (only ?? group.ownerId) : null;
@@ -471,7 +474,7 @@ routes.put(
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
 
-    const groupInfo = await repos().expenses.getSplitGroupAccessInfo(id);
+    const groupInfo = await repos().expenses.getSplitGroupAccessInfo(id, user.id);
     if (!groupInfo) throw new NotFoundError('Split expense');
     const existingConfig: SplitConfig = { method: 'even', vehicleIds: groupInfo.vehicleIds };
     await requireSplitWriteAccess(existingConfig, user.id);
@@ -538,7 +541,7 @@ routes.get(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const groupInfo = await repos().expenses.getSplitGroupAccessInfo(id);
+    const groupInfo = await repos().expenses.getSplitGroupAccessInfo(id, user.id);
     if (!groupInfo) throw new NotFoundError('Split expense');
     for (const vehicleId of groupInfo.vehicleIds) {
       const access = await requireVehicleAccess(vehicleId, user.id, 'read');
@@ -574,7 +577,7 @@ routes.delete(
     const user = c.get('user');
     const { id } = c.req.valid('param');
 
-    const groupInfo = await repos().expenses.getSplitGroupAccessInfo(id);
+    const groupInfo = await repos().expenses.getSplitGroupAccessInfo(id, user.id);
     if (!groupInfo) throw new NotFoundError('Split expense');
     const { writesFinancials: mayTouch } = await requireSplitWriteAccess(
       { method: 'even', vehicleIds: groupInfo.vehicleIds },

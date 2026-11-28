@@ -21,7 +21,7 @@ interface TermExpenseParams {
   startDate: Date;
   monthlyCost?: number | null;
   endDate?: Date | null;
-  policyNumber?: string;
+  carrier?: string;
   userId: string;
 }
 
@@ -112,8 +112,8 @@ export function assertTermPremiumWithinCap(
 }
 
 function createPremiumExpenses(params: TermExpenseParams, totalCost: number) {
-  const { termId, vehicleIds, startDate, policyNumber, userId } = params;
-  const description = policyNumber ? `Insurance premium — ${policyNumber}` : 'Insurance premium';
+  const { termId, vehicleIds, startDate, carrier, userId } = params;
+  const description = carrier ? `Insurance premium, ${carrier}` : 'Insurance premium';
   return repos().expenses.createSplitExpense(
     {
       splitConfig: { method: 'even', vehicleIds },

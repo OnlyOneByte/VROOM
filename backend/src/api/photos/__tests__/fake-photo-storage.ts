@@ -9,10 +9,10 @@ export interface FakePhotoStorage {
   restore: () => void;
 }
 
-export function installFakePhotoStorage(ctx: TestApp): FakePhotoStorage {
+export async function installFakePhotoStorage(ctx: TestApp): Promise<FakePhotoStorage> {
   const provider = new FakeStorageProvider();
 
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
      VALUES (?, ?, 'storage', 'fake', 'Fake storage', 'unused', 'active')`,
     [FAKE_PROVIDER_ID, ctx.user.id]
@@ -23,8 +23,8 @@ export function installFakePhotoStorage(ctx: TestApp): FakePhotoStorage {
     insurance_docs: FAKE_PROVIDER_ID,
     odometer_readings: FAKE_PROVIDER_ID,
   };
-  ctx.sqlite.run(
-    'INSERT OR REPLACE INTO user_preferences (user_id, storage_config) VALUES (?, ?)',
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, storage_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET storage_config = excluded.storage_config',
     [ctx.user.id, JSON.stringify({ defaults, providerCategories: {} })]
   );
 

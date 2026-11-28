@@ -13,37 +13,37 @@ const OTHER_USER = 'other-owner';
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO users (id, email, display_name) VALUES ('${OTHER_USER}', 'other@test.com', 'Other Owner')`
   );
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedVehicle(id: string, userId: string): void {
-  ctx.sqlite.run(
+async function seedVehicle(id: string, userId: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Toyota', 'Camry', 2022)`,
     [id, userId]
   );
 }
 
-function seedExpense(id: string, vehicleId: string, userId: string): void {
-  ctx.sqlite.run(
+async function seedExpense(id: string, vehicleId: string, userId: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
      VALUES (?, ?, ?, 'maintenance', 1700000000, 100.0)`,
     [id, vehicleId, userId]
   );
 }
 
-function seedOdometerEntry(id: string, vehicleId: string, userId: string): void {
-  ctx.sqlite.run(
+async function seedOdometerEntry(id: string, vehicleId: string, userId: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at)
      VALUES (?, ?, ?, 50000, 1700000000)`,
     [id, vehicleId, userId]
   );
 }
 
-function seedPolicy(id: string, userId: string): void {
-  ctx.sqlite.run(
+async function seedPolicy(id: string, userId: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO insurance_policies (id, user_id, company) VALUES (?, ?, 'Acme Mutual')`,
     [id, userId]
   );
@@ -55,24 +55,24 @@ async function getPhotos(entityType: string, entityId: string): Promise<Response
 
 const cases: Array<{
   entityType: string;
-  seed: (id: string, userId: string) => void;
+  seed: (id: string, userId: string) => Promise<void>;
 }> = [
   { entityType: 'vehicle', seed: (id, userId) => seedVehicle(id, userId) },
   {
     entityType: 'expense',
-    seed: (id, userId) => {
+    seed: async (id, userId) => {
       const vehId = `veh-for-${id}`;
-      seedVehicle(vehId, userId);
-      seedExpense(id, vehId, userId);
+      await seedVehicle(vehId, userId);
+      await seedExpense(id, vehId, userId);
     },
   },
   { entityType: 'insurance_policy', seed: (id, userId) => seedPolicy(id, userId) },
   {
     entityType: 'odometer_entry',
-    seed: (id, userId) => {
+    seed: async (id, userId) => {
       const vehId = `veh-for-${id}`;
-      seedVehicle(vehId, userId);
-      seedOdometerEntry(id, vehId, userId);
+      await seedVehicle(vehId, userId);
+      await seedOdometerEntry(id, vehId, userId);
     },
   },
 ];
@@ -82,7 +82,7 @@ describe('photo-upload ownership gate (validateEntityOwnership) per entity type'
     describe(entityType, () => {
       test('own entity passes the gate (200, empty list)', async () => {
         const ownId = `${entityType}-own`;
-        seed(ownId, ctx.user.id);
+        await seed(ownId, ctx.user.id);
 
         const res = await getPhotos(entityType, ownId);
         expect(res.status, await res.clone().text()).toBe(200);
@@ -93,7 +93,7 @@ describe('photo-upload ownership gate (validateEntityOwnership) per entity type'
 
       test("another user's entity is rejected (404, no existence leak)", async () => {
         const foreignId = `${entityType}-foreign`;
-        seed(foreignId, OTHER_USER);
+        await seed(foreignId, OTHER_USER);
 
         const res = await getPhotos(entityType, foreignId);
         expect(res.status).toBe(404);

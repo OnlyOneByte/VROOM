@@ -31,18 +31,20 @@ describe('accepting a share sets the built-in role from its level', () => {
 
     await invitee.acceptShare(vehicleId, 'viewer');
 
-    const roles = ctx.sqlite
-      .query('SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id = ?')
-      .all(invitee.id, vehicleId);
+    const roles = await ctx.sql.all(
+      'SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id = ?',
+      [invitee.id, vehicleId]
+    );
     expect(roles).toEqual([{ role_id: builtInRoleId('viewer') }]);
   });
 });
 
 describe('share transitions read the share inside their transaction', () => {
-  function vehicleRoles(userId: string, vehicleId: string): unknown[] {
-    return ctx.sqlite
-      .query('SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id = ?')
-      .all(userId, vehicleId);
+  async function vehicleRoles(userId: string, vehicleId: string): Promise<unknown[]> {
+    return await ctx.sql.all(
+      'SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id = ?',
+      [userId, vehicleId]
+    );
   }
 
   test('a racing accept and revoke always leave the status and roles in agreement', async () => {
@@ -61,10 +63,10 @@ describe('share transitions read the share inside their transaction', () => {
       ]);
       expect([200, 409]).toContain(accepted.status);
       expect([200, 409]).toContain(revoked.status);
-      const { status } = ctx.sqlite
-        .query('SELECT status FROM vehicle_shares WHERE id = ?')
-        .get(shareId) as { status: string };
-      const roles = vehicleRoles(invitee.id, vehicleId);
+      const { status } = (await ctx.sql.get('SELECT status FROM vehicle_shares WHERE id = ?', [
+        shareId,
+      ])) as { status: string };
+      const roles = await vehicleRoles(invitee.id, vehicleId);
       expect(roles).toEqual(status === 'accepted' ? [{ role_id: builtInRoleId('editor') }] : []);
     }
   });
@@ -72,7 +74,7 @@ describe('share transitions read the share inside their transaction', () => {
   test('a leftover override does not survive a new accept', async () => {
     const vehicleId = await seedVehicle(ctx);
     const invitee = await createInvitee(ctx, 'stale-override');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect) VALUES ('stale', ?, 'vehicle', ?, 'vehicle.financing.read', 'allow')",
       [invitee.id, vehicleId]
     );
@@ -80,9 +82,11 @@ describe('share transitions read the share inside their transaction', () => {
     await invitee.acceptShare(vehicleId, 'viewer');
 
     expect(
-      ctx.sqlite.query('SELECT id FROM permission_overrides WHERE user_id = ?').all(invitee.id)
+      await ctx.sql.all('SELECT id FROM permission_overrides WHERE user_id = ?', [invitee.id])
     ).toEqual([]);
-    expect(vehicleRoles(invitee.id, vehicleId)).toEqual([{ role_id: builtInRoleId('viewer') }]);
+    expect(await vehicleRoles(invitee.id, vehicleId)).toEqual([
+      { role_id: builtInRoleId('viewer') },
+    ]);
   });
 
   test('a transition on a share that changed underneath answers 409', async () => {

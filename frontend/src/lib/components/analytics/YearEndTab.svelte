@@ -64,6 +64,7 @@
 		const { start, end } = yearRange(year);
 		try {
 			isLoading = true;
+			error = null;
 			const [items, ...responses] = await Promise.all([
 				analyticsApi.queryItems({
 					start,
@@ -79,7 +80,6 @@
 			results = Object.fromEntries(
 				YEAR_QUERIES.map((key, i) => [key, responses[i] as AnalyticsQueryResponse])
 			) as Record<YearQuery, AnalyticsQueryResponse>;
-			error = null;
 		} catch (e) {
 			if (current !== request) return;
 			error = userFacingErrorMessage(e);
@@ -91,7 +91,6 @@
 	function handleYearChange(value: string | undefined) {
 		if (!value) return;
 		selectedYear = Number.parseInt(value, 10);
-		error = null;
 	}
 
 	let carsKey = $derived(vehicleIds?.join(',') ?? '');
@@ -222,7 +221,11 @@
 				</div>
 			{/snippet}
 			{#snippet title()}No expenses in {selectedYear}{/snippet}
-			{#snippet description()}Pick another year, or log an expense to start this one.{/snippet}
+			{#snippet description()}
+				{vehicleIds
+					? `The cars you picked have no expenses in ${selectedYear}. Pick another year or other cars.`
+					: 'Pick another year, or log an expense to start this one.'}
+			{/snippet}
 		</EmptyState>
 	{:else if results}
 		<section aria-label="{selectedYear} in review" class="space-y-8">

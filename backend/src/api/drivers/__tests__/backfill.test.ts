@@ -30,7 +30,7 @@ const trip = (start: number, date: string) => ({
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'bf');
   await ctx.authed('POST', '/api/v1/trips', trip(1000, '2024-03-01'));
   await m.editor.request('POST', '/api/v1/trips', trip(1100, '2024-03-05'));
@@ -58,22 +58,22 @@ async function post<T>(path: string, body?: unknown, status = 200): Promise<T> {
   return (await json<DataEnvelope<T>>(res)).data;
 }
 
-const insuranceExpense = () =>
-  ctx.sqlite.run(
+const insuranceExpense = async () =>
+  await ctx.sql.run(
     "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, source_type) VALUES ('bf-ins', ?, ?, 'financial', ?, 90, 'insurance_term')",
     [CAR, ctx.user.id, Math.floor(Date.parse('2024-03-10') / 1000)]
   );
 
-const payerOf = (id: string) =>
+const payerOf = async (id: string) =>
   (
-    ctx.sqlite.query('SELECT paid_by_driver_id AS d FROM expenses WHERE id = ?').get(id) as {
+    (await ctx.sql.get('SELECT paid_by_driver_id AS d FROM expenses WHERE id = ?', [id])) as {
       d: string | null;
     }
   ).d;
 
-const tripDrivers = () =>
+const tripDrivers = async () =>
   (
-    ctx.sqlite.query('SELECT driver_id AS d FROM trips ORDER BY start_odometer').all() as {
+    (await ctx.sql.all('SELECT driver_id AS d FROM trips ORDER BY start_odometer')) as {
       d: string | null;
     }[]
   ).map((r) => r.d);
@@ -82,9 +82,9 @@ describe('applying a planned backfill', () => {
   test('re-checks car sharing and the drivers inside its transaction', async () => {
     const { applyBackfill, undoBackfill } = await import('../backfill');
     const { asyncDb } = (await import('../../../app-context')).appContext();
-    const tripId = (ctx.sqlite.query('SELECT id FROM trips LIMIT 1').get() as { id: string }).id;
-    seedCar(ctx, 'bf-other-car');
-    ctx.sqlite.run(
+    const tripId = ((await ctx.sql.get('SELECT id FROM trips LIMIT 1')) as { id: string }).id;
+    await seedCar(ctx, 'bf-other-car');
+    await ctx.sql.run(
       "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('bf-moved', 'bf-other-car', ?, 'maintenance', 1, 10)",
       [ctx.user.id]
     );
@@ -96,9 +96,9 @@ describe('applying a planned backfill', () => {
     ];
     const applied = await applyBackfill(asyncDb, CAR, 'logged', planned, ctx.user.id, false);
     expect(applied.entries.map((e) => e.id)).toEqual([tripId]);
-    expect(payerOf('bf-moved')).toBeNull();
+    expect(await payerOf('bf-moved')).toBeNull();
 
-    ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 0 WHERE id = ?', [CAR]);
+    await ctx.sql.run('UPDATE vehicles SET car_share_enabled = FALSE WHERE id = ?', [CAR]);
     await expect(
       applyBackfill(asyncDb, CAR, 'logged', planned, ctx.user.id, false)
     ).rejects.toThrow('Car sharing');
@@ -116,7 +116,7 @@ describe('backfilling past entries', () => {
     expect(preview.total).toBeGreaterThanOrEqual(3);
     expect(preview.expenses).toBe(1);
     expect(preview.byDriver.find((d) => d.driverId === editor)?.count).toBeGreaterThanOrEqual(2);
-    expect(tripDrivers()).toEqual([null, null]);
+    expect(await tripDrivers()).toEqual([null, null]);
 
     const applied = await post<Summary & { batchId: string }>(
       `${base}/backfill`,
@@ -124,7 +124,7 @@ describe('backfilling past entries', () => {
       201
     );
     expect(applied.total).toBe(preview.total);
-    expect(tripDrivers()).toEqual([owner, editor]);
+    expect(await tripDrivers()).toEqual([owner, editor]);
   });
 
   test('undo reverts the whole batch, but leaves entries someone has changed since', async () => {
@@ -134,20 +134,20 @@ describe('backfilling past entries', () => {
       201
     );
     const guest = await post<{ id: string }>(base, { name: 'Riley' }, 201);
-    ctx.sqlite.run('UPDATE trips SET driver_id = ? WHERE start_odometer = 1100', [guest.id]);
+    await ctx.sql.run('UPDATE trips SET driver_id = ? WHERE start_odometer = 1100', [guest.id]);
 
     const recent = await ctx.authed('GET', `${base}/backfill`);
     expect((await json<DataEnvelope<{ id: string }[]>>(recent)).data.map((b) => b.id)).toEqual([
       batchId,
     ]);
     await post(`${base}/backfill/${batchId}/undo`);
-    expect(tripDrivers()).toEqual([null, guest.id]);
+    expect(await tripDrivers()).toEqual([null, guest.id]);
     expect((await ctx.authed('POST', `${base}/backfill/${batchId}/undo`)).status).toBe(404);
   });
 
   test('a date range goes to one active driver, and only unattributed entries inside it change', async () => {
     const owner = await driverOf(ctx.user.id);
-    ctx.sqlite.run('UPDATE trips SET driver_id = ? WHERE start_odometer = 1000', [owner]);
+    await ctx.sql.run('UPDATE trips SET driver_id = ? WHERE start_odometer = 1000', [owner]);
     const guest = await post<{ id: string }>(base, { name: 'Riley' }, 201);
     const range = {
       mode: 'range',
@@ -159,21 +159,21 @@ describe('backfilling past entries', () => {
     expect(preview.expenses).toBe(0);
     expect(preview.trips).toBe(1);
     await post(`${base}/backfill`, range, 201);
-    expect(tripDrivers()).toEqual([owner, guest.id]);
+    expect(await tripDrivers()).toEqual([owner, guest.id]);
 
     await ctx.authed('PATCH', `${base}/${guest.id}`, { archived: true });
     expect((await ctx.authed('POST', `${base}/backfill/preview`, range)).status).toBe(400);
   });
 
   test('"who logged it" credits archived drivers and skips people who never drove the car', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, created_by) VALUES ('bf-stranger', ?, ?, 1200, 1250, 'personal', ?, ?)",
       [CAR, ctx.user.id, Math.floor(Date.parse('2024-03-09') / 1000), m.stranger.id]
     );
     const editor = await driverOf(m.editor.id);
-    ctx.sqlite.run('UPDATE vehicle_drivers SET archived_at = 1 WHERE id = ?', [editor]);
+    await ctx.sql.run('UPDATE vehicle_drivers SET archived_at = 1 WHERE id = ?', [editor]);
     await post(`${base}/backfill`, { mode: 'logged' }, 201);
-    expect(tripDrivers()).toEqual([await driverOf(ctx.user.id), editor, null]);
+    expect(await tripDrivers()).toEqual([await driverOf(ctx.user.id), editor, null]);
   });
 
   test('a fill-in that changes nothing saves no batch and creates nothing', async () => {
@@ -189,33 +189,33 @@ describe('backfilling past entries', () => {
   });
 
   test("an undo that skips expenses you can't read leaves the batch open for someone who can", async () => {
-    insuranceExpense();
+    await insuranceExpense();
     const { batchId } = await post<{ batchId: string }>(
       `${base}/backfill`,
       { mode: 'logged' },
       201
     );
-    expect(payerOf('bf-ins')).not.toBeNull();
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    expect(await payerOf('bf-ins')).not.toBeNull();
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
 
     const partial = await m.coOwner.request('POST', `${base}/backfill/${batchId}/undo`);
     expect(partial.status).toBe(200);
-    expect(payerOf('bf-ins')).not.toBeNull();
-    expect(tripDrivers()).toEqual([null, null]);
+    expect(await payerOf('bf-ins')).not.toBeNull();
+    expect(await tripDrivers()).toEqual([null, null]);
     const left = await json<DataEnvelope<{ id: string; total: number }[]>>(
       await ctx.authed('GET', `${base}/backfill`)
     );
     expect(left.data).toEqual([expect.objectContaining({ id: batchId, total: 1 })]);
 
     await post(`${base}/backfill/${batchId}/undo`);
-    expect(payerOf('bf-ins')).toBeNull();
+    expect(await payerOf('bf-ins')).toBeNull();
     const after = await json<DataEnvelope<unknown[]>>(await ctx.authed('GET', `${base}/backfill`));
     expect(after.data).toHaveLength(0);
   });
 
   test("skips expenses the manager can't read", async () => {
-    insuranceExpense();
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    await insuranceExpense();
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
     const range = {
       mode: 'range',
       driverId: await driverOf(ctx.user.id),
@@ -227,7 +227,7 @@ describe('backfilling past entries', () => {
     expect((await asCoOwner(`${base}/backfill/preview`)).expenses).toBe(1);
     expect((await post<Summary>(`${base}/backfill/preview`, range)).expenses).toBe(2);
     await asCoOwner(`${base}/backfill`);
-    expect(payerOf('bf-ins')).toBeNull();
+    expect(await payerOf('bf-ins')).toBeNull();
   });
 
   test('stays within the car and only works while car sharing is on', async () => {
@@ -236,7 +236,7 @@ describe('backfilling past entries', () => {
       { mode: 'logged' },
       201
     );
-    seedCar(ctx, 'bf-other');
+    await seedCar(ctx, 'bf-other');
     const other = '/api/v1/vehicles/bf-other/drivers';
     await ctx.authed('PUT', '/api/v1/vehicles/bf-other/car-share', { enabled: true });
     expect((await ctx.authed('POST', `${other}/backfill/${batchId}/undo`)).status).toBe(404);

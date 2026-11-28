@@ -19,12 +19,12 @@ const JUNE = 1717200000;
 const RUNNING = 'srv-running';
 const RESTRICTED = 'srv-restricted';
 
-function reminder(id: string, category: string): void {
-  ctx.sqlite.run(
+async function reminder(id: string, category: string): Promise<void> {
+  await ctx.sql.run(
     "INSERT INTO reminders (id, user_id, name, type, frequency, start_date, next_due_date, expense_category, expense_amount) VALUES (?, ?, ?, 'expense', 'monthly', ?, ?, ?, 5000)",
     [id, ctx.user.id, `Reminder ${id}`, JUNE, JUNE + 86_400 * 30, category]
   );
-  ctx.sqlite.run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [
+  await ctx.sql.run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [
     id,
     CAR,
   ]);
@@ -32,13 +32,13 @@ function reminder(id: string, category: string): void {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
-  reminder(RUNNING, 'maintenance');
-  reminder(RESTRICTED, 'financial');
+  await seedCar(ctx, CAR);
+  await reminder(RUNNING, 'maintenance');
+  await reminder(RESTRICTED, 'financial');
   viewer = await createInvitee(ctx, 'srv-viewer');
   editor = await createInvitee(ctx, 'srv-editor');
-  shareCar(ctx, CAR, viewer, 'viewer');
-  shareCar(ctx, CAR, editor, 'editor');
+  await shareCar(ctx, CAR, viewer, 'viewer');
+  await shareCar(ctx, CAR, editor, 'editor');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -56,8 +56,8 @@ describe('reminders of a shared car follow the share settings', () => {
   });
 
   test('a viewer with that access sees every reminder', async () => {
-    overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
     expect(await listed(viewer.request)).toEqual([RESTRICTED, RUNNING].sort());
   });
 
@@ -70,11 +70,11 @@ describe('reminders of a shared car follow the share settings', () => {
     expect(put.status).toBe(404);
     const serviced = await editor.request('POST', `/api/v1/reminders/${RESTRICTED}/mark-serviced`);
     expect(serviced.status).toBe(404);
-    ctx.sqlite.run('UPDATE reminders SET created_by = ? WHERE id = ?', [editor.id, RESTRICTED]);
+    await ctx.sql.run('UPDATE reminders SET created_by = ? WHERE id = ?', [editor.id, RESTRICTED]);
     const removed = await editor.request('DELETE', `/api/v1/reminders/${RESTRICTED}`);
     expect(removed.status).toBe(404);
 
-    const row = ctx.sqlite.query('SELECT name FROM reminders WHERE id = ?').get(RESTRICTED) as {
+    const row = (await ctx.sql.get('SELECT name FROM reminders WHERE id = ?', [RESTRICTED])) as {
       name: string;
     } | null;
     expect(row?.name).toBe(`Reminder ${RESTRICTED}`);
@@ -88,9 +88,10 @@ describe('reminders of a shared car follow the share settings', () => {
       expenseCategory: 'financial',
     });
     expect(moved.status).toBe(404);
-    const row = ctx.sqlite
-      .query('SELECT expense_category AS category FROM reminders WHERE id = ?')
-      .get(RUNNING) as { category: string };
+    const row = (await ctx.sql.get(
+      'SELECT expense_category AS category FROM reminders WHERE id = ?',
+      [RUNNING]
+    )) as { category: string };
     expect(row.category).toBe('maintenance');
 
     const created = await editor.request('POST', '/api/v1/reminders', {
@@ -107,20 +108,24 @@ describe('reminders of a shared car follow the share settings', () => {
 
   test('a reminder on two shared cars stays hidden until the viewer has access on both', async () => {
     const SECOND = 'srv-second';
-    seedCar(ctx, SECOND);
-    shareCar(ctx, SECOND, viewer, 'viewer');
-    ctx.sqlite.run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [
+    await seedCar(ctx, SECOND);
+    await shareCar(ctx, SECOND, viewer, 'viewer');
+    await ctx.sql.run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [
       RESTRICTED,
       SECOND,
     ]);
-    overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
     expect(await listed(viewer.request)).toEqual([RUNNING]);
   });
 });
 
 describe('more expense views of a shared car follow the share settings', () => {
-  function expense(id: string, category: string, extra: Record<string, unknown> = {}): void {
+  async function expense(
+    id: string,
+    category: string,
+    extra: Record<string, unknown> = {}
+  ): Promise<void> {
     const columns = [
       'id',
       'vehicle_id',
@@ -143,7 +148,7 @@ describe('more expense views of a shared car follow the share settings', () => {
       12000,
       ...Object.values(extra),
     ];
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO expenses (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
       values as never[]
     );
@@ -151,15 +156,15 @@ describe('more expense views of a shared car follow the share settings', () => {
 
   test('a split group the share hides cannot be opened', async () => {
     const split = { group_id: 'srv-group', group_total: 8000, split_method: 'even' };
-    expense('srv-leg-a', 'financial', split);
-    expense('srv-leg-b', 'financial', split);
+    await expense('srv-leg-a', 'financial', split);
+    await expense('srv-leg-b', 'financial', split);
     expect((await viewer.request('GET', '/api/v1/expenses/split/srv-group')).status).toBe(404);
     expect((await ctx.authed('GET', '/api/v1/expenses/split/srv-group')).status).toBe(200);
   });
 
   test('a photo of a hidden expense is refused before the photo is looked up', async () => {
-    expense('srv-hidden', 'financial');
-    expense('srv-shown', 'maintenance');
+    await expense('srv-hidden', 'financial');
+    await expense('srv-shown', 'maintenance');
     const hidden = await viewer.request(
       'GET',
       '/api/v1/photos/expense/srv-hidden/no-photo/thumbnail'
@@ -174,8 +179,8 @@ describe('more expense views of a shared car follow the share settings', () => {
   });
 
   test('odometer history leaves out readings from hidden expenses', async () => {
-    expense('srv-hidden-mileage', 'financial');
-    expense('srv-shown-mileage', 'maintenance');
+    await expense('srv-hidden-mileage', 'financial');
+    await expense('srv-shown-mileage', 'maintenance');
     const res = await viewer.request('GET', `/api/v1/odometer/${CAR}/history`);
     expect(res.status).toBe(200);
     const text = await res.text();

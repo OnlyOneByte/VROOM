@@ -329,7 +329,7 @@ export class AnalyticsInsightsRepository {
     );
     const car = ctx.cars.find((c) => c.id === largest?.vehicle_id);
     const what = largest
-      ? ` The largest expense was ${largest.description || largest.category}${car && ctx.cars.length > 1 ? ` on the ${car.name}` : ''} (${ctx.money(largest.amount)}).`
+      ? ` The largest expense was ${largest.description ? `“${largest.description}”` : largest.category}${car && ctx.cars.length > 1 ? ` on the ${car.name}` : ''} (${ctx.money(largest.amount)}).`
       : '';
     return {
       id: 'recordMonth',

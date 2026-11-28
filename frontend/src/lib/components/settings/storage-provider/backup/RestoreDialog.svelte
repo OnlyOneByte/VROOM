@@ -4,7 +4,7 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
+	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as RadioGroup from '#lib/components/ui/radio-group/index.ts';
 	import {
@@ -14,8 +14,7 @@
 		Cloud,
 		Database,
 		ChevronDown,
-		CircleAlert,
-		TriangleAlert
+		CircleAlert
 	} from '@lucide/svelte';
 	import {
 		Collapsible,
@@ -23,7 +22,7 @@
 		CollapsibleTrigger
 	} from '#lib/components/ui/collapsible/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
-	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import ProviderPicker from './RestoreProviderPicker.svelte';
 	import type { RestoreResult, RestoreProviderInfo, BackupFileInfo } from '#lib/types/index.ts';
 
@@ -64,8 +63,9 @@
 
 	let restorePreview = $state<Record<string, number> | null>(null);
 	let skippedPhotos = $state(0);
-	let restoreConflicts = $state<Array<{ table: string; id: string }>>([]);
-	let restoreMode = $state<'replace' | 'merge'>('replace');
+	let mergePreview = $state<RestoreResult['merge'] | null>(null);
+	let mergeInstead = $state(false);
+	let restoreMode = $state<'replace' | 'merge'>('merge');
 	let isProcessing = $state(false);
 	let error = $state<string | null>(null);
 
@@ -83,8 +83,9 @@
 		selectedFile = null;
 		restorePreview = null;
 		skippedPhotos = 0;
-		restoreConflicts = [];
-		restoreMode = 'replace';
+		mergePreview = null;
+		mergeInstead = false;
+		restoreMode = 'merge';
 		isProcessing = false;
 		error = null;
 	}
@@ -141,7 +142,7 @@
 				});
 				restorePreview = result.preview ?? null;
 				skippedPhotos = result.skipped?.photos ?? 0;
-				restoreConflicts = result.conflicts ?? [];
+				mergePreview = result.merge ?? null;
 				step = 3;
 			} catch (err) {
 				error = `Couldn't preview the Sheets data. ${userFacingErrorMessage(err)}`;
@@ -168,7 +169,7 @@
 			});
 			restorePreview = result.preview ?? null;
 			skippedPhotos = result.skipped?.photos ?? 0;
-			restoreConflicts = result.conflicts ?? [];
+			mergePreview = result.merge ?? null;
 			step = 3;
 		} catch (err) {
 			error = `Couldn't preview the backup. ${userFacingErrorMessage(err)}`;
@@ -188,7 +189,7 @@
 			const result = await settingsStore.uploadBackup(file, 'preview');
 			restorePreview = result.preview ?? null;
 			skippedPhotos = result.skipped?.photos ?? 0;
-			restoreConflicts = result.conflicts ?? [];
+			mergePreview = result.merge ?? null;
 			step = 3;
 		} catch (err) {
 			error = `Couldn't preview the file. ${userFacingErrorMessage(err)}`;
@@ -200,6 +201,7 @@
 	async function handleRestore() {
 		isProcessing = true;
 		error = null;
+		mergeInstead = false;
 		try {
 			let result: RestoreResult;
 			if (flowType === 'file' && selectedFile) {
@@ -233,18 +235,29 @@
 			open = false;
 		} catch (err) {
 			error = `Couldn't restore. ${userFacingErrorMessage(err)}`;
+			mergeInstead = restoreMode === 'replace' && err instanceof ApiError && err.statusCode === 409;
 			if (selectedSourceType === 'sheets') void settingsStore.load();
 		} finally {
 			isProcessing = false;
 		}
 	}
 
+	function mergeInsteadOfReplace() {
+		restoreMode = 'merge';
+		void handleRestore();
+	}
+
+	const total = (counts: Record<string, number> | undefined) =>
+		Object.values(counts ?? {}).reduce((sum, count) => sum + count, 0);
+	const records = (count: number) => (count === 1 ? '1 record' : `${count} records`);
+
 	function handleBack() {
 		error = null;
+		mergeInstead = false;
 		if (step === 3) {
 			restorePreview = null;
 			skippedPhotos = 0;
-			restoreConflicts = [];
+			mergePreview = null;
 			if (flowType === 'provider' && selectedSourceType === 'zip') {
 				selectedBackup = null;
 				providerSubStep = 'pick-file';
@@ -319,7 +332,20 @@
 			{#if error}
 				<Alert variant="destructive" role="alert">
 					<CircleAlert aria-hidden="true" />
-					<AlertDescription>{error}</AlertDescription>
+					<AlertDescription>
+						<p>{error}</p>
+						{#if mergeInstead}
+							<Button
+								variant="outline"
+								size="sm"
+								class="mt-2"
+								disabled={isProcessing}
+								onclick={mergeInsteadOfReplace}
+							>
+								Merge instead
+							</Button>
+						{/if}
+					</AlertDescription>
 				</Alert>
 			{/if}
 
@@ -443,7 +469,7 @@
 
 			{#if step === 3 && restorePreview}
 				<div class="rounded-lg border border-border bg-muted p-4">
-					<h4 class="mb-3 font-medium text-foreground">Import Summary</h4>
+					<h4 class="mb-3 font-medium text-foreground">In this backup</h4>
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Vehicles:</span><span
@@ -511,27 +537,28 @@
 					</Alert>
 				{/if}
 
-				{#if restoreConflicts.length > 0}
-					<Alert variant="warning" role="status">
-						<TriangleAlert aria-hidden="true" />
-						<AlertTitle>
-							{restoreConflicts.length === 1
-								? '1 conflict found'
-								: `${restoreConflicts.length} conflicts found`}
-						</AlertTitle>
-						<AlertDescription>
-							<ul class="mt-1 max-h-48 space-y-1 overflow-y-auto text-foreground">
-								{#each restoreConflicts as conflict, i (i)}
-									<li class="text-sm">{conflict.table} · ID {conflict.id}</li>
-								{/each}
-							</ul>
-						</AlertDescription>
-					</Alert>
-				{/if}
-
 				<div class="space-y-3">
 					<p id="restore-mode-label" class="font-medium">How to restore</p>
 					<RadioGroup.Root bind:value={restoreMode} aria-labelledby="restore-mode-label">
+						<div class="flex items-center gap-2">
+							<RadioGroup.Item value="merge" id="mode-merge" />
+							<Label for="mode-merge" class="cursor-pointer font-normal">
+								<div>
+									<div class="font-medium">Merge with what's here</div>
+									<div class="text-sm text-muted-foreground">
+										Keeps anything you added since the backup. Records already here stay as they
+										are.
+									</div>
+									{#if mergePreview}
+										<div class="text-sm text-foreground" data-testid="restore-merge-counts">
+											{total(mergePreview.imported) === 0
+												? 'Nothing new to add from this backup.'
+												: `${records(total(mergePreview.imported))} to add, ${total(mergePreview.kept)} already here or skipped.`}
+										</div>
+									{/if}
+								</div>
+							</Label>
+						</div>
 						<div class="flex items-center gap-2">
 							<RadioGroup.Item value="replace" id="mode-replace" />
 							<Label for="mode-replace" class="cursor-pointer font-normal">
@@ -540,15 +567,6 @@
 									<div class="text-sm text-muted-foreground">
 										Deletes what's here and brings in the backup
 									</div>
-								</div>
-							</Label>
-						</div>
-						<div class="flex items-center gap-2 opacity-50">
-							<RadioGroup.Item value="merge" id="mode-merge" disabled />
-							<Label for="mode-merge" class="cursor-not-allowed font-normal">
-								<div>
-									<div class="font-medium">Merge with what's here</div>
-									<div class="text-sm text-muted-foreground">Not available yet</div>
 								</div>
 							</Label>
 						</div>
@@ -566,9 +584,11 @@
 			<div class="flex-1"></div>
 			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
 			{#if step === 3 && restorePreview}
-				<Button disabled={isProcessing || restoreMode !== 'replace'} onclick={handleRestore}>
+				<Button disabled={isProcessing} onclick={handleRestore}>
 					{#if isProcessing}
 						<LoaderCircle class="animate-spin" aria-hidden="true" />Restoring…
+					{:else if restoreMode === 'merge'}
+						Merge
 					{:else}
 						Replace everything
 					{/if}

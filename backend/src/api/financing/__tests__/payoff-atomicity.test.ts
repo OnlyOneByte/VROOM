@@ -13,13 +13,13 @@ let ctx: TestApp;
 beforeEach(async () => {
   ctx = await createTestApp();
 }, SETUP_TIMEOUT_MS);
-afterEach(() => {
-  ctx.sqlite.run('DROP TRIGGER IF EXISTS test_block_expense_update');
+afterEach(async () => {
+  await ctx.sql.run('DROP TRIGGER IF EXISTS test_block_expense_update');
   ctx.close();
 });
 
-function blockExpenseUpdates(): void {
-  ctx.sqlite.run(
+async function blockExpenseUpdates(): Promise<void> {
+  await ctx.sql.run(
     `CREATE TRIGGER test_block_expense_update BEFORE UPDATE ON expenses
      BEGIN SELECT RAISE(ABORT, 'expense update blocked by test'); END`
   );
@@ -52,14 +52,14 @@ async function seedLoanWithPayment(): Promise<{ financingId: string; expenseId: 
   return { financingId: loan.data.id, expenseId: expense.data.id };
 }
 
-function financingRow(id: string): { is_active: number; end_date: number | null } {
-  return ctx.sqlite
-    .query('SELECT is_active, end_date FROM vehicle_financing WHERE id = ?')
-    .get(id) as { is_active: number; end_date: number | null };
+async function financingRow(id: string): Promise<{ is_active: number; end_date: number | null }> {
+  return (await ctx.sql.get('SELECT is_active, end_date FROM vehicle_financing WHERE id = ?', [
+    id,
+  ])) as { is_active: number; end_date: number | null };
 }
 
-function expenseSource(id: string): string | null {
-  const r = ctx.sqlite.query('SELECT source_id FROM expenses WHERE id = ?').get(id) as {
+async function expenseSource(id: string): Promise<string | null> {
+  const r = (await ctx.sql.get('SELECT source_id FROM expenses WHERE id = ?', [id])) as {
     source_id: string | null;
   };
   return r.source_id;
@@ -72,14 +72,14 @@ describe('financing payoff is atomic with detaching its payments', () => {
   ] as const) {
     test(`${method} fails and keeps the loan active when the payments cannot be detached`, async () => {
       const { financingId, expenseId } = await seedLoanWithPayment();
-      blockExpenseUpdates();
+      await blockExpenseUpdates();
 
       const res = await ctx.authed(method, `/api/v1/financing/${financingId}${suffix}`, {});
 
       expect(res.status).toBeGreaterThanOrEqual(500);
-      expect(financingRow(financingId).is_active).toBe(1);
-      expect(financingRow(financingId).end_date).toBeNull();
-      expect(expenseSource(expenseId)).toBe(financingId);
+      expect((await financingRow(financingId)).is_active).toBe(1);
+      expect((await financingRow(financingId)).end_date).toBeNull();
+      expect(await expenseSource(expenseId)).toBe(financingId);
     });
   }
 
@@ -89,7 +89,7 @@ describe('financing payoff is atomic with detaching its payments', () => {
     const res = await ctx.authed('PUT', `/api/v1/financing/${financingId}/payoff`, {});
 
     expect(res.status).toBe(200);
-    expect(financingRow(financingId).is_active).toBe(0);
-    expect(expenseSource(expenseId)).toBeNull();
+    expect((await financingRow(financingId)).is_active).toBe(0);
+    expect(await expenseSource(expenseId)).toBeNull();
   });
 });

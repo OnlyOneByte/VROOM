@@ -46,7 +46,7 @@ async function driverOf(userId: string): Promise<string> {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'ds');
   await ctx.authed('PUT', `/api/v1/vehicles/${CAR}/car-share`, { enabled: true });
   await ctx.authed('POST', `/api/v1/odometer/${CAR}`, { odometer: 1000, recordedAt: '2024-03-01' });
@@ -153,7 +153,7 @@ describe('per-driver figures', () => {
   });
 
   test('without expense.read there are no car-wide costs or fuel used', async () => {
-    overrideOn(ctx, CAR, m.editor, 'vehicle.expense.read', 'deny');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.expense.read', 'deny');
     const data = await read(m.editor.request);
     expect(data.runningCosts).toBeNull();
     expect(data.costPerDistance).toBeNull();
@@ -161,7 +161,7 @@ describe('per-driver figures', () => {
   });
 
   test('a read_own deny refuses the figures', async () => {
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.driver_stats.read_own', 'deny');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.driver_stats.read_own', 'deny');
     expect((await m.viewer.request('GET', stats)).status).toBe(403);
   });
 

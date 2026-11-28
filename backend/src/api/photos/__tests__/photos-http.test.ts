@@ -12,11 +12,11 @@ import {
 
 let ctx: TestApp;
 
-function seedPhoto(
-  sqlite: TestApp['sqlite'],
+async function seedPhoto(
+  sql: TestApp['sql'],
   opts: { id: string; userId: string; entityType: string; entityId: string; fileName?: string }
-): void {
-  sqlite.run(
+): Promise<void> {
+  await sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
      VALUES (?, ?, ?, ?, ?, 'image/jpeg', 1024)`,
     [opts.id, opts.userId, opts.entityType, opts.entityId, opts.fileName ?? `${opts.id}.jpg`]
@@ -39,19 +39,19 @@ describe('GET /api/v1/photos?entityType= (batch list)', () => {
   });
 
   test("groups the session user's vehicle photos by entityId", async () => {
-    seedPhoto(ctx.sqlite, {
+    await seedPhoto(ctx.sql, {
       id: 'p1',
       userId: ctx.user.id,
       entityType: 'vehicle',
       entityId: 'veh-1',
     });
-    seedPhoto(ctx.sqlite, {
+    await seedPhoto(ctx.sql, {
       id: 'p2',
       userId: ctx.user.id,
       entityType: 'vehicle',
       entityId: 'veh-1',
     });
-    seedPhoto(ctx.sqlite, {
+    await seedPhoto(ctx.sql, {
       id: 'p3',
       userId: ctx.user.id,
       entityType: 'vehicle',
@@ -68,16 +68,16 @@ describe('GET /api/v1/photos?entityType= (batch list)', () => {
   });
 
   test("never returns another user's photos", async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@test.com', 'Other')`
     );
-    seedPhoto(ctx.sqlite, {
+    await seedPhoto(ctx.sql, {
       id: 'mine',
       userId: ctx.user.id,
       entityType: 'vehicle',
       entityId: 'veh-mine',
     });
-    seedPhoto(ctx.sqlite, {
+    await seedPhoto(ctx.sql, {
       id: 'theirs',
       userId: 'other-user',
       entityType: 'vehicle',
@@ -93,13 +93,13 @@ describe('GET /api/v1/photos?entityType= (batch list)', () => {
   });
 
   test('filters by entity type — expense photos excluded from a vehicle batch', async () => {
-    seedPhoto(ctx.sqlite, {
+    await seedPhoto(ctx.sql, {
       id: 'veh',
       userId: ctx.user.id,
       entityType: 'vehicle',
       entityId: 'veh-1',
     });
-    seedPhoto(ctx.sqlite, {
+    await seedPhoto(ctx.sql, {
       id: 'exp',
       userId: ctx.user.id,
       entityType: 'expense',

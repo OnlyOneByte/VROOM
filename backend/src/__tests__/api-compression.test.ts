@@ -64,8 +64,8 @@ describe('API response compression', () => {
   describe('photo thumbnails', () => {
     let storage: FakePhotoStorage;
 
-    beforeEach(() => {
-      storage = installFakePhotoStorage(ctx);
+    beforeEach(async () => {
+      storage = await installFakePhotoStorage(ctx);
     });
 
     afterEach(() => storage.restore());

@@ -92,9 +92,9 @@ async function sharedGarage(): Promise<Garage> {
       date: '2024-03-01T00:00:00.000Z',
     })
   );
-  const premium = ctx.sqlite
-    .query("SELECT group_id FROM expenses WHERE source_type = 'insurance_term'")
-    .get() as { group_id: string };
+  const premium = (await ctx.sql.get(
+    "SELECT group_id FROM expenses WHERE source_type = 'insurance_term'"
+  )) as { group_id: string };
   await editor.acceptShare(vehicleId, 'editor');
   await viewer.acceptShare(vehicleId, 'viewer');
   return {
@@ -289,9 +289,9 @@ describe('shared analytics and insurance', () => {
 });
 
 describe('shared expense writes linked to a loan or policy', () => {
-  function storedAmount(id: string): number | undefined {
+  async function storedAmount(id: string): Promise<number | undefined> {
     return (
-      ctx.sqlite.query('SELECT expense_amount FROM expenses WHERE id = ?').get(id) as {
+      (await ctx.sql.get('SELECT expense_amount FROM expenses WHERE id = ?', [id])) as {
         expense_amount: number;
       } | null
     )?.expense_amount;
@@ -335,11 +335,11 @@ describe('shared expense writes linked to a loan or policy', () => {
         'delete'
       );
     }
-    const linked = ctx.sqlite
-      .query("SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'financing'")
-      .get() as { n: number };
+    const linked = (await ctx.sql.get(
+      "SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'financing'"
+    )) as { n: number };
     expect(linked.n).toBe(1);
-    expect(storedAmount(loanPaymentId)).toBe(40000);
+    expect(await storedAmount(loanPaymentId)).toBe(40000);
 
     expect((await ctx.authed('POST', '/api/v1/expenses', payment)).status).toBe(201);
     expect(
@@ -357,19 +357,19 @@ describe('shared expense writes linked to a loan or policy', () => {
       sourceId: financingId,
     });
     expect(res.status).toBe(404);
-    const row = ctx.sqlite
-      .query('SELECT source_type FROM expenses WHERE id = ?')
-      .get(maintenanceId) as { source_type: string | null };
+    const row = (await ctx.sql.get('SELECT source_type FROM expenses WHERE id = ?', [
+      maintenanceId,
+    ])) as { source_type: string | null };
     expect(row.source_type).toBeNull();
   });
 
   test('only the owner can delete an insurance premium', async () => {
     const { premiumGroupId } = await sharedGarage();
-    const premiumRows = () =>
+    const premiumRows = async () =>
       (
-        ctx.sqlite
-          .query('SELECT COUNT(*) AS n FROM expenses WHERE group_id = ?')
-          .get(premiumGroupId) as { n: number }
+        (await ctx.sql.get('SELECT COUNT(*) AS n FROM expenses WHERE group_id = ?', [
+          premiumGroupId,
+        ])) as { n: number }
       ).n;
 
     for (const [who, request] of [...sharees(), ['stranger', stranger.request] as const]) {
@@ -379,12 +379,12 @@ describe('shared expense writes linked to a loan or policy', () => {
         'delete'
       );
     }
-    expect(premiumRows()).toBe(1);
+    expect(await premiumRows()).toBe(1);
 
     expect((await ctx.authed('DELETE', `/api/v1/expenses/split/${premiumGroupId}`)).status).toBe(
       200
     );
-    expect(premiumRows()).toBe(0);
+    expect(await premiumRows()).toBe(0);
   });
 });
 

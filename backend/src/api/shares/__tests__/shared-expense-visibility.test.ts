@@ -19,14 +19,14 @@ const RUNNING = 'sev-running';
 const MANUAL = 'sev-manual';
 const LINKED = 'sev-linked';
 
-function expense(
+async function expense(
   id: string,
   category: string,
   cents: number,
   description: string,
   sourceType: string | null = null
-): void {
-  ctx.sqlite.run(
+): Promise<void> {
+  await ctx.sql.run(
     'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, description, source_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [id, CAR, ctx.user.id, category, cents, JUNE, description, sourceType]
   );
@@ -34,12 +34,12 @@ function expense(
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
-  expense(RUNNING, 'maintenance', 8000, 'Oil change');
-  expense(MANUAL, 'financial', 5000, 'Paperwork fee');
-  expense(LINKED, 'financial', 40000, 'Loan payment', 'financing');
+  await seedCar(ctx, CAR);
+  await expense(RUNNING, 'maintenance', 8000, 'Oil change');
+  await expense(MANUAL, 'financial', 5000, 'Paperwork fee');
+  await expense(LINKED, 'financial', 40000, 'Loan payment', 'financing');
   viewer = await createInvitee(ctx, 'sev-viewer');
-  shareCar(ctx, CAR, viewer, 'viewer');
+  await shareCar(ctx, CAR, viewer, 'viewer');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -98,8 +98,8 @@ describe('expenses of a shared car follow the share settings everywhere', () => 
   });
 
   test('a viewer the owner lets see financials gets every row', async () => {
-    overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
 
     expect(await listedIds(viewer.request)).toEqual([LINKED, MANUAL, RUNNING].sort());
     const summary = await data<{ totalAmount: number }>(
@@ -129,15 +129,15 @@ describe('other views of a shared car follow the same settings', () => {
   });
 
   test("a reminder's expenses leave out what the share hides", async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO reminders (id, user_id, name, type, frequency, start_date, expense_category, expense_amount) VALUES ('sev-rem', ?, 'Monthly', 'expense', 'monthly', ?, 'financial', 5000)",
       [ctx.user.id, JUNE]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('sev-rem', ?)",
       [CAR]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "UPDATE expenses SET source_type = 'reminder', source_id = 'sev-rem' WHERE id = ?",
       [MANUAL]
     );
@@ -149,8 +149,8 @@ describe('other views of a shared car follow the same settings', () => {
 
   test('an editor without financial access cannot change or delete what they cannot see', async () => {
     const editor = await createInvitee(ctx, 'sev-editor');
-    shareCar(ctx, CAR, editor, 'editor');
-    ctx.sqlite.run('UPDATE expenses SET updated_at = ? WHERE id = ?', [JUNE, MANUAL]);
+    await shareCar(ctx, CAR, editor, 'editor');
+    await ctx.sql.run('UPDATE expenses SET updated_at = ? WHERE id = ?', [JUNE, MANUAL]);
 
     const put = await editor.request('PUT', `/api/v1/expenses/${MANUAL}`, {
       description: 'Changed',
@@ -160,7 +160,7 @@ describe('other views of a shared car follow the same settings', () => {
     expect(
       (await editor.request('DELETE', `/api/v1/expenses/${MANUAL}`)).status
     ).toBeGreaterThanOrEqual(400);
-    const row = ctx.sqlite.query('SELECT description FROM expenses WHERE id = ?').get(MANUAL) as {
+    const row = (await ctx.sql.get('SELECT description FROM expenses WHERE id = ?', [MANUAL])) as {
       description: string;
     } | null;
     expect(row?.description).toBe('Paperwork fee');

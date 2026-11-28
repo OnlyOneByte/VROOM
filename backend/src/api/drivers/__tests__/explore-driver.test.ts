@@ -17,7 +17,7 @@ interface Period {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'ex');
   await ctx.authed('PUT', `/api/v1/vehicles/${CAR}/car-share`, { enabled: true });
   const spend = (request: typeof ctx.authed, amount: number, date: string) =>
@@ -29,7 +29,7 @@ beforeEach(async () => {
     });
   await spend(ctx.authed, 60, '2024-03-02');
   await spend(m.editor.request, 40, '2024-03-03');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('unpaid', ?, ?, 'maintenance', ?, 1500)",
     [CAR, ctx.user.id, Date.parse('2024-03-04') / 1000]
   );
