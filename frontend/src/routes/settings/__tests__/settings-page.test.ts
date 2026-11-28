@@ -271,6 +271,16 @@ describe('Settings page loading', () => {
 		expect(account.queryByText(/@/)).toBeNull();
 	});
 
+	test('the page grid has a shrinkable column below lg, so a long storage summary truncates', async () => {
+		getProviders.mockResolvedValue([
+			{ id: 'p1', displayName: 'Family Drive for the whole household and the car club' }
+		] as UserProviderInfo[]);
+		await mount();
+		const grid = screen.getByRole('region', { name: 'Account' }).parentElement?.parentElement;
+		expect(grid?.className).toMatch(/(^|\s)grid(\s|$)/);
+		expect(grid?.className).toMatch(/(^|\s)grid-cols-1(\s|$)/);
+	});
+
 	test('Your data holds the import tool and the one Export button', async () => {
 		await mount();
 		const data = screen.getByRole('region', { name: 'Your data' });

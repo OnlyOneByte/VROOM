@@ -300,7 +300,7 @@
 			<Button onclick={retryLoad}>Retry</Button>
 		</div>
 	{:else}
-		<div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
+		<div class="grid grid-cols-1 gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
 			<div class="space-y-6">
 				<Card variant="section" role="region" aria-labelledby="storage-connected">
 					<CardHeader>

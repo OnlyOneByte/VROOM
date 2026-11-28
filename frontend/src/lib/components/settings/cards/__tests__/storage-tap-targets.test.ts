@@ -104,6 +104,17 @@ describe('Storage Providers controls are 40px tap targets on phones', () => {
 		expect(primaries.length).toBeLessThanOrEqual(1);
 	});
 
+	test('the page grid has a shrinkable column below lg, so a long account email truncates instead of widening the page', async () => {
+		providers.mockResolvedValue([DRIVE]);
+		render(StorageProvidersCard, { props: {} });
+
+		const email = await screen.findByText(/demo@example\.com/);
+		expect(email.className).toMatch(/(^|\s)truncate(\s|$)/);
+		const grid = screen.getByRole('region', { name: 'Connected' }).parentElement?.parentElement;
+		expect(grid?.className).toMatch(/(^|\s)grid(\s|$)/);
+		expect(grid?.className).toMatch(/(^|\s)grid-cols-1(\s|$)/);
+	});
+
 	test('Restore, without a phone flex-basis that overrides the height, and no duplicate ZIP export', async () => {
 		providers.mockResolvedValue([]);
 		render(StorageProvidersCard, { props: {} });

@@ -235,7 +235,7 @@
 		</div>
 	{:else}
 		<div class="space-y-6">
-			<div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
+			<div class="grid grid-cols-1 gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
 				<div class="space-y-6">
 					<ThemeCard />
 					<ThemePickerCard />
