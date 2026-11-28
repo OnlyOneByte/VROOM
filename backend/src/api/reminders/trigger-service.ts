@@ -504,7 +504,11 @@ class ReminderTriggerService {
     return result;
   }
 
-  async recheckMileageReminders(userId: string, vehicleId: string): Promise<TriggerResult> {
+  async recheckMileageReminders(
+    userId: string,
+    vehicleId: string,
+    timeZone?: string
+  ): Promise<TriggerResult> {
     const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
     let mileageReminders: ReminderWithVehicles[];
     try {
@@ -515,7 +519,8 @@ class ReminderTriggerService {
     }
     await this.processMileageReminders(
       mileageReminders.filter(({ vehicleIds }) => vehicleIds.includes(vehicleId)),
-      result
+      result,
+      timeZone
     );
     return result;
   }
