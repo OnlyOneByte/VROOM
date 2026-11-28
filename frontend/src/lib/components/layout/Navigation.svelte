@@ -35,6 +35,7 @@
 	import { countPendingSync } from '#lib/utils/sync/pending-expenses.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import Wordmark from '#lib/components/common/Wordmark.svelte';
+	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { Sheet, SheetContent, SheetHeader, SheetTitle } from '#lib/components/ui/sheet/index.ts';
 	import { cn } from '#lib/utils.ts';
 	import { handleErrorWithNotification } from '#lib/utils/error-handling.ts';
@@ -184,9 +185,12 @@
 				{:then { default: SyncStatusInline }}
 					<SyncStatusInline />
 				{:catch}
-					<p class="px-3 py-2 text-sm text-muted-foreground" role="alert">
-						Couldn't load sync status. Close this and try again.
-					</p>
+					<LoadErrorCard
+						compact
+						title="Couldn't load sync status"
+						message="Check your connection, then reload the page."
+						onRetry={() => location.reload()}
+					/>
 				{/await}
 			</DialogPrimitive.Content>
 		</DialogPrimitive.Root>
