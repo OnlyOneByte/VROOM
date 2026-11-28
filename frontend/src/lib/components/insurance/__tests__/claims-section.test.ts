@@ -436,6 +436,25 @@ describe('ClaimsSection editing a claim', () => {
 		expect(screen.queryByText('Edit claim')).toBeNull();
 	});
 
+	test('a set fault and car can be cleared back to Not specified', async () => {
+		getClaims.mockResolvedValue([claim({ faultDesignation: 'at_fault', vehicleId: 'v1' })]);
+		updateClaim.mockResolvedValue(claim());
+		mount({ vehicles: VEHICLES });
+		await settle();
+		await fireEvent.click(screen.getByRole('button', { name: 'Edit claim' }));
+
+		await pickOption('claim-fault-p1', 'Not specified');
+		await pickOption('claim-vehicle-p1', 'Not specified');
+		await fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+		await settle();
+
+		expect(updateClaim).toHaveBeenCalledWith(
+			'p1',
+			'c1',
+			expect.objectContaining({ faultDesignation: null, vehicleId: null })
+		);
+	});
+
 	test('editing a claim without optionals sends null for each one', async () => {
 		getClaims.mockResolvedValue([claim()]);
 		updateClaim.mockResolvedValue(claim());

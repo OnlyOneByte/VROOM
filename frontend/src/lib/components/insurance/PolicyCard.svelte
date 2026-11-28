@@ -89,6 +89,14 @@
 	}
 	let latestTerm = $derived(getLatestTerm(policy.terms));
 	let pastTerms = $derived(policy.terms.filter(t => t.id !== latestTerm?.id));
+	let latestTermVehicleNames = $derived.by(() => {
+		const covered = (policy.termVehicleCoverage ?? []).filter(tc => tc.termId === latestTerm?.id);
+		if (covered.length === 0 || vehicles.length === 0) return vehicleNames;
+		return covered.map(tc => {
+			const v = vehicles.find(vh => vh.id === tc.vehicleId);
+			return v ? v.nickname || `${v.year} ${v.make} ${v.model}` : tc.vehicleId;
+		});
+	});
 
 	function handleEditTerm(term: import('#lib/types/index.ts').InsuranceTerm) {
 		goto(resolve(paramRoutes.insuranceTermEdit, { id: policy.id, termId: term.id }));
@@ -156,10 +164,17 @@
 				<InsuranceTermCard
 					term={latestTerm}
 					isCurrent={true}
-					{vehicleNames}
+					vehicleNames={latestTermVehicleNames}
 					onEdit={readOnly ? undefined : handleEditTerm}
 					onDelete={readOnly || authStore.user?.demo === true ? undefined : handleDeleteTerm}
 				/>
+			</div>
+		{/if}
+
+		{#if policy.notes}
+			<div class="mt-3">
+				<p class="text-xs font-medium text-muted-foreground mb-1">Notes</p>
+				<p class="text-sm break-words whitespace-pre-line text-foreground">{policy.notes}</p>
 			</div>
 		{/if}
 
@@ -185,13 +200,6 @@
 
 		{#if expanded}
 			<div class="mt-2 space-y-4">
-				{#if policy.notes}
-					<div>
-						<p class="text-xs font-medium text-muted-foreground mb-1">Notes</p>
-						<p class="text-sm text-foreground">{policy.notes}</p>
-					</div>
-				{/if}
-
 				<TermHistory
 					terms={pastTerms}
 					policyId={policy.id}
