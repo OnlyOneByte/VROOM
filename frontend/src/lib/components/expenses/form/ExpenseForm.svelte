@@ -761,16 +761,16 @@
 				{/if}
 				<div class="space-y-2 empty:hidden {quickAdd ? '-mt-2 text-center' : ''}">
 					{#if !form.isEditMode}
-						<div
-							class="flex flex-wrap items-center gap-2 {quickAdd ? 'justify-center' : ''} {rowBreak
-								? 'max-sm:gap-y-0'
-								: ''}"
-						>
-							{#if !form.isSplit}
+						<div class="flex flex-wrap items-center gap-2 {quickAdd ? 'justify-center' : ''}">
+							{#if rowBreak}
+								<div
+									class="flex basis-full items-center justify-center gap-2 sm:contents"
+									data-testid="quick-vehicle-row"
+								>
+									{@render vehicleField(false)}
+								</div>
+							{:else if !form.isSplit}
 								{@render vehicleField(false)}
-								{#if rowBreak}
-									<span class="h-2 basis-full sm:hidden" aria-hidden="true"></span>
-								{/if}
 							{/if}
 							<Label for="date" class="sr-only">Date *</Label>
 							{@render dateField('h-10 w-auto rounded-full px-3.5')}
