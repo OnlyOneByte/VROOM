@@ -91,6 +91,28 @@ describe('ProviderInfoCard header', () => {
 		expect(screen.getByText(label)).toBeInTheDocument();
 	});
 
+	test.each([
+		['Connected', '2026-05-10T11:55:00.000Z'],
+		['Added', null]
+	] as const)(
+		'the %s and last-backup badges sit on their own line, outside the inline action row',
+		async (label, lastCheckedAt) => {
+			await mount({
+				provider: provider({ lastCheckedAt }),
+				lastBackupAt: '2026-05-10T00:00:00.000Z'
+			});
+			const actionRow = screen.getByRole('button', { name: 'Edit My Drive' }).parentElement
+				?.parentElement as HTMLElement;
+			const backup = screen.getByText('Last backup 12 hours ago');
+			const status = screen.getByText(label);
+			expect(actionRow).toHaveTextContent('My Drive');
+			expect(actionRow).not.toContainElement(backup);
+			expect(actionRow).not.toContainElement(status);
+			expect(backup.parentElement).toBe(status.parentElement);
+			expect(backup.parentElement?.className).toMatch(/(^|\s)flex-wrap(\s|$)/);
+		}
+	);
+
 	test('an active provider never checked reads Added, not Connected, next to not checked yet', async () => {
 		await mount({ provider: provider({ status: 'active', lastCheckedAt: null }) });
 		expect(screen.getByText('Added')).toBeInTheDocument();

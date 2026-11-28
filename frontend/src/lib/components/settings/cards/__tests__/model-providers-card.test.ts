@@ -196,6 +196,16 @@ describe('ModelProvidersCard', () => {
 		expect(screen.queryByText('No receipt-scanning provider connected')).toBeNull();
 	});
 
+	test.each([
+		['vlm', 'Add AI provider'],
+		['llm', 'Add AI assistant']
+	] as const)('%s: %s is an outline button, not a second primary', async (domain, name) => {
+		render(ModelProvidersCard, { props: { domain } });
+		const add = await screen.findByRole('button', { name });
+		expect(add.className).toMatch(/(^|\s)border-border-strong(\s|$)/);
+		expect(add.className).not.toMatch(/(^|\s)bg-primary(\s|$)/);
+	});
+
 	test('lists the providers returned for the domain', async () => {
 		getProviders.mockResolvedValue([provider('llm', 'Work Claude')]);
 		render(ModelProvidersCard, { props: { domain: 'llm' } });

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
-	import { DoorOpen, LoaderCircle, Lock } from '@lucide/svelte';
+	import { LoaderCircle, Lock } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -87,12 +87,9 @@
 	}
 </script>
 
-<Card id="who-can-join">
+<Card variant="section" id="who-can-join" role="region" aria-labelledby="who-can-join-title">
 	<CardHeader>
-		<div class="flex items-center gap-2">
-			<DoorOpen class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={2}>Who can join</CardTitle>
-		</div>
+		<CardTitle level={2} id="who-can-join-title" class="text-base">Who can join</CardTitle>
 		<CardDescription>The first account on a server is always its admin.</CardDescription>
 	</CardHeader>
 	<CardContent class="space-y-6">

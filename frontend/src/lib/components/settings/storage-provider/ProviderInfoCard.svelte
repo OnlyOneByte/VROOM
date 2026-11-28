@@ -149,7 +149,7 @@
 <div class="border-b py-3 last:border-b-0" data-slot="provider-tile">
 	<div>
 		<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
-		<div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+		<div class="flex min-w-0 items-center justify-between gap-2">
 			<div class="flex items-center gap-3 min-w-0">
 				<div
 					class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
@@ -158,17 +158,7 @@
 					<Icon class="size-5 text-foreground" />
 				</div>
 				<div class="min-w-0">
-					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-						<p class="min-w-0 font-medium break-words">{provider.displayName}</p>
-						<ProviderStatusBadge
-							status={provider.status}
-							lastCheckedAt={provider.lastCheckedAt}
-							lastErrorCode={provider.lastErrorCode}
-						/>
-						{#if lastBackupAt}
-							<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
-						{/if}
-					</div>
+					<p class="min-w-0 font-medium break-words">{provider.displayName}</p>
 					<p class="text-sm text-muted-foreground truncate">
 						{#if provider.config?.['accountEmail']}
 							{provider.config['accountEmail']} ·
@@ -177,7 +167,7 @@
 					</p>
 				</div>
 			</div>
-			<div class="flex shrink-0 items-center gap-2 self-end sm:gap-1 sm:self-auto">
+			<div class="flex shrink-0 items-center gap-2 sm:gap-1">
 				<Button
 					variant="ghost"
 					size="icon"
@@ -211,6 +201,16 @@
 					{/if}
 				</Button>
 			</div>
+		</div>
+		<div class="mt-2 flex flex-wrap items-center gap-2 pl-14" data-slot="provider-badges">
+			<ProviderStatusBadge
+				status={provider.status}
+				lastCheckedAt={provider.lastCheckedAt}
+				lastErrorCode={provider.lastErrorCode}
+			/>
+			{#if lastBackupAt}
+				<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
+			{/if}
 		</div>
 	</div>
 

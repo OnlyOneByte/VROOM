@@ -70,6 +70,9 @@ describe('Storage Providers controls are 40px tap targets on phones', () => {
 		const expand = screen.getByRole('button', { name: 'Expand storage details' });
 		for (const button of [edit, del, expand]) expect(button.className).toContain('size-10');
 		expect(edit.parentElement?.className).toMatch(/(^|\s)gap-2(\s|$)/);
+		expect(edit.parentElement?.className).not.toMatch(/self-end/);
+		expect(edit.parentElement?.parentElement?.className).not.toMatch(/(^|\s)flex-col(\s|$)/);
+		expect(edit.parentElement?.parentElement).toHaveTextContent('Family Drive');
 
 		await fireEvent.click(expand);
 		expectTouchHeight(await screen.findByRole('button', { name: /Sync all/ }));
@@ -86,6 +89,30 @@ describe('Storage Providers controls are 40px tap targets on phones', () => {
 		expectTouchHeight(addButtons[0] as HTMLElement);
 		expect(screen.queryByText(/No storage connected yet/)).toBeNull();
 		expectTouchHeight(screen.getByRole('button', { name: /Customize per photo type/ }));
+	});
+
+	test('Add storage is an outline button, so the view keeps one primary button', async () => {
+		providers.mockResolvedValue([DRIVE]);
+		render(StorageProvidersCard, { props: {} });
+
+		const add = await screen.findByRole('button', { name: 'Add storage' });
+		expect(add.className).toMatch(/(^|\s)border-border-strong(\s|$)/);
+		expect(add.className).not.toMatch(/(^|\s)bg-primary(\s|$)/);
+		const primaries = screen
+			.getAllByRole('button')
+			.filter(b => /(^|\s)bg-primary(\s|$)/.test(b.className));
+		expect(primaries.length).toBeLessThanOrEqual(1);
+	});
+
+	test('the page grid has a shrinkable column below lg, so a long account email truncates instead of widening the page', async () => {
+		providers.mockResolvedValue([DRIVE]);
+		render(StorageProvidersCard, { props: {} });
+
+		const email = await screen.findByText(/demo@example\.com/);
+		expect(email.className).toMatch(/(^|\s)truncate(\s|$)/);
+		const grid = screen.getByRole('region', { name: 'Connected' }).parentElement?.parentElement;
+		expect(grid?.className).toMatch(/(^|\s)grid(\s|$)/);
+		expect(grid?.className).toMatch(/(^|\s)grid-cols-1(\s|$)/);
 	});
 
 	test('Restore, without a phone flex-basis that overrides the height, and no duplicate ZIP export', async () => {

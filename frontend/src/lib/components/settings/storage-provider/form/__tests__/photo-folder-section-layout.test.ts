@@ -43,6 +43,28 @@ describe('PhotoFolderSection rows on phones', () => {
 	});
 });
 
+describe('PhotoFolderSection status note', () => {
+	test('"(some categories disabled)" wraps with its label, not back to the chevron', () => {
+		render(PhotoFolderSection, {
+			props: {
+				photoRootPath: 'photos',
+				categorySettings: {
+					...categorySettings,
+					odometer_readings: { enabled: false, folderPath: '/Odometer' }
+				},
+				providerRootPath: 'VROOM',
+				onUpdate: vi.fn()
+			}
+		});
+		const note = screen.getByText('(some categories disabled)');
+		const label = note.parentElement;
+		expect(label).toContainElement(screen.getByText('Category paths & sync settings'));
+		expect(label?.tagName).toBe('SPAN');
+		hasClass(note, 'whitespace-nowrap');
+		expect(note.closest('button')?.className).not.toMatch(/(^|\s)flex-wrap(\s|$)/);
+	});
+});
+
 describe('PhotoFolderSection accessible names', () => {
 	test('every checkbox is named by its visible label, and every path input names its category', async () => {
 		const onUpdate = vi.fn();

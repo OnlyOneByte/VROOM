@@ -313,7 +313,7 @@
 	<CardHeader>
 		<CardTitle level={2} id="{copy.anchor}-title" class="text-base">{copy.title}</CardTitle>
 		<CardAction>
-			<Button onclick={openCreate} data-testid="{domain}-add-provider">
+			<Button variant="outline" onclick={openCreate} data-testid="{domain}-add-provider">
 				<Plus aria-hidden="true" />
 				{copy.addLabel}
 			</Button>

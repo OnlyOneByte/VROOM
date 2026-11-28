@@ -91,17 +91,19 @@
 
 	<Collapsible.Root bind:open={advancedOpen}>
 		<Collapsible.Trigger
-			class="flex min-h-10 w-full flex-wrap items-center gap-x-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
+			class="flex min-h-10 w-full items-center gap-x-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
 		>
 			<ChevronDown
 				class="h-4 w-4 shrink-0 transition-transform duration-200 {advancedOpen
 					? 'rotate-180'
 					: ''}"
 			/>
-			<span>Category paths & sync settings</span>
-			{#if hasCustomPaths}
-				<span class="text-xs text-warning">(some categories disabled)</span>
-			{/if}
+			<span class="min-w-0">
+				<span>Category paths & sync settings</span>
+				{#if hasCustomPaths}
+					<span class="whitespace-nowrap text-xs text-warning">(some categories disabled)</span>
+				{/if}
+			</span>
 		</Collapsible.Trigger>
 		<Collapsible.Content class="pt-3">
 			<div class="space-y-2 rounded-lg border border-border p-3">

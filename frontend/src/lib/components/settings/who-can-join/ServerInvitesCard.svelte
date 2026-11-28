@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { LoaderCircle, Mail } from '@lucide/svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import { Badge, type BadgeVariant } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -119,12 +119,9 @@
 	}
 </script>
 
-<Card id="server-invites">
+<Card variant="section" id="server-invites" role="region" aria-labelledby="server-invites-title">
 	<CardHeader>
-		<div class="flex items-center gap-2">
-			<Mail class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={2}>Invites</CardTitle>
-		</div>
+		<CardTitle level={2} id="server-invites-title" class="text-base">Invites</CardTitle>
 		<CardDescription>
 			An invite lets one email sign up once, before it expires. Tell the person yourself: VROOM
 			doesn't send email.

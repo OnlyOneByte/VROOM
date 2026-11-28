@@ -271,6 +271,16 @@ describe('Settings page loading', () => {
 		expect(account.queryByText(/@/)).toBeNull();
 	});
 
+	test('the page grid has a shrinkable column below lg, so a long storage summary truncates', async () => {
+		getProviders.mockResolvedValue([
+			{ id: 'p1', displayName: 'Family Drive for the whole household and the car club' }
+		] as UserProviderInfo[]);
+		await mount();
+		const grid = screen.getByRole('region', { name: 'Account' }).parentElement?.parentElement;
+		expect(grid?.className).toMatch(/(^|\s)grid(\s|$)/);
+		expect(grid?.className).toMatch(/(^|\s)grid-cols-1(\s|$)/);
+	});
+
 	test('Your data holds the import tool and the one Export button', async () => {
 		await mount();
 		const data = screen.getByRole('region', { name: 'Your data' });
@@ -281,7 +291,7 @@ describe('Settings page loading', () => {
 	test('AI helpers links to its page, and the provider cards no longer sit on Settings', async () => {
 		await mount();
 		const ai = within(screen.getByRole('region', { name: 'AI helpers' }));
-		expect(ai.getByRole('link', { name: 'Manage AI helpers' })).toHaveAttribute(
+		expect(ai.getByRole('link', { name: /^Receipt scanning and the assistant/ })).toHaveAttribute(
 			'href',
 			'/settings/ai'
 		);
@@ -316,16 +326,33 @@ describe('Settings page loading', () => {
 		getProviders.mockResolvedValue(providers as UserProviderInfo[]);
 		await mount();
 		const storage = within(screen.getByRole('region', { name: 'Backups and storage' }));
-		expect(storage.getByRole('link', { name: 'Manage backups and storage' })).toHaveAttribute(
+		expect(storage.getByRole('link', { name: /^Storage you own/ })).toHaveAttribute(
 			'href',
 			'/settings/storage'
 		);
 		expect(screen.getByTestId('settings-storage-summary')).toHaveTextContent(summary);
 	});
 
+	test('Storage, AI and Server each open from a full row with a chevron, not a Manage link', async () => {
+		serverRules.mockResolvedValueOnce(
+			packRules([{ action: 'server.signup.manage', subject: 'all' }]) as PackedRules
+		);
+		await mount();
+		expect(screen.queryByRole('link', { name: /Manage/ })).toBeNull();
+		for (const id of ['settings-storage-link', 'settings-ai-link', 'settings-server-link']) {
+			const row = screen.getByTestId(id);
+			expect(row.tagName).toBe('A');
+			expect(row.className).toMatch(/(^|\s)flex(\s|$)/);
+			expect(row.className).toMatch(/(^|\s)justify-between(\s|$)/);
+			expect(row.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+			expect(row.className).toContain('focus-visible:ring-[3px]');
+			expect(row.className).toContain('focus-visible:ring-ring/50');
+		}
+	});
+
 	test('the section header links are 40px tap targets', async () => {
 		await mount();
-		for (const name of ['Profile', 'Manage backups and storage', 'Manage AI helpers']) {
+		for (const name of ['Profile']) {
 			expect(screen.getByRole('link', { name })).toHaveClass(
 				'inline-flex',
 				'min-h-10',
