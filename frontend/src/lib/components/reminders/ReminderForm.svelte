@@ -83,7 +83,9 @@
 		<Dialog.Header>
 			<Dialog.Title>{isEdit ? 'Edit reminder' : 'New reminder'}</Dialog.Title>
 			<Dialog.Description>
-				Get notified about recurring maintenance or events on your vehicles.
+				{isEdit
+					? 'Change what this reminder does and when it’s due.'
+					: 'Remind yourself about maintenance and renewals, or have a recurring cost added for you.'}
 			</Dialog.Description>
 		</Dialog.Header>
 

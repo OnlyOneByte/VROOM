@@ -107,6 +107,14 @@ describe('ExpensePhotoSection: loading', () => {
 		expect(button?.className).not.toMatch(/\b(?:sm|md):(?:h|w|size)-/);
 	});
 
+	test('the delete button over a photo has its own fill in both themes, since outline has none', async () => {
+		mocks.getPhotos.mockResolvedValue(page([photo('p1')]));
+		mount();
+		await screen.findByAltText('p1.jpg');
+		expect(deleteButtons()[0]).toHaveClass('bg-background');
+		expect(deleteButtons()[0]?.className).not.toMatch(/(^|\s)bg-transparent(\s|$)/);
+	});
+
 	test('a failed load notifies the user and falls back to the empty state', async () => {
 		mocks.getPhotos.mockRejectedValue(new Error('offline'));
 		mount();

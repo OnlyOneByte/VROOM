@@ -122,9 +122,18 @@ describe('ReminderRow status', () => {
 		expect(screen.getByText('In 1,700 km')).toHaveClass('text-muted-foreground');
 	});
 
-	test('while it is being marked serviced from the menu, the row says so', () => {
+	test('while it is being marked serviced from the menu, the row says so', async () => {
 		renderUpcoming(40360, 'mi', true);
 		expect(screen.getByRole('status')).toHaveTextContent('Marking serviced…');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'More actions for Oil change' }));
+		expect(await screen.findByRole('button', { name: 'Marking…' })).toBeDisabled();
+	});
+
+	test('the status region is already in the row before marking starts, so the change is announced', () => {
+		renderUpcoming(40360, 'mi');
+		expect(screen.getByRole('status').textContent).toBe('');
+		expect(screen.getByRole('status').className).not.toMatch(/(^|\s|:)hidden(\s|$)/);
 	});
 
 	test('with no reading yet it names the target reading', () => {
@@ -139,6 +148,27 @@ describe('ReminderRow status', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'More actions for Oil change' }));
 		await fireEvent.click(await screen.findByRole('button', { name: 'Mark serviced' }));
 		expect(handlers.onMarkServiced).toHaveBeenCalledTimes(1);
+	});
+
+	test('marking a due reminder is announced too, without repeating the button text on screen', () => {
+		render(ReminderRow, {
+			props: {
+				item: odometerOnly(43100),
+				group: 'due',
+				vehicleNames: new Map(),
+				servicing: true,
+				now: NOW,
+				onEdit: vi.fn(),
+				onDelete: vi.fn(),
+				onToggleActive: vi.fn(),
+				onMarkServiced: vi.fn(),
+				onViewExpenses: vi.fn()
+			}
+		});
+		const status = screen.getByRole('status');
+		expect(status).toHaveTextContent('Marking serviced…');
+		expect(status).toHaveClass('sr-only');
+		expect(screen.getByRole('button', { name: 'Marking…' })).toBeDisabled();
 	});
 
 	test('once due, Mark serviced is offered in the row', () => {

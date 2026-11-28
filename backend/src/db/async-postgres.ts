@@ -13,6 +13,7 @@ import {
   TransactionRolledBackError,
 } from './async-sqlite';
 import * as schema from './pg/schema';
+import { noteStatement } from './statement-count';
 
 type RowMode = 'array' | 'object';
 
@@ -163,6 +164,7 @@ export function openAsyncPostgres(connection: PgConnection) {
     if (scope && ended(scope)) throw lateQuery();
     if (scope?.root.aborted) throw new TransactionRolledBackError();
     if (!onConnection(scope)) return RETRY;
+    noteStatement();
     if (!scope) return connection.query(text, params, rowMode);
     return statement(scope, text, params, rowMode);
   }

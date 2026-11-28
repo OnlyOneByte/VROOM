@@ -3,6 +3,7 @@ import { NotFoundError } from '../../errors';
 import { authorize, vehicleParam } from '../../permissions/authorize';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas, zValidator } from '../../utils/validation';
+import { withoutOwnerIds } from '../drivers/attribution';
 import { parseUploadedPhoto, photoThumbnailResponse, withPhotoAuthor } from '../photos/helpers';
 import {
   deletePhotoForEntity,
@@ -27,7 +28,7 @@ photoRoutes.post('/', authorize(ofVehicle), async (c) => {
   const file = await parseUploadedPhoto(c);
 
   const photo = await uploadPhotoForEntity('vehicle', vehicleId, user.id, file);
-  return c.json({ success: true, data: photo }, 201);
+  return c.json({ success: true, data: withoutOwnerIds(c, photo) }, 201);
 });
 
 photoRoutes.get(
@@ -41,7 +42,8 @@ photoRoutes.get(
     const { limit, offset } = c.req.valid('query');
     const user = c.get('user');
     const result = await listPhotosForEntity('vehicle', vehicleId, user.id, { limit, offset });
-    return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
+    const rows = result.data.map((photo) => withoutOwnerIds(c, photo));
+    return c.json(buildPaginatedResponse(rows, result.totalCount, limit, offset));
   }
 );
 
@@ -84,7 +86,7 @@ photoRoutes.put('/:photoId/cover', authorize(ofVehicle), async (c) => {
 
   const user = c.get('user');
   const photo = await setCoverPhotoForEntity('vehicle', vehicleId, photoId, user.id);
-  return c.json({ success: true, data: photo });
+  return c.json({ success: true, data: withoutOwnerIds(c, photo) });
 });
 
 photoRoutes.delete('/:photoId', authorize(withPhotoAuthor(ofVehicle)), async (c) => {

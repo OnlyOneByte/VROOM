@@ -15,7 +15,12 @@ import {
 import { authorize, ownAccount } from '../../permissions/authorize';
 import type { BackupConfig, ProviderBackupSettings } from '../../types';
 import { readJsonBody } from '../../utils/request-body';
-import { OPERATION_TIMEOUTS, withDeadline, withTimeout } from '../../utils/timeout';
+import {
+  OPERATION_TIMEOUTS,
+  withDeadline,
+  withoutIdleTimeout,
+  withTimeout,
+} from '../../utils/timeout';
 import { zValidator } from '../../utils/validation';
 import { activityTracker } from './activity-tracker';
 import { backupService } from './backup';
@@ -122,7 +127,9 @@ routes.post(
     const force = body?.force === true;
     const providerIds = await validateProviderIds(userId, body?.providerIds);
 
-    const result = await backupOrchestrator.execute(userId, user.displayName, force, providerIds);
+    const result = await withoutIdleTimeout(c, () =>
+      backupOrchestrator.execute(userId, user.displayName, force, providerIds)
+    );
 
     if (result.status === 'in_progress') {
       return c.json(
@@ -230,10 +237,8 @@ routes.get('/backups/providers', authorize(ownAccount), async (c) => {
 
 routes.get('/backups/download', backupRateLimiter, authorize(ownAccount), async (c) => {
   const user = c.get('user');
-  const zipBuffer = await withTimeout(
-    backupService.exportAsZip(user.id),
-    OPERATION_TIMEOUTS.BACKUP,
-    'Backup export'
+  const zipBuffer = await withoutIdleTimeout(c, () =>
+    withTimeout(backupService.exportAsZip(user.id), OPERATION_TIMEOUTS.BACKUP, 'Backup export')
   );
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   return new Response(zipBuffer, {
@@ -272,25 +277,25 @@ routes.post(
       throw new ValidationError('Provider not found or inactive');
     }
 
-    let result: RestoreResponse;
-    if (body.sourceType === 'zip') {
-      const zipBuffer = await withTimeout(
-        backupService.downloadBackup(user.id, body.providerId, body.fileRef),
-        OPERATION_TIMEOUTS.RESTORE,
-        'Download backup from provider'
-      );
-      result = await withDeadline(
-        (signal) => restoreService.restoreFromBackup(user.id, zipBuffer, body.mode, signal),
-        OPERATION_TIMEOUTS.RESTORE,
-        'Restore from provider backup'
-      );
-    } else {
-      result = await withDeadline(
+    const result = await withoutIdleTimeout(c, async (): Promise<RestoreResponse> => {
+      if (body.sourceType === 'zip') {
+        const zipBuffer = await withTimeout(
+          backupService.downloadBackup(user.id, body.providerId, body.fileRef),
+          OPERATION_TIMEOUTS.RESTORE,
+          'Download backup from provider'
+        );
+        return withDeadline(
+          (signal) => restoreService.restoreFromBackup(user.id, zipBuffer, body.mode, signal),
+          OPERATION_TIMEOUTS.RESTORE,
+          'Restore from provider backup'
+        );
+      }
+      return withDeadline(
         (signal) => restoreService.restoreFromSheets(user.id, body.providerId, body.mode, signal),
         OPERATION_TIMEOUTS.RESTORE,
         'Restore from provider sheets'
       );
-    }
+    });
 
     return c.json(createSuccessResponse(result, 'Restore operation completed'));
   }
@@ -329,16 +334,18 @@ routes.post(
       throw new ValidationError(sizeValidation.errors[0]);
     }
 
-    const result = await withDeadline(
-      (signal) =>
-        restoreService.restoreFromBackup(
-          user.id,
-          fileBuffer,
-          mode as 'preview' | 'merge' | 'replace',
-          signal
-        ),
-      OPERATION_TIMEOUTS.RESTORE,
-      'Restore from backup'
+    const result = await withoutIdleTimeout(c, () =>
+      withDeadline(
+        (signal) =>
+          restoreService.restoreFromBackup(
+            user.id,
+            fileBuffer,
+            mode as 'preview' | 'merge' | 'replace',
+            signal
+          ),
+        OPERATION_TIMEOUTS.RESTORE,
+        'Restore from backup'
+      )
     );
     return c.json(createSuccessResponse(result, 'Restore operation completed'));
   }

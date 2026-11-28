@@ -48,11 +48,11 @@
 		</Button>
 		<Button
 			type="button"
-			variant="link"
+			variant="outline"
 			onmousedown={keepFieldFocus}
 			onclick={onCancel}
 			disabled={isSubmitting}
-			class="h-11 px-4 font-semibold text-accent-ink"
+			class="mt-1 h-11 w-full rounded-full text-base"
 		>
 			Cancel
 		</Button>

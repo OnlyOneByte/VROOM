@@ -9,7 +9,6 @@
 		currency?: string;
 		min?: string;
 		required?: boolean;
-		placeholder?: string;
 		onblur?: () => void;
 		'aria-invalid'?: boolean;
 		'aria-describedby'?: string | undefined;
@@ -22,7 +21,6 @@
 		currency,
 		min = '0',
 		required,
-		placeholder,
 		onblur,
 		'aria-invalid': ariaInvalid,
 		'aria-describedby': ariaDescribedby
@@ -56,7 +54,6 @@
 		step={amountStep(currency)}
 		{min}
 		{required}
-		{placeholder}
 		{onblur}
 		bind:value
 		aria-invalid={ariaInvalid}
