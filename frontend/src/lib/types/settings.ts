@@ -90,6 +90,15 @@ export interface RestoreResult {
 	imported?: Record<string, number>;
 	skipped?: { photos: number };
 	conflicts?: Array<{ table: string; id: string }>;
+	grants?: {
+		reapplied: number;
+		dropped: Array<{
+			kind: 'role' | 'override';
+			vehicleId: string;
+			userId: string;
+			reason: string;
+		}>;
+	};
 }
 
 export interface UserSettings {
