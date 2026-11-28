@@ -95,6 +95,14 @@ describe('UnitPreferencesCard', () => {
 		expect(screen.getByLabelText('Currency')).toBe(currency());
 	});
 
+	test('the currency field is full width on phones and capped only from sm', () => {
+		mount();
+		const classes = currency().className.split(/\s+/);
+		expect(classes).toContain('w-full');
+		expect(classes).not.toContain('max-w-xs');
+		expect(classes).toContain('sm:max-w-xs');
+	});
+
 	test('offers exactly the shared currency list', async () => {
 		mount();
 		await fireEvent.click(currency());

@@ -306,7 +306,7 @@
 					<CardHeader>
 						<CardTitle level={2} id="storage-connected" class="text-base">Connected</CardTitle>
 						<CardAction>
-							<Button onclick={() => goto(resolve(routes.settingsProviderNew))}>
+							<Button variant="outline" onclick={() => goto(resolve(routes.settingsProviderNew))}>
 								<Plus aria-hidden="true" />
 								Add storage
 							</Button>

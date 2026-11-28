@@ -173,7 +173,7 @@
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
 				<label for="currency" class="font-medium">Currency</label>
 				<Select.Root type="single" bind:value={shownCurrency} onValueChange={chooseCurrency}>
-					<Select.Trigger id="currency" class="w-full max-w-xs sm:w-auto">
+					<Select.Trigger id="currency" class="w-full sm:w-auto sm:max-w-xs">
 						{currencyLabel(currencyUnit)}
 					</Select.Trigger>
 					<Select.Content>

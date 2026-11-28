@@ -281,7 +281,7 @@ describe('Settings page loading', () => {
 	test('AI helpers links to its page, and the provider cards no longer sit on Settings', async () => {
 		await mount();
 		const ai = within(screen.getByRole('region', { name: 'AI helpers' }));
-		expect(ai.getByRole('link', { name: 'Manage AI helpers' })).toHaveAttribute(
+		expect(ai.getByRole('link', { name: /^Receipt scanning and the assistant/ })).toHaveAttribute(
 			'href',
 			'/settings/ai'
 		);
@@ -316,11 +316,26 @@ describe('Settings page loading', () => {
 		getProviders.mockResolvedValue(providers as UserProviderInfo[]);
 		await mount();
 		const storage = within(screen.getByRole('region', { name: 'Backups and storage' }));
-		expect(storage.getByRole('link', { name: 'Manage backups and storage' })).toHaveAttribute(
+		expect(storage.getByRole('link', { name: /^Storage you own/ })).toHaveAttribute(
 			'href',
 			'/settings/storage'
 		);
 		expect(screen.getByTestId('settings-storage-summary')).toHaveTextContent(summary);
+	});
+
+	test('Storage, AI and Server each open from a full row with a chevron, not a Manage link', async () => {
+		serverRules.mockResolvedValueOnce(
+			packRules([{ action: 'server.signup.manage', subject: 'all' }]) as PackedRules
+		);
+		await mount();
+		expect(screen.queryByRole('link', { name: /Manage/ })).toBeNull();
+		for (const id of ['settings-storage-link', 'settings-ai-link', 'settings-server-link']) {
+			const row = screen.getByTestId(id);
+			expect(row.tagName).toBe('A');
+			expect(row.className).toMatch(/(^|\s)flex(\s|$)/);
+			expect(row.className).toMatch(/(^|\s)justify-between(\s|$)/);
+			expect(row.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+		}
 	});
 
 	test('an old link to the storage section goes to the Backups and storage page', async () => {

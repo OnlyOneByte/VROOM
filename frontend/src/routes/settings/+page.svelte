@@ -313,38 +313,44 @@
 							<CardTitle level={2} id="settings-storage" class="text-base">
 								Backups and storage
 							</CardTitle>
-							<CardAction>
-								<a
-									href={resolve(routes.settingsStorage)}
-									class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
-									aria-label="Manage backups and storage"
-								>
-									Manage
-								</a>
-							</CardAction>
 						</CardHeader>
-						<CardContent class="pb-3" data-testid="settings-storage-summary">
-							<p class="font-medium">Storage you own</p>
-							<p class="truncate text-sm text-muted-foreground">{storageSummary}</p>
+						<CardContent data-testid="settings-storage-summary">
+							<a
+								href={resolve(routes.settingsStorage)}
+								class="group flex items-center justify-between gap-4 pb-3"
+								data-testid="settings-storage-link"
+							>
+								<span class="min-w-0">
+									<span class="block font-medium underline-offset-4 group-hover:underline">
+										Storage you own
+									</span>
+									<span class="block truncate text-sm text-muted-foreground">{storageSummary}</span>
+								</span>
+								<ChevronRight class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+							</a>
 						</CardContent>
 					</Card>
 
 					<Card variant="section" role="region" aria-labelledby="settings-ai-helpers">
 						<CardHeader>
 							<CardTitle level={2} id="settings-ai-helpers" class="text-base">AI helpers</CardTitle>
-							<CardAction>
-								<a
-									href={resolve(routes.settingsAi)}
-									class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
-									aria-label="Manage AI helpers"
-								>
-									Manage
-								</a>
-							</CardAction>
 						</CardHeader>
-						<CardContent class="pb-3" data-testid="settings-ai-summary">
-							<p class="font-medium">Receipt scanning and the assistant</p>
-							<p class="text-sm text-muted-foreground">Optional, with your own provider and key</p>
+						<CardContent data-testid="settings-ai-summary">
+							<a
+								href={resolve(routes.settingsAi)}
+								class="group flex items-center justify-between gap-4 pb-3"
+								data-testid="settings-ai-link"
+							>
+								<span class="min-w-0">
+									<span class="block font-medium underline-offset-4 group-hover:underline">
+										Receipt scanning and the assistant
+									</span>
+									<span class="block text-sm text-muted-foreground">
+										Optional, with your own provider and key
+									</span>
+								</span>
+								<ChevronRight class="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+							</a>
 						</CardContent>
 					</Card>
 

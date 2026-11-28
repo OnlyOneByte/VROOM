@@ -59,6 +59,17 @@ describe('Server settings page', () => {
 		expect(api.getSettings).not.toHaveBeenCalled();
 	});
 
+	test('the three parts are ruled sections with plain headings, like the other Settings pages', async () => {
+		render(ServerPage);
+		await screen.findByTestId('signup-mode-approval');
+		for (const name of ['Who can join', 'Waiting for approval', 'Invites']) {
+			const region = screen.getByRole('region', { name });
+			expect(region).toHaveAttribute('data-variant', 'section');
+			const heading = within(region).getByRole('heading', { level: 2, name });
+			expect(heading.parentElement?.querySelector('svg')).toBeNull();
+		}
+	});
+
 	test('Save Mode shows only once a new mode is chosen, and saves nothing until pressed', async () => {
 		render(ServerPage);
 		await screen.findByTestId('signup-mode-approval');
