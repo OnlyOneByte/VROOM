@@ -1,5 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
-import { and, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, isNull, lt, ne, or } from 'drizzle-orm';
+import { CONFIG } from '../../config';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import type { InsurancePolicy, InsuranceTerm } from '../../db/schema';
 import {
@@ -10,6 +11,7 @@ import {
   nextInsuranceTermVehiclePosition,
 } from '../../db/schema';
 import { DatabaseError, NotFoundError, ValidationError } from '../../errors';
+import { termBillingMonths } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
 import { logger } from '../../utils/logger';
 import { requireVehiclesAccess } from '../../utils/vehicle-access';
@@ -163,6 +165,47 @@ export class InsurancePolicyRepository {
     }));
   }
 
+  private async assertTermFits(
+    tx: AsyncHandle,
+    policyId: string,
+    term: { startDate: Date; endDate: Date; vehicleIds: string[] },
+    excludeTermId?: string
+  ): Promise<void> {
+    const limits = CONFIG.validation.insurance;
+    if (termBillingMonths(term.startDate, term.endDate) > limits.maxTermMonths) {
+      throw new ValidationError(`A term can be at most ${limits.maxTermMonths} months long`);
+    }
+    if (!excludeTermId) {
+      const [row] = await tx
+        .select({ n: count() })
+        .from(insuranceTerms)
+        .where(eq(insuranceTerms.policyId, policyId));
+      if ((row?.n ?? 0) >= limits.maxTerms) {
+        throw new ValidationError(`A policy can have at most ${limits.maxTerms} terms`);
+      }
+    }
+    if (term.vehicleIds.length === 0) return;
+    const [overlap] = await tx
+      .select({ id: insuranceTerms.id })
+      .from(insuranceTerms)
+      .innerJoin(insuranceTermVehicles, eq(insuranceTermVehicles.termId, insuranceTerms.id))
+      .where(
+        and(
+          eq(insuranceTerms.policyId, policyId),
+          inArray(insuranceTermVehicles.vehicleId, term.vehicleIds),
+          lt(insuranceTerms.startDate, term.endDate),
+          gt(insuranceTerms.endDate, term.startDate),
+          excludeTermId ? ne(insuranceTerms.id, excludeTermId) : undefined
+        )
+      )
+      .limit(1);
+    if (overlap) {
+      throw new ValidationError(
+        'This term overlaps another term on this policy for the same vehicle'
+      );
+    }
+  }
+
   async create(data: CreatePolicyData, userId: string): Promise<InsurancePolicyWithVehicles> {
     try {
       const allVehicleIds = [...new Set(data.terms.flatMap((t) => t.vehicleCoverage.vehicleIds))];
@@ -192,6 +235,11 @@ export class InsurancePolicyRepository {
         const termCoverage: TermCoverageRow[] = [];
 
         for (const term of data.terms) {
+          await this.assertTermFits(tx, policyId, {
+            startDate: term.startDate,
+            endDate: term.endDate,
+            vehicleIds: term.vehicleCoverage.vehicleIds,
+          });
           const termId = createId();
           const [insertedTerm] = await tx
             .insert(insuranceTerms)
@@ -233,7 +281,7 @@ export class InsurancePolicyRepository {
         };
       });
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError || error instanceof ValidationError) throw error;
       logger.error('Failed to create insurance policy', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -373,6 +421,12 @@ export class InsurancePolicyRepository {
           throw new NotFoundError('Insurance policy');
         }
 
+        await this.assertTermFits(tx, policyId, {
+          startDate: term.startDate,
+          endDate: term.endDate,
+          vehicleIds: term.vehicleCoverage.vehicleIds,
+        });
+
         const now = new Date();
         await tx.insert(insuranceTerms).values({
           id: termId,
@@ -412,7 +466,7 @@ export class InsurancePolicyRepository {
 
       return { ...updatedPolicy[0], ...coverage, newTermId: termId };
     } catch (error) {
-      if (error instanceof NotFoundError) throw error;
+      if (error instanceof NotFoundError || error instanceof ValidationError) throw error;
       logger.error('Failed to add term to insurance policy', {
         policyId,
         error: error instanceof Error ? error.message : String(error),
@@ -459,6 +513,26 @@ export class InsurancePolicyRepository {
         const nextEndDate = termFields.endDate ?? storedTerm.endDate;
         if (nextEndDate <= nextStartDate) {
           throw new ValidationError('End date must be after start date');
+        }
+        if (
+          termFields.startDate !== undefined ||
+          termFields.endDate !== undefined ||
+          vehicleCoverage
+        ) {
+          const vehicleIds =
+            vehicleCoverage?.vehicleIds ??
+            (
+              await tx
+                .select({ vehicleId: insuranceTermVehicles.vehicleId })
+                .from(insuranceTermVehicles)
+                .where(eq(insuranceTermVehicles.termId, termId))
+            ).map((row) => row.vehicleId);
+          await this.assertTermFits(
+            tx,
+            policyId,
+            { startDate: nextStartDate, endDate: nextEndDate, vehicleIds },
+            termId
+          );
         }
 
         const setFields: Record<string, unknown> = { updatedAt: new Date() };

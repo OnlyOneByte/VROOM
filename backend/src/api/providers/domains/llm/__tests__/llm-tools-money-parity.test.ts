@@ -9,6 +9,7 @@ import {
 } from '../../../../../test-helpers/http-client';
 import { createInvitee } from '../../../../../test-helpers/invitee';
 import { seedVehicle } from '../../../../../test-helpers/seed';
+import { termBillingMonths } from '../../../../../utils/calculations';
 
 let ctx: TestApp;
 let asB: RequestFn;
@@ -291,7 +292,8 @@ describe('assistant tools report the SAME money as the HTTP routes (dollars, not
       '/api/v1/analytics/insurance'
     );
 
-    expect(tool.summary.totalMonthlyPremiums).toBeCloseTo(INSURANCE_MONTHLY, 2);
+    const billedMonths = termBillingMonths(new Date(ago(180)), new Date(ahead(180)));
+    expect(tool.summary.totalMonthlyPremiums).toBeCloseTo(INSURANCE_TOTAL / billedMonths, 2);
     expect(tool).toEqual(route);
   });
 
