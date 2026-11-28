@@ -6,6 +6,7 @@ import { rateLimiter, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
 import { isValidTimeZone } from '../../utils/time-zone';
+import { withoutIdleTimeout } from '../../utils/timeout';
 import { zValidator } from '../../utils/validation';
 import type { ChatMessage } from '../providers/domains/llm/llm-provider';
 import { runAssistant } from '../providers/domains/llm/orchestrator';
@@ -55,13 +56,8 @@ routes.post(
     }));
 
     try {
-      const { reply, toolsUsed } = await runAssistant(
-        provider,
-        user.id,
-        body.message,
-        history,
-        Date.now(),
-        body.timeZone
+      const { reply, toolsUsed } = await withoutIdleTimeout(c, () =>
+        runAssistant(provider, user.id, body.message, history, Date.now(), body.timeZone)
       );
       return c.json({ success: true, data: { reply, toolsUsed } });
     } catch (err) {

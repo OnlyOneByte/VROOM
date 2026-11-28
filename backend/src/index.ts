@@ -11,6 +11,7 @@ import { validateTrustedProxies } from './utils/client-ip';
 import { extractErrorMessage } from './utils/error-handling';
 import { logger } from './utils/logger';
 import { adminEmailWarnings, parsePrivateEndpointPolicy } from './utils/outbound-url';
+import { SERVER_IDLE_TIMEOUT_SECONDS } from './utils/timeout';
 
 logger.startup(`VROOM Backend starting on ${CONFIG.server.host}:${CONFIG.server.port}`);
 logger.startup(`Environment: ${CONFIG.env}`);
@@ -104,5 +105,6 @@ export default {
   port: CONFIG.server.port,
   // Bun binds every interface when no hostname is given, so HOST must always be passed through.
   hostname: CONFIG.server.host,
+  idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
   fetch: app.fetch,
 };

@@ -15,6 +15,7 @@ import {
 } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
+import { withoutIdleTimeout } from '../../utils/timeout';
 import { OcrUnavailableError } from './domains/vlm/local-ocr';
 import { parseExtraction } from './domains/vlm/prompt';
 import { getVlmProvider, LOCAL_OCR_PROVIDER_ID } from './domains/vlm/registry';
@@ -66,7 +67,9 @@ routes.post('/parse', receiptScanLimiter, scansAtOnce, authorize(ownAccount), as
   const provider = await getVlmProvider(providerRow);
   let raw: Awaited<ReturnType<typeof provider.extractReceipt>>;
   try {
-    raw = await provider.extractReceipt({ data: bytes, mimeType: file.type });
+    raw = await withoutIdleTimeout(c, () =>
+      provider.extractReceipt({ data: bytes, mimeType: file.type })
+    );
   } catch (err) {
     // Adapters log upstream errors; the client gets a generic 502 with no key or raw error.
     const message = err instanceof Error ? err.message : 'VLM provider error';
