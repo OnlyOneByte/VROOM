@@ -346,7 +346,10 @@ const fromSplitBody: ResourceOf = async (c) => {
 };
 
 const fromSplitGroup: ResourceOf = async (c) => {
-  const group = await repos().expenses.getSplitGroupAccessInfo(c.req.param('id') ?? '', c.get('user').id);
+  const group = await repos().expenses.getSplitGroupAccessInfo(
+    c.req.param('id') ?? '',
+    c.get('user').id
+  );
   if (!group) throw new NotFoundError('Split expense');
   const [only, ...others] = group.authors;
   const author = others.length === 0 ? (only ?? group.ownerId) : null;

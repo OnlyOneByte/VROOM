@@ -47,7 +47,9 @@ describe('replace restore', () => {
     photo('left-out-photo', 'left-out');
     const { backupService } = await import('../backup');
     const zip = await backupService.exportAsZip(ctx.user.id);
-    ctx.sqlite.run("INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')");
+    ctx.sqlite.run(
+      "INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')"
+    );
     ctx.sqlite.run(
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('their-car', 'them', 'Kia', 'Rio', 2020)"
     );

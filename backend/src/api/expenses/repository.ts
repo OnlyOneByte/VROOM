@@ -457,7 +457,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       .from(expenses)
       .where(eq(expenses.groupId, groupId));
     const owners = new Set(rows.map((r) => r.userId));
-    const ownerId = owners.has(requesterId) ? requesterId : owners.size === 1 ? rows[0]?.userId : undefined;
+    const ownerId = owners.has(requesterId)
+      ? requesterId
+      : owners.size === 1
+        ? rows[0]?.userId
+        : undefined;
     const own = rows.filter((r) => r.userId === ownerId);
     if (!ownerId || own.length === 0) return null;
     return {

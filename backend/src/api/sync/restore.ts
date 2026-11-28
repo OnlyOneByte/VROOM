@@ -850,9 +850,9 @@ class RestoreService {
       Boolean(sets[String(row.entityType)]?.has(String(row.entityId)));
     const stamped = this.stampUserId(data.photos, userId);
     const photoRows = this.keepMemberAuthors(
-      stamped.filter((row) => onEntity(row, entities)).map((row) =>
-        coverOnlyOnNew(row, merge, onEntity(row, newEntities))
-      ),
+      stamped
+        .filter((row) => onEntity(row, entities))
+        .map((row) => coverOnlyOnNew(row, merge, onEntity(row, newEntities))),
       consentedShares,
       (row) => [photoVehicle(row)]
     );
