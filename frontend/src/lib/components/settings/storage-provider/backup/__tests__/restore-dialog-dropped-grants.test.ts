@@ -53,12 +53,7 @@ const dropped = (
 	vehicleId: string,
 	reason: RestoreDroppedReason,
 	kind: 'role' | 'override' = 'override'
-) => ({
-	kind,
-	vehicleId,
-	userId: `person-${reason}`,
-	reason
-});
+) => ({ kind, vehicleId, reason });
 
 beforeEach(() => {
 	restoreFromProvider.mockReset().mockResolvedValue(preview);
@@ -73,10 +68,10 @@ describe('RestoreDialog after a full restore', () => {
 			grants: {
 				reapplied: 3,
 				dropped: [
-					dropped('car-1', 'no_accepted_share', 'role'),
-					dropped('car-1', 'no_accepted_share'),
+					dropped('car-1', 'person_not_active', 'role'),
+					dropped('car-1', 'person_not_active'),
 					dropped('car-1', 'role_not_assignable', 'role'),
-					dropped('car-2', 'member_not_active'),
+					dropped('car-2', 'person_not_active'),
 					dropped('gone-car', 'vehicle_not_restored')
 				]
 			}
@@ -91,11 +86,10 @@ describe('RestoreDialog after a full restore', () => {
 				[...item.children].map(line => line.textContent?.replace(/\s+/g, ' ').trim()).join(' | ')
 			);
 		expect(items).toEqual([
-			"Blue | 2 sharing settings: the person no longer has this car shared with them. | 1 sharing setting: that role isn't available any more.",
-			"2015 Ford Focus | 1 sharing setting: the member isn't active on this car.",
+			"Blue | 2 sharing settings: the person isn't active on this car any more. | 1 sharing setting: that role isn't available any more.",
+			"2015 Ford Focus | 1 sharing setting: the person isn't active on this car any more.",
 			"A car not in this backup | 1 sharing setting: the car isn't in this backup."
 		]);
-		expect(screen.getByTestId('restore-dropped-grants')).not.toHaveTextContent(/person-/);
 		expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
 		await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Done' })).toHaveFocus());
 
@@ -107,7 +101,7 @@ describe('RestoreDialog after a full restore', () => {
 		const view = await replaceRestore({
 			success: true,
 			imported: { vehicles: 1 },
-			grants: { reapplied: 0, dropped: [dropped('car-1', 'no_accepted_share')] }
+			grants: { reapplied: 0, dropped: [dropped('car-1', 'person_not_active')] }
 		});
 		await fireEvent.click(await screen.findByRole('button', { name: 'Done' }));
 		await vi.waitFor(() => expect(screen.queryByText('Restore finished')).toBeNull());
@@ -117,6 +111,65 @@ describe('RestoreDialog after a full restore', () => {
 		expect(await screen.findByText('Restore data')).toBeInTheDocument();
 		expect(screen.queryByTestId('restore-dropped-grants')).toBeNull();
 		expect(screen.getByText('Restore from storage')).toBeInTheDocument();
+	});
+
+	test('while a restore runs the dialog cannot be closed, and it can again once it finishes', async () => {
+		const onRestore = vi.fn();
+		render(RestoreDialog, {
+			props: {
+				open: true,
+				backupProviders: [],
+				sheetsSyncEnabled: true,
+				onRestore,
+				onClose: vi.fn()
+			}
+		});
+		await fireEvent.click(await screen.findByText('Restore from storage'));
+		await screen.findByText('How to restore');
+		await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
+		let finish: (result: RestoreResult) => void = () => {};
+		restoreFromProvider.mockImplementationOnce(
+			() => new Promise<RestoreResult>(resolve => (finish = resolve))
+		);
+		await fireEvent.click(screen.getByRole('button', { name: 'Replace everything' }));
+		await screen.findByText('Restoring…');
+
+		expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+		expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+		await fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+		expect(screen.getByText('Restoring…')).toBeInTheDocument();
+
+		const result = {
+			success: true,
+			imported: { vehicles: 1 },
+			grants: { reapplied: 0, dropped: [dropped('car-1', 'person_not_active')] }
+		};
+		finish(result);
+		await vi.waitFor(() => expect(onRestore).toHaveBeenCalledWith(result));
+		expect(await screen.findByText('Restore finished')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+	});
+
+	test('a failed restore unlocks the dialog again', async () => {
+		render(RestoreDialog, {
+			props: {
+				open: true,
+				backupProviders: [],
+				sheetsSyncEnabled: true,
+				onRestore: vi.fn(),
+				onClose: vi.fn()
+			}
+		});
+		await fireEvent.click(await screen.findByText('Restore from storage'));
+		await screen.findByText('How to restore');
+		await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
+		restoreFromProvider.mockRejectedValueOnce(new Error('offline'));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Replace everything' }));
+
+		await screen.findByText(/Couldn't restore/);
+		expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
 	});
 
 	test('when every grant came back the dialog just closes', async () => {
