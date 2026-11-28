@@ -421,3 +421,32 @@ describe('ShareVehicleDialog managing existing shares', () => {
 		expect(screen.getByText('friend@example.com')).toBeInTheDocument();
 	});
 });
+
+describe('ShareVehicleDialog email check matches the server', () => {
+	test.each(['a@b.c', 'pat..x@example.com', 'pat@example', '.pat@example.com', 'pat@-example.com'])(
+		'%s is explained on the field and never sent',
+		async address => {
+			mount();
+			await settle();
+			await fireEvent.input(emailInput(), { target: { value: address } });
+			await fireEvent.click(sendButton());
+			await settle();
+			expect(emailInput()).toHaveAccessibleDescription(
+				'Enter a full email address, like person@example.com'
+			);
+			expect(invite).not.toHaveBeenCalled();
+		}
+	);
+
+	test.each(["pat.o'neil+cars@mail.example.co", 'p_9-x@sub.example.io'])(
+		'%s is sent',
+		async address => {
+			mount();
+			await settle();
+			await fireEvent.input(emailInput(), { target: { value: address } });
+			await fireEvent.click(sendButton());
+			await settle();
+			expect(invite).toHaveBeenCalledWith(expect.objectContaining({ email: address }));
+		}
+	);
+});

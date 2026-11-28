@@ -50,6 +50,7 @@ describe('ReminderVehicleFields', () => {
 		await tick();
 
 		const group = screen.getByRole('group', { name: 'Split across vehicles' });
+		expect(group).toHaveClass('focus-visible:ring-[3px]', 'focus-visible:ring-ring/50');
 		expect(group).toHaveAccessibleDescription('Percentages must add up to 100%');
 		await focusFirstProblem(container);
 		expect(document.activeElement).toBe(group);

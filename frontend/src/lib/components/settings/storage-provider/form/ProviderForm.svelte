@@ -238,6 +238,7 @@
 		if (canSave || !selectedType) return null;
 		if (!displayName.trim()) return 'Give this storage a name to save it.';
 		if (hasBackupErrors && anyBackupEnabled) return 'Fix the backup settings to save.';
+		if (selectedEntry?.connect === 'oauth') return 'Connect your Google account to save.';
 		return 'Finish the connection details to save.';
 	});
 

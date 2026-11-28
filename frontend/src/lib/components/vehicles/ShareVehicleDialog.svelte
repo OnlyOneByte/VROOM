@@ -31,7 +31,8 @@
 	let inviting = $state(false);
 	let emailError = $state<string | null>(null);
 	let emailInput = $state<HTMLInputElement | null>(null);
-	const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	const EMAIL_SHAPE =
+		/^(?:[A-Za-z0-9_'+-]+\.)*[A-Za-z0-9_'+-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$/;
 
 	function emailProblem(value: string): string | null {
 		if (!value) return 'Enter the email address of the person to invite';

@@ -244,3 +244,11 @@ describe('ProviderForm save explains what is missing', () => {
 		expect(createProvider).not.toHaveBeenCalled();
 	});
 });
+
+describe('ProviderForm save reason for Google storage', () => {
+	test('a named Google Drive storage asks for the Google account, not connection details', async () => {
+		await startCreate(/Google Drive/);
+		expect(saveButton()).toHaveAttribute('aria-disabled', 'true');
+		expect(saveButton()).toHaveAccessibleDescription('Connect your Google account to save.');
+	});
+});
