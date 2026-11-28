@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, lt, ne } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, lt, ne } from 'drizzle-orm';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import { firstRow } from '../../db/first-row';
 import type { NewTrip, Trip } from '../../db/schema';
@@ -34,6 +34,27 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .where(and(eq(trips.id, id), eq(trips.userId, userId)))
       .limit(1);
     return row ?? null;
+  }
+
+  async findOverlapping(
+    span: { vehicleId: string; userId: string; start: number; end: number; excludeTripId?: string },
+    db: AsyncHandle = this.db
+  ): Promise<Trip | null> {
+    return db
+      .select()
+      .from(trips)
+      .where(
+        and(
+          eq(trips.vehicleId, span.vehicleId),
+          eq(trips.userId, span.userId),
+          lt(trips.startOdometer, trips.endOdometer),
+          lt(trips.startOdometer, span.end),
+          gt(trips.endOdometer, span.start),
+          span.excludeTripId ? ne(trips.id, span.excludeTripId) : undefined
+        )
+      )
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
   }
 
   // Odometer dedup key: do not remove the linked odometer entry while this returns > 0.
