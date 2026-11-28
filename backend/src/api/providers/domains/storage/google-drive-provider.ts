@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { logger } from '../../../../utils/logger';
 import { assertSafeStoragePath } from '../../../../utils/paths';
 import { GoogleDriveService } from '../../services/google-drive-service';
@@ -10,12 +11,16 @@ import type {
 } from './storage-provider';
 import { assertWithinSize, credentialFailureOf, type DownloadOptions } from './storage-provider';
 
+const folderLookups = new Map<string, Promise<string>>();
+
 export class GoogleDriveProvider implements StorageProvider {
   readonly type = 'google-drive';
   private driveService: GoogleDriveService;
+  private readonly account: string;
 
   constructor(refreshToken: string, driveService?: GoogleDriveService) {
     this.driveService = driveService ?? new GoogleDriveService(refreshToken);
+    this.account = createHash('sha256').update(refreshToken).digest('hex');
   }
 
   async upload(params: UploadParams): Promise<StorageRef> {
@@ -85,13 +90,7 @@ export class GoogleDriveProvider implements StorageProvider {
     let parentId: string | undefined;
 
     for (const segment of segments) {
-      const existing = await this.driveService.findFolder(segment, parentId);
-      if (existing) {
-        parentId = existing.id;
-      } else {
-        const created = await this.driveService.createFolder(segment, parentId);
-        parentId = created.id;
-      }
+      parentId = await this.findOrCreateFolder(segment, parentId);
     }
 
     if (!parentId) {
@@ -99,6 +98,20 @@ export class GoogleDriveProvider implements StorageProvider {
     }
 
     return parentId;
+  }
+
+  private findOrCreateFolder(name: string, parentId: string | undefined): Promise<string> {
+    const key = `${this.account}/${parentId ?? 'root'}/${name}`;
+    const pending = folderLookups.get(key);
+    if (pending) return pending;
+    const lookup = (async () => {
+      const existing = await this.driveService.findFolder(name, parentId);
+      return existing ? existing.id : (await this.driveService.createFolder(name, parentId)).id;
+    })();
+    folderLookups.set(key, lookup);
+    const forget = () => folderLookups.delete(key);
+    lookup.then(forget, forget);
+    return lookup;
   }
 
   private async resolveExistingFolderPath(pathHint: string): Promise<string | null> {
