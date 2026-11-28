@@ -81,10 +81,12 @@ describe('GooglePhotosService — read', () => {
 
   test('healthCheck is true when albums list, false when it errors', async () => {
     expect(await svc.healthCheck()).toBe(true);
-    store.injectFault('listAlbums', photosApiError(500, 'Backend Error'));
+    store.injectFault('listAlbums', photosApiError(502, 'Bad Gateway'));
     expect(await svc.healthCheck()).toBe(false);
     store.injectFault('listAlbums', photosApiError(401, 'Invalid Credentials'));
     await expect(svc.healthCheck()).rejects.toMatchObject({ code: SyncErrorCode.AUTH_INVALID });
+    store.injectFault('listAlbums', photosApiError(429, 'Too Many Requests'));
+    await expect(svc.healthCheck()).rejects.toMatchObject({ status: 429 });
   });
 });
 

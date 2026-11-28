@@ -43,5 +43,6 @@ describe('ProviderHealth', () => {
 		});
 		expect(screen.getByText('The provider is busy or limiting requests right now.')).toBeTruthy();
 		expect(screen.queryByText("Couldn't connect.")).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Edit settings' })).toBeNull();
 	});
 });

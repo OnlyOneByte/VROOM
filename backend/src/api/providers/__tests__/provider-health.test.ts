@@ -205,6 +205,26 @@ describe('POST /providers/:id/test works for every capability', () => {
     }
   );
 
+  test('storage: a busy provider is reported busy on Test, and stays active', async () => {
+    const fake = new FakeStorageProvider();
+    spyOn(fake, 'healthCheck').mockRejectedValue(
+      Object.assign(new Error('Please reduce your request rate.'), {
+        name: 'SlowDown',
+        $metadata: { httpStatusCode: 503 },
+      })
+    );
+    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockResolvedValue(
+      fake
+    );
+    try {
+      await seedStorage('s-busy');
+      expect((await testProvider('s-busy')).data).toMatchObject({ ok: false, code: 'busy' });
+      expect(await statusOf('s-busy')).toMatchObject({ status: 'active', last_error_code: 'busy' });
+    } finally {
+      built.mockRestore();
+    }
+  });
+
   test.each([429, 503])(
     'a model answering %i is reported busy, not unreachable',
     async (status) => {

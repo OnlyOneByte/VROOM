@@ -138,6 +138,21 @@ export function credentialFailureOf(error: unknown): SyncError | null {
   return null;
 }
 
+const BUSY_STATUSES = new Set([429, 500, 503]);
+const BUSY_ERROR_NAMES = new Set(['SlowDown', 'ThrottlingException', 'TooManyRequestsException']);
+
+export function isProviderBusy(error: unknown): boolean {
+  if (isSyncError(error)) return error.code === SyncErrorCode.QUOTA_EXCEEDED;
+  if (typeof error !== 'object' || error === null) return false;
+  const record = error as Record<string, unknown>;
+  const status = statusOf(record);
+  const text = `${String(record.name ?? '')} ${String(record.message ?? '')}`;
+  if (status !== undefined) {
+    return BUSY_STATUSES.has(status) || (status === 403 && isThrottled(record, text));
+  }
+  return BUSY_ERROR_NAMES.has(String(record.name)) || /HTTP (429|500|503)\b/.test(text);
+}
+
 export function credentialCodeOf(error: unknown): 'auth' | 'permission' | null {
   const failure = credentialFailureOf(error);
   if (!failure) return null;

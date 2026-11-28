@@ -9,7 +9,12 @@ import type {
   StorageRef,
   UploadParams,
 } from './storage-provider';
-import { assertWithinSize, credentialFailureOf, type DownloadOptions } from './storage-provider';
+import {
+  assertWithinSize,
+  credentialFailureOf,
+  type DownloadOptions,
+  isProviderBusy,
+} from './storage-provider';
 
 const folderLookups = new Map<string, Promise<string>>();
 
@@ -65,6 +70,7 @@ export class GoogleDriveProvider implements StorageProvider {
     } catch (error) {
       const credentialFailure = credentialFailureOf(error);
       if (credentialFailure) throw credentialFailure;
+      if (isProviderBusy(error)) throw error;
       logger.warn('Google Drive health check failed', {
         error: error instanceof Error ? error.message : String(error),
       });

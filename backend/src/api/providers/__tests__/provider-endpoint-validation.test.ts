@@ -203,6 +203,10 @@ describe('provider endpoints with private endpoints blocked', () => {
     expect(healthCodeOf(new ValidationError('x'))).toBe('config');
     expect(healthCodeOf(new SyncError(SyncErrorCode.QUOTA_EXCEEDED, 'x'))).toBe('busy');
     expect(healthCodeOf(new SyncError(SyncErrorCode.NETWORK_ERROR, 'x'))).toBe('unreachable');
+    expect(healthCodeOf({ $metadata: { httpStatusCode: 503 } })).toBe('busy');
+    expect(healthCodeOf({ response: { status: 429 } })).toBe('busy');
+    expect(healthCodeOf({ $metadata: { httpStatusCode: 502 } })).toBe('unreachable');
+    expect(healthCodeOf(new Error('provider returned HTTP 504'))).toBe('unreachable');
   });
 
   test.each([

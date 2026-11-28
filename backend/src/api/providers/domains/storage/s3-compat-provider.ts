@@ -25,6 +25,7 @@ import {
   assertWithinSize,
   credentialFailureOf,
   type DownloadOptions,
+  isProviderBusy,
   ProviderConfigError,
 } from './storage-provider';
 
@@ -255,6 +256,7 @@ export class S3CompatProvider implements StorageProvider {
       if (error instanceof ValidationError) throw error;
       const credentialFailure = credentialFailureOf(error);
       if (credentialFailure) throw credentialFailure;
+      if (isProviderBusy(error)) throw error;
       const configProblem = this.bucketProblemOf(error);
       if (configProblem) throw new ProviderConfigError(configProblem);
       logger.warn('S3 health check failed', {

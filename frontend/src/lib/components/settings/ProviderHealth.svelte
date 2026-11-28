@@ -129,13 +129,15 @@
 			<AlertDescription class="text-foreground!">
 				<p>{problem.detail}</p>
 				<div class="mt-2 flex flex-wrap gap-2">
-					<Button
-						class="h-10"
-						onclick={() =>
-							onFix(provider, provider.status === 'needs_reauth' ? 'reconnect' : 'edit')}
-					>
-						{provider.status === 'needs_reauth' ? 'Reconnect' : 'Edit settings'}
-					</Button>
+					{#if provider.status === 'needs_reauth' || provider.lastErrorCode !== 'busy'}
+						<Button
+							class="h-10"
+							onclick={() =>
+								onFix(provider, provider.status === 'needs_reauth' ? 'reconnect' : 'edit')}
+						>
+							{provider.status === 'needs_reauth' ? 'Reconnect' : 'Edit settings'}
+						</Button>
+					{/if}
 					{@render testButton()}
 				</div>
 			</AlertDescription>

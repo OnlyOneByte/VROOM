@@ -7,7 +7,11 @@ import { EndpointNotAllowedError } from '../../utils/outbound-url';
 import { LLM_PROVIDERS } from './domains/llm/registry';
 import { resolveModelSettings } from './domains/model/model-registry';
 import { getStorageProviderRegistry } from './domains/storage/registry';
-import { credentialFailureOf, ProviderConfigError } from './domains/storage/storage-provider';
+import {
+  credentialFailureOf,
+  isProviderBusy,
+  ProviderConfigError,
+} from './domains/storage/storage-provider';
 
 export type HealthCode = 'auth' | 'permission' | 'unreachable' | 'busy' | 'config' | 'endpoint';
 
@@ -71,16 +75,14 @@ export function healthCodeOf(error: unknown): HealthCode {
   if (credentialFailure) {
     return credentialFailure.code === SyncErrorCode.PERMISSION_DENIED ? 'permission' : 'auth';
   }
-  if (isSyncError(error)) {
-    return error.code === SyncErrorCode.QUOTA_EXCEEDED ? 'busy' : 'unreachable';
-  }
+  if (isProviderBusy(error)) return 'busy';
+  if (isSyncError(error)) return 'unreachable';
   if (error instanceof EndpointNotAllowedError) return 'endpoint';
   if (error instanceof ValidationError || error instanceof ProviderConfigError) return 'config';
   const message = error instanceof Error ? error.message : '';
   if (/HTTP 401\b/.test(message)) return 'auth';
   if (/HTTP 403\b/.test(message)) return 'permission';
   if (/HTTP (400|404|422)\b/.test(message)) return 'config';
-  if (/HTTP (429|5\d\d)\b/.test(message)) return 'busy';
   return 'unreachable';
 }
 

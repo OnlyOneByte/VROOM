@@ -225,8 +225,13 @@ describe('GoogleDriveProvider', () => {
     });
 
     test('false when the Drive API errors', async () => {
-      store.injectFault('files.list', googleApiError(500, 'Backend Error'));
+      store.injectFault('files.list', googleApiError(502, 'Bad Gateway'));
       expect(await provider.healthCheck()).toBe(false);
+    });
+
+    test('a busy Drive API is passed on, so the check can say busy', async () => {
+      store.injectFault('files.list', googleApiError(503, 'Backend Error'));
+      await expect(provider.healthCheck()).rejects.toBeDefined();
     });
 
     test('a rejected token throws AUTH_INVALID, so the check can say to reconnect', async () => {

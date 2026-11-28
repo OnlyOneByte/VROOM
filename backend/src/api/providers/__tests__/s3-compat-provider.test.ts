@@ -292,6 +292,15 @@ describe('S3CompatProvider', () => {
       expect(result).toBe(false);
     });
 
+    test('a busy or throttling S3 endpoint is passed on, so the check can say busy', async () => {
+      const slowDown = Object.assign(new Error('Please reduce your request rate.'), {
+        name: 'SlowDown',
+        $metadata: { httpStatusCode: 503 },
+      });
+      mockSend.mockRejectedValueOnce(slowDown);
+      await expect(provider.healthCheck()).rejects.toBe(slowDown);
+    });
+
     test('a missing bucket is a settings problem that names the bucket', async () => {
       mockSend.mockRejectedValueOnce(
         Object.assign(new Error('UnknownError'), { $metadata: { httpStatusCode: 404 } })

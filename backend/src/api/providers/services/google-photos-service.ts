@@ -3,7 +3,7 @@ import { google } from 'googleapis';
 import { CONFIG } from '../../../config';
 import { SyncError, SyncErrorCode } from '../../../errors';
 import { OPERATION_TIMEOUTS } from '../../../utils/timeout';
-import { credentialFailureOf } from '../domains/storage/storage-provider';
+import { credentialFailureOf, isProviderBusy } from '../domains/storage/storage-provider';
 
 const PHOTOS_API = 'https://photoslibrary.googleapis.com';
 export const VROOM_ALBUM_TITLE = 'VROOM';
@@ -103,6 +103,7 @@ export class GooglePhotosService {
     } catch (error) {
       const credentialFailure = credentialFailureOf(error);
       if (credentialFailure) throw credentialFailure;
+      if (isProviderBusy(error)) throw error;
       return false;
     }
   }
