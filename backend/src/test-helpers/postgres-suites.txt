@@ -20,6 +20,7 @@ src/api/analytics/__tests__/fuel-stats-monthly-spend.test.ts
 src/api/analytics/__tests__/fuel-stats-previous-window.test.ts
 src/api/analytics/__tests__/insurance-details.test.ts
 src/api/analytics/__tests__/per-vehicle.property.test.ts
+src/api/analytics/__tests__/query-shared-vehicles.test.ts
 src/api/analytics/__tests__/query-totals-dialect.test.ts
 src/api/analytics/__tests__/shared-analytics-read.test.ts
 src/api/analytics/__tests__/shared-summary-cross-vehicle.test.ts
