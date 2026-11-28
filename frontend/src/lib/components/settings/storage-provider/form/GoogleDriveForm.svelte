@@ -73,7 +73,7 @@
 		<div class="rounded-lg border border-border p-4 text-center">
 			<ProviderIcon class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
 			<p class="text-sm text-muted-foreground mb-3">
-				Connect your Google account to use {providerLabel} for photo storage
+				Connect your Google account to use {providerLabel} for photos and backups
 			</p>
 			<Button variant="outline" onclick={handleConnectGoogle}>
 				<svg class="h-4 w-4 mr-2" viewBox="0 0 24 24">

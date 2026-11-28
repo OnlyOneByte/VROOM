@@ -17,7 +17,11 @@ vi.mock('#lib/services/provider-api.ts', async importOriginal => {
 		...actual,
 		providerApi: {
 			getCatalog: async () =>
-				(await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')).PROVIDER_CATALOG,
+				(
+					await import('#lib/stores/__tests__/provider-catalog-fixtures.ts')
+				).PROVIDER_CATALOG.filter(
+					entry => entry.capability !== 'storage' || entry.id === 'google-drive'
+				),
 			updateProvider: vi.fn(),
 			createProvider: vi.fn(),
 			deleteProvider: (id: string, options?: { force?: boolean }) => deleteProvider(id, options)
@@ -66,6 +70,16 @@ describe('ProviderForm Remove storage section asks before deleting', () => {
 		expect(save.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 	});
 
+	test('on edit, Save changes sits in a bar that sticks to the bottom below lg', async () => {
+		render(ProviderForm, {
+			props: { providerId: 'drive-1', existingProvider: STORED_PROVIDER }
+		});
+		const save = await screen.findByRole('button', { name: 'Save changes' });
+
+		const bar = save.closest('[data-slot="form-action-bar"]');
+		expect(bar).toHaveClass('sticky', 'bottom-0', 'lg:static', 'short:static');
+	});
+
 	test('Delete storage opens a confirmation and deletes nothing yet', async () => {
 		await clickDeleteStorage();
 		expect(await screen.findByText('Delete My Drive?')).toBeInTheDocument();
@@ -102,5 +116,19 @@ describe('ProviderForm Remove storage section asks before deleting', () => {
 		await waitFor(() =>
 			expect(deleteProvider).toHaveBeenLastCalledWith('drive-1', { force: true })
 		);
+	});
+});
+
+describe('ProviderForm with a single storage type on offer', () => {
+	test('Add storage picks that type, so the form shows at once with no hint', async () => {
+		render(ProviderForm, { props: {} });
+
+		const drive = await screen.findByRole('button', { name: /Google Drive/ });
+		await waitFor(() => expect(drive).toHaveAttribute('aria-pressed', 'true'));
+		expect(screen.getByLabelText('Name')).toBeInTheDocument();
+		expect(screen.queryByText('Choose a type to continue.')).toBeNull();
+		expect(
+			screen.getByText('Connect your Google account to use Google Drive for photos and backups')
+		).toBeInTheDocument();
 	});
 });
