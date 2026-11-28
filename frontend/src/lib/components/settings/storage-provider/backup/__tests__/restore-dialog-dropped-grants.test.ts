@@ -53,12 +53,7 @@ const dropped = (
 	vehicleId: string,
 	reason: RestoreDroppedReason,
 	kind: 'role' | 'override' = 'override'
-) => ({
-	kind,
-	vehicleId,
-	userId: `person-${reason}`,
-	reason
-});
+) => ({ kind, vehicleId, reason });
 
 beforeEach(() => {
 	restoreFromProvider.mockReset().mockResolvedValue(preview);
@@ -95,7 +90,6 @@ describe('RestoreDialog after a full restore', () => {
 			"2015 Ford Focus | 1 sharing setting: the person isn't active on this car any more.",
 			"A car not in this backup | 1 sharing setting: the car isn't in this backup."
 		]);
-		expect(screen.getByTestId('restore-dropped-grants')).not.toHaveTextContent(/person-/);
 		expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
 		await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Done' })).toHaveFocus());
 
@@ -153,6 +147,28 @@ describe('RestoreDialog after a full restore', () => {
 		finish(result);
 		await vi.waitFor(() => expect(onRestore).toHaveBeenCalledWith(result));
 		expect(await screen.findByText('Restore finished')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+	});
+
+	test('a failed restore unlocks the dialog again', async () => {
+		render(RestoreDialog, {
+			props: {
+				open: true,
+				backupProviders: [],
+				sheetsSyncEnabled: true,
+				onRestore: vi.fn(),
+				onClose: vi.fn()
+			}
+		});
+		await fireEvent.click(await screen.findByText('Restore from provider'));
+		await screen.findByText('How to restore');
+		await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
+		restoreFromProvider.mockRejectedValueOnce(new Error('offline'));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Replace everything' }));
+
+		await screen.findByText(/Couldn't restore/);
+		expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
 		expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
 	});
 

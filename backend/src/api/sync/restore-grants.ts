@@ -28,7 +28,6 @@ export type DroppedGrantReason =
 export interface DroppedGrant {
   kind: 'role' | 'override';
   vehicleId: string;
-  userId: string;
   reason: DroppedGrantReason;
 }
 
@@ -164,14 +163,10 @@ export async function reapplyVehicleGrants(
   live: LiveVehicleGrants
 ): Promise<RegrantReport> {
   const report: RegrantReport = { reapplied: 0, dropped: [] };
-  const record = (
-    kind: DroppedGrant['kind'],
-    row: { scopeId: string; userId: string },
-    outcome: Outcome
-  ) => {
+  const record = (kind: DroppedGrant['kind'], row: { scopeId: string }, outcome: Outcome) => {
     if (outcome === 'reapplied') report.reapplied++;
     else if (outcome !== 'unchanged') {
-      report.dropped.push({ kind, vehicleId: row.scopeId, userId: row.userId, reason: outcome });
+      report.dropped.push({ kind, vehicleId: row.scopeId, reason: outcome });
     }
   };
   for (const row of live.assignments) {

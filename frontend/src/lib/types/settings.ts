@@ -96,7 +96,6 @@ export interface RestoreResult {
 		dropped: Array<{
 			kind: 'role' | 'override';
 			vehicleId: string;
-			userId: string;
 			reason: RestoreDroppedReason;
 		}>;
 	};
