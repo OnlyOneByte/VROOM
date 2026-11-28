@@ -165,7 +165,7 @@ routes.post(
       inOrder(await readingCheck(vehicleId, data.odometer, data.recordedAt, data.timeZone))
     );
 
-    await reminderTriggerService.recheckMileageReminders(ownerId, vehicleId);
+    await reminderTriggerService.recheckMileageReminders(ownerId, vehicleId, data.timeZone);
 
     return c.json(
       {
@@ -206,7 +206,11 @@ routes.put(
       )
     );
 
-    await reminderTriggerService.recheckMileageReminders(existing.userId, updated.vehicleId);
+    await reminderTriggerService.recheckMileageReminders(
+      existing.userId,
+      updated.vehicleId,
+      timeZone
+    );
 
     return c.json({
       success: true,

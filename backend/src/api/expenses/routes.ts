@@ -922,7 +922,11 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   assertMayTouchFinancialExpense(writesFinancials(access), createdExpense.sourceType);
 
   if (createdExpense.mileage != null) {
-    await reminderTriggerService.recheckMileageReminders(ownerId, createdExpense.vehicleId);
+    await reminderTriggerService.recheckMileageReminders(
+      ownerId,
+      createdExpense.vehicleId,
+      timeZone
+    );
   }
 
   return c.json(
@@ -1122,7 +1126,8 @@ routes.put(
     if (updatedExpense.mileage != null) {
       await reminderTriggerService.recheckMileageReminders(
         existingExpense.userId,
-        updatedExpense.vehicleId
+        updatedExpense.vehicleId,
+        timeZone
       );
     }
 

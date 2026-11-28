@@ -59,13 +59,14 @@ async function afterOdometerChange(
   userId: string,
   trip: { tripId: string; vehicleId: string },
   removedEntryIds: string[],
-  action: 'create' | 'edit' | 'delete'
+  action: 'create' | 'edit' | 'delete',
+  timeZone: string | undefined
 ): Promise<void> {
   try {
     if (removedEntryIds.length > 0) {
       await deleteEntryPhotosWithRetry(removedEntryIds, userId, trip);
     }
-    await reminderTriggerService.recheckMileageReminders(userId, trip.vehicleId);
+    await reminderTriggerService.recheckMileageReminders(userId, trip.vehicleId, timeZone);
   } catch (error) {
     logger.error(`Trip ${action}: mileage reminder recheck failed after the change was committed`, {
       ...trip,
@@ -123,7 +124,13 @@ export async function createTrip(
     return created;
   });
 
-  await afterOdometerChange(userId, { tripId: trip.id, vehicleId: trip.vehicleId }, [], 'create');
+  await afterOdometerChange(
+    userId,
+    { tripId: trip.id, vehicleId: trip.vehicleId },
+    [],
+    'create',
+    data.timeZone
+  );
   return trip;
 }
 
@@ -168,7 +175,9 @@ export async function updateTrip(
     return { updated: row, removedEntryIds };
   });
 
-  if (resync) await afterOdometerChange(userId, { tripId: id, vehicleId }, removedEntryIds, 'edit');
+  if (resync) {
+    await afterOdometerChange(userId, { tripId: id, vehicleId }, removedEntryIds, 'edit', timeZone);
+  }
   return updated;
 }
 
@@ -283,6 +292,12 @@ export async function deleteTrip(
   });
 
   if (!handedOver && !options.keepOdometer) {
-    await afterOdometerChange(userId, { tripId: id, vehicleId }, removedEntryIds, 'delete');
+    await afterOdometerChange(
+      userId,
+      { tripId: id, vehicleId },
+      removedEntryIds,
+      'delete',
+      options.timeZone
+    );
   }
 }

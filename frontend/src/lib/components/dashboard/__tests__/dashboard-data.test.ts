@@ -199,6 +199,32 @@ describe('dashboard data', () => {
 		]);
 	});
 
+	test('a time-or-mileage reminder past its milestone shows the mileage line, not its date', () => {
+		const reminders = [
+			{
+				reminder: {
+					id: 'b1',
+					name: 'Service',
+					isActive: true,
+					triggerMode: 'both',
+					nextDueDate: new Date(NOW + 5 * DAY).toISOString(),
+					nextDueOdometer: 45000
+				},
+				vehicleIds: ['v1'],
+				mileageDue: true
+			}
+		] as unknown as ReminderWithVehicles[];
+
+		const items = attentionItems(reminders, [], () => 'Daily Driver', String, NOW);
+
+		expect(items).toHaveLength(1);
+		expect(items[0]).toMatchObject({
+			status: 'overdue',
+			detail: 'Reached 45,000 mi',
+			dueAt: NOW
+		});
+	});
+
 	test('a mileage reminder within about 1,000 miles of its reading is coming up soon, in the car’s unit', () => {
 		const mileage = (id: string, nextDueOdometer: number, currentOdometer: number | null) => ({
 			reminder: { id, name: id, isActive: true, nextDueDate: null, nextDueOdometer },
