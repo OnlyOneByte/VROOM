@@ -11,6 +11,7 @@ import {
 
 const PHOTOS_API = 'https://photoslibrary.googleapis.com';
 export const VROOM_ALBUM_TITLE = 'VROOM';
+export const MAX_RECEIPT_SEARCH_PAGES = 20;
 
 export interface PhotosMediaItem {
   id: string;
@@ -79,7 +80,10 @@ export class GooglePhotosService {
     return this.client.downloadMediaItem(mediaItemId, options);
   }
 
-  async listReceiptPhotos(maxItems: number): Promise<PhotosMediaItem[]> {
+  async listReceiptPhotos(
+    maxItems: number,
+    skip: (photoId: string) => Promise<boolean> = async () => false
+  ): Promise<PhotosMediaItem[]> {
     if (!this.client.searchMediaItems) {
       throw new SyncError(
         SyncErrorCode.AUTH_INVALID,
@@ -89,14 +93,16 @@ export class GooglePhotosService {
     const albumId = await this.resolveAlbumId();
     const items: PhotosMediaItem[] = [];
     let pageToken: string | undefined;
-    do {
+    for (let pages = 0; pages < MAX_RECEIPT_SEARCH_PAGES; pages++) {
       const page = await this.client.searchMediaItems(albumId, pageToken);
       for (const item of page.items) {
+        if (await skip(item.id)) continue;
         items.push(item);
         if (items.length >= maxItems) return items;
       }
       pageToken = page.nextPageToken;
-    } while (pageToken);
+      if (!pageToken) break;
+    }
     return items;
   }
 
@@ -241,7 +247,7 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
       });
       if (!bytes.ok) {
         throw new SyncError(
-          SyncErrorCode.NETWORK_ERROR,
+          bytes.status === 429 ? SyncErrorCode.QUOTA_EXCEEDED : SyncErrorCode.NETWORK_ERROR,
           `Google Photos download failed: ${bytes.status}`
         );
       }

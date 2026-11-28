@@ -1,6 +1,6 @@
 <script lang="ts">
 	import DatePicker from '#lib/components/common/date-picker.svelte';
-	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
@@ -101,7 +101,10 @@
 			const drafts = await photosImportApi.getReceiptDrafts();
 			rows = drafts.map(toRow);
 		} catch (e) {
-			loadError = userFacingErrorMessage(e);
+			loadError =
+				e instanceof ApiError && e.code !== 'API_ERROR' && [502, 503].includes(e.statusCode ?? 0)
+					? e.message
+					: userFacingErrorMessage(e);
 		} finally {
 			isLoading = false;
 		}

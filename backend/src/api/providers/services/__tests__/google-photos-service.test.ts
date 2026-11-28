@@ -9,6 +9,7 @@ import {
   classifyPhotosApiError,
   GooglePhotosService,
   listAllAlbums,
+  MAX_RECEIPT_SEARCH_PAGES,
   VROOM_ALBUM_TITLE,
 } from '../google-photos-service';
 
@@ -85,6 +86,32 @@ describe('GooglePhotosService — read', () => {
     expect(await svc.healthCheck()).toBe(false);
     store.injectFault('listAlbums', photosApiError(401, 'Invalid Credentials'));
     await expect(svc.healthCheck()).rejects.toMatchObject({ code: SyncErrorCode.AUTH_INVALID });
+  });
+});
+
+describe('GooglePhotosService — receipt listing', () => {
+  test('skipped photos do not use up the limit, so later pages are read', async () => {
+    const ids = store.seedSearchablePhotos(
+      Array.from({ length: 30 }, () => ({})),
+      10
+    );
+    const imported = new Set(ids.slice(0, 25));
+    const listed = await svc.listReceiptPhotos(5, async (id) => imported.has(id));
+    expect(listed.map((p) => p.id)).toEqual(ids.slice(25));
+  });
+
+  test('paging stops after a bounded number of pages', async () => {
+    store.seedSearchablePhotos(
+      Array.from({ length: MAX_RECEIPT_SEARCH_PAGES + 5 }, () => ({})),
+      1
+    );
+    let looked = 0;
+    const listed = await svc.listReceiptPhotos(100, async () => {
+      looked++;
+      return true;
+    });
+    expect(listed).toEqual([]);
+    expect(looked).toBe(MAX_RECEIPT_SEARCH_PAGES);
   });
 });
 

@@ -3,7 +3,6 @@ import { PayloadTooLargeError, SyncError, SyncErrorCode } from '../../../errors'
 import type { ReceiptDraft } from '../../providers/domains/vlm/prompt';
 import type { PhotosMediaItem } from '../../providers/services/google-photos-service';
 import {
-  MAX_RECEIPT_PHOTOS_LOOKED_AT,
   MAX_RECEIPT_PHOTOS_PER_RUN,
   MAX_SCAN_BYTES,
   ReceiptScanStopped,
@@ -19,6 +18,8 @@ function makeDeps(overrides: Partial<StageDeps> = {}): StageDeps {
     freshUrl: async (id) => `https://photos.fake/${id}`,
     parseImage: async () => ({ amount: 10 }) as ReceiptDraft,
     isAlreadyImported: async () => false,
+    cachedDraft: () => undefined,
+    rememberDraft: () => {},
     ...overrides,
   };
 }
@@ -51,9 +52,14 @@ describe('stageReceiptDrafts', () => {
     expect(drafts[1]?.draft).toEqual({ amount: 40, vendor: 'Shell' });
   });
 
-  test('an already-imported photo is filtered out', async () => {
+  test('an already-imported photo is filtered out while listing', async () => {
     const deps = makeDeps({
-      listReceiptPhotos: async () => [photo('m-1'), photo('m-2'), photo('m-3')],
+      listReceiptPhotos: async (_max, skip) => {
+        const all = [photo('m-1'), photo('m-2'), photo('m-3')];
+        const kept: PhotosMediaItem[] = [];
+        for (const item of all) if (!(await skip(item.id))) kept.push(item);
+        return kept;
+      },
       isAlreadyImported: async (id) => id === 'm-2',
     });
     const drafts = await stageReceiptDrafts(deps);
@@ -107,18 +113,20 @@ describe('stageReceiptDrafts', () => {
     await expect(stageReceiptDrafts(deps)).rejects.toThrow('Photos API 503');
   });
 
-  test('the read looks past imported photos, and no more than the cap is staged', async () => {
+  test('the read skips imported photos while listing, and no more than the cap is staged', async () => {
     let calledWith = -1;
     const all = Array.from({ length: 40 }, (_, i) => photo(`m-${i}`));
     const deps = makeDeps({
-      listReceiptPhotos: async (max) => {
+      listReceiptPhotos: async (max, skip) => {
         calledWith = max;
-        return all.slice(0, max);
+        const kept: PhotosMediaItem[] = [];
+        for (const item of all) if (kept.length < max && !(await skip(item.id))) kept.push(item);
+        return kept;
       },
       isAlreadyImported: async (id) => Number(id.slice(2)) < 30,
     });
     const drafts = await stageReceiptDrafts(deps);
-    expect(calledWith).toBe(MAX_RECEIPT_PHOTOS_LOOKED_AT);
+    expect(calledWith).toBe(MAX_RECEIPT_PHOTOS_PER_RUN);
     expect(drafts.map((d) => d.photoId)).toEqual(all.slice(30).map((p) => p.id));
     expect(await stageReceiptDrafts(deps, 5)).toHaveLength(5);
     expect(MAX_RECEIPT_PHOTOS_PER_RUN).toBe(25);
@@ -162,6 +170,7 @@ describe('stageReceiptDrafts', () => {
     ['a rejected key', new Error('VLM provider returned HTTP 401'), 'ai_key'],
     ['a rate limit', new Error('VLM provider returned HTTP 429'), 'ai_rate_limit'],
     ['lost Photos access', new SyncError(SyncErrorCode.AUTH_INVALID, 'revoked'), 'photos_access'],
+    ['a Photos quota', new SyncError(SyncErrorCode.QUOTA_EXCEEDED, 'quota'), 'photos_quota'],
   ])('%s stops the whole run after the first photo', async (_, failure, reason) => {
     let scans = 0;
     const deps = makeDeps({
@@ -177,14 +186,61 @@ describe('stageReceiptDrafts', () => {
     expect(scans).toBe(1);
   });
 
-  test('PERSISTS NOTHING — the orchestration only reads (no write seam in StageDeps)', () => {
+  test('writes nothing to the database: the only write seam is the in-memory draft cache', () => {
     const deps = makeDeps();
     expect(Object.keys(deps).sort()).toEqual([
+      'cachedDraft',
       'downloadPhoto',
       'freshUrl',
       'isAlreadyImported',
       'listReceiptPhotos',
       'parseImage',
+      'rememberDraft',
     ]);
+  });
+
+  test('a photo with a cached draft is not downloaded or scanned again', async () => {
+    const remembered: string[] = [];
+    let scans = 0;
+    const deps = makeDeps({
+      listReceiptPhotos: async () => [photo('seen'), photo('new')],
+      cachedDraft: (id) => (id === 'seen' ? { amount: 7 } : undefined),
+      rememberDraft: (id) => {
+        remembered.push(id);
+      },
+      parseImage: async () => {
+        scans++;
+        return { amount: 10 };
+      },
+    });
+    const drafts = await stageReceiptDrafts(deps);
+    expect(drafts.map((d) => d.draft)).toEqual([{ amount: 7 }, { amount: 10 }]);
+    expect(scans).toBe(1);
+    expect(remembered).toEqual(['new']);
+  });
+
+  test('a scan that reads nothing is not cached, so it is tried again next time', async () => {
+    const remembered: string[] = [];
+    const deps = makeDeps({
+      listReceiptPhotos: async () => [photo('blank')],
+      parseImage: async () => ({}),
+      rememberDraft: (id) => {
+        remembered.push(id);
+      },
+    });
+    await stageReceiptDrafts(deps);
+    expect(remembered).toEqual([]);
+  });
+
+  test.each<[string, SyncError, ScanStopReason]>([
+    ['a Photos quota', new SyncError(SyncErrorCode.QUOTA_EXCEEDED, 'quota'), 'photos_quota'],
+    ['lost Photos access', new SyncError(SyncErrorCode.AUTH_INVALID, 'revoked'), 'photos_access'],
+  ])('%s while listing stops the run with its own reason', async (_, failure, reason) => {
+    const deps = makeDeps({
+      listReceiptPhotos: async () => {
+        throw failure;
+      },
+    });
+    await expect(stageReceiptDrafts(deps)).rejects.toMatchObject({ reason });
   });
 });

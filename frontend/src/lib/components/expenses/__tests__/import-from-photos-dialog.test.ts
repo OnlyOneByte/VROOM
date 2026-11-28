@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { ConfirmDraftInput, ReceiptDraftItem } from '#lib/services/photos-import-api.ts';
 import type { Vehicle } from '#lib/types/index.ts';
-import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
+import {
+	ApiError,
+	SERVER_FAILURE_MESSAGE,
+	UNEXPECTED_FAILURE_MESSAGE
+} from '#lib/utils/error-handling.ts';
 
 const mocks = vi.hoisted(() => ({
 	getReceiptDrafts: vi.fn<() => Promise<ReceiptDraftItem[]>>(),
@@ -152,6 +156,25 @@ describe('ImportFromPhotosDialog: loading drafts', () => {
 
 		await waitFor(() => expect(rows()).toHaveLength(1));
 		expect(mocks.getReceiptDrafts).toHaveBeenCalledTimes(2);
+	});
+
+	test.each([
+		[502, "The AI provider didn't accept its key. Check it in Settings, then try again."],
+		[503, 'Google Photos is limiting requests right now. Try again in a few minutes.']
+	])('a stopped sweep (%i) shows what the server says went wrong', async (status, message) => {
+		mocks.getReceiptDrafts.mockRejectedValue(new ApiError(message, status, undefined, 'AppError'));
+		mount();
+
+		expect(await screen.findByTestId('photos-import-error')).toHaveTextContent(message);
+	});
+
+	test('a proxy error page keeps the generic wording, not the status text', async () => {
+		mocks.getReceiptDrafts.mockRejectedValue(new ApiError('Request failed with status 503', 503));
+		mount();
+
+		expect(await screen.findByTestId('photos-import-error')).toHaveTextContent(
+			SERVER_FAILURE_MESSAGE
+		);
 	});
 
 	test('a non-Error failure gets a generic explanation', async () => {

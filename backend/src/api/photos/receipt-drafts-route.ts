@@ -15,6 +15,7 @@ import { parseExtraction } from '../providers/domains/vlm/prompt';
 import { getVlmProvider } from '../providers/domains/vlm/registry';
 import { resolveProvider } from '../providers/resolve';
 import { GooglePhotosService } from '../providers/services/google-photos-service';
+import { cachedReceiptDraft, rememberReceiptDraft } from './receipt-draft-cache';
 import {
   MAX_SCAN_BYTES,
   ReceiptScanStopped,
@@ -29,6 +30,7 @@ const STOPPED_MESSAGES: Record<ScanStopReason, [string, number]> = {
     'The AI provider is limiting requests right now. Try again in a few minutes.',
     503,
   ],
+  photos_quota: ['Google Photos is limiting requests right now. Try again in a few minutes.', 503],
   photos_access: [
     'Google Photos needs reconnecting. Reconnect it in Settings, then try again.',
     502,
@@ -101,14 +103,18 @@ routes.get(
 
     const photosService = photosServiceBuilder(photosRow);
     const vlmProvider = await getVlmProvider(vlmRow);
+    const vlmVersion = vlmRow.updatedAt?.getTime() ?? 0;
+    const draftKey = (photoId: string) => `${user.id}:${vlmRow.id}:${vlmVersion}:${photoId}`;
     const deps: StageDeps = {
-      listReceiptPhotos: (max) => photosService.listReceiptPhotos(max),
+      listReceiptPhotos: (max, skip) => photosService.listReceiptPhotos(max, skip),
       downloadPhoto: (id) => photosService.download(id, { maxBytes: MAX_SCAN_BYTES }),
       freshUrl: (id) => photosService.getFreshUrl(id),
       parseImage: async (bytes, mimeType) =>
         parseExtraction(await vlmProvider.extractReceipt({ data: bytes, mimeType })),
       isAlreadyImported: async (photoId) =>
         (await repos().expenses.findByClientId(`photos:${photoId}`, user.id)) !== null,
+      cachedDraft: (photoId) => cachedReceiptDraft(draftKey(photoId)),
+      rememberDraft: (photoId, draft) => rememberReceiptDraft(draftKey(photoId), draft),
     };
 
     try {

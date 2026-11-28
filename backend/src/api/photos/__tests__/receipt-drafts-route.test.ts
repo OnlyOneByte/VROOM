@@ -16,7 +16,11 @@ import {
 import { seedVehicle } from '../../../test-helpers/seed';
 import { encrypt } from '../../../utils/encryption';
 import { stopLocalOcr } from '../../providers/domains/vlm/local-ocr';
-import { GooglePhotosService } from '../../providers/services/google-photos-service';
+import {
+  classifyPhotosApiError,
+  GooglePhotosService,
+} from '../../providers/services/google-photos-service';
+import { clearReceiptDraftCache } from '../receipt-draft-cache';
 import { setPhotosServiceBuilderForTest } from '../receipt-drafts-route';
 import type { ReceiptDraftItem } from '../receipt-drafts-service';
 
@@ -35,6 +39,7 @@ afterAll(stopLocalOcr);
 
 afterEach(() => {
   setPhotosServiceBuilderForTest(null);
+  clearReceiptDraftCache();
   globalThis.fetch = realFetch;
   ctx.close();
 });
@@ -186,6 +191,55 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     expect(await res.text()).toMatch(/Could not read|try again/i);
     const count = ((await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number }).n;
     expect(count).toBe(0);
+  });
+
+  test('opening the import again reuses the drafts already read, without scanning again', async () => {
+    await seedPhotosProvider();
+    await seedVlmProvider();
+    store.seedSearchablePhotos([{ filename: 'r1.jpg' }, { filename: 'r2.jpg' }]);
+    let scans = 0;
+    globalThis.fetch = (async () => {
+      scans++;
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: '{"amount": 9}' } }] }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+      // biome-ignore lint/suspicious/noExplicitAny: test fetch stub.
+    }) as any;
+
+    const first = await getDrafts();
+    const second = await getDrafts();
+    expect(first.drafts.map((d) => d.draft.amount)).toEqual([9, 9]);
+    expect(second.drafts).toEqual(first.drafts);
+    expect(scans).toBe(2);
+  });
+
+  test('editing the AI provider scans the photos again instead of reusing old drafts', async () => {
+    await seedPhotosProvider();
+    await seedVlmProvider();
+    store.seedSearchablePhotos([{ filename: 'r1.jpg' }]);
+    stubVlm('{"amount": 9}');
+    expect((await getDrafts()).drafts[0]?.draft.amount).toBe(9);
+
+    await ctx.sql.run(
+      "UPDATE user_providers SET updated_at = updated_at + 60 WHERE domain = 'vlm' AND user_id = ?",
+      [ctx.user.id]
+    );
+    stubVlm('{"amount": 11}');
+    expect((await getDrafts()).drafts[0]?.draft.amount).toBe(11);
+  });
+
+  test('a Google Photos quota error stops the run with one clear message', async () => {
+    await seedPhotosProvider();
+    await seedVlmProvider();
+    store.seedSearchablePhotos([{ filename: 'a.jpg' }]);
+    store.injectFault('searchMediaItems', classifyPhotosApiError(429, 'Too Many Requests'));
+    const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');
+    expect(res.status).toBe(503);
+    expect(await res.text()).toMatch(/Google Photos is limiting requests/);
   });
 
   test('a rejected AI key stops the run with a message that says so', async () => {
