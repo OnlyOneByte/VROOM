@@ -149,22 +149,16 @@
 <div class="border-b py-3 last:border-b-0" data-slot="provider-tile">
 	<div>
 		<!-- min-w-0 is required: grid items default to min-width auto and overflow. -->
-		<div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+		<div class="flex min-w-0 items-center justify-between gap-2">
 			<div class="flex items-center gap-3 min-w-0">
 				<div
-					class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+					class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
 					aria-hidden="true"
 				>
 					<Icon class="size-5 text-foreground" />
 				</div>
 				<div class="min-w-0">
-					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-						<p class="min-w-0 font-medium break-words">{provider.displayName}</p>
-						<ProviderStatusBadge status={provider.status} />
-						{#if lastBackupAt}
-							<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
-						{/if}
-					</div>
+					<p class="min-w-0 font-medium break-words">{provider.displayName}</p>
 					<p class="text-sm text-muted-foreground truncate">
 						{#if provider.config?.['accountEmail']}
 							{provider.config['accountEmail']} ·
@@ -173,7 +167,7 @@
 					</p>
 				</div>
 			</div>
-			<div class="flex shrink-0 items-center gap-2 self-end sm:gap-1 sm:self-auto">
+			<div class="flex shrink-0 items-center gap-2 sm:gap-1">
 				<Button
 					variant="ghost"
 					size="icon"
@@ -196,7 +190,7 @@
 					variant="ghost"
 					size="icon"
 					class="size-10"
-					aria-label={expanded ? 'Collapse provider details' : 'Expand provider details'}
+					aria-label={expanded ? 'Collapse storage details' : 'Expand storage details'}
 					aria-expanded={expanded}
 					onclick={() => (expanded = !expanded)}
 				>
@@ -207,6 +201,16 @@
 					{/if}
 				</Button>
 			</div>
+		</div>
+		<div class="mt-2 flex flex-wrap items-center gap-2 pl-14" data-slot="provider-badges">
+			<ProviderStatusBadge
+				status={provider.status}
+				lastCheckedAt={provider.lastCheckedAt}
+				lastErrorCode={provider.lastErrorCode}
+			/>
+			{#if lastBackupAt}
+				<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
+			{/if}
 		</div>
 	</div>
 
@@ -230,7 +234,7 @@
 				<div class="flex items-center justify-between">
 					<div class="space-y-0.5">
 						<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
-						<p class="text-xs text-muted-foreground">Store ZIP backups on this provider</p>
+						<p class="text-xs text-muted-foreground">Store ZIP backups in this storage</p>
 					</div>
 					<Switch
 						id="backup-{provider.id}"
@@ -245,8 +249,8 @@
 				{/if}
 			{:else}
 				<p class="text-xs text-muted-foreground">
-					{providerLabel(provider.providerType)} stores your photos only. Use a {zipBackupProviders}
-					provider for ZIP data backups.
+					{providerLabel(provider.providerType)} stores your photos only. Use {zipBackupProviders} for
+					ZIP data backups.
 				</p>
 			{/if}
 			{#if supportsSheets}
@@ -279,7 +283,7 @@
 								{#if isResuming}
 									<LoaderCircle class="h-3 w-3 animate-spin mr-1" />
 								{/if}
-								Resume Automatic Backups
+								Resume automatic backups
 							</Button>
 						</AlertDescription>
 					</Alert>
@@ -291,7 +295,7 @@
 	{#if expanded}
 		<div class="mt-4 sm:pl-14">
 			<div class="mb-4 space-y-3 border-t pt-4">
-				<p class="text-sm font-medium text-muted-foreground">Provider Settings</p>
+				<p class="text-sm font-medium text-muted-foreground">Storage settings</p>
 				{#if details.length > 0}
 					<div class="space-y-1 text-sm">
 						{#each details as detail (detail.label)}
@@ -323,7 +327,7 @@
 							Syncing...
 						{:else}
 							<RefreshCw class="h-3 w-3 mr-1" />
-							Sync All
+							Sync all
 						{/if}
 					</Button>
 				</div>

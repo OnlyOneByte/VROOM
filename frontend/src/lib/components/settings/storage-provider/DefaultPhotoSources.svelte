@@ -26,10 +26,10 @@
 	import type { PhotoCategory, StorageConfig, UserProviderInfo } from '#lib/types/index.ts';
 
 	const CATEGORY_META: Record<PhotoCategory, { label: string; icon: typeof Camera }> = {
-		vehicle_photos: { label: 'Vehicle Photos', icon: Image },
-		expense_receipts: { label: 'Expense Receipts', icon: FileText },
-		insurance_docs: { label: 'Insurance Docs', icon: ShieldCheck },
-		odometer_readings: { label: 'Odometer Readings', icon: Gauge }
+		vehicle_photos: { label: 'Vehicle photos', icon: Image },
+		expense_receipts: { label: 'Expense receipts', icon: FileText },
+		insurance_docs: { label: 'Insurance docs', icon: ShieldCheck },
+		odometer_readings: { label: 'Odometer readings', icon: Gauge }
 	};
 
 	const CATEGORIES: PhotoCategory[] = [
@@ -122,7 +122,7 @@
 				pendingChange = {
 					category: CATEGORIES[0] ?? 'vehicle_photos',
 					providerId,
-					providerName: provider?.displayName ?? 'this provider',
+					providerName: provider?.displayName ?? 'this storage',
 					gap: totalGap,
 					total: totalPhotos
 				};
@@ -156,7 +156,7 @@
 					pendingChange = {
 						category,
 						providerId,
-						providerName: provider?.displayName ?? 'this provider',
+						providerName: provider?.displayName ?? 'this storage',
 						gap,
 						total: categoryStatus.total
 					};
@@ -189,13 +189,13 @@
 <div class="space-y-4">
 	<div class="flex items-center gap-2">
 		<Camera class="h-4 w-4 text-muted-foreground" />
-		<p class="text-sm font-medium">Default Photo Source</p>
+		<p class="text-sm font-medium">Default photo source</p>
 	</div>
 
 	<div class="space-y-2">
 		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
 			<p class="text-xs text-muted-foreground min-w-0">
-				Select a provider to serve all photo types from.
+				Choose the storage that holds every type of photo.
 			</p>
 			<div class="flex items-center gap-2">
 				{#if checkingCategory && !advancedOpen}
@@ -312,7 +312,7 @@
 <AlertDialog bind:open={showSyncGapDialog}>
 	<AlertDialogContent>
 		<AlertDialogHeader>
-			<AlertDialogTitle>Unsynced Photos</AlertDialogTitle>
+			<AlertDialogTitle>Unsynced photos</AlertDialogTitle>
 			<AlertDialogDescription>
 				{#if pendingChange}
 					{pendingChange.gap} of {pendingChange.total} photos haven't synced to {pendingChange.providerName}
@@ -328,7 +328,7 @@
 			>
 				Cancel
 			</AlertDialogCancel>
-			<AlertDialogAction onclick={confirmChange}>Switch Anyway</AlertDialogAction>
+			<AlertDialogAction onclick={confirmChange}>Switch anyway</AlertDialogAction>
 		</AlertDialogFooter>
 	</AlertDialogContent>
 </AlertDialog>

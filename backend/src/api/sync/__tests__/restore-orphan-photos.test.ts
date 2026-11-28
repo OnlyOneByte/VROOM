@@ -15,8 +15,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function photoIds(): string[] {
-  return (ctx.sqlite.query('SELECT id FROM photos ORDER BY id').all() as { id: string }[]).map(
+async function photoIds(): Promise<string[]> {
+  return ((await ctx.sql.all('SELECT id FROM photos ORDER BY id')) as { id: string }[]).map(
     (r) => r.id
   );
 }
@@ -40,18 +40,18 @@ describe('an orphaned photo row does not make backups unrestorable', () => {
     });
     const trip = await json<DataEnvelope<{ id: string }>>(tripRes);
     expect(tripRes.status, JSON.stringify(trip)).toBe(201);
-    const odometer = ctx.sqlite.query('SELECT id FROM odometer_entries').get() as { id: string };
+    const odometer = (await ctx.sql.get('SELECT id FROM odometer_entries')) as { id: string };
     expect(odometer, 'trip auto-creates an odometer entry').toBeTruthy();
 
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-odo', ?, 'odometer_entry', ?, 'dash.jpg', 'image/jpeg', 2048),
               ('photo-car', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 4096)`,
       [ctx.user.id, odometer.id, ctx.user.id, vehicle.data.id]
     );
 
-    ctx.sqlite.run('DELETE FROM odometer_entries WHERE id = ?', [odometer.id]);
-    expect(photoIds(), 'a legacy orphan left by an older build').toEqual([
+    await ctx.sql.run('DELETE FROM odometer_entries WHERE id = ?', [odometer.id]);
+    expect(await photoIds(), 'a legacy orphan left by an older build').toEqual([
       'photo-car',
       'photo-odo',
     ]);
@@ -67,7 +67,7 @@ describe('an orphaned photo row does not make backups unrestorable', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.skipped).toEqual({ photos: 1 });
-    expect(photoIds()).toEqual(['photo-car']);
+    expect(await photoIds()).toEqual(['photo-car']);
   });
 
   test('an old-format 1.0.0 ZIP carrying an orphan photo and its ref restores without them', async () => {
@@ -105,7 +105,7 @@ describe('an orphaned photo row does not make backups unrestorable', () => {
     const { restoreService } = await import('../restore');
     const result = await restoreService.restoreFromBackup(userId, zip.toBuffer(), 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(photoIds()).toEqual(['p-ok']);
+    expect(await photoIds()).toEqual(['p-ok']);
   });
 
   test("a shared-vehicle editor's receipt on the owner's expense survives the editor's replace restore", async () => {
@@ -117,21 +117,21 @@ describe('an orphaned photo row does not make backups unrestorable', () => {
     const vehicle = await json<DataEnvelope<{ id: string }>>(ownerVehicle);
     expect(ownerVehicle.status, JSON.stringify(vehicle)).toBe(201);
     const editorId = 'editor-user';
-    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+    await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
       editorId,
       'editor@test.com',
       'Editor',
     ]);
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, created_by, category, date, expense_amount)
        VALUES ('exp-shared', ?, ?, ?, 'fuel', 1700000000, 3000)`,
       [vehicle.data.id, ctx.user.id, editorId]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v-editor', ?, 'Mini', 'Cooper', 2019)`,
       [editorId]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-receipt', ?, 'expense', 'exp-shared', 'r.jpg', 'image/jpeg', 1),
               ('photo-own', ?, 'vehicle', 'v-editor', 'c.jpg', 'image/jpeg', 1)`,
@@ -144,7 +144,7 @@ describe('an orphaned photo row does not make backups unrestorable', () => {
     const result = await restoreService.restoreFromBackup(editorId, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect(photoIds(), "the owner's receipt is not wiped by the editor's restore").toEqual([
+    expect(await photoIds(), "the owner's receipt is not wiped by the editor's restore").toEqual([
       'photo-own',
       'photo-receipt',
     ]);

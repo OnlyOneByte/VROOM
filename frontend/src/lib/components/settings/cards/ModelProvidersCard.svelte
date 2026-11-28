@@ -313,7 +313,7 @@
 	<CardHeader>
 		<CardTitle level={2} id="{copy.anchor}-title" class="text-base">{copy.title}</CardTitle>
 		<CardAction>
-			<Button onclick={openCreate} data-testid="{domain}-add-provider">
+			<Button variant="outline" onclick={openCreate} data-testid="{domain}-add-provider">
 				<Plus aria-hidden="true" />
 				{copy.addLabel}
 			</Button>
@@ -343,7 +343,7 @@
 					<div class="space-y-3 py-3 first:pt-0" data-testid="{domain}-builtin-row">
 						<div class="flex min-w-0 items-center gap-3">
 							<div
-								class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+								class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
 								aria-hidden="true"
 							>
 								<Icon class="size-5 text-foreground" />
@@ -368,7 +368,7 @@
 						<div class="flex items-center justify-between gap-2">
 							<div class="flex min-w-0 items-center gap-3">
 								<div
-									class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+									class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
 									aria-hidden="true"
 								>
 									<Icon class="size-5 text-foreground" />
@@ -376,7 +376,11 @@
 								<div class="min-w-0">
 									<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
 										<p class="font-medium break-words">{provider.displayName}</p>
-										<ProviderStatusBadge status={provider.status} />
+										<ProviderStatusBadge
+											status={provider.status}
+											lastCheckedAt={provider.lastCheckedAt}
+											lastErrorCode={provider.lastErrorCode}
+										/>
 									</div>
 									<p class="text-sm break-words text-muted-foreground">
 										{labelFor(provider.providerType)}

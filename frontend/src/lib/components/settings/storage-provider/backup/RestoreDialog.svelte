@@ -134,7 +134,7 @@
 				}
 			}
 		} catch (err) {
-			error = `Couldn't load your storage providers. ${userFacingErrorMessage(err)}`;
+			error = `Couldn't load your storage. ${userFacingErrorMessage(err)}`;
 		} finally {
 			isLoadingProviders = false;
 		}
@@ -361,24 +361,24 @@
 	}
 
 	let dialogTitle = $derived.by(() => {
-		if (step === 1) return 'Restore Data';
-		if (step === 2 && flowType === 'file') return 'Upload Backup File';
+		if (step === 1) return 'Restore data';
+		if (step === 2 && flowType === 'file') return 'Upload backup file';
 		if (step === 2 && flowType === 'provider') {
-			if (providerSubStep === 'pick-provider') return 'Select Provider';
-			if (providerSubStep === 'pick-file') return 'Select Backup';
+			if (providerSubStep === 'pick-provider') return 'Select storage';
+			if (providerSubStep === 'pick-file') return 'Select backup';
 			return 'Loading...';
 		}
 		if (step === 4) return 'Restore finished';
-		return 'Preview Import';
+		return 'Preview import';
 	});
 
 	let dialogDescription = $derived.by(() => {
 		if (step === 1) return 'Choose where to restore your data from';
 		if (step === 2 && flowType === 'file') return 'Select a .zip backup file';
 		if (step === 2 && flowType === 'provider') {
-			if (providerSubStep === 'pick-provider') return 'Choose a provider and source type';
+			if (providerSubStep === 'pick-provider') return 'Choose storage and a source type';
 			if (providerSubStep === 'pick-file') return 'Choose a backup to restore';
-			return 'Loading data from provider...';
+			return 'Loading data from storage...';
 		}
 		if (step === 4) return 'Your data is back. A few sharing settings were not brought back.';
 		return 'Review and confirm the restore';
@@ -463,9 +463,9 @@
 								<Cloud class="size-5 text-foreground" />
 							</div>
 							<div>
-								<div class="font-medium text-foreground">Restore from provider</div>
+								<div class="font-medium text-foreground">Restore from storage</div>
 								<div class="text-sm text-muted-foreground">
-									Choose a connected provider and backup source
+									Choose connected storage and a backup source
 								</div>
 							</div>
 						</button>
@@ -488,7 +488,7 @@
 			{#if step === 2 && flowType === 'provider' && providerSubStep === 'pick-provider'}
 				{#if isLoadingProviders}
 					<div class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-						<LoaderCircle class="h-4 w-4 animate-spin" /><span>Loading providers...</span>
+						<LoaderCircle class="h-4 w-4 animate-spin" /><span>Loading storage...</span>
 					</div>
 				{:else}
 					<ProviderPicker providers={restoreProviders} onSelect={handleProviderSelect} />

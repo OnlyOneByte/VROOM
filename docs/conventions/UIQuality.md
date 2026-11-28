@@ -164,7 +164,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   (with bottom padding to clear them) and a normal row at the end of the form from `lg`.
 - Icon-only buttons are `size="icon"` or larger and always have an `aria-label`. On touch layouts
   use `icon-lg` or pad the hit area to 40px.
-- Labels are verbs in Title Case: "Add Expense", "Log Fill-up", "Import CSV". While a mutation is
+- Labels are verbs in sentence case: "Add expense", "Log fill-up", "Import CSV". While a mutation is
   in flight the button is disabled and shows a spinner. That rule is for submits; expense
   create, edit and delete are optimistic instead (see *Interaction quality*).
 - A Retry button that reloads data or re-sends queued work stays focusable while it runs: use
@@ -175,7 +175,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Wrap form pages in `FormLayout`. One column on mobile; two columns only for short paired fields
   (date + amount) at `sm:` and up.
 - Every field has a visible `Label for=`. Required fields carry ` *`; optional fields say
-  "(Optional)". A prefilled chip (the expense form's vehicle and date) is the one exception: its
+  "(optional)". A prefilled chip (the expense form's vehicle and date) is the one exception: its
   value is the visible text, its `sr-only` label names it, and the value is read with that name.
 - Validation errors render under the field with `FormFieldError`, wired by `aria-describedby`
   and `aria-invalid`. Validate on submit and on blur, not on every keystroke.
@@ -197,7 +197,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   on open. Fields with a sensible default are prefilled: the vehicle from the last entry and the
   date as today, both shown as chips, and the category from that vehicle's last entry, selected
   in its chip row. Optional fields sit under one "More details" disclosure, open when editing or
-  when a field inside it is invalid. Add Expense is the reference.
+  when a field inside it is invalid. Add expense is the reference.
 - Long forms keep Save/Cancel reachable (a sticky bar at the bottom on mobile), and that bar
   never covers the last field: pad the form by the bar's height.
 - **One save model per page.** Settings that apply instantly need no Save button; when a page
@@ -254,7 +254,7 @@ Every view that loads or mutates data handles all of these:
    sentence-case title that says what's missing, one line on why it matters, and the primary
    action that fills it. NOT a bare "No data". `/reminders` is the reference.
    With no vehicles, every page whose content needs one shows the no-vehicle `EmptyState` with
-   Add Vehicle as its action (`/trips` is the reference). Don't render zero-value stat tiles,
+   Add vehicle as its action (`/trips` is the reference). Don't render zero-value stat tiles,
    filters or charts over no data. While an empty state shows its action, the page shows no second
    button for the same action under another label.
 3. **Error** — a visible, recoverable message, never a silent `catch {}` that leaves the user on
@@ -365,9 +365,9 @@ VROOM installs to phones. Mobile is the primary form factor, not an afterthought
 
 Plain, short, friendly, specific. Write like a helpful friend who knows cars, not like a bank.
 
-- **Case.** Page titles, card titles, buttons and nav use Title Case ("Monthly Expense Trends",
-  "Add Vehicle"). Empty-state titles, descriptions, helper text, toasts and errors use sentence
-  case ("Nothing due soon").
+- **Case.** Everything uses sentence case: page titles, card titles, buttons, nav, labels,
+  empty states, helper text, toasts and errors ("Monthly expense trends", "Add vehicle",
+  "Nothing due soon"). Only names keep their capitals ("Google Drive", "Settings", "VROOM").
 - **Verbs on buttons, nouns on titles.** A confirm button repeats the verb of its question
   ("Delete vehicle?" → "Delete").
 - **Say what happened and what to do.** "Couldn't save the expense. Check your connection and try

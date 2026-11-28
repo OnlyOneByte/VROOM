@@ -83,7 +83,7 @@ async function migratedPostgres(): Promise<import('@electric-sql/pglite').PGlite
   return client;
 }
 
-async function openPostgresTestDatabase(): Promise<import('@electric-sql/pglite').PGlite> {
+export async function openPostgresTestDatabase(): Promise<import('@electric-sql/pglite').PGlite> {
   if (!postgres) {
     postgres = migratedPostgres().catch((error) => {
       postgres = undefined;

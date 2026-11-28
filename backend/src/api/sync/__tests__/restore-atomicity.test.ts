@@ -11,8 +11,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function vehicleRows(): { id: string; make: string }[] {
-  return ctx.sqlite.query('SELECT id, make FROM vehicles').all() as { id: string; make: string }[];
+async function vehicleRows(): Promise<{ id: string; make: string }[]> {
+  return (await ctx.sql.all('SELECT id, make FROM vehicles')) as { id: string; make: string }[];
 }
 
 function duplicateVehicleRow(zipBuffer: Buffer): Buffer {
@@ -29,7 +29,7 @@ function duplicateVehicleRow(zipBuffer: Buffer): Buffer {
 describe('replace-mode restore atomicity — a mid-insert failure rolls the wipe back', () => {
   test('a backup that throws UNIQUE on vehicles.id during insert leaves the ORIGINAL data intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2021 });
-    expect(vehicleRows()).toHaveLength(1);
+    expect(await vehicleRows()).toHaveLength(1);
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -48,7 +48,7 @@ describe('replace-mode restore atomicity — a mid-insert failure rolls the wipe
     expect(String((threw as Error)?.message)).not.toContain('UNIQUE');
     expect(String((threw as Error)?.message)).not.toContain('vehicles.id');
 
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows, 'the original vehicle survives the failed restore (atomic rollback)').toHaveLength(
       1
     );
@@ -66,7 +66,7 @@ describe('replace-mode restore atomicity — a mid-insert failure rolls the wipe
 
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.imported?.vehicles).toBe(1);
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]?.id).toBe(vehicleId);
   });
@@ -85,11 +85,7 @@ describe('a restore past its time limit', () => {
       restoreService.restoreFromBackup(ctx.user.id, zip, 'replace', AbortSignal.abort(timedOut))
     ).rejects.toBe(timedOut);
 
-    expect(
-      vehicleRows()
-        .map((v) => v.make)
-        .sort()
-    ).toEqual(['Honda', 'Subaru']);
+    expect((await vehicleRows()).map((v) => v.make).sort()).toEqual(['Honda', 'Subaru']);
   });
 });
 
@@ -103,13 +99,12 @@ const OWNED_TABLES = [
   'user_preferences',
 ] as const;
 
-function snapshot(): Record<string, unknown[]> {
-  return Object.fromEntries(
-    OWNED_TABLES.map((table) => [
-      table,
-      ctx.sqlite.query(`SELECT * FROM ${table} ORDER BY rowid`).all(),
-    ])
-  );
+async function snapshot(): Promise<Record<string, unknown[]>> {
+  const tables: Record<string, unknown[]> = {};
+  for (const table of OWNED_TABLES) {
+    tables[table] = await ctx.sql.all(`SELECT * FROM ${table} ORDER BY rowid`);
+  }
+  return tables;
 }
 
 describe('a replace restore that fails on its last step', () => {
@@ -142,7 +137,7 @@ describe('a replace restore that fails on its last step', () => {
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
     await seedVehicle(ctx, { make: 'Honda', model: 'Fit', year: 2019 });
-    const before = snapshot();
+    const before = await snapshot();
     expect(before.vehicles).toHaveLength(2);
 
     const late = new Error('forced failure after every row was written');
@@ -158,7 +153,7 @@ describe('a replace restore that fails on its last step', () => {
       spy.mockRestore();
     }
 
-    expect(snapshot()).toEqual(before);
+    expect(await snapshot()).toEqual(before);
   });
 });
 
@@ -188,10 +183,6 @@ describe('a restore whose deadline passes while its transaction is open', () => 
       spy.mockRestore();
     }
 
-    expect(
-      vehicleRows()
-        .map((v) => v.make)
-        .sort()
-    ).toEqual(['Honda', 'Subaru']);
+    expect((await vehicleRows()).map((v) => v.make).sort()).toEqual(['Honda', 'Subaru']);
   });
 });

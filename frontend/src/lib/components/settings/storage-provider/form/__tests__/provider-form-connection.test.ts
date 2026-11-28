@@ -162,6 +162,20 @@ describe('ProviderForm connection contract', () => {
 		expect(saveButton().disabled).toBe(true);
 	});
 
+	test('the Google prompt names backups for Drive only, since Google Photos holds photos alone', async () => {
+		await startCreate(/Google Drive/);
+		expect(
+			screen.getByText('Connect your Google account to use Google Drive for photos and backups')
+		).toBeInTheDocument();
+
+		await fireEvent.click(screen.getByRole('button', { name: /Google Photos/ }));
+
+		expect(
+			screen.getByText('Connect your Google account to use Google Photos for photo storage')
+		).toBeInTheDocument();
+		expect(screen.queryByText(/for photos and backups/)).toBeNull();
+	});
+
 	test('a connected Drive account is saved with the OAuth nonce and no S3 data', async () => {
 		oauth.pendingEmail = 'me@example.com';
 		oauth.oauthNonce = '0f8fad5b-d9cb-469f-a165-70867728950e';

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { LoaderCircle, UserCheck } from '@lucide/svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import * as Empty from '#lib/components/ui/empty/index.ts';
@@ -86,12 +86,16 @@
 	}
 </script>
 
-<Card id="pending-accounts">
+<Card
+	variant="section"
+	id="pending-accounts"
+	role="region"
+	aria-labelledby="pending-accounts-title"
+>
 	<CardHeader>
-		<div class="flex items-center gap-2">
-			<UserCheck class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={2}>Waiting for Approval</CardTitle>
-		</div>
+		<CardTitle level={2} id="pending-accounts-title" class="text-base">
+			Waiting for approval
+		</CardTitle>
 		<CardDescription>
 			People who signed up while sign-up needed approval. They can't see or add anything yet.
 		</CardDescription>

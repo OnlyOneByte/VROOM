@@ -169,7 +169,7 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
       triggerMode: 'both',
       startDate: '2024-02-15T00:00:00.000Z',
     });
-    await addOdometerReading(ctx, vehicleId, 38000);
+    await addOdometerReading(ctx, vehicleId, 34000);
     const before = await reminderRow(id);
     expect(before.next_due_date).not.toBeNull();
 
@@ -177,7 +177,7 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
     expect(res.status).toBe(200);
 
     const after = await reminderRow(id);
-    expect(after.next_due_odometer, '38000 + 5000').toBe(43000);
+    expect(after.next_due_odometer, '34000 + 5000').toBe(39000);
     expect((after.next_due_date as number) > (before.next_due_date as number)).toBe(true);
   });
 

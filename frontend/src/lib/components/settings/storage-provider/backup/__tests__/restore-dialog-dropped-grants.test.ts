@@ -41,7 +41,7 @@ async function replaceRestore(result: RestoreResult) {
 }
 
 async function runReplace(onRestore: ReturnType<typeof vi.fn>, result: RestoreResult) {
-	await fireEvent.click(await screen.findByText('Restore from provider'));
+	await fireEvent.click(await screen.findByText('Restore from storage'));
 	await screen.findByText('How to restore');
 	await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
 	restoreFromProvider.mockResolvedValueOnce(result);
@@ -108,9 +108,9 @@ describe('RestoreDialog after a full restore', () => {
 
 		await view.rerender({ open: true });
 
-		expect(await screen.findByText('Restore Data')).toBeInTheDocument();
+		expect(await screen.findByText('Restore data')).toBeInTheDocument();
 		expect(screen.queryByTestId('restore-dropped-grants')).toBeNull();
-		expect(screen.getByText('Restore from provider')).toBeInTheDocument();
+		expect(screen.getByText('Restore from storage')).toBeInTheDocument();
 	});
 
 	test('while a restore runs the dialog cannot be closed, and it can again once it finishes', async () => {

@@ -98,8 +98,8 @@
 	const photosNoun = (n: number) => (n === 1 ? '1 photo' : `${n} photos`);
 	let orphanConfirmDescription = $derived(
 		orphanCount === 1
-			? "This photo belongs to a vehicle, expense, odometer reading or insurance record that was deleted. VROOM deletes it and its file in your storage providers. This can't be undone."
-			: "These photos belong to vehicles, expenses, odometer readings or insurance records that were deleted. VROOM deletes them and their files in your storage providers. This can't be undone."
+			? "This photo belongs to a vehicle, expense, odometer reading or insurance record that was deleted. VROOM deletes it and its file in your storage. This can't be undone."
+			: "These photos belong to vehicles, expenses, odometer readings or insurance records that were deleted. VROOM deletes them and their files in your storage. This can't be undone."
 	);
 
 	async function loadOrphanCount() {
@@ -117,7 +117,7 @@
 			if (removed > 0) appStore.showSuccess(`Removed ${photosNoun(removed)}`);
 			if (failed > 0) {
 				appStore.showError(
-					`Couldn't delete ${photosNoun(failed)} from your storage providers. ${failed === 1 ? 'It stays' : 'They stay'} listed here so you can try again later.`
+					`Couldn't delete ${photosNoun(failed)} from your storage. ${failed === 1 ? 'It stays' : 'They stay'} listed here so you can try again later.`
 				);
 			}
 		} catch (e) {
@@ -249,9 +249,7 @@
 		try {
 			await settingsStore.update({ backupConfig: updatedConfig });
 			await fetchLastSyncTime();
-			appStore.showSuccess(
-				enabled ? 'ZIP backup enabled for provider' : 'ZIP backup disabled for provider'
-			);
+			appStore.showSuccess(enabled ? 'ZIP backup turned on' : 'ZIP backup turned off');
 		} catch (e) {
 			appStore.showError(`Couldn't save the backup settings. ${userFacingErrorMessage(e)}`);
 		}
@@ -275,9 +273,7 @@
 		try {
 			await settingsStore.update({ backupConfig: updatedConfig });
 			await fetchLastSyncTime();
-			appStore.showSuccess(
-				enabled ? 'Sheets sync enabled for provider' : 'Sheets sync disabled for provider'
-			);
+			appStore.showSuccess(enabled ? 'Sheets sync turned on' : 'Sheets sync turned off');
 		} catch (e) {
 			appStore.showError(`Couldn't save the backup settings. ${userFacingErrorMessage(e)}`);
 		}
@@ -294,19 +290,19 @@
 		<div class="rounded-(--r-lg) border bg-card p-4">
 			<div class="mb-2 flex items-center gap-2 text-destructive">
 				<CircleAlert class="h-5 w-5 shrink-0" aria-hidden="true" />
-				<p class="font-medium">Couldn't load your storage providers</p>
+				<p class="font-medium">Couldn't load your storage</p>
 			</div>
 			<p class="mb-3 text-sm text-muted-foreground">{error}</p>
 			<Button onclick={retryLoad}>Retry</Button>
 		</div>
 	{:else}
-		<div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
+		<div class="grid grid-cols-1 gap-x-12 gap-y-6 lg:grid-cols-2 lg:items-start">
 			<div class="space-y-6">
 				<Card variant="section" role="region" aria-labelledby="storage-connected">
 					<CardHeader>
 						<CardTitle level={2} id="storage-connected" class="text-base">Connected</CardTitle>
 						<CardAction>
-							<Button onclick={() => goto(resolve(routes.settingsProviderNew))}>
+							<Button variant="outline" onclick={() => goto(resolve(routes.settingsProviderNew))}>
 								<Plus aria-hidden="true" />
 								Add storage
 							</Button>
@@ -315,8 +311,8 @@
 					<CardContent class="space-y-3">
 						{#if providers.length === 0}
 							<p class="text-sm text-muted-foreground">
-								No storage connected yet. Add Google Drive, S3 or another provider to keep photos
-								and backups in an account you own.
+								No storage connected yet. Add Google Drive, S3 or other storage to keep photos and
+								backups in an account you own.
 							</p>
 						{:else}
 							{#each providers as provider (provider.id)}
@@ -377,8 +373,8 @@
 							<CircleAlert aria-hidden="true" />
 							<AlertTitle class="line-clamp-none">
 								{unhealthyBackupProviders.length === 1
-									? '1 backup provider needs attention.'
-									: `${unhealthyBackupProviders.length} backup providers need attention.`}
+									? '1 backup needs attention.'
+									: `${unhealthyBackupProviders.length} backups need attention.`}
 							</AlertTitle>
 							<AlertDescription class="text-foreground!">
 								Your backups may not reach {new Intl.ListFormat('en', {
@@ -396,12 +392,11 @@
 							<p class="font-medium">Back up now</p>
 							<p class="text-sm text-muted-foreground">
 								{#if backupProviderCount > 0}
-									Sends a copy to every provider with backups on. Last backup: {lastBackupText}
+									Sends a copy to all storage with backups on. Last backup: {lastBackupText}
 								{:else if canBackUpNow}
-									No provider has backups on. You can still send one backup to a provider you
-									choose.
+									Backups are off for all storage. You can still send one backup now.
 								{:else if providers.length > 0}
-									Turn on backups for a provider under Connected first.
+									Turn on backups for your storage under Connected first.
 								{:else}
 									Add storage first, then turn on its backups.
 								{/if}

@@ -405,7 +405,12 @@ routes.put(
         domain: existing.domain,
       });
       if (existing.status !== 'disabled') {
-        Object.assign(updates, { status: 'active', lastErrorCode: null, failureCount: 0 });
+        Object.assign(updates, {
+          status: 'active',
+          lastErrorCode: null,
+          failureCount: 0,
+          lastCheckedAt: null,
+        });
       }
     }
 

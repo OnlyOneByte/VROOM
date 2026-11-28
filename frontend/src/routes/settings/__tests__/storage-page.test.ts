@@ -119,10 +119,9 @@ describe('Backups and storage page', () => {
 			'href',
 			'/settings'
 		);
-		expect(screen.getByRole('link', { name: 'Export everything from Your data' })).toHaveAttribute(
-			'href',
-			'/settings#settings-data'
-		);
+		expect(
+			screen.getByRole('link', { name: 'Export all your data from Settings' })
+		).toHaveAttribute('href', '/settings#settings-data');
 		expect(screen.queryByRole('button', { name: /Download|Export/ })).toBeNull();
 	});
 
@@ -226,7 +225,7 @@ describe('Backups and storage page backups', () => {
 		);
 		await mount();
 		await backUpNow();
-		expect(toast.success).toHaveBeenCalledWith('Backed up to 2 providers', { id: 'toast-1' });
+		expect(toast.success).toHaveBeenCalledWith('Backed up to 2 places', { id: 'toast-1' });
 	});
 
 	test('a partial run names the failed provider and says the rest succeeded', async () => {
@@ -240,7 +239,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			'Backed up to 1 provider. Office S3 failed. Check it under Connected, then try again.',
+			'Backed up to 1 place. Office S3 failed. Check it under Connected, then try again.',
 			{ id: 'toast-1' }
 		);
 		expect(toast.error).not.toHaveBeenCalled();
@@ -250,10 +249,9 @@ describe('Backups and storage page backups', () => {
 		settingsStoreFake.executeSync.mockResolvedValue(orchestratorResult('noop', {}));
 		await mount();
 		await backUpNow();
-		expect(toast.info).toHaveBeenCalledWith(
-			'Nothing to back up: no provider has backups turned on',
-			{ id: 'toast-1' }
-		);
+		expect(toast.info).toHaveBeenCalledWith('Nothing to back up: backups are off for all storage', {
+			id: 'toast-1'
+		});
 	});
 
 	test('a failed run reported in the body ends the toast with the failed providers', async () => {
@@ -285,7 +283,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			'Backed up to 1 provider. Office S3, Home NAS, and Cabin S3 failed. Check them under Connected, then try again.',
+			'Backed up to 1 place. Office S3, Home NAS, and Cabin S3 failed. Check them under Connected, then try again.',
 			{ id: 'toast-1' }
 		);
 	});
@@ -308,7 +306,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 1 provider. Office S3 and Home NAS failed and Old Drive can't be used. Check them under Connected, then try again.",
+			"Backed up to 1 place. Office S3 and Home NAS failed and Old Drive can't be used. Check them under Connected, then try again.",
 			{ id: 'toast-1' }
 		);
 	});
@@ -325,7 +323,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 1 provider. Office S3 failed and Old Drive can't be used. Check them under Connected, then try again.",
+			"Backed up to 1 place. Office S3 failed and Old Drive can't be used. Check them under Connected, then try again.",
 			{ id: 'toast-1' }
 		);
 	});
@@ -357,7 +355,7 @@ describe('Backups and storage page backups', () => {
 			await backUpNow();
 			expect(toast.dismiss).toHaveBeenCalled();
 			expect(showError).toHaveBeenCalledWith(message);
-			expect(screen.queryByText(/no provider has backups turned on/)).toBeNull();
+			expect(screen.queryByText(/backups are off for all storage/)).toBeNull();
 		}
 	);
 

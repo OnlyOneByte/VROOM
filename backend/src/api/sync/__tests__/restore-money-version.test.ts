@@ -9,8 +9,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function expenseAmountCents(id: string): number | undefined {
-  const row = ctx.sqlite.query('SELECT expense_amount FROM expenses WHERE id = ?').get(id) as {
+async function expenseAmountCents(id: string): Promise<number | undefined> {
+  const row = (await ctx.sql.get('SELECT expense_amount FROM expenses WHERE id = ?', [id])) as {
     expense_amount: number;
   } | null;
   return row?.expense_amount;
@@ -59,17 +59,17 @@ describe('backup version bump and restore shim', () => {
     expect(veh.status, JSON.stringify(vehicle)).toBe(201);
 
     const expenseId = 'e_t2_roundtrip';
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES (?, ?, ?, 'fuel', 1700000000, 4550)`,
       [expenseId, vehicle.data.id, ctx.user.id]
     );
-    expect(expenseAmountCents(expenseId)).toBe(4550);
+    expect(await expenseAmountCents(expenseId)).toBe(4550);
 
     const zip = await backupService.exportAsZip(ctx.user.id);
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect(expenseAmountCents(expenseId)).toBe(4550);
+    expect(await expenseAmountCents(expenseId)).toBe(4550);
   });
 
   test('a PRE-CENTS 1.0.0 dollar backup is ×100-shimmed to cents on restore (12.34 → 1234)', async () => {
@@ -78,7 +78,7 @@ describe('backup version bump and restore shim', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect(expenseAmountCents('e_t2')).toBe(1234);
+    expect(await expenseAmountCents('e_t2')).toBe(1234);
   });
 
   test('the shim handles a binary-float edge dollar value (19.99 → 1999, not 1998)', async () => {
@@ -86,7 +86,7 @@ describe('backup version bump and restore shim', () => {
     const zip = buildBackupZip('1.0.0', '19.99');
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(expenseAmountCents('e_t2')).toBe(1999);
+    expect(await expenseAmountCents('e_t2')).toBe(1999);
   });
 
   test('a future-version backup is rejected', async () => {
@@ -101,7 +101,7 @@ describe('backup version bump and restore shim', () => {
     expect(thrown).toBeDefined();
     const details = (thrown as { details?: string[] }).details ?? [];
     expect(details.some((d) => /version/i.test(d))).toBe(true);
-    expect(expenseAmountCents('e_t2')).toBeUndefined();
+    expect(await expenseAmountCents('e_t2')).toBeUndefined();
   });
 
   test('backupVersionError accepts older and same-minor versions and refuses newer ones', async () => {

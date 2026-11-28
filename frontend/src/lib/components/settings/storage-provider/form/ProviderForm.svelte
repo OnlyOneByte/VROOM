@@ -22,6 +22,7 @@
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
+	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
 	import { routes } from '#lib/routes.ts';
 	import {
 		defaultFolderSettings,
@@ -198,6 +199,21 @@
 			}
 		}
 		if (oauthResult.restoredDisplayName) displayName = oauthResult.restoredDisplayName;
+	});
+
+	function selectType(id: string) {
+		if (id === selectedType) return;
+		if (selectedEntry?.connect === 'oauth') oauth.forget();
+		selectedType = id;
+		photoRootPath = getDefaultPhotoRootPath(id);
+		folderSettings = defaultFolderSettings(id);
+		resetFields(id, undefined);
+	}
+
+	$effect(() => {
+		if (providerId || selectedType) return;
+		const only = providerTypes.length === 1 ? providerTypes[0] : undefined;
+		if (only) selectType(only.id);
 	});
 
 	function handleFolderSettingsUpdate(settings: Record<PhotoCategory, CategorySetting>) {
@@ -386,7 +402,7 @@
 				{@const Icon = pt.icon}
 				<div class="flex items-center gap-3">
 					<div
-						class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+						class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
 						aria-hidden="true"
 					>
 						<Icon class="size-5 text-foreground" />
@@ -421,20 +437,16 @@
 								{selected
 								? 'border-foreground bg-foreground text-background'
 								: 'cursor-pointer border-border bg-surface text-foreground hover:bg-sunk'}"
-							onclick={() => {
-								if (pt.id === selectedType) return;
-								if (selectedEntry?.connect === 'oauth') oauth.forget();
-								selectedType = pt.id;
-								photoRootPath = getDefaultPhotoRootPath(pt.id);
-								folderSettings = defaultFolderSettings(pt.id);
-								resetFields(pt.id, undefined);
-							}}
+							onclick={() => selectType(pt.id)}
 						>
 							<Icon class="size-4" aria-hidden="true" />
 							{pt.label}
 						</button>
 					{/each}
 				</div>
+				{#if !selectedType && providerTypes.length > 0}
+					<p class="text-sm text-muted-foreground">Choose a type to continue.</p>
+				{/if}
 			</div>
 		{/if}
 
@@ -454,7 +466,9 @@
 						Connection
 					</CardTitle>
 					<CardDescription>
-						{selectedForm?.description ?? selectedEntry?.description ?? 'Provider configuration'}
+						{selectedForm?.description ??
+							selectedEntry?.description ??
+							'How VROOM connects to this storage'}
 					</CardDescription>
 				</CardHeader>
 				<CardContent class="space-y-4" bind:ref={connectionCard}>
@@ -466,6 +480,7 @@
 								{isEditMode}
 								providerLabel={selectedEntry?.label ?? 'Google'}
 								providerIcon={providerUi(selectedType)?.icon ?? Cloud}
+								supportsBackups={supportsZipBackup(selectedType)}
 								{oauth}
 								bind:connection
 							/>
@@ -483,10 +498,10 @@
 					{/if}
 
 					<div class="space-y-2 border-t border-border pt-4">
-						<Label for="provider-root-path" class="text-sm">Provider root path</Label>
+						<Label for="provider-root-path" class="text-sm">Root folder</Label>
 						<Input id="provider-root-path" bind:value={providerRootPath} placeholder="VROOM" />
 						<p class="text-xs text-muted-foreground">
-							Top-level folder on the provider. All other paths are relative to this.
+							Top-level folder in this storage. All other paths are relative to this.
 						</p>
 					</div>
 				</CardContent>
@@ -528,8 +543,13 @@
 				</Card>
 			{/if}
 
-			<div class="flex justify-end border-t pt-6">
-				<Button onclick={handleSave} disabled={!canSave || isSaving}>
+			<FormActionBar>
+				<Button
+					size="lg"
+					class="ml-auto rounded-full"
+					onclick={handleSave}
+					disabled={!canSave || isSaving}
+				>
 					{#if isSaving}
 						<LoaderCircle class="animate-spin" aria-hidden="true" />
 						Saving…
@@ -537,7 +557,7 @@
 						{isEditMode ? 'Save changes' : 'Save storage'}
 					{/if}
 				</Button>
-			</div>
+			</FormActionBar>
 
 			{#if isEditMode}
 				<Card variant="section" role="region" aria-labelledby="provider-remove-title">

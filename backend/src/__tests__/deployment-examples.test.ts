@@ -4,6 +4,7 @@ import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GLOBAL_MAX_BODY_SIZE } from '../app';
 import { CONFIG } from '../config';
+import { dialectFromUrl } from '../db/dialect/active';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../test-helpers/http-client';
 import { parseTrustedProxies } from '../utils/client-ip';
 
@@ -244,6 +245,32 @@ describe('the trusted proxy recipes in docs/deployment.md', () => {
     const gateway = /gateway: ([0-9.]+)/.exec(guide())?.[1] ?? 'missing gateway';
     expect(values).toContain(tunnel);
     expect(values).toContain(gateway);
+  });
+});
+
+describe('the Postgres example', () => {
+  const OVERRIDE = 'docs/examples/docker-compose.postgres.yml';
+
+  test('Postgres publishes no port and the password comes fail-fast from .env', () => {
+    const yaml = repoFile(OVERRIDE);
+    expect(yaml).not.toMatch(/^\s*ports:/m);
+    expect(yaml).toContain('POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?');
+    expect(yaml).not.toMatch(/POSTGRES_PASSWORD=[^$\s]/);
+    expect(yaml).toMatch(/image: postgres:\d+\.\d+-alpine/);
+  });
+
+  test('the backend gets a postgres:// URL for the stack service, which it opens as Postgres', () => {
+    const url = repoFile(OVERRIDE).match(/DATABASE_URL=(.+)$/m)?.[1] ?? '';
+    expect(url).toStartWith('postgres://vroom:${POSTGRES_PASSWORD:?');
+    expect(url).toEndWith('@postgres:5432/vroom');
+    expect(dialectFromUrl(url)).toBe('pg');
+    expect(backendEnvKeys(OVERRIDE)).toEqual(['DATABASE_URL']);
+  });
+
+  test('the CI move job keeps its Postgres service on the runner loopback', () => {
+    const job = repoFile('.github/workflows/ci-cd.yml').split('postgres-move-smoke:')[1] ?? '';
+    expect(job).toContain('- 127.0.0.1:5432:5432');
+    expect(job).not.toMatch(/- "?5432:5432/);
   });
 });
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
-	import { DoorOpen, LoaderCircle, Lock } from '@lucide/svelte';
+	import { LoaderCircle, Lock } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
@@ -87,12 +87,9 @@
 	}
 </script>
 
-<Card id="who-can-join">
+<Card variant="section" id="who-can-join" role="region" aria-labelledby="who-can-join-title">
 	<CardHeader>
-		<div class="flex items-center gap-2">
-			<DoorOpen class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={2}>Who Can Join</CardTitle>
-		</div>
+		<CardTitle level={2} id="who-can-join-title" class="text-base">Who can join</CardTitle>
 		<CardDescription>The first account on a server is always its admin.</CardDescription>
 	</CardHeader>
 	<CardContent class="space-y-6">
@@ -131,13 +128,13 @@
 					onclick={() => void saveMode()}
 				>
 					{#if savingMode}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
-					Save Mode
+					Save mode
 				</Button>
 			{/if}
 		</fieldset>
 
 		<form class="space-y-2" onsubmit={saveDomains} novalidate>
-			<Label for="signup-domains">Allowed email domains (Optional)</Label>
+			<Label for="signup-domains">Allowed email domains (optional)</Label>
 			<div class="flex flex-col gap-2 sm:flex-row">
 				<Input
 					id="signup-domains"
@@ -153,7 +150,7 @@
 				{#if !settings.domainsLocked && (domainsChanged || savingDomains)}
 					<Button type="submit" variant="outline" class="h-10 shrink-0" aria-busy={savingDomains}>
 						{#if savingDomains}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
-						Save Domains
+						Save domains
 					</Button>
 				{/if}
 			</div>
