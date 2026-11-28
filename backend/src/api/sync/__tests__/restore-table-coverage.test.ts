@@ -26,7 +26,7 @@ describe('restore table coverage', () => {
         continue;
       }
       const insertPattern = new RegExp(
-        `\\.insert\\(\\s*${exportName}\\s*\\)|insertRows\\(\\s*tx,\\s*${exportName}\\s*,`
+        `\\binsert\\(\\s*${exportName}\\s*,|insertRows\\(\\s*tx,\\s*${exportName}\\s*,`
       );
       if (!insertPattern.test(RESTORE_SRC)) {
         missing.push(`${key} → ${exportName} (getTableName: ${getTableName(table)})`);
@@ -39,42 +39,10 @@ describe('restore table coverage', () => {
     ).toEqual([]);
   });
 
-  test('every inserted table is conflict-probed OR a child of a probed parent (the symmetry)', () => {
-    const probedTableNames = new Set(
-      [...RESTORE_SRC.matchAll(/name:\s*'([a-z_]+)'/g)].map((m) => m[1])
-    );
-
-    const CHILD_OF_PROBED_PARENT: Record<string, string> = {
-      insuranceTerms: 'insurance_policies (FK policyId → a probed parent)',
-      insuranceTermVehicles: 'insurance_terms → insurance_policies (probed ancestor)',
-      insuranceClaims: 'insurance_policies (FK policyId → probed parent)',
-      odometerEntries: 'vehicles (FK vehicleId → probed parent)',
-      reminderVehicles: 'reminders (FK reminderId → a probed parent)',
-      reminderNotifications: 'reminders (FK reminderId → a probed parent)',
-    };
-
-    const insertedExportNames = [
-      ...RESTORE_SRC.matchAll(/\.insert\(\s*(\w+)\s*\)/g),
-      ...RESTORE_SRC.matchAll(/insertRows\(\s*tx,\s*(\w+)\s*,/g),
-    ].map((m) => m[1]);
-
-    const unguarded: string[] = [];
-    for (const exportName of new Set(insertedExportNames)) {
-      const table = (schema as Record<string, unknown>)[exportName];
-      if (!table) continue;
-      const dbName = getTableName(table as Parameters<typeof getTableName>[0]);
-      if (probedTableNames.has(dbName)) continue;
-      if (exportName in CHILD_OF_PROBED_PARENT) continue;
-      unguarded.push(`${exportName} (table '${dbName}')`);
-    }
-
-    expect(
-      unguarded,
-      `Table(s) insertBackupData inserts that are neither conflict-probed nor a documented child of a ` +
-        `probed parent. On a colliding merge these would throw a raw UNIQUE-PK error instead of a clean ` +
-        `conflict (class). Either add a probe to detectConflicts, or add it to ` +
-        `CHILD_OF_PROBED_PARENT with the parent FK that collides first:\n${unguarded.join('\n')}`
-    ).toEqual([]);
+  test('every restore write goes through insertRows, so a merge skips rows already here', () => {
+    const directInserts = [...RESTORE_SRC.matchAll(/\btx\s*\.insert\(/g)].length;
+    expect(directInserts, 'only insertRows calls tx.insert, once per mode').toBe(2);
+    expect(RESTORE_SRC).toContain('.onConflictDoNothing()');
   });
 
   test('ImportSummary has a count field for every registry key', async () => {

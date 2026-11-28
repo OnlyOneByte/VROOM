@@ -87,9 +87,10 @@ export interface BackupOrchestratorResult {
 export interface RestoreResult {
 	success: boolean;
 	preview?: Record<string, number>;
+	merge?: { imported: Record<string, number>; kept: Record<string, number> };
 	imported?: Record<string, number>;
+	kept?: Record<string, number>;
 	skipped?: { photos: number };
-	conflicts?: Array<{ table: string; id: string }>;
 }
 
 export interface UserSettings {
