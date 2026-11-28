@@ -156,7 +156,10 @@ function matchesDriveQuery(f: FakeFile, q: string): boolean {
     if (f.name !== wanted) return false;
   }
   const parentMatch = q.match(/'([^']+)' in parents/);
-  if (parentMatch && !f.parents.includes(parentMatch[1])) return false;
+  if (parentMatch) {
+    const atRoot = parentMatch[1] === 'root' && f.parents.length === 0;
+    if (!atRoot && !f.parents.includes(parentMatch[1])) return false;
+  }
   const mimeMatch = q.match(/mimeType='([^']+)'/);
   if (mimeMatch && f.mimeType !== mimeMatch[1]) return false;
   return true;

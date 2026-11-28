@@ -584,7 +584,10 @@ class BackupService {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
     return provider
-      .download({ providerType: provider.type, externalId: fileRef })
+      .download(
+        { providerType: provider.type, externalId: fileRef },
+        { maxBytes: CONFIG.backup.maxFileSize }
+      )
       .catch(async (error: unknown) => {
         throw await providerReadError(error, 'Backup file');
       });

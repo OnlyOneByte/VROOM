@@ -1,4 +1,4 @@
-import { isSyncError, SyncError, SyncErrorCode } from '../../../../errors';
+import { isSyncError, PayloadTooLargeError, SyncError, SyncErrorCode } from '../../../../errors';
 import { PHOTO_CATEGORIES, type PhotoCategory } from '../../../../types';
 
 export type { PhotoCategory };
@@ -33,12 +33,22 @@ export interface StorageCapabilities {
   arbitraryFiles: boolean;
 }
 
+export interface DownloadOptions {
+  maxBytes?: number;
+}
+
+export function assertWithinSize(bytes: number, options: DownloadOptions | undefined): void {
+  if (options?.maxBytes === undefined || bytes <= options.maxBytes) return;
+  const limitMb = Math.round(options.maxBytes / 1024 / 1024);
+  throw new PayloadTooLargeError(`The file is larger than the ${limitMb} MB limit`);
+}
+
 export interface StorageProvider {
   readonly type: string;
   readonly capabilities?: StorageCapabilities;
 
   upload(params: UploadParams): Promise<StorageRef>;
-  download(ref: StorageRef): Promise<Buffer>;
+  download(ref: StorageRef, options?: DownloadOptions): Promise<Buffer>;
   delete(ref: StorageRef): Promise<void>;
   getExternalUrl(ref: StorageRef): Promise<string | null>;
   healthCheck(): Promise<boolean>;

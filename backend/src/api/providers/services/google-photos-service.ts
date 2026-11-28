@@ -2,6 +2,7 @@ import type { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import { CONFIG } from '../../../config';
 import { SyncError, SyncErrorCode } from '../../../errors';
+import { OPERATION_TIMEOUTS } from '../../../utils/timeout';
 import { credentialFailureOf } from '../domains/storage/storage-provider';
 
 const PHOTOS_API = 'https://photoslibrary.googleapis.com';
@@ -107,6 +108,40 @@ export class GooglePhotosService {
   }
 }
 
+interface AlbumPage {
+  albums?: PhotosAlbum[];
+  nextPageToken?: string;
+}
+
+const MAX_ALBUM_PAGES = 100;
+
+export async function listAllAlbums(
+  fetchPage: (pageToken: string | undefined) => Promise<AlbumPage>
+): Promise<PhotosAlbum[]> {
+  const albums: PhotosAlbum[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < MAX_ALBUM_PAGES; page++) {
+    const result = await fetchPage(pageToken);
+    albums.push(...(result.albums ?? []));
+    pageToken = result.nextPageToken;
+    if (!pageToken) break;
+  }
+  return albums;
+}
+
+const QUOTA_REASONS =
+  /RESOURCE_EXHAUSTED|RATE_LIMIT_EXCEEDED|rateLimitExceeded|userRateLimitExceeded|quotaExceeded/;
+
+export function classifyPhotosApiError(status: number, body: string): SyncError {
+  const message = `Google Photos API ${status}: ${body}`;
+  if (status === 401) return new SyncError(SyncErrorCode.AUTH_INVALID, message);
+  if (status === 429 || (status === 403 && QUOTA_REASONS.test(body))) {
+    return new SyncError(SyncErrorCode.QUOTA_EXCEEDED, message);
+  }
+  if (status === 403) return new SyncError(SyncErrorCode.PERMISSION_DENIED, message);
+  return new SyncError(SyncErrorCode.NETWORK_ERROR, message);
+}
+
 // Library API upload is a raw bytes POST, so this uses fetch rather than the googleapis SDK.
 function createRealPhotosClient(refreshToken: string): PhotosClient {
   const oauth2Client: OAuth2Client = new google.auth.OAuth2(
@@ -127,14 +162,13 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
     const token = await accessToken();
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Bearer ${token}`);
-    const res = await fetch(url, { ...init, headers });
+    const res = await fetch(url, {
+      ...init,
+      headers,
+      signal: AbortSignal.timeout(OPERATION_TIMEOUTS.DOWNLOAD),
+    });
     if (!res.ok) {
-      throw new SyncError(
-        res.status === 401 || res.status === 403
-          ? SyncErrorCode.AUTH_INVALID
-          : SyncErrorCode.NETWORK_ERROR,
-        `Google Photos API ${res.status}: ${await res.text().catch(() => res.statusText)}`
-      );
+      throw classifyPhotosApiError(res.status, await res.text().catch(() => res.statusText));
     }
     return res;
   }
@@ -143,6 +177,7 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
     async uploadBytes(buffer, mimeType, fileName) {
       const token = await accessToken();
       const res = await fetch(`${PHOTOS_API}/v1/uploads`, {
+        signal: AbortSignal.timeout(OPERATION_TIMEOUTS.DOWNLOAD),
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -154,13 +189,7 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
         body: new Uint8Array(buffer),
       });
       if (!res.ok) {
-        // Raw upload bypasses authedFetch; keep the 401/403 mapping or expired tokens retry as network errors.
-        throw new SyncError(
-          res.status === 401 || res.status === 403
-            ? SyncErrorCode.AUTH_INVALID
-            : SyncErrorCode.NETWORK_ERROR,
-          `Google Photos upload failed: ${res.status}`
-        );
+        throw classifyPhotosApiError(res.status, await res.text().catch(() => res.statusText));
       }
       return res.text();
     },
@@ -203,7 +232,9 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
         throw new SyncError(SyncErrorCode.NETWORK_ERROR, 'Media item has no baseUrl');
       }
       // Google Photos '=d' suffix returns the original bytes, not a resized rendition.
-      const bytes = await fetch(`${item.baseUrl}=d`);
+      const bytes = await fetch(`${item.baseUrl}=d`, {
+        signal: AbortSignal.timeout(OPERATION_TIMEOUTS.DOWNLOAD),
+      });
       if (!bytes.ok) {
         throw new SyncError(
           SyncErrorCode.NETWORK_ERROR,
@@ -213,15 +244,13 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
       return Buffer.from(await bytes.arrayBuffer());
     },
 
-    async listAlbums() {
-      const res = await authedFetch(
-        `${PHOTOS_API}/v1/albums?pageSize=50&excludeNonAppCreatedData=true`,
-        {
-          method: 'GET',
-        }
-      );
-      const data = (await res.json()) as { albums?: PhotosAlbum[] };
-      return data.albums ?? [];
+    listAlbums() {
+      return listAllAlbums(async (pageToken) => {
+        const params = new URLSearchParams({ pageSize: '50', excludeNonAppCreatedData: 'true' });
+        if (pageToken) params.set('pageToken', pageToken);
+        const res = await authedFetch(`${PHOTOS_API}/v1/albums?${params}`, { method: 'GET' });
+        return (await res.json()) as AlbumPage;
+      });
     },
 
     async createAlbum(title) {

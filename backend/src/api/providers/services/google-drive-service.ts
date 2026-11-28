@@ -1,6 +1,7 @@
 import { type drive_v3, google } from 'googleapis';
 import { CONFIG } from '../../../config';
 import { SyncError, SyncErrorCode } from '../../../errors';
+import { OPERATION_TIMEOUTS } from '../../../utils/timeout';
 
 interface DriveFolder {
   id: string;
@@ -43,14 +44,17 @@ export class GoogleDriveService {
       refresh_token: refreshToken,
     });
 
-    this.drive = google.drive({ version: 'v3', auth: oauth2Client });
+    this.drive = google.drive({
+      version: 'v3',
+      auth: oauth2Client,
+      timeout: OPERATION_TIMEOUTS.DOWNLOAD,
+    });
   }
 
   async findFolder(name: string, parentId?: string): Promise<DriveFolder | null> {
     const escapedName = escapeDriveQuery(name);
-    const query = parentId
-      ? `name='${escapedName}' and '${escapeDriveQuery(parentId)}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
-      : `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const parent = escapeDriveQuery(parentId ?? 'root');
+    const query = `name='${escapedName}' and '${parent}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
     const response = await this.drive.files.list({
       q: query,
@@ -162,6 +166,11 @@ export class GoogleDriveService {
 
   async deleteFile(fileId: string): Promise<void> {
     await this.drive.files.delete({ fileId });
+  }
+
+  async getFileSize(fileId: string): Promise<number> {
+    const response = await this.drive.files.get({ fileId, fields: 'size' });
+    return Number(response.data.size ?? 0);
   }
 
   async downloadFile(fileId: string): Promise<Buffer> {
