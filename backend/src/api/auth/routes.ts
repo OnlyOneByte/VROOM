@@ -9,7 +9,7 @@ import { CONFIG } from '../../config';
 import type { AsyncHandle } from '../../db/async-sqlite';
 import { userProviders, users } from '../../db/schema';
 import { createErrorResponse, isUniqueConstraintError, NotFoundError } from '../../errors';
-import { rateLimiter, requireAuth } from '../../middleware';
+import { rateLimiter, requireAuth, sessionFor } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import { assignServerRole, loadResolver, resolverFor } from '../../permissions/grants';
 import { PERMISSION_REGISTRY, type PermissionId } from '../../permissions/registry';
@@ -43,7 +43,6 @@ import { NoVerifiedEmailError, type OAuthFlow } from './providers/types';
 import {
   clearSessionCookie,
   consumeOAuthState,
-  demoSessionExpiresAt,
   setSessionCookie,
   validateAndRefreshSession,
 } from './utils';
@@ -606,19 +605,20 @@ routes.get('/me', async (c) => {
     throw new HTTPException(401, { message: 'No session found' });
   }
 
-  const { session, user } = await appContext().lucia.validateSession(sessionId);
+  const found = await sessionFor(c, sessionId);
 
-  if (!session) {
+  if (!found) {
     clearSessionCookie(c, appContext().lucia.sessionCookieName);
     throw new HTTPException(401, { message: 'Invalid session' });
   }
+  const { session, user } = found;
 
   return c.json({
     success: true,
     data: {
       user: serializeSessionUser(user),
       session: {
-        expiresAt: demoSessionExpiresAt(session.id) ?? session.expiresAt,
+        expiresAt: session.expiresAt,
       },
       demo: user.id === DEMO_USER_ID,
       pendingApproval: user.pendingApprovalAt !== null,

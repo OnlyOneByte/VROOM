@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { appContext } from '../../../app-context';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
@@ -129,6 +130,42 @@ describe('bad-session 401 clears the session cookie', () => {
 
   test('a missing session (no cookie) is a plain 401', async () => {
     const res = await ctx.anon('GET', '/api/v1/auth/me');
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('session lookups per request', () => {
+  test('a signed-in request validates its session once', async () => {
+    const validate = spyOn(appContext().lucia, 'validateSession');
+    try {
+      for (const path of ['/api/v1/auth/me', '/api/v1/vehicles']) {
+        validate.mockClear();
+        const res = await ctx.authed('GET', path);
+        expect(res.status, path).toBe(200);
+        expect(validate, path).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      validate.mockRestore();
+    }
+  });
+
+  test('when the first lookup fails, the route still validates the session itself', async () => {
+    const validate = spyOn(appContext().lucia, 'validateSession').mockRejectedValueOnce(
+      new Error('lookup failed')
+    );
+    try {
+      const res = await ctx.authed('GET', '/api/v1/auth/me');
+      expect(res.status).toBe(200);
+      expect(validate).toHaveBeenCalledTimes(2);
+    } finally {
+      validate.mockRestore();
+    }
+  });
+
+  test('an invalid session is still refused', async () => {
+    const res = await ctx.app.request('/api/v1/auth/me', {
+      headers: { Cookie: `${appContext().lucia.sessionCookieName}=not-a-session` },
+    });
     expect(res.status).toBe(401);
   });
 });

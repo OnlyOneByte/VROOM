@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { AuthUser } from '../api/auth/lucia';
 import { clearSessionCookie, validateAndRefreshSession } from '../api/auth/utils';
@@ -20,19 +20,34 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
     throw new AuthenticationError('Authentication required');
   }
 
-  const result = await validateAndRefreshSession(sessionId, appContext().lucia, c);
+  const result = await sessionFor(c, sessionId);
   if (!result) {
     clearSessionCookie(c, appContext().lucia.sessionCookieName);
     throw new AuthenticationError('Invalid or expired session');
   }
 
-  c.set('session', { id: result.session.id, expiresAt: result.session.expiresAt });
+  c.set('session', result.session);
   c.set('user', result.user);
   if (result.user.pendingApprovalAt && !PENDING_ALLOWED.has(`${c.req.method} ${c.req.path}`)) {
     throw new AccountPendingError();
   }
   return next();
 };
+
+export async function sessionFor(
+  c: Context,
+  sessionId: string
+): Promise<{ user: AuthUser; session: { id: string; expiresAt: Date } } | null> {
+  const session = c.get('session');
+  const user = c.get('user');
+  if (session?.id === sessionId && user) return { user, session };
+  const result = await validateAndRefreshSession(sessionId, appContext().lucia, c);
+  if (!result) return null;
+  return {
+    user: result.user,
+    session: { id: result.session.id, expiresAt: result.session.expiresAt },
+  };
+}
 
 const PENDING_ALLOWED = new Set([
   'GET /api/v1/auth/me',

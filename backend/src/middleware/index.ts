@@ -1,5 +1,5 @@
 export { activityTracker, changeTracker } from './activity';
-export { optionalAuth, requireAuth } from './auth';
+export { optionalAuth, requireAuth, sessionFor } from './auth';
 export { bodyLimit } from './body-limit';
 export { errorHandler } from './error-handler';
 export { idempotency } from './idempotency';
