@@ -188,6 +188,22 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     expect(count).toBe(0);
   });
 
+  test('a rejected AI key stops the run with a message that says so', async () => {
+    await seedPhotosProvider();
+    await seedVlmProvider();
+    store.seedSearchablePhotos([{ filename: 'a.jpg' }, { filename: 'b.jpg' }]);
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return new Response('nope', { status: 401 });
+      // biome-ignore lint/suspicious/noExplicitAny: test fetch stub.
+    }) as any;
+    const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');
+    expect(res.status).toBe(502);
+    expect(await res.text()).toMatch(/didn't accept its key/);
+    expect(calls).toBe(1);
+  });
+
   test('an unauthenticated request is rejected (401)', async () => {
     const res = await ctx.anon('GET', '/api/v1/photos/receipt-drafts');
     expect(res.status).toBe(401);
