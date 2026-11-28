@@ -53,7 +53,7 @@
 	};
 
 	const RESTORE_TIMEOUT_MESSAGE =
-		"The restore is taking longer than expected, so we stopped waiting. It may still finish. Reload this page in a few minutes and check your data before you try again.";
+		'The restore is taking longer than expected, so we stopped waiting. It may still finish. Reload this page in a few minutes and check your data before you try again.';
 
 	interface Props {
 		open: boolean;

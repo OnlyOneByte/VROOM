@@ -9,7 +9,7 @@ import type {
 import { RequestTimeoutError } from '#lib/utils/error-handling.ts';
 import { apiClient } from './api-client';
 
-export const RESTORE_TIMEOUT_MS = 11 * 60 * 1000;
+export const RESTORE_TIMEOUT_MS = 25 * 60 * 1000;
 
 async function withRestoreDeadline<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
 	const controller = new AbortController();
