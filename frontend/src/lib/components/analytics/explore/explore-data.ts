@@ -19,7 +19,7 @@ import {
 	getVolumeUnitLabel
 } from '#lib/utils/units.ts';
 import type { ChartAnnotations } from '#lib/components/charts/types.ts';
-import { metricInfo, type ExploreQuery } from './query-state';
+import { chartForm, metricInfo, type ExploreQuery } from './query-state';
 
 export interface ExploreSeries {
 	key: string;
@@ -74,6 +74,13 @@ export function seriesFor(
 export function isAdditive(query: ExploreQuery): boolean {
 	const { metric } = metricInfo(query.metric);
 	return metric === 'cost' || metric === 'count' || metric === 'volume' || metric === 'distance';
+}
+
+export function chartKind(query: ExploreQuery): 'bar' | 'line' {
+	const form = chartForm(query);
+	if (form === 'compare' || form === 'line') return 'line';
+	if (form === 'panels') return isAdditive(query) ? 'bar' : 'line';
+	return 'bar';
 }
 
 function sum(values: Array<number | null>): number {

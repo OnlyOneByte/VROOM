@@ -17,8 +17,10 @@ vi.mock('$app/state', () => ({
 	}
 }));
 vi.mock('#lib/components/analytics/fuel/FuelStatsTab.svelte', () => ({ default: () => {} }));
-vi.mock('#lib/components/charts/index.ts', () => ({
-	AppBarChart: () => {},
+vi.mock('#lib/components/analytics/explore/explore-bar-chart.ts', () => ({
+	AppBarChart: () => {}
+}));
+vi.mock('#lib/components/analytics/explore/explore-line-chart.ts', () => ({
 	AppLineChart: () => {}
 }));
 vi.mock('#lib/services/vehicle-api.ts', () => ({

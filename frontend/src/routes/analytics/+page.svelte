@@ -219,6 +219,7 @@
 	onMount(() => {
 		prefetchExplore(exploreRequest(explore, dateRange, vehicleIds));
 		import('#lib/components/analytics/explore/ExploreTab.svelte').catch(() => {});
+		import('#lib/components/analytics/explore/explore-bar-chart.ts').catch(() => {});
 		void loadVehicles();
 	});
 </script>
