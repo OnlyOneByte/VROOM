@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { failWrites } from '../fail-writes';
-import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../http-client';
+import { createTestApp, ON_POSTGRES, SETUP_TIMEOUT_MS, type TestApp } from '../http-client';
 
 let ctx: TestApp;
 
@@ -36,14 +36,24 @@ describe('failWrites', () => {
     ]);
   });
 
-  test('the same rule can be set up again after a restore', async () => {
-    const rule = { name: 'fail_writes_again', table: 'vehicles', event: 'INSERT', message: 'no' };
-    await (await failWrites(ctx.sql, rule))();
-    const restore = await failWrites(ctx.sql, rule);
-    try {
-      await expect(insertCar('again')).rejects.toThrow('no');
-    } finally {
-      await restore();
+  test.skipIf(!ON_POSTGRES)(
+    'a setup that failed partway does not block setting the rule up again',
+    async () => {
+      const rule = {
+        name: 'fail_writes_again',
+        table: 'vehicles',
+        event: 'INSERT',
+        message: 'fail_writes_again fired',
+      };
+      await expect(
+        failWrites(ctx.sql, { ...rule, when: 'NEW.no_such_column = 1' })
+      ).rejects.toThrow();
+      const restore = await failWrites(ctx.sql, rule);
+      try {
+        await expect(insertCar('again')).rejects.toThrow('fail_writes_again fired');
+      } finally {
+        await restore();
+      }
     }
-  });
+  );
 });
