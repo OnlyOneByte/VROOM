@@ -39,5 +39,5 @@ export function defaultDriverId(
 	const active = drivers.filter(d => !d.archived);
 	const lastPicked = withStorage(storage => storage.getItem(memoryKey(vehicleId)), null);
 	if (lastPicked && active.some(d => d.id === lastPicked)) return lastPicked;
-	return active.find(d => d.userId === userId)?.id ?? null;
+	return active.find(d => userId !== undefined && d.userId === userId)?.id ?? null;
 }

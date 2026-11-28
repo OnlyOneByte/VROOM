@@ -112,7 +112,7 @@
 
 	function roleOf(driver: Driver): string {
 		if (driver.guest) return 'guest';
-		return driver.userId === authStore.user?.id ? 'you' : '';
+		return driver.userId !== undefined && driver.userId === authStore.user?.id ? 'you' : '';
 	}
 </script>
 

@@ -45,6 +45,10 @@ describe('defaultDriverId', () => {
 		expect(defaultDriverId('car', drivers, 'u-me')).toBe('me');
 		expect(defaultDriverId('car', drivers, 'u-stranger')).toBeNull();
 	});
+
+	test('picks nobody before the account is known', () => {
+		expect(defaultDriverId('car', drivers, undefined)).toBeNull();
+	});
 });
 
 test('driverColor only trusts the chart palette slots', () => {
