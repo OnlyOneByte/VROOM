@@ -163,7 +163,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   Delete and error text, so a Cancel in it reads as a warning and is easy to mis-tap near Delete.
   `link` is for an inline action that moves things forward, such as "Mark serviced" on a due
   reminder. `outline` has no fill of its own, so a button drawn over a photo or another
-  non-surface background sets its own (`bg-background`).
+  non-surface background sets its own for both modes (`bg-background dark:bg-background`, which `button-override-hazards.test.ts` enforces).
 - Mobile primary actions are `size="lg"` (40px) or full-width. A page's primary action is the
   primary button in `PageHeader` at every width; the bottom bar's raised + is always Add expense.
   From `lg` up nothing fixed covers page content at rest: form action bars are sticky below `lg`
