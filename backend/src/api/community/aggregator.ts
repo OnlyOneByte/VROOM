@@ -449,7 +449,7 @@ export async function refreshCommunityStats(
   const tagOf = memberTagger(noiseKey);
   const due =
     releaseDue(await repository.lastRefreshedAt(LOCAL_SCOPE), now) ||
-    (await repository.releasedWithoutMembers(LOCAL_SCOPE));
+    (await repository.releaseOutdated(LOCAL_SCOPE));
   if (!due) {
     const withdrawn = await repository.withdrawLeavers(LOCAL_SCOPE, tagOf);
     logger.info(`community stats kept until the next release: ${withdrawn} buckets withdrawn`);
