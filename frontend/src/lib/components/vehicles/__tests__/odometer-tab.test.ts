@@ -174,7 +174,7 @@ describe('OdometerTab entry list', () => {
 		expect(screen.getByRole('link', { name: 'Add reading' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: /45,000\s+mi/ })).toHaveAttribute(
 			'href',
-			'/vehicles/v1/odometer/o7/edit?returnTo=/vehicles/v1'
+			`/vehicles/v1/odometer/o7/edit?returnTo=${encodeURIComponent('/vehicles/v1?tab=odometer')}`
 		);
 		expect(
 			within(screen.getByRole('region', { name: '1 reading' })).queryAllByRole('button')
@@ -272,7 +272,7 @@ describe('OdometerTab expense mileage', () => {
 
 		expect(screen.getByRole('link', { name: /30,120\s+mi/ })).toHaveAttribute(
 			'href',
-			'/expenses/e2/edit?returnTo=/vehicles/v1'
+			`/expenses/e2/edit?returnTo=${encodeURIComponent('/vehicles/v1?tab=odometer')}`
 		);
 	});
 
@@ -508,6 +508,23 @@ describe('OdometerTab chart range', () => {
 
 		expect(getChartHistory).toHaveBeenCalledTimes(2);
 		expect(getHistory).toHaveBeenCalledTimes(listCalls);
+		expect(chartProps?.['error']).toBeNull();
+		expect((chartProps?.['data'] as unknown[]).length).toBe(3);
+	});
+
+	test('when the list and the chart both fail, the page Retry reloads both and clears the chart error', async () => {
+		getHistory.mockRejectedValueOnce(new Error('Server unavailable'));
+		getHistory.mockResolvedValue(page(dated(3)));
+		getChartHistory.mockRejectedValueOnce(new Error('Server unavailable'));
+		getChartHistory.mockResolvedValue(page(dated(3)));
+		mount();
+		await settle();
+		expect(screen.getByText("Couldn't load odometer readings")).toBeInTheDocument();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+		await settle();
+
+		expect(screen.getByText('3 readings')).toBeInTheDocument();
 		expect(chartProps?.['error']).toBeNull();
 		expect((chartProps?.['data'] as unknown[]).length).toBe(3);
 	});

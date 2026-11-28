@@ -14,9 +14,8 @@
 	import {
 		CLAIM_STATUS_LABELS,
 		getDaysRemaining,
-		getLatestTerm,
 		groupPoliciesByActive,
-		sortTermsByEndDateDesc
+		splitTermsByToday
 	} from '#lib/utils/insurance.ts';
 	import { cn } from '#lib/utils.js';
 	import type { InsuranceClaim, InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
@@ -36,18 +35,16 @@
 	let claimsLoading = $state(true);
 	let showPastTerms = $state(false);
 
-	let returnTo = $derived(resolve(paramRoutes.vehicle, { id: vehicleId }));
+	let returnTo = $derived(`${resolve(paramRoutes.vehicle, { id: vehicleId })}?tab=insurance`);
 	let ordered = $derived.by(() => {
 		const { active, inactive } = groupPoliciesByActive(policies);
 		return [...active, ...inactive];
 	});
+	let termsByPolicy = $derived(new Map(policies.map(p => [p.id, splitTermsByToday(p.terms)])));
 	let pastTerms = $derived(
-		ordered.flatMap(policy => {
-			const latest = getLatestTerm(policy.terms);
-			return sortTermsByEndDateDesc(policy.terms)
-				.filter(t => t.id !== latest?.id)
-				.map(term => ({ policy, term }));
-		})
+		ordered.flatMap(policy =>
+			(termsByPolicy.get(policy.id)?.past ?? []).map(term => ({ policy, term }))
+		)
 	);
 
 	onMount(async () => {
@@ -192,11 +189,12 @@
 			</div>
 			<ul class="divide-y border-y">
 				{#each ordered as policy (policy.id)}
-					{@const term = getLatestTerm(policy.terms)}
+					{@const split = termsByPolicy.get(policy.id)}
+					{@const term = split?.shown}
 					{@const cost = costText(term)}
 					{@const days = term ? getDaysRemaining(term.endDate) : null}
 					{@const coverage = coverageText(term)}
-					<li class="flex">
+					<li class="flex flex-col">
 						<svelte:element
 							this={readOnly ? 'div' : 'a'}
 							href={readOnly ? undefined : policyHref(policy)}
@@ -214,21 +212,25 @@
 								{#if coverage}
 									<span class="block text-sm text-muted-foreground">{coverage}</span>
 								{/if}
-								{#if policy.notes?.trim()}
-									<span class="block text-sm break-words text-muted-foreground">
-										{policy.notes}
-									</span>
-								{/if}
 							</span>
 							<span class="shrink-0 text-right">
 								{#if cost}
 									<span class="block font-semibold tabular-nums">{cost}</span>
 								{/if}
 								{#if term && days !== null && policy.isActive}
-									<span class={cn('block text-sm', statusTone(days))}>{renewalText(term)}</span>
+									{#if split?.upcoming && days >= 0}
+										<span class="block text-sm text-muted-foreground">
+											Next term from {formatDate(split.upcoming.startDate)}
+										</span>
+									{:else}
+										<span class={cn('block text-sm', statusTone(days))}>{renewalText(term)}</span>
+									{/if}
 								{/if}
 							</span>
 						</svelte:element>
+						{#if policy.notes?.trim()}
+							<p class="-mt-1 pb-3 text-sm break-words text-muted-foreground">{policy.notes}</p>
+						{/if}
 					</li>
 				{/each}
 			</ul>
