@@ -193,6 +193,7 @@ src/api/sync/__tests__/reminder-split-config-roundtrip.test.ts
 src/api/sync/__tests__/restore-drivers.test.ts
 src/api/sync/__tests__/restore-empty-replace-guard.test.ts
 src/api/sync/__tests__/restore-entry-authors.test.ts
+src/api/sync/__tests__/restore-idle-timeout.test.ts
 src/api/sync/__tests__/restore-json-cell-recovery.test.ts
 src/api/sync/__tests__/restore-junction-refs.test.ts
 src/api/sync/__tests__/restore-merge-dependents.test.ts

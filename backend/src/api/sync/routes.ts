@@ -9,6 +9,7 @@ import {
   bodyLimit,
   heavyJobLimiter,
   idempotency,
+  noIdleTimeout,
   rateLimiter,
   requireAuth,
 } from '../../middleware';
@@ -107,6 +108,7 @@ routes.post(
   '/',
   syncRateLimiter,
   authorize(ownAccount),
+  noIdleTimeout(),
   idempotency({ required: false }),
   async (c) => {
     const user = c.get('user');
@@ -228,28 +230,35 @@ routes.get('/backups/providers', authorize(ownAccount), async (c) => {
   return c.json(createSuccessResponse(allBackups));
 });
 
-routes.get('/backups/download', backupRateLimiter, authorize(ownAccount), async (c) => {
-  const user = c.get('user');
-  const zipBuffer = await withTimeout(
-    backupService.exportAsZip(user.id),
-    OPERATION_TIMEOUTS.BACKUP,
-    'Backup export'
-  );
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return new Response(zipBuffer, {
-    headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="vroom-backup-${timestamp}.zip"`,
-      'Content-Length': zipBuffer.length.toString(),
-    },
-  });
-});
+routes.get(
+  '/backups/download',
+  backupRateLimiter,
+  authorize(ownAccount),
+  noIdleTimeout(),
+  async (c) => {
+    const user = c.get('user');
+    const zipBuffer = await withTimeout(
+      backupService.exportAsZip(user.id),
+      OPERATION_TIMEOUTS.BACKUP,
+      'Backup export'
+    );
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    return new Response(zipBuffer, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="vroom-backup-${timestamp}.zip"`,
+        'Content-Length': zipBuffer.length.toString(),
+      },
+    });
+  }
+);
 
 routes.post(
   '/restore/from-provider',
   restoreRateLimiter,
   heavyJobLimiter,
   authorize(ownAccount),
+  noIdleTimeout(),
   idempotency({ required: true }),
   async (c) => {
     const user = c.get('user');
@@ -303,6 +312,7 @@ routes.post(
   heavyJobLimiter,
   authorize(ownAccount),
   bodyLimit({ maxSize: CONFIG.backup.maxFileSize }),
+  noIdleTimeout(),
   idempotency({ required: true }),
   async (c) => {
     const user = c.get('user');
