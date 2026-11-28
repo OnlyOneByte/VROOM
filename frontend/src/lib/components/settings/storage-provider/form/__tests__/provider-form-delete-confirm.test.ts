@@ -131,4 +131,26 @@ describe('ProviderForm with a single storage type on offer', () => {
 			screen.getByText('Connect your Google account to use Google Drive for photos and backups')
 		).toBeInTheDocument();
 	});
+
+	test('the Edit page does not pick a type before its storage has loaded', async () => {
+		render(ProviderForm, { props: { providerId: 'drive-1' } });
+
+		const drive = await screen.findByRole('button', { name: /Google Drive/ });
+		await new Promise(r => setTimeout(r, 0));
+		expect(drive).toHaveAttribute('aria-pressed', 'false');
+		expect(screen.queryByLabelText('Name')).toBeNull();
+	});
+
+	test('a type restored after the Google sign-in round trip is kept', async () => {
+		sessionStorage.setItem(
+			'provider-form-state',
+			JSON.stringify({ selectedType: 'google-photos', displayName: 'Trip photos' })
+		);
+		render(ProviderForm, { props: {} });
+
+		const drive = await screen.findByRole('button', { name: /Google Drive/ });
+		await new Promise(r => setTimeout(r, 0));
+		expect(drive).toHaveAttribute('aria-pressed', 'false');
+		expect(screen.getByLabelText('Name')).toHaveValue('Trip photos');
+	});
 });

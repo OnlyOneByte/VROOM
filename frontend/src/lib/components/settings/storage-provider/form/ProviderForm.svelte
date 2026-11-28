@@ -478,6 +478,7 @@
 								{isEditMode}
 								providerLabel={selectedEntry?.label ?? 'Google'}
 								providerIcon={providerUi(selectedType)?.icon ?? Cloud}
+								supportsBackups={supportsZipBackup(selectedType)}
 								{oauth}
 								bind:connection
 							/>

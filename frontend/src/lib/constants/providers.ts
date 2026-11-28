@@ -17,6 +17,7 @@ export interface ProviderFormProps {
 	isEditMode: boolean;
 	providerLabel: string;
 	providerIcon: Component<Record<string, unknown>>;
+	supportsBackups: boolean;
 	oauth: GoogleOAuthReturn;
 	connection: ProviderConnection;
 }
