@@ -16,9 +16,19 @@
 		onRetry: () => void;
 		onAccepted: (_share: ReceivedShare) => void;
 		onDeclined: (_share: ReceivedShare) => void;
+		title?: string | null;
 	}
 
-	let { pending, loadError, onRetry, onAccepted, onDeclined }: Props = $props();
+	let {
+		pending,
+		loadError,
+		onRetry,
+		onAccepted,
+		onDeclined,
+		title = 'Shared with you'
+	}: Props = $props();
+
+	let waiting = $derived(pending.filter(share => share.status === 'pending'));
 
 	let acting = $state<string | null>(null);
 
@@ -51,14 +61,16 @@
 
 {#if loadError}
 	<LoadErrorCard compact title="Couldn't load your invitations" message={loadError} {onRetry} />
-{:else if pending.length > 0}
+{:else if waiting.length > 0}
 	<Card.Root class="gap-3 py-5" data-testid="shared-with-you">
-		<Card.Header class="px-5">
-			<Card.Title level={2} class="text-lg">Shared with you</Card.Title>
-		</Card.Header>
+		{#if title}
+			<Card.Header class="px-5">
+				<Card.Title level={2} class="text-lg">{title}</Card.Title>
+			</Card.Header>
+		{/if}
 		<Card.Content class="px-5">
-			<ul class="divide-y" role="list">
-				{#each pending as share (share.id)}
+			<ul class="divide-y" role="list" aria-label="Invitations to accept">
+				{#each waiting as share (share.id)}
 					<li
 						class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-3 first:pt-0 last:pb-0"
 					>
