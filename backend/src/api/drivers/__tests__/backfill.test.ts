@@ -189,7 +189,9 @@ describe('backfilling past entries', () => {
     );
 
     expect(await payerOf('bf-leg-1')).toBe(guest.id);
-    const leg = (await ctx.sql.get("SELECT updated_at AS t FROM expenses WHERE id = 'bf-leg-1'")) as {
+    const leg = (await ctx.sql.get(
+      "SELECT updated_at AS t FROM expenses WHERE id = 'bf-leg-1'"
+    )) as {
       t: number;
     };
     expect(leg.t).toBeGreaterThan(later);
