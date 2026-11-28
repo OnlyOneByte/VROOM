@@ -167,7 +167,7 @@
 
 		try {
 			const data = await settingsStore.executeSync(['backup'], true, providerIds);
-			const providers = (count: number) => `${count} provider${count === 1 ? '' : 's'}`;
+			const providers = (count: number) => `${count} place${count === 1 ? '' : 's'}`;
 
 			if (data.outcome === 'success') {
 				toast.success(`Backed up to ${providers(Object.keys(data.results).length)}`, {
@@ -183,7 +183,7 @@
 				toast.info(
 					providerIds
 						? 'Nothing was backed up. Reload the page to see your storage, then try again.'
-						: 'Nothing to back up: no provider has backups turned on',
+						: 'Nothing to back up: backups are off for all storage',
 					{ id: toastId }
 				);
 			} else {
@@ -280,7 +280,7 @@
 				href="{resolve(routes.settings)}#settings-data"
 				class="font-semibold text-accent-ink underline-offset-4 hover:underline"
 			>
-				Export everything from Your data
+				Export all your data from Settings
 			</a>
 		</p>
 	{/if}

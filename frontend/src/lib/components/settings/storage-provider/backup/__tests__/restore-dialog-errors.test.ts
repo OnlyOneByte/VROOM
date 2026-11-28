@@ -35,7 +35,7 @@ async function openProviderFlow(): Promise<void> {
 			onClose: vi.fn()
 		}
 	});
-	await fireEvent.click(await screen.findByText('Restore from provider'));
+	await fireEvent.click(await screen.findByText('Restore from storage'));
 }
 
 beforeEach(() => {
@@ -50,7 +50,7 @@ describe('RestoreDialog errors', () => {
 		await openProviderFlow();
 
 		expect(
-			await screen.findByText(`Couldn't load your storage providers. ${SERVER_FAILURE_MESSAGE}`)
+			await screen.findByText(`Couldn't load your storage. ${SERVER_FAILURE_MESSAGE}`)
 		).toBeInTheDocument();
 		expect(screen.queryByText(/SQLITE_BUSY/)).toBeNull();
 	});

@@ -1,16 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedInsurancePolicy,
   seedInsuranceTermVehicle,
   seedUser,
   seedVehicle,
   seedVehicleFinancing,
-  type TestDb,
-} from './analytics-test-generators';
+} from './analytics-test-db';
 
 const OWNER = { id: 'owner', email: 'o@test.com', displayName: 'O' };
 const STRANGER = { id: 'stranger', email: 's@test.com', displayName: 'S' };
@@ -23,12 +22,12 @@ const RANGE = {
 };
 const DAY = 86_400_000;
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
-function fillUps(vehicleId: string, amount: number, startMileage: number): void {
+async function fillUps(vehicleId: string, amount: number, startMileage: number): Promise<void> {
   for (let i = 0; i < 6; i++) {
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: `${vehicleId}-fuel-${i}`,
       vehicleId,
       category: 'fuel',
@@ -40,7 +39,7 @@ function fillUps(vehicleId: string, amount: number, startMileage: number): void 
       missedFillup: false,
     });
   }
-  seedExpense(testDb.sqlite, {
+  await seedExpense(testDb.sql, {
     id: `${vehicleId}-service`,
     vehicleId,
     category: 'maintenance',
@@ -53,17 +52,17 @@ function fillUps(vehicleId: string, amount: number, startMileage: number): void 
   });
 }
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
-  for (const user of [OWNER, STRANGER]) seedUser(testDb.sqlite, user);
-  for (const vehicle of [CIVIC, RAV4, FORD]) seedVehicle(testDb.sqlite, vehicle);
-  fillUps(CIVIC.id, 4_000, 10_000);
-  fillUps(RAV4.id, 6_000, 30_000);
-  fillUps(FORD.id, 9_000, 50_000);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
+  for (const user of [OWNER, STRANGER]) await seedUser(testDb.sql, user);
+  for (const vehicle of [CIVIC, RAV4, FORD]) await seedVehicle(testDb.sql, vehicle);
+  await fillUps(CIVIC.id, 4_000, 10_000);
+  await fillUps(RAV4.id, 6_000, 30_000);
+  await fillUps(FORD.id, 9_000, 50_000);
 });
 
-afterEach(() => testDb.sqlite.close());
+afterEach(() => testDb.close());
 
 describe('the car filter narrows every fleet endpoint', () => {
   test('summary counts only the picked cars', async () => {
@@ -104,7 +103,7 @@ describe('the car filter narrows every fleet endpoint', () => {
   });
 
   test('financing follows the car filter', async () => {
-    seedVehicleFinancing(testDb.sqlite, {
+    await seedVehicleFinancing(testDb.sql, {
       id: 'loan',
       vehicleId: RAV4.id,
       financingType: 'loan',
@@ -125,13 +124,13 @@ describe('the car filter narrows every fleet endpoint', () => {
   });
 
   test('a policy covering two cars counts only the picked share', async () => {
-    seedInsurancePolicy(testDb.sqlite, {
+    await seedInsurancePolicy(testDb.sql, {
       id: 'pol',
       userId: OWNER.id,
       company: 'Acme',
       isActive: true,
     });
-    testDb.sqlite.run(
+    await testDb.sql.run(
       'INSERT INTO insurance_terms (id, policy_id, start_date, end_date, monthly_cost) VALUES (?, ?, ?, ?, ?)',
       [
         'term',
@@ -142,7 +141,7 @@ describe('the car filter narrows every fleet endpoint', () => {
       ]
     );
     for (const vehicleId of [CIVIC.id, RAV4.id]) {
-      seedInsuranceTermVehicle(testDb.sqlite, { termId: 'term', vehicleId });
+      await seedInsuranceTermVehicle(testDb.sql, { termId: 'term', vehicleId });
     }
     const all = await repo.getInsurance(OWNER.id);
     expect(all.summary.totalMonthlyPremiums).toBe(20_000);

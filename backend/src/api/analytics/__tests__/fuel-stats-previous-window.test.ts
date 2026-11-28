@@ -1,33 +1,31 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
-  type TestExpense,
-  yearToRange,
-} from './analytics-test-generators';
+} from './analytics-test-db';
+import { type TestExpense, yearToRange } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
 const USER = { id: 'user-prev', email: 'prev@test.com', displayName: 'Prev' };
 const GAS = { id: 'veh-gas', userId: USER.id, make: 'Honda', model: 'Civic', year: 2020 };
 const EV = { id: 'veh-ev', userId: USER.id, make: 'Kia', model: 'Niro EV', year: 2022 };
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
-  seedUser(testDb.sqlite, USER);
-  seedVehicle(testDb.sqlite, GAS);
-  seedVehicle(testDb.sqlite, EV);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
+  await seedUser(testDb.sql, USER);
+  await seedVehicle(testDb.sql, GAS);
+  await seedVehicle(testDb.sql, EV);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): TestExpense {
@@ -43,10 +41,15 @@ function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): Te
   };
 }
 
-function seedFillups(year: number, startMileage: number, milesPer: number, cost: number): void {
+async function seedFillups(
+  year: number,
+  startMileage: number,
+  milesPer: number,
+  cost: number
+): Promise<void> {
   for (let m = 0; m < 4; m++) {
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({
         id: `g${year}-${m}`,
         date: new Date(Date.UTC(year, m * 3, 10)),
@@ -59,10 +62,10 @@ function seedFillups(year: number, startMileage: number, milesPer: number, cost:
 
 describe('fuel stats previous window', () => {
   test('carries the previous window figures next to the current ones', async () => {
-    seedFillups(2023, 10_000, 250, 4000);
-    seedFillups(2024, 11_000, 300, 5000);
-    seedExpense(
-      testDb.sqlite,
+    await seedFillups(2023, 10_000, 250, 4000);
+    await seedFillups(2024, 11_000, 300, 5000);
+    await seedExpense(
+      testDb.sql,
       fuel({
         id: 'c2023',
         vehicleId: EV.id,
@@ -73,8 +76,8 @@ describe('fuel stats previous window', () => {
         expenseAmount: 1200,
       })
     );
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({
         id: 'c2023b',
         vehicleId: EV.id,
@@ -97,7 +100,7 @@ describe('fuel stats previous window', () => {
   });
 
   test('a user with no older data has no previous figures', async () => {
-    seedFillups(2024, 11_000, 300, 5000);
+    await seedFillups(2024, 11_000, 300, 5000);
 
     const { previous } = await repo.getFuelStats(USER.id, yearToRange(2024));
 
@@ -110,8 +113,8 @@ describe('fuel stats previous window', () => {
   });
 
   test('getSummary carries the same previous figures', async () => {
-    seedFillups(2023, 10_000, 250, 4000);
-    seedFillups(2024, 11_000, 300, 5000);
+    await seedFillups(2023, 10_000, 250, 4000);
+    await seedFillups(2024, 11_000, 300, 5000);
 
     const range = yearToRange(2024);
     const [summary, stats] = await Promise.all([

@@ -38,7 +38,7 @@ function renderDialog() {
 
 async function openSheetsPreview() {
 	const onRestore = renderDialog();
-	await fireEvent.click(await screen.findByText('Restore from provider'));
+	await fireEvent.click(await screen.findByText('Restore from storage'));
 	await screen.findByText('How to restore');
 	return onRestore;
 }

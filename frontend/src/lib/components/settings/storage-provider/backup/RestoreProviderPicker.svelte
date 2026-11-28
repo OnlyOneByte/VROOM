@@ -26,7 +26,7 @@
 		<Database class="h-10 w-10 text-muted-foreground mx-auto mb-2" />
 		<p class="text-sm font-medium text-foreground">No backups available</p>
 		<p class="text-xs text-muted-foreground mt-1">
-			Create a backup first to enable provider-based restore
+			Create a backup first to restore from your storage
 		</p>
 	</div>
 {:else}

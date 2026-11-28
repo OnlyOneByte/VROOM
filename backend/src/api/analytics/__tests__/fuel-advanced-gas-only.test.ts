@@ -1,31 +1,29 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
-  type TestExpense,
-  yearToRange,
-} from './analytics-test-generators';
+} from './analytics-test-db';
+import { type TestExpense, yearToRange } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
 const USER = { id: 'user-gas', email: 'gas@test.com', displayName: 'Gas' };
 const VEHICLE = { id: 'veh-1', userId: USER.id, make: 'Toyota', model: 'Prime', year: 2022 };
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
-  seedUser(testDb.sqlite, USER);
-  seedVehicle(testDb.sqlite, VEHICLE);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
+  await seedUser(testDb.sql, USER);
+  await seedVehicle(testDb.sql, VEHICLE);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): TestExpense {
@@ -42,17 +40,17 @@ function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): Te
 }
 
 describe('PHEV charge sessions stay out of the gas-MPG averages', () => {
-  beforeEach(() => {
-    seedExpense(
-      testDb.sqlite,
+  beforeEach(async () => {
+    await seedExpense(
+      testDb.sql,
       fuel({ id: 'g1', date: new Date(Date.UTC(2024, 0, 1)), mileage: 10_000 })
     );
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({ id: 'g2', date: new Date(Date.UTC(2024, 0, 8)), mileage: 10_300 })
     );
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({
         id: 'c1',
         date: new Date(Date.UTC(2024, 0, 15)),
@@ -79,8 +77,8 @@ describe('PHEV charge sessions stay out of the gas-MPG averages', () => {
 describe('a split fuel expense counts as one fill-up', () => {
   test('seasonal and day-of-week fill-up counts skip volume-null siblings', async () => {
     const date = new Date(Date.UTC(2024, 0, 10));
-    seedExpense(testDb.sqlite, fuel({ id: 's1', date, volume: 10, expenseAmount: 20 }));
-    seedExpense(testDb.sqlite, fuel({ id: 's2', date, volume: null, expenseAmount: 20 }));
+    await seedExpense(testDb.sql, fuel({ id: 's1', date, volume: 10, expenseAmount: 20 }));
+    await seedExpense(testDb.sql, fuel({ id: 's2', date, volume: null, expenseAmount: 20 }));
 
     const adv = await repo.getFuelAdvanced(USER.id, yearToRange(2024));
     const winter = adv.seasonalEfficiency.find((s) => s.season === 'Winter');
@@ -95,13 +93,13 @@ describe('a split fuel expense counts as one fill-up', () => {
 describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', () => {
   const CHARGE = 'Level 2 (AC)';
 
-  beforeEach(() => {
-    seedExpense(
-      testDb.sqlite,
+  beforeEach(async () => {
+    await seedExpense(
+      testDb.sql,
       fuel({ id: 'g1', date: new Date(Date.UTC(2024, 0, 1)), mileage: 10_000 })
     );
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({
         id: 'c1',
         date: new Date(Date.UTC(2024, 0, 5)),
@@ -111,16 +109,16 @@ describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', ()
         fuelType: CHARGE,
       })
     );
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({ id: 'g2', date: new Date(Date.UTC(2024, 0, 8)), mileage: 10_300 })
     );
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({ id: 'p1', date: new Date(Date.UTC(2023, 5, 1)), mileage: 5_000 })
     );
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({
         id: 'pc',
         date: new Date(Date.UTC(2023, 5, 5)),
@@ -143,8 +141,8 @@ describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', ()
   });
 
   test('fuel stats report charging separately in kWh', async () => {
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({
         id: 'c2',
         date: new Date(2024, 0, 20),
@@ -154,8 +152,8 @@ describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', ()
         fuelType: CHARGE,
       })
     );
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({
         id: 'c3',
         date: new Date(2024, 0, 27),
@@ -186,15 +184,15 @@ describe('PHEV gas fill-ups pair with gas, and kWh stays out of fuel volume', ()
 
   test('an electric vehicle trend uses the charge-to-charge interval', async () => {
     const EV = { id: 'veh-ev', userId: USER.id, make: 'Tesla', model: '3', year: 2023 };
-    seedVehicle(testDb.sqlite, EV);
-    testDb.sqlite.run("UPDATE vehicles SET vehicle_type = 'electric' WHERE id = ?", [EV.id]);
+    await seedVehicle(testDb.sql, EV);
+    await testDb.sql.run("UPDATE vehicles SET vehicle_type = 'electric' WHERE id = ?", [EV.id]);
     const charge = { vehicleId: EV.id, volume: 20, fuelType: 'Level 2 (AC)' };
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({ id: 'e1', date: new Date(Date.UTC(2024, 1, 1)), mileage: 500, ...charge })
     );
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({ id: 'e2', date: new Date(Date.UTC(2024, 1, 8)), mileage: 580, ...charge })
     );
 

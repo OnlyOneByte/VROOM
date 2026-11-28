@@ -74,7 +74,7 @@ export function expenseArb(
     id: fc.constant(`expense-${vehicleId}-${expenseIndex}`),
     vehicleId: fc.constant(vehicleId),
     category: fc.constantFrom(...EXPENSE_CATEGORIES),
-    expenseAmount: fc.double({ min: 0.01, max: 10000, noNaN: true, noDefaultInfinity: true }),
+    expenseAmount: fc.integer({ min: 1, max: 1_000_000 }),
     date: fc.integer({ min: minTs, max: maxTs }).map((ts) => new Date(ts)),
     mileage: fc.option(fc.integer({ min: 1000, max: 300000 }), { nil: null }),
     volume: fc.option(fc.double({ min: 0.1, max: 30, noNaN: true, noDefaultInfinity: true }), {

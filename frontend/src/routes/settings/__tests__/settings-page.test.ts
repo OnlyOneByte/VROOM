@@ -350,6 +350,17 @@ describe('Settings page loading', () => {
 		}
 	});
 
+	test('the section header links are 40px tap targets', async () => {
+		await mount();
+		for (const name of ['Profile']) {
+			expect(screen.getByRole('link', { name })).toHaveClass(
+				'inline-flex',
+				'min-h-10',
+				'items-center'
+			);
+		}
+	});
+
 	test('an old link to the storage section goes to the Backups and storage page', async () => {
 		window.history.replaceState(null, '', '/settings#settings-connections');
 		await mount();

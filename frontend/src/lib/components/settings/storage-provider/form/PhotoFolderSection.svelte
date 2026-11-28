@@ -85,7 +85,7 @@
 			/>
 		</div>
 		<p class="text-xs text-muted-foreground">
-			All photos will be stored under this path on the provider.
+			All photos will be stored under this path in this storage.
 		</p>
 	</div>
 
@@ -110,7 +110,7 @@
 				<div class="flex min-h-10 items-center gap-2">
 					<Checkbox id="{uid}-all" checked={allEnabled} onCheckedChange={handleToggleAll} />
 					<label for="{uid}-all" class="text-sm text-muted-foreground">
-						{allEnabled ? 'Disable All' : 'Enable All'}
+						{allEnabled ? 'Disable all' : 'Enable all'}
 					</label>
 				</div>
 
@@ -158,8 +158,7 @@
 
 				{#if defaultCategories.size > 0}
 					<p class="text-xs text-muted-foreground">
-						Categories marked as default cannot be disabled. Change the default provider in settings
-						first.
+						Categories marked as default cannot be disabled. Change the default photo source first.
 					</p>
 				{/if}
 

@@ -212,7 +212,7 @@
 
 <svelte:head>
 	<title>Settings - VROOM Car Tracker</title>
-	<meta name="description" content="Manage your preferences, units, and storage providers" />
+	<meta name="description" content="Manage your preferences, units and storage" />
 </svelte:head>
 
 <div class="mx-auto w-full max-w-2xl lg:max-w-5xl">
@@ -265,7 +265,7 @@
 							<CardAction>
 								<a
 									href={resolve(routes.profile)}
-									class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
+									class="-mt-2.5 inline-flex min-h-10 items-center text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
 								>
 									Profile
 								</a>

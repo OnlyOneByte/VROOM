@@ -29,7 +29,7 @@ describe('PhotoFolderSection rows on phones', () => {
 		const rows = await screen.findAllByTestId('photo-folder-row');
 		expect(rows).toHaveLength(4);
 		hasClass(rows[0]?.parentElement, 'space-y-2');
-		hasClass(screen.getByText('Disable All').parentElement, 'min-h-10');
+		hasClass(screen.getByText('Disable all').parentElement, 'min-h-10');
 		for (const row of rows) {
 			hasClass(row, 'flex-wrap');
 			hasClass(row, 'gap-y-2');
@@ -73,18 +73,18 @@ describe('PhotoFolderSection accessible names', () => {
 		});
 		await fireEvent.click(screen.getByText('Category paths & sync settings'));
 
-		expect(await screen.findByRole('checkbox', { name: 'Disable All' })).toBeInTheDocument();
+		expect(await screen.findByRole('checkbox', { name: 'Disable all' })).toBeInTheDocument();
 		for (const name of [
-			'Vehicle Photos',
-			'Expense Receipts',
-			'Insurance Docs',
-			'Odometer Readings'
+			'Vehicle photos',
+			'Expense receipts',
+			'Insurance docs',
+			'Odometer readings'
 		]) {
 			expect(screen.getByRole('checkbox', { name })).toBeInTheDocument();
 			expect(screen.getByRole('textbox', { name: `${name} folder path` })).toBeInTheDocument();
 		}
 
-		await fireEvent.click(screen.getByText('Vehicle Photos'));
+		await fireEvent.click(screen.getByText('Vehicle photos'));
 		expect(onUpdate).toHaveBeenCalledWith(
 			expect.objectContaining({ vehicle_photos: { enabled: false, folderPath: '/Vehicle' } })
 		);

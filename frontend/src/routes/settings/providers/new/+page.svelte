@@ -4,7 +4,7 @@
 
 <svelte:head>
 	<title>Add storage - VROOM Car Tracker</title>
-	<meta name="description" content="Add a new storage provider" />
+	<meta name="description" content="Add storage for backups and photos" />
 </svelte:head>
 
 <ProviderForm />

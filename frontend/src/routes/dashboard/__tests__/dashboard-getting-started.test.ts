@@ -94,6 +94,20 @@ describe('dashboard getting started', () => {
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
 	});
 
+	test('steps still to come have a strong circle edge', async () => {
+		getVehicles.mockResolvedValue([]);
+		render(Page);
+
+		await screen.findByRole('heading', { name: 'Add your first vehicle' });
+		const circles = [
+			...screen
+				.getByRole('list', { name: 'Getting started' })
+				.querySelectorAll('li > span[aria-hidden="true"]')
+		];
+		expect(circles.slice(1)).toHaveLength(2);
+		for (const circle of circles.slice(1)) expect(circle).toHaveClass('border-border-strong');
+	});
+
 	test('with a vehicle but no expenses, step 1 is ticked and Log fill-up stays the only action', async () => {
 		getVehicles.mockResolvedValue([OWNED]);
 		render(Page);
@@ -108,6 +122,18 @@ describe('dashboard getting started', () => {
 		expect(controls('Log fill-up').length).toBeGreaterThan(0);
 		expect(screen.queryByText('Total Expenses')).toBeNull();
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
+	});
+
+	test('steps that are not current are 40px links that look like links', async () => {
+		getVehicles.mockResolvedValue([]);
+		render(Page);
+
+		await screen.findByRole('heading', { name: 'Add your first vehicle' });
+		for (const name of ['Log an expense or fill-up', 'See what it costs']) {
+			const link = screen.getByRole('link', { name });
+			expect(link).toHaveClass('inline-flex', 'min-h-10', 'items-center', 'text-accent-ink');
+			expect(link).not.toHaveClass('text-muted-foreground');
+		}
 	});
 
 	test('with a vehicle but no expenses, due reminders and recurring costs still show', async () => {

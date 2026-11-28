@@ -266,6 +266,19 @@ describe('ProviderForm — a new provider stores the photo root path the user ty
 		expect(screen.queryByText('Soon')).toBeNull();
 	});
 
+	test('with several types and none picked, a hint says to choose one, and goes once one is', async () => {
+		render(ProviderForm, { props: {} });
+
+		const group = screen.getByRole('group', { name: 'Type' });
+		expect(group).toHaveTextContent('Choose a type to continue.');
+		expect(screen.queryByLabelText('Name')).toBeNull();
+
+		await fireEvent.click(screen.getByRole('button', { name: /S3 \/ B2 \/ R2/i }));
+
+		expect(screen.queryByText('Choose a type to continue.')).toBeNull();
+		expect(screen.getByLabelText('Name')).toBeInTheDocument();
+	});
+
 	test('the type chips form a labelled group and say which one is picked', async () => {
 		render(ProviderForm, { props: {} });
 

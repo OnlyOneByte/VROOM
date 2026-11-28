@@ -26,18 +26,14 @@ describe('ProviderHealth', () => {
 		render(ProviderHealth, {
 			props: { provider: provider('endpoint'), onFix: vi.fn(), onUpdated: vi.fn() }
 		});
-		expect(
-			screen.getByText('This server only lets providers reach public https:// addresses.')
-		).toBeTruthy();
-		expect(screen.getByRole('button', { name: 'Edit provider' })).toBeTruthy();
+		expect(screen.getByText('This server only allows public https:// addresses.')).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Edit settings' })).toBeTruthy();
 	});
 
 	test('a settings problem keeps its own message', () => {
 		render(ProviderHealth, {
 			props: { provider: provider('config'), onFix: vi.fn(), onUpdated: vi.fn() }
 		});
-		expect(
-			screen.getByText('The settings for this provider are incomplete or invalid.')
-		).toBeTruthy();
+		expect(screen.getByText('These settings are incomplete or invalid.')).toBeTruthy();
 	});
 });

@@ -310,6 +310,19 @@ describe('reconnecting clears a provider that needs it', () => {
     });
   });
 
+  test('saving new credentials forgets the last check, so they read as not checked yet', async () => {
+    const id = await createModel('llm');
+    await ctx.sql.run(
+      "UPDATE user_providers SET last_error_code = 'unreachable', failure_count = 1, last_checked_at = 1000 WHERE id = ?",
+      [id]
+    );
+    const res = await ctx.authed('PUT', `/api/v1/providers/${id}`, {
+      credentials: { apiKey: 'sk-new' },
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(await statusOf(id)).toMatchObject({ status: 'active', last_checked_at: null });
+  });
+
   test('a turned-off provider stays turned off when its credentials change', async () => {
     const id = await createModel('llm');
     await ctx.sql.run("UPDATE user_providers SET status = 'disabled' WHERE id = ?", [id]);

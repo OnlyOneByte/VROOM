@@ -1,19 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { zonedCalendar } from '../../../utils/analytics-charts';
 import { cachedTimeZoneCount, calendarDayIn, zonedMidnight } from '../../../utils/time-zone';
 import { AnalyticsRepository, calendarYearRange } from '../repository';
 import {
-  createTestDb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedInsurancePolicy,
   seedInsuranceTermVehicle,
   seedUser,
   seedVehicle,
-  type TestDb,
-} from './analytics-test-generators';
+} from './analytics-test-db';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
 const USER = { id: 'user-nz', email: 'nz@test.com', displayName: 'NZ' };
@@ -26,12 +25,12 @@ const WINDOW = {
   end: seconds('2025-03-01T00:00:00.000Z'),
 };
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
-  seedUser(testDb.sqlite, USER);
-  seedVehicle(testDb.sqlite, VEHICLE);
-  seedExpense(testDb.sqlite, {
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
+  await seedUser(testDb.sql, USER);
+  await seedVehicle(testDb.sql, VEHICLE);
+  await seedExpense(testDb.sql, {
     id: 'fuel-jan-1',
     vehicleId: VEHICLE.id,
     category: 'fuel',
@@ -44,7 +43,7 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => testDb.sqlite.close());
+afterEach(() => testDb.close());
 
 describe('zoned calendar helpers', () => {
   test('Auckland local noon on Jan 1 is Jan 1 there and Dec 31 in UTC', () => {
@@ -97,13 +96,13 @@ describe('analytics bucket a UTC+13 user by their own calendar when timeZone is 
   });
 
   test('an insurance term starting on local Jan 1 charts from January', async () => {
-    seedInsurancePolicy(testDb.sqlite, {
+    await seedInsurancePolicy(testDb.sql, {
       id: 'pol-nz',
       userId: USER.id,
       company: 'AMI',
       isActive: true,
     });
-    testDb.sqlite.run(
+    await testDb.sql.run(
       'INSERT INTO insurance_terms (id, policy_id, start_date, end_date, monthly_cost) VALUES (?, ?, ?, ?, ?)',
       [
         'term-nz',
@@ -113,7 +112,7 @@ describe('analytics bucket a UTC+13 user by their own calendar when timeZone is 
         100,
       ]
     );
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'term-nz', vehicleId: VEHICLE.id });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'term-nz', vehicleId: VEHICLE.id });
 
     const local = await repo.getInsurance(USER.id, AUCKLAND);
     expect(local.monthlyPremiumTrend.map((m) => m.month)).toEqual([

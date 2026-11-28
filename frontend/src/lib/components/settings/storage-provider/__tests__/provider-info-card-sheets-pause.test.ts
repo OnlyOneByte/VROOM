@@ -78,7 +78,7 @@ describe('ProviderInfoCard: paused Sheets backups', () => {
 		expect(
 			screen.getByText(/Automatic backups to this spreadsheet are paused/)
 		).toBeInTheDocument();
-		await fireEvent.click(screen.getByRole('button', { name: 'Resume Automatic Backups' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Resume automatic backups' }));
 
 		await waitFor(() => expect(resumeSheetsBackups).toHaveBeenCalledWith('prov-1'));
 		await waitFor(() => expect(store.load).toHaveBeenCalled());
@@ -89,6 +89,6 @@ describe('ProviderInfoCard: paused Sheets backups', () => {
 		mount();
 
 		expect(screen.queryByText(/are paused/)).toBeNull();
-		expect(screen.queryByRole('button', { name: 'Resume Automatic Backups' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Resume automatic backups' })).toBeNull();
 	});
 });
