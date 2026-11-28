@@ -67,9 +67,9 @@ describe('reminder notification feed (GET + mark-read)', () => {
     const marked = await ctx.authed('PUT', `/api/v1/reminders/notifications/${target.id}/read`);
     expect(marked.status, await marked.text()).toBe(200);
 
-    const row = ctx.sqlite
-      .query('SELECT is_read FROM reminder_notifications WHERE id = ?')
-      .get(target.id) as { is_read: number };
+    const row = (await ctx.sql.get('SELECT is_read FROM reminder_notifications WHERE id = ?', [
+      target.id,
+    ])) as { is_read: number };
     expect(row.is_read).toBe(1);
 
     const unreadAfter = await json<DataEnvelope<NotificationRow[]>>(
@@ -95,19 +95,19 @@ describe('reminder notification feed (GET + mark-read)', () => {
       vehicleIds: [vehicleId],
     });
     const reminderId = (
-      ctx.sqlite.query('SELECT id FROM reminders WHERE user_id = ? LIMIT 1').get(ctx.user.id) as {
+      (await ctx.sql.get('SELECT id FROM reminders WHERE user_id = ? LIMIT 1', [ctx.user.id])) as {
         id: string;
       }
     ).id;
-    ctx.sqlite.run('DELETE FROM reminder_notifications WHERE user_id = ?', [ctx.user.id]);
-    ctx.sqlite.run(
+    await ctx.sql.run('DELETE FROM reminder_notifications WHERE user_id = ?', [ctx.user.id]);
+    await ctx.sql.run(
       `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read, created_at)
-       VALUES ('ntime', ?, ?, 1700000000, NULL, 0, 1000)`,
+       VALUES ('ntime', ?, ?, 1700000000, NULL, FALSE, 1000)`,
       [reminderId, ctx.user.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read, created_at)
-       VALUES ('nmileage', ?, ?, NULL, 35000, 0, 2000)`,
+       VALUES ('nmileage', ?, ?, NULL, 35000, FALSE, 2000)`,
       [reminderId, ctx.user.id]
     );
 

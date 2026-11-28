@@ -481,11 +481,11 @@ function addInto(sum: Aggregate, value: Aggregate): Aggregate {
 
 function toAggregate(row: AggregateRow): Aggregate {
   return {
-    cost: row.cost ?? 0,
-    count: row.n,
-    volume: row.volume ?? 0,
-    effDistance: row.eff_distance ?? 0,
-    effEnergy: row.eff_energy ?? 0,
+    cost: Number(row.cost ?? 0),
+    count: Number(row.n),
+    volume: Number(row.volume ?? 0),
+    effDistance: Number(row.eff_distance ?? 0),
+    effEnergy: Number(row.eff_energy ?? 0),
   };
 }
 
@@ -527,11 +527,11 @@ function collectDistances(ctx: QueryContext, result: PeriodRows[], rows: Distanc
     const period = result[row.period];
     if (!period) continue;
     const rangeRow = row.idx < 0;
-    if (rangeRow) period.rangeDistance += row.distance ?? 0;
+    if (rangeRow) period.rangeDistance += Number(row.distance ?? 0);
     if (rangeRow !== wholeRange) continue;
     const length = ctx.periods[row.period]?.length ?? 0;
     seriesFor(period.distanceByVehicle, row.vehicle_id, length, () => 0)[rangeRow ? 0 : row.idx] =
-      row.distance ?? 0;
+      Number(row.distance ?? 0);
   }
 }
 
@@ -864,11 +864,11 @@ export class AnalyticsQueryRepository {
       ORDER BY e.expense_amount DESC, e.date DESC, e.id DESC LIMIT ${limit}
     `
     );
-    const total = totals?.total ?? 0;
-    const count = totals?.n ?? 0;
-    const fuelTotal = totals?.fuel_total ?? 0;
-    const fuelCount = totals?.fuel_n ?? 0;
-    const listed = rows.reduce((sum, r) => sum + r.amount, 0);
+    const total = Number(totals?.total ?? 0);
+    const count = Number(totals?.n ?? 0);
+    const fuelTotal = Number(totals?.fuel_total ?? 0);
+    const fuelCount = Number(totals?.fuel_n ?? 0);
+    const listed = rows.reduce((sum, r) => sum + Number(r.amount), 0);
     const othersCount = count - fuelCount - rows.length;
     return {
       total,
@@ -881,7 +881,7 @@ export class AnalyticsQueryRepository {
         vehicleId: r.vehicle_id,
         vehicleName: names.get(r.vehicle_id) ?? 'Unknown vehicle',
         description: r.description,
-        amount: r.amount,
+        amount: Number(r.amount),
       })),
       others: othersCount > 0 ? { total: total - fuelTotal - listed, count: othersCount } : null,
       categories,

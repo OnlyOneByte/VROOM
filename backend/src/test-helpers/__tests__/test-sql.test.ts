@@ -15,6 +15,17 @@ describe('positionalPlaceholders', () => {
       `SELECT 'why?', "odd?name" FROM t -- really?\n WHERE a = $1 /* ok? */ AND b = 'it''s?'`
     );
   });
+
+  test('keeps numbered placeholders and continues after the highest one', () => {
+    expect(positionalPlaceholders('SELECT ?2, ?1, ?, ?')).toBe('SELECT $2, $1, $3, $4');
+  });
+
+  test('leaves dollar-quoted and escape strings alone', () => {
+    const text = String.raw`SELECT $$why?$$, $q$a?b$q$, E'it\'s?' WHERE a = ?`;
+    expect(positionalPlaceholders(text)).toBe(
+      String.raw`SELECT $$why?$$, $q$a?b$q$, E'it\'s?' WHERE a = $1`
+    );
+  });
 });
 
 describe('ctx.sql', () => {
