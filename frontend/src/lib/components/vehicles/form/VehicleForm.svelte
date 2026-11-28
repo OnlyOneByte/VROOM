@@ -52,6 +52,7 @@
 		amountPlaceholder,
 		amountStep,
 		dateOnlyToISO,
+		formatNumber,
 		fromMinor,
 		toDateInputValue,
 		toMinor
@@ -75,7 +76,8 @@
 	import { maxVehicleYear } from '#lib/constants/limits.ts';
 	import {
 		annuityPayment,
-		calculatePayoffDateFromStart
+		calculatePayoffDateFromStart,
+		resolveCurrentOdometer
 	} from '#lib/utils/financing-calculations.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
@@ -106,6 +108,7 @@
 	let financingBeingEnded = $state<VehicleFinancing | null>(null);
 	let showUnitChangeConfirm = $state(false);
 	let vehicle = $state<Vehicle | null>(null);
+	let todayReading = $state<number | null>(null);
 	let loadError = $state<string | null>(null);
 
 	let trackFuel = $state(true);
@@ -257,11 +260,21 @@
 		}
 	});
 
+	async function loadTodayReading(id: string, initial: number | null) {
+		try {
+			const stats = await vehicleApi.getVehicleStats(id, '30d');
+			todayReading = resolveCurrentOdometer(stats.currentOdometer, stats.currentMileage, initial);
+		} catch {
+			todayReading = null;
+		}
+	}
+
 	async function loadVehicle() {
 		isLoading = true;
 		loadError = null;
 		try {
 			vehicle = await vehicleApi.getVehicle(vehicleId!);
+			void loadTodayReading(vehicleId!, vehicle.initialMileage ?? null);
 
 			const financingData = await vehicleApi.getFinancing(vehicleId!);
 			if (financingData && vehicle) {
@@ -812,12 +825,14 @@
 						</div>
 
 						<div class="space-y-2">
-							<Label for="initialMileage">Odometer today</Label>
+							<Label for="initialMileage">
+								{isEditMode ? 'Starting odometer' : 'Odometer today'}
+							</Label>
 							<Input
 								id="initialMileage"
 								type="number"
 								min="0"
-								placeholder="Current odometer reading"
+								placeholder={isEditMode ? 'Reading when you started' : 'Current odometer reading'}
 								bind:value={vehicleForm.initialMileage}
 								aria-invalid={!!errors['initialMileage']}
 								aria-describedby={errors['initialMileage']
@@ -830,9 +845,18 @@
 								</FormFieldError>
 							{:else}
 								<FormFieldDescription id="initialMileage-hint">
-									Used as the starting point for cost per {distanceUnit === 'kilometers'
-										? 'km'
-										: 'mile'}.
+									{#if isEditMode}
+										Cost per {distanceUnit === 'kilometers' ? 'km' : 'mile'} counts from this reading.
+										{#if todayReading !== null && todayReading !== vehicleForm.initialMileage}
+											Today it reads {formatNumber(todayReading, 0)}
+											{distanceUnit === 'kilometers' ? 'km' : 'mi'}; log new readings on the
+											Odometer tab.
+										{/if}
+									{:else}
+										Used as the starting point for cost per {distanceUnit === 'kilometers'
+											? 'km'
+											: 'mile'}.
+									{/if}
 								</FormFieldDescription>
 							{/if}
 						</div>

@@ -29,10 +29,15 @@ const deleteVehicle = vi.fn<(id: string) => Promise<void>>();
 const createFinancing =
 	vi.fn<(vehicleId: string, data: Partial<VehicleFinancing>) => Promise<VehicleFinancing>>();
 const payOffFinancing = vi.fn<(id: string) => Promise<VehicleFinancing>>();
+const getVehicleStats =
+	vi.fn<
+		(id: string, period: string) => Promise<{ currentOdometer?: number; currentMileage?: number }>
+	>();
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicle,
 		getFinancing,
+		getVehicleStats,
 		createVehicle,
 		updateVehicle,
 		deleteVehicle,
@@ -132,6 +137,7 @@ beforeEach(() => {
 	vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
 	vi.clearAllMocks();
 	getFinancing.mockResolvedValue(null);
+	getVehicleStats.mockRejectedValue(new Error('no stats in this test'));
 	appStore.clearNotifications();
 	appStore.setVehicles([]);
 });
@@ -141,6 +147,14 @@ afterEach(() => {
 });
 
 describe('VehicleForm create mode', () => {
+	test("asks for today's odometer, which becomes the starting point", async () => {
+		await renderCreate();
+
+		expect(screen.getByLabelText('Odometer today')).toBe(input('initialMileage'));
+		expect(screen.queryByLabelText('Starting odometer')).toBeNull();
+		expect(getVehicleStats).not.toHaveBeenCalled();
+	});
+
 	test('starts empty with the current year, gas type, fuel tracking on and charging off', async () => {
 		await renderCreate();
 
@@ -443,6 +457,26 @@ describe('VehicleForm edit mode', () => {
 		expect(switchState('trackCharging')).toBe('checked');
 		expect(screen.getByText('Daily Driver', { selector: 'p' })).toBeTruthy();
 		expect(screen.getByText('Kilometers · Liters · kWh')).toBeTruthy();
+	});
+
+	test('names the field the starting odometer and shows what the car reads today', async () => {
+		getVehicleStats.mockResolvedValue({ currentOdometer: 64360 });
+		await renderEdit();
+
+		expect(screen.getByLabelText('Starting odometer')).toBe(input('initialMileage'));
+		expect(screen.queryByLabelText('Odometer today')).toBeNull();
+		expect(getVehicleStats).toHaveBeenCalledWith('veh-1', '30d');
+		expect(await screen.findByText(/Today it reads 64,360\s+km/)).toBeTruthy();
+		expect(document.getElementById('initialMileage-hint')?.textContent).toMatch(
+			/Cost per km counts from this reading/
+		);
+	});
+
+	test('without a newer reading the hint leaves today out', async () => {
+		await renderEdit();
+
+		expect(screen.getByLabelText('Starting odometer')).toBe(input('initialMileage'));
+		expect(screen.queryByText(/Today it reads/)).toBeNull();
 	});
 
 	test('falls back to year make model as the subtitle when the vehicle has no nickname', async () => {
