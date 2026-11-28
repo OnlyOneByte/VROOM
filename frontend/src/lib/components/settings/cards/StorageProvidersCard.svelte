@@ -323,6 +323,7 @@
 									sheetsSyncEnabled={backupConfig.providers[provider.id]?.sheetsSyncEnabled ??
 										false}
 									lastBackupAt={backupConfig.providers[provider.id]?.lastBackupAt}
+									backupWarning={backupConfig.providers[provider.id]?.backupWarning}
 									onEdit={handleProviderEdit}
 									onReconnect={handleProviderReconnect}
 									onDelete={requestProviderDelete}

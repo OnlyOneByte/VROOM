@@ -40,6 +40,7 @@
 		backupEnabled = false,
 		sheetsSyncEnabled = false,
 		lastBackupAt,
+		backupWarning,
 		onEdit,
 		onDelete,
 		onBackupToggle,
@@ -52,6 +53,7 @@
 		backupEnabled?: boolean;
 		sheetsSyncEnabled?: boolean;
 		lastBackupAt?: string;
+		backupWarning?: string;
 		onEdit: (_provider: UserProviderInfo) => void;
 		onDelete: (_provider: UserProviderInfo) => void;
 		onBackupToggle?: (_providerId: string, _enabled: boolean) => void;
@@ -211,6 +213,9 @@
 			{#if lastBackupAt}
 				<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
 			{/if}
+			{#if backupWarning}
+				<Badge variant="soon">Couldn't remove old backups</Badge>
+			{/if}
 		</div>
 	</div>
 
@@ -235,6 +240,9 @@
 					<div class="space-y-0.5">
 						<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
 						<p class="text-xs text-muted-foreground">Store ZIP backups in this storage</p>
+						{#if backupWarning}
+							<p class="text-xs text-warning" data-testid="backup-warning">{backupWarning}</p>
+						{/if}
 					</div>
 					<Switch
 						id="backup-{provider.id}"
