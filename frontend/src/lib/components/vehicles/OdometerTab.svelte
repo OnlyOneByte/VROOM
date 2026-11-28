@@ -33,20 +33,17 @@
 </script>
 
 <script lang="ts">
-	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import { cn } from '#lib/utils.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { paramRoutes } from '#lib/routes.ts';
-	import { Plus, LoaderCircle, Gauge, ChevronLeft, ChevronRight, Trash2 } from '@lucide/svelte';
+	import { Plus, LoaderCircle, Gauge, ChevronLeft, ChevronRight } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import type { ChartConfig } from '#lib/components/ui/chart/index.ts';
-	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { AppLineChart } from '#lib/components/charts/index.ts';
 	import { formatDayLabel, unitTooltip } from '#lib/utils/chart-formatters.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import { odometerApi } from '#lib/services/odometer-api.ts';
 	import { odometerHistoryApi } from '#lib/services/odometer-history-api.ts';
 	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
@@ -71,6 +68,7 @@
 	let distLabel = $derived(getDistanceUnitLabel(units.distanceUnit, true));
 
 	let entries = $state<OdometerHistoryEntry[]>([]);
+	let nextOlder = $state<OdometerHistoryEntry | undefined>();
 	let chartEntries = $state<OdometerHistoryEntry[]>([]);
 	let chartIsCapped = $state(false);
 	let chartError = $state<string | null>(null);
@@ -79,11 +77,6 @@
 	let isLoading = $state(true);
 	let isPageLoading = $state(false);
 	let error = $state<string | null>(null);
-
-	let deleteDialogOpen = $state(false);
-	let deletingEntry = $state<OdometerHistoryEntry | null>(null);
-	let isDeleting = $state(false);
-	let deleteError = $state<string | null>(null);
 
 	let currentPage = $derived(Math.floor(offset / PAGE_SIZE) + 1);
 	let totalPages = $derived(Math.max(1, Math.ceil(totalCount / PAGE_SIZE)));
@@ -146,9 +139,10 @@
 		try {
 			const response: PaginatedResponse<OdometerHistoryEntry> = await odometerHistoryApi.getHistory(
 				vehicleId,
-				{ limit: PAGE_SIZE, offset: newOffset }
+				{ limit: PAGE_SIZE + 1, offset: newOffset }
 			);
-			entries = response.data;
+			entries = response.data.slice(0, PAGE_SIZE);
+			nextOlder = response.data[PAGE_SIZE];
 			totalCount = response.pagination.totalCount;
 			offset = response.pagination.offset;
 		} catch (e) {
@@ -177,7 +171,7 @@
 	}
 
 	function gainSince(index: number): number | null {
-		const older = entries[index + 1];
+		const older = entries[index + 1] ?? nextOlder;
 		const entry = entries[index];
 		if (!older || !entry) return null;
 		const gain = entry.odometer - older.odometer;
@@ -192,28 +186,6 @@
 					id: vehicleId,
 					entryId: entry.sourceId
 				}) + returnTo;
-	}
-
-	function openDeleteDialog(entry: OdometerHistoryEntry) {
-		deletingEntry = entry;
-		deleteError = null;
-		deleteDialogOpen = true;
-	}
-
-	async function handleDelete() {
-		if (!deletingEntry) return;
-		isDeleting = true;
-		deleteError = null;
-		try {
-			await odometerApi.delete(deletingEntry.sourceId);
-			deleteDialogOpen = false;
-			deletingEntry = null;
-			await loadAll(offset);
-		} catch (e) {
-			deleteError = `Couldn't delete the reading. ${userFacingErrorMessage(e)}`;
-		} finally {
-			isDeleting = false;
-		}
 	}
 </script>
 
@@ -313,7 +285,7 @@
 					{#each entries as entry, i (`${entry.source}-${entry.sourceId}`)}
 						{@const href = canWrite ? rowHref(entry) : undefined}
 						{@const gain = gainSince(i)}
-						<li class="flex items-center gap-3">
+						<li class="flex">
 							<svelte:element
 								this={href ? 'a' : 'div'}
 								{href}
@@ -344,18 +316,6 @@
 									</span>
 								{/if}
 							</svelte:element>
-							{#if canWrite && entry.source === 'manual' && authStore.user?.demo !== true}
-								<Button
-									variant="ghost"
-									size="icon"
-									class="h-10 w-10 shrink-0 text-destructive hover:text-destructive"
-									aria-label="Delete reading"
-									title="Delete reading"
-									onclick={() => openDeleteDialog(entry)}
-								>
-									<Trash2 class="h-4 w-4" />
-								</Button>
-							{/if}
 						</li>
 					{/each}
 				</ul>
@@ -389,32 +349,3 @@
 		{/if}
 	</div>
 {/if}
-
-<Dialog.Root bind:open={deleteDialogOpen}>
-	<Dialog.Content class="sm:max-w-sm">
-		<Dialog.Header>
-			<Dialog.Title>Delete Reading</Dialog.Title>
-			<Dialog.Description>
-				Are you sure you want to delete this odometer reading
-				{#if deletingEntry}
-					({formatOdometer(deletingEntry.odometer)} {distLabel})?
-				{:else}
-					?
-				{/if}
-				This action cannot be undone.
-			</Dialog.Description>
-		</Dialog.Header>
-		{#if deleteError}
-			<p class="text-sm text-destructive">{deleteError}</p>
-		{/if}
-		<Dialog.Footer>
-			<Button variant="outline" onclick={() => (deleteDialogOpen = false)}>Cancel</Button>
-			<Button variant="destructive" disabled={isDeleting} onclick={handleDelete}>
-				{#if isDeleting}
-					<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-				{/if}
-				Delete
-			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
