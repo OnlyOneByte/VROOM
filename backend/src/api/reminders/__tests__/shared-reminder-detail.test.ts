@@ -151,7 +151,7 @@ describe('reminder details for someone a car is shared with', () => {
     expect((await ctx.authed('POST', '/api/v1/reminders/trigger')).status).toBe(200);
 
     const res = await viewer.request('GET', `/api/v1/reminders/${id}/expenses`);
-    const body = await json<DataEnvelope<Array<Record<string, unknown>>>>(res);
+    const body = await json<DataEnvelope<Record<string, unknown>[]>>(res);
 
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.length).toBeGreaterThan(0);
