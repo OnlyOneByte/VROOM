@@ -164,7 +164,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
   (with bottom padding to clear them) and a normal row at the end of the form from `lg`.
 - Icon-only buttons are `size="icon"` or larger and always have an `aria-label`. On touch layouts
   use `icon-lg` or pad the hit area to 40px.
-- Labels are verbs in Title Case: "Add Expense", "Log Fill-up", "Import CSV". While a mutation is
+- Labels are verbs in sentence case: "Add expense", "Log fill-up", "Import CSV". While a mutation is
   in flight the button is disabled and shows a spinner. That rule is for submits; expense
   create, edit and delete are optimistic instead (see *Interaction quality*).
 - A Retry button that reloads data or re-sends queued work stays focusable while it runs: use
@@ -175,7 +175,7 @@ The inventory and import paths are in `DesignSystem.md`. The usage rules:
 - Wrap form pages in `FormLayout`. One column on mobile; two columns only for short paired fields
   (date + amount) at `sm:` and up.
 - Every field has a visible `Label for=`. Required fields carry ` *`; optional fields say
-  "(Optional)". A prefilled chip (the expense form's vehicle and date) is the one exception: its
+  "(optional)". A prefilled chip (the expense form's vehicle and date) is the one exception: its
   value is the visible text, its `sr-only` label names it, and the value is read with that name.
 - Validation errors render under the field with `FormFieldError`, wired by `aria-describedby`
   and `aria-invalid`. Validate on submit and on blur, not on every keystroke.
@@ -365,9 +365,9 @@ VROOM installs to phones. Mobile is the primary form factor, not an afterthought
 
 Plain, short, friendly, specific. Write like a helpful friend who knows cars, not like a bank.
 
-- **Case.** Page titles, card titles, buttons and nav use Title Case ("Monthly Expense Trends",
-  "Add Vehicle"). Empty-state titles, descriptions, helper text, toasts and errors use sentence
-  case ("Nothing due soon").
+- **Case.** Everything uses sentence case: page titles, card titles, buttons, nav, labels,
+  empty states, helper text, toasts and errors ("Monthly expense trends", "Add vehicle",
+  "Nothing due soon"). Only names keep their capitals ("Google Drive", "Settings", "VROOM").
 - **Verbs on buttons, nouns on titles.** A confirm button repeats the verb of its question
   ("Delete vehicle?" → "Delete").
 - **Say what happened and what to do.** "Couldn't save the expense. Check your connection and try

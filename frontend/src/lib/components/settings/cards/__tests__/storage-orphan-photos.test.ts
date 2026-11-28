@@ -61,9 +61,7 @@ describe('Storage Providers: photos no longer attached to anything', () => {
 
 		const dialog = await screen.findByRole('alertdialog');
 		expect(dialog).toHaveTextContent('Remove 3 photos?');
-		expect(dialog).toHaveTextContent(
-			'VROOM deletes them and their files in your storage providers.'
-		);
+		expect(dialog).toHaveTextContent('VROOM deletes them and their files in your storage.');
 		expect(remove).not.toHaveBeenCalled();
 	});
 
@@ -92,7 +90,7 @@ describe('Storage Providers: photos no longer attached to anything', () => {
 
 		await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('Removed 2 photos'));
 		expect(showError).toHaveBeenCalledWith(
-			"Couldn't delete 1 photo from your storage providers. It stays listed here so you can try again later."
+			"Couldn't delete 1 photo from your storage. It stays listed here so you can try again later."
 		);
 		expect(
 			await screen.findByText('1 photo is no longer attached to anything.')

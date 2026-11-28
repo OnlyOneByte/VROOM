@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { CircleAlert, CircleCheck, CircleMinus, CircleX } from '@lucide/svelte';
+	import { CircleAlert, CircleCheck, CircleDashed, CircleMinus, CircleX } from '@lucide/svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import type { ProviderStatus } from '#lib/types/index.ts';
 
-	let { status }: { status: ProviderStatus } = $props();
+	let { status, lastCheckedAt }: { status: ProviderStatus; lastCheckedAt?: string | null } =
+		$props();
 
 	const LOOK = {
 		active: { label: 'Connected', icon: CircleCheck, tone: 'text-success' },
@@ -12,8 +13,12 @@
 		disabled: { label: 'Turned off', icon: CircleMinus, tone: 'text-muted-foreground' }
 	} as const;
 
+	const ADDED = { label: 'Added', icon: CircleDashed, tone: 'text-muted-foreground' } as const;
+
 	let look = $derived(
-		LOOK[status] ?? { label: status, icon: CircleMinus, tone: 'text-muted-foreground' }
+		status === 'active' && !lastCheckedAt
+			? ADDED
+			: (LOOK[status] ?? { label: status, icon: CircleMinus, tone: 'text-muted-foreground' })
 	);
 </script>
 

@@ -454,7 +454,9 @@
 						Connection
 					</CardTitle>
 					<CardDescription>
-						{selectedForm?.description ?? selectedEntry?.description ?? 'Provider configuration'}
+						{selectedForm?.description ??
+							selectedEntry?.description ??
+							'How VROOM connects to this storage'}
 					</CardDescription>
 				</CardHeader>
 				<CardContent class="space-y-4" bind:ref={connectionCard}>
@@ -483,10 +485,10 @@
 					{/if}
 
 					<div class="space-y-2 border-t border-border pt-4">
-						<Label for="provider-root-path" class="text-sm">Provider root path</Label>
+						<Label for="provider-root-path" class="text-sm">Root folder</Label>
 						<Input id="provider-root-path" bind:value={providerRootPath} placeholder="VROOM" />
 						<p class="text-xs text-muted-foreground">
-							Top-level folder on the provider. All other paths are relative to this.
+							Top-level folder in this storage. All other paths are relative to this.
 						</p>
 					</div>
 				</CardContent>

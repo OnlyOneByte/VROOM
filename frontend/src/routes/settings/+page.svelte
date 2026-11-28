@@ -212,7 +212,7 @@
 
 <svelte:head>
 	<title>Settings - VROOM Car Tracker</title>
-	<meta name="description" content="Manage your preferences, units, and storage providers" />
+	<meta name="description" content="Manage your preferences, units and storage" />
 </svelte:head>
 
 <div class="mx-auto w-full max-w-2xl lg:max-w-5xl">

@@ -98,7 +98,7 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 
 		expect(await screen.findByRole('heading', { name: 'Back up now' })).toBeInTheDocument();
 		expect(screen.getByRole('list', { name: 'Backups go to' })).toHaveTextContent('Family Drive');
-		await fireEvent.click(screen.getByRole('button', { name: 'Back up to 2 providers' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Back up to 2 places' }));
 		expect(onSync).toHaveBeenCalledExactlyOnceWith(undefined);
 		expect(screen.queryByText(/Backup Now|Back Up Now/)).toBeNull();
 	});
@@ -111,14 +111,12 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 				onSync: vi.fn()
 			}
 		});
-		expect(await screen.findByRole('button', { name: 'Back up to 1 provider' })).toBeEnabled();
+		expect(await screen.findByRole('button', { name: 'Back up to 1 place' })).toBeEnabled();
 		unmount();
 
 		render(BackupDialog, { props: { open: true, onSync: vi.fn() } });
 		expect(await screen.findByRole('button', { name: 'Back up now' })).toBeDisabled();
-		expect(
-			screen.getByText('Connect a storage provider that can hold backups first.')
-		).toBeInTheDocument();
+		expect(screen.getByText('Add storage that can hold backups first.')).toBeInTheDocument();
 	});
 
 	test('two providers with the same name both show, without a duplicate-key crash', async () => {
@@ -134,7 +132,7 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 		});
 		const list = await screen.findByRole('list', { name: 'Backups go to' });
 		expect(list.querySelectorAll('li')).toHaveLength(2);
-		expect(screen.getByRole('button', { name: 'Back up to 2 providers' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: 'Back up to 2 places' })).toBeEnabled();
 	});
 
 	test('switches start from the saved setting and choosing a subset sends only those ids', async () => {
@@ -158,7 +156,7 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 
 		await fireEvent.click(drive);
 		await fireEvent.click(s3);
-		await fireEvent.click(screen.getByRole('button', { name: 'Back up to 1 provider' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Back up to 1 place' }));
 		expect(onSync).toHaveBeenCalledExactlyOnceWith(['p2']);
 	});
 
@@ -187,7 +185,7 @@ describe('Back up now is one verb-form name for the cloud backup action', () => 
 
 			expect(
 				await screen.findByText(
-					'No provider has backups on. You can still send one backup to a provider you choose.'
+					'Backups are off for all storage. You can still send one backup now.'
 				)
 			).toBeInTheDocument();
 			await fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));

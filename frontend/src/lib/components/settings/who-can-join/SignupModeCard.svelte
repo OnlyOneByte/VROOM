@@ -91,7 +91,7 @@
 	<CardHeader>
 		<div class="flex items-center gap-2">
 			<DoorOpen class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={2}>Who Can Join</CardTitle>
+			<CardTitle level={2}>Who can join</CardTitle>
 		</div>
 		<CardDescription>The first account on a server is always its admin.</CardDescription>
 	</CardHeader>
@@ -131,13 +131,13 @@
 					onclick={() => void saveMode()}
 				>
 					{#if savingMode}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
-					Save Mode
+					Save mode
 				</Button>
 			{/if}
 		</fieldset>
 
 		<form class="space-y-2" onsubmit={saveDomains} novalidate>
-			<Label for="signup-domains">Allowed email domains (Optional)</Label>
+			<Label for="signup-domains">Allowed email domains (optional)</Label>
 			<div class="flex flex-col gap-2 sm:flex-row">
 				<Input
 					id="signup-domains"
@@ -153,7 +153,7 @@
 				{#if !settings.domainsLocked && (domainsChanged || savingDomains)}
 					<Button type="submit" variant="outline" class="h-10 shrink-0" aria-busy={savingDomains}>
 						{#if savingDomains}<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />{/if}
-						Save Domains
+						Save domains
 					</Button>
 				{/if}
 			</div>

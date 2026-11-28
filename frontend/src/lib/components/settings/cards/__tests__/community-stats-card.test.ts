@@ -69,7 +69,7 @@ describe('CommunityStatsCard', () => {
 		).toBeInTheDocument();
 		expect(
 			screen.getByText("Off by default. Changing it doesn't affect your own data.")
-		).toBeInTheDocument();
+		).not.toHaveClass('italic');
 		expect(toggle()).toHaveAttribute('aria-checked', 'false');
 		expect(trigger('community-region-country')).toHaveTextContent('Not set');
 		expect(document.getElementById('community-region-subdivision')).toBeNull();

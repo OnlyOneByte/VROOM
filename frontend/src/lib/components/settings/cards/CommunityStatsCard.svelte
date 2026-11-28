@@ -167,7 +167,7 @@
 			</div>
 		{/if}
 
-		<p class="text-xs italic text-muted-foreground">
+		<p class="text-xs text-muted-foreground">
 			Off by default. Changing it doesn't affect your own data.
 		</p>
 	</CardContent>

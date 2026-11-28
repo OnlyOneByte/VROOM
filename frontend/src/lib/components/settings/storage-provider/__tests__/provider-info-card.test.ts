@@ -87,8 +87,15 @@ describe('ProviderInfoCard header', () => {
 		['error', 'Not working'],
 		['disabled', 'Turned off']
 	] as const)('status %s is labelled %s', async (status, label) => {
-		await mount({ provider: provider({ status }) });
+		await mount({ provider: provider({ status, lastCheckedAt: '2026-05-10T11:55:00.000Z' }) });
 		expect(screen.getByText(label)).toBeInTheDocument();
+	});
+
+	test('an active provider never checked reads Added, not Connected, next to not checked yet', async () => {
+		await mount({ provider: provider({ status: 'active', lastCheckedAt: null }) });
+		expect(screen.getByText('Added')).toBeInTheDocument();
+		expect(screen.queryByText('Connected')).toBeNull();
+		expect(screen.getByText('Connection not checked yet')).toBeInTheDocument();
 	});
 
 	test('an unexpected status is shown verbatim', async () => {
@@ -128,10 +135,10 @@ describe('ProviderInfoCard header', () => {
 		expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'prov-1' }));
 	});
 
-	test('a provider that is not working says what to check and offers Edit provider', async () => {
+	test('a provider that is not working says what to check and offers Edit settings', async () => {
 		await mount({ provider: provider({ status: 'error', lastErrorCode: 'unreachable' }) });
-		expect(screen.getByText("Couldn't reach the provider.")).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Edit provider' })).toBeInTheDocument();
+		expect(screen.getByText("Couldn't connect.")).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Edit settings' })).toBeInTheDocument();
 	});
 
 	test('Test connection checks the provider and hands back its refreshed status', async () => {
@@ -169,7 +176,13 @@ describe('ProviderInfoCard header', () => {
 			code: 'unreachable',
 			message: "Couldn't reach the provider."
 		});
-		getProviders.mockResolvedValue([provider({ status: 'active', lastErrorCode: 'unreachable' })]);
+		getProviders.mockResolvedValue([
+			provider({
+				status: 'active',
+				lastErrorCode: 'unreachable',
+				lastCheckedAt: '2026-05-10T11:59:00.000Z'
+			})
+		]);
 		const view = await mount({
 			onUpdated: (p: UserProviderInfo) => view.rerender({ provider: p })
 		});
@@ -196,7 +209,7 @@ describe('ProviderInfoCard header', () => {
 		expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ status: 'error' }));
 	});
 
-	test('Reconnect uses onReconnect when the card has one, and Edit provider always edits', async () => {
+	test('Reconnect uses onReconnect when the card has one, and Edit settings always edits', async () => {
 		const onReconnect = vi.fn<(p: UserProviderInfo) => void>();
 		await mount({ provider: provider({ status: 'needs_reauth' }), onReconnect });
 		await fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
@@ -306,7 +319,7 @@ describe('ProviderInfoCard details', () => {
 				config: { endpoint: 'https://s3.example', bucket: 'vroom', region: 'us-west-2' }
 			})
 		});
-		const toggle = screen.getByRole('button', { name: 'Expand provider details' });
+		const toggle = screen.getByRole('button', { name: 'Expand storage details' });
 		expect(toggle).toHaveAttribute('aria-expanded', 'false');
 		await fireEvent.click(toggle);
 
@@ -314,7 +327,7 @@ describe('ProviderInfoCard details', () => {
 		expect(screen.getByText('vroom')).toBeInTheDocument();
 		expect(screen.getByText('us-west-2')).toBeInTheDocument();
 
-		const collapse = screen.getByRole('button', { name: 'Collapse provider details' });
+		const collapse = screen.getByRole('button', { name: 'Collapse storage details' });
 		expect(collapse).toHaveAttribute('aria-expanded', 'true');
 		await fireEvent.click(collapse);
 		expect(screen.queryByText('https://s3.example')).toBeNull();
@@ -322,14 +335,14 @@ describe('ProviderInfoCard details', () => {
 
 	test('missing s3 settings show a dash placeholder', async () => {
 		await mount({ provider: provider({ providerType: 's3', config: {} }) });
-		await fireEvent.click(screen.getByRole('button', { name: 'Expand provider details' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Expand storage details' }));
 		expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
 	});
 
 	test('non-s3 providers show no endpoint settings when expanded', async () => {
 		await mount();
-		await fireEvent.click(screen.getByRole('button', { name: 'Expand provider details' }));
-		expect(screen.getByText('Provider Settings')).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole('button', { name: 'Expand storage details' }));
+		expect(screen.getByText('Storage settings')).toBeInTheDocument();
 		expect(screen.queryByText('Endpoint:')).toBeNull();
 	});
 });

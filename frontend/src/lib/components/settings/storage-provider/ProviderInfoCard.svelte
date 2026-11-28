@@ -160,7 +160,7 @@
 				<div class="min-w-0">
 					<div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
 						<p class="min-w-0 font-medium break-words">{provider.displayName}</p>
-						<ProviderStatusBadge status={provider.status} />
+						<ProviderStatusBadge status={provider.status} lastCheckedAt={provider.lastCheckedAt} />
 						{#if lastBackupAt}
 							<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
 						{/if}
@@ -196,7 +196,7 @@
 					variant="ghost"
 					size="icon"
 					class="size-10"
-					aria-label={expanded ? 'Collapse provider details' : 'Expand provider details'}
+					aria-label={expanded ? 'Collapse storage details' : 'Expand storage details'}
 					aria-expanded={expanded}
 					onclick={() => (expanded = !expanded)}
 				>
@@ -230,7 +230,7 @@
 				<div class="flex items-center justify-between">
 					<div class="space-y-0.5">
 						<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
-						<p class="text-xs text-muted-foreground">Store ZIP backups on this provider</p>
+						<p class="text-xs text-muted-foreground">Store ZIP backups in this storage</p>
 					</div>
 					<Switch
 						id="backup-{provider.id}"
@@ -245,8 +245,8 @@
 				{/if}
 			{:else}
 				<p class="text-xs text-muted-foreground">
-					{providerLabel(provider.providerType)} stores your photos only. Use a {zipBackupProviders}
-					provider for ZIP data backups.
+					{providerLabel(provider.providerType)} stores your photos only. Use {zipBackupProviders} for
+					ZIP data backups.
 				</p>
 			{/if}
 			{#if supportsSheets}
@@ -279,7 +279,7 @@
 								{#if isResuming}
 									<LoaderCircle class="h-3 w-3 animate-spin mr-1" />
 								{/if}
-								Resume Automatic Backups
+								Resume automatic backups
 							</Button>
 						</AlertDescription>
 					</Alert>
@@ -291,7 +291,7 @@
 	{#if expanded}
 		<div class="mt-4 sm:pl-14">
 			<div class="mb-4 space-y-3 border-t pt-4">
-				<p class="text-sm font-medium text-muted-foreground">Provider Settings</p>
+				<p class="text-sm font-medium text-muted-foreground">Storage settings</p>
 				{#if details.length > 0}
 					<div class="space-y-1 text-sm">
 						{#each details as detail (detail.label)}
@@ -323,7 +323,7 @@
 							Syncing...
 						{:else}
 							<RefreshCw class="h-3 w-3 mr-1" />
-							Sync All
+							Sync all
 						{/if}
 					</Button>
 				</div>

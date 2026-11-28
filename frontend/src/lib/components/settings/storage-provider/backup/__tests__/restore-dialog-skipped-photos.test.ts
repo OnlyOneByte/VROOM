@@ -32,7 +32,7 @@ async function previewFromSheets(result: RestoreResult): Promise<void> {
 			onClose: vi.fn()
 		}
 	});
-	await fireEvent.click(await screen.findByText('Restore from provider'));
+	await fireEvent.click(await screen.findByText('Restore from storage'));
 	await screen.findByText('In this backup');
 }
 

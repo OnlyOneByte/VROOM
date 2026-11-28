@@ -125,7 +125,7 @@ test.describe('Back up now lets you choose the providers for this one backup', (
 
 		await drive.click();
 		await s3.click();
-		await dialog.getByRole('button', { name: 'Back up to 1 provider' }).click();
+		await dialog.getByRole('button', { name: 'Back up to 1 place' }).click();
 
 		await expect.poll(() => syncBodies.length).toBe(1);
 		expect(syncBodies[0]).toMatchObject({
@@ -144,7 +144,7 @@ test.describe('Back up now lets you choose the providers for this one backup', (
 		await page.getByRole('button', { name: 'Back up now' }).click();
 		await page
 			.getByRole('dialog', { name: 'Back up now' })
-			.getByRole('button', { name: 'Back up to 1 provider' })
+			.getByRole('button', { name: 'Back up to 1 place' })
 			.click();
 
 		await expect.poll(() => syncBodies.length).toBe(1);
