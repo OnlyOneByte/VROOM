@@ -188,6 +188,7 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       const [created] = await this.db
         .insert(reminderNotifications)
         .values({ reminderId, userId, dueDate: null, dueOdometer, isRead: false })
+        .onConflictDoNothing()
         .returning();
       return created ?? null;
     } catch (error) {

@@ -271,6 +271,9 @@ function rescheduledFields(
   if (!resumed && !scheduleChanged(existing, merged)) return {};
   const nextDueDate = firstDueOnOrAfter(merged, new Date(), timeZone);
   const ended = merged.endDate != null && nextDueDate > merged.endDate;
+  if (ended && resumed) {
+    throw new ValidationError('This reminder has passed its end date. Extend it to resume.');
+  }
   return ended ? { nextDueDate, isActive: false } : { nextDueDate };
 }
 

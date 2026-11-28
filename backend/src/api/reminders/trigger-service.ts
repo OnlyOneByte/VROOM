@@ -479,11 +479,20 @@ class ReminderTriggerService {
     }
 
     const distanceUnit = await vehicleDistanceUnit(vehicleId);
-    const created = await repos().reminders.createMileageNotification(
-      reminder.id,
-      reminder.userId,
-      reminder.nextDueOdometer
-    );
+    const dueOdometer = reminder.nextDueOdometer;
+    const created = await appContext().asyncDb.transaction(async (tx) => {
+      const claimed = await repos().reminders.createMileageNotification(
+        reminder.id,
+        reminder.userId,
+        dueOdometer
+      );
+      if (claimed && reminder.type === 'expense') {
+        result.createdExpenses.push(
+          ...(await createExpenseFromReminder(tx, { reminder, vehicleIds }, new Date()))
+        );
+      }
+      return claimed;
+    });
     if (created) {
       result.notifications.push(created);
       await firePushForNotification(reminder, created, distanceUnit);
