@@ -172,10 +172,11 @@ describe('downloadExpensesCsv (blob → anchor download)', () => {
 		await expect(expenseApi.downloadExpensesCsv()).rejects.toBe(failure);
 	});
 
-	test('no filters → bare export path', async () => {
+	test('no filters → the export path with only the time zone, so days come out local', async () => {
 		raw.mockRejectedValueOnce(new Error('stop'));
 		await expect(expenseApi.downloadExpensesCsv()).rejects.toThrow('stop');
-		expect(raw).toHaveBeenCalledWith('/expenses/export');
+		const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		expect(raw).toHaveBeenCalledWith(`/expenses/export?timeZone=${encodeURIComponent(zone)}`);
 	});
 
 	test('on success: fetches the export URL with filters, blobs, and clicks a download anchor', async () => {
