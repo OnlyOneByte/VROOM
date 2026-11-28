@@ -42,8 +42,7 @@
 	let totalCount = $state(0);
 
 	let distLabel = $derived(getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true));
-	let loggable = $derived(vehicles.filter(v => v.sharedAccess?.level !== 'viewer'));
-	let editable = $derived(new Set(loggable.map(v => v.id)));
+	let loggable = $derived(vehicles.filter(v => !v.sharedAccess || v.sharedAccess.writesTrips));
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 	let vehicleDistLabels = $derived(
 		new Map(
@@ -215,12 +214,12 @@
 			</p>
 		</div>
 		<div class="flex shrink-0 items-center gap-2">
-			{#if editable.has(trip.vehicleId)}
+			{#if trip.access?.edit}
 				<Button variant="ghost" size="icon" aria-label="Edit trip" onclick={() => openEdit(trip)}>
 					<Pencil class="h-4 w-4" />
 				</Button>
 			{/if}
-			{#if authStore.user?.demo !== true && editable.has(trip.vehicleId)}
+			{#if authStore.user?.demo !== true && trip.access?.delete}
 				<Button
 					variant="ghost"
 					size="icon"

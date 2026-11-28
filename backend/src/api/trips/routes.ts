@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { repos } from '../../app-context';
 import type { Trip } from '../../db/schema';
@@ -10,6 +10,7 @@ import {
   vehicleEntry,
   vehicleOrOwnAccount,
 } from '../../permissions/authorize';
+import { loadResolver, vehicleResources } from '../../permissions/grants';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences } from '../../types';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { readJsonBody } from '../../utils/request-body';
@@ -17,7 +18,7 @@ import { buildTripSummary } from '../../utils/trip-summary';
 import { convertDistance } from '../../utils/unit-conversions';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { readableVehicles, requireVehicleAccess } from '../../utils/vehicle-access';
-import { attributedDriver, memberView } from '../drivers/attribution';
+import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { createTrip, deleteTrip, updateTrip } from './service';
 import {
   createTripSchema,
@@ -73,6 +74,21 @@ function withoutDriver(trip: Trip): Trip {
   return rest as Trip;
 }
 
+async function present(c: Context, rows: Trip[]) {
+  const userId = c.get('user').id;
+  const resolver = await loadResolver(c, vehicleResources(rows.map((trip) => trip.vehicleId)));
+  return rows.map((trip) => {
+    const entry = vehicleEntry(trip.vehicleId, trip.userId, trip.createdBy);
+    const access = {
+      edit: resolver.can('vehicle.trip.write', entry).allow,
+      delete: resolver.can('vehicle.trip.delete', entry).allow,
+    };
+    if (trip.userId === userId) return { ...trip, access };
+    const { userId: _userId, createdBy: _createdBy, ...shared } = trip;
+    return { ...shared, access };
+  });
+}
+
 async function ownerOf(vehicleId: string | undefined, userId: string): Promise<string> {
   return vehicleId ? (await requireVehicleAccess(vehicleId, userId, 'read')).ownerId : userId;
 }
@@ -96,7 +112,11 @@ routes.post('/', zValidator('json', createTripSchema), authorize(fromBodyVehicle
   );
 
   return c.json(
-    { success: true, data: memberView(c, trip.vehicleId, trip), message: 'Trip created' },
+    {
+      success: true,
+      data: (await present(c, [hideDriverFields(c, trip.vehicleId, trip)]))[0],
+      message: 'Trip created',
+    },
     201
   );
 });
@@ -116,7 +136,7 @@ routes.get('/', zValidator('query', listQuerySchema), authorize(fromQueryVehicle
     );
     const seesDrivers = new Set(readable.filter((v) => v.seesDrivers).map((v) => v.vehicleId));
     const rows = data.map((trip) => (seesDrivers.has(trip.vehicleId) ? trip : withoutDriver(trip)));
-    return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
+    return c.json(buildPaginatedResponse(await present(c, rows), totalCount, limit, offset));
   }
 
   const ownerId = await ownerOf(query.vehicleId, user.id);
@@ -124,8 +144,8 @@ routes.get('/', zValidator('query', listQuerySchema), authorize(fromQueryVehicle
     vehicleId: query.vehicleId,
     purpose: query.purpose,
   });
-  const rows = data.map((trip) => memberView(c, trip.vehicleId, trip));
-  return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
+  const rows = data.map((trip) => hideDriverFields(c, trip.vehicleId, trip));
+  return c.json(buildPaginatedResponse(await present(c, rows), totalCount, limit, offset));
 });
 
 routes.get(
@@ -181,7 +201,7 @@ routes.put(
     );
     return c.json({
       success: true,
-      data: memberView(c, updated.vehicleId, updated),
+      data: (await present(c, [hideDriverFields(c, updated.vehicleId, updated)]))[0],
       message: 'Trip updated',
     });
   }
