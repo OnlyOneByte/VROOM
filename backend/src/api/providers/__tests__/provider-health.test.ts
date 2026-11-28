@@ -323,6 +323,45 @@ describe('reconnecting clears a provider that needs it', () => {
     expect(await statusOf(id)).toMatchObject({ status: 'active', last_checked_at: null });
   });
 
+  test('reconnecting Google forgets the last check, so the new grant reads as not checked yet', async () => {
+    const { googleStorageClient } = await import('../../auth/providers/google');
+    await ctx.sql.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status, last_error_code, failure_count, last_checked_at)
+       VALUES ('g-drive', ?, 'storage', 'google-drive', 'Drive', 'x', '{}', 'needs_reauth', 'auth', 2, 1000)`,
+      [ctx.user.id]
+    );
+    const exchange = spyOn(googleStorageClient, 'validateAuthorizationCode').mockResolvedValue({
+      accessToken: () => 'access',
+      hasRefreshToken: () => true,
+      refreshToken: () => 'refresh',
+      hasScopes: () => true,
+      scopes: () => [],
+    } as unknown as Awaited<ReturnType<typeof googleStorageClient.validateAuthorizationCode>>);
+    globalThis.fetch = (async () =>
+      Response.json({ email: 'me@example.com', email_verified: true })) as unknown as typeof fetch;
+    try {
+      const start = await ctx.authed(
+        'GET',
+        '/api/v1/auth/providers/connect/google?returnTo=%2Fsettings&nonce=n-1&providerId=g-drive'
+      );
+      const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? '';
+      const done = await ctx.authed(
+        'GET',
+        `/api/v1/auth/callback/provider/google?code=c&state=${encodeURIComponent(state)}`
+      );
+      const location = new URL(done.headers.get('location') ?? '');
+      expect(location.searchParams.get('provider_connected')).toBe('true');
+      expect(await statusOf('g-drive')).toMatchObject({
+        status: 'active',
+        last_error_code: null,
+        failure_count: 0,
+        last_checked_at: null,
+      });
+    } finally {
+      exchange.mockRestore();
+    }
+  });
+
   test('a turned-off provider stays turned off when its credentials change', async () => {
     const id = await createModel('llm');
     await ctx.sql.run("UPDATE user_providers SET status = 'disabled' WHERE id = ?", [id]);

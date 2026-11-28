@@ -8,10 +8,18 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
-	import PolicyList from './PolicyList.svelte';
 	import { insuranceApi } from '#lib/services/insurance-api.ts';
 	import { logLoadFailure, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import type { InsurancePolicy } from '#lib/types/index.ts';
+	import { capitalize, formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import {
+		CLAIM_STATUS_LABELS,
+		getDaysRemaining,
+		getLatestTerm,
+		groupPoliciesByActive,
+		sortTermsByEndDateDesc
+	} from '#lib/utils/insurance.ts';
+	import { cn } from '#lib/utils.js';
+	import type { InsuranceClaim, InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
 
 	interface Props {
 		vehicleId: string;
@@ -21,8 +29,26 @@
 	let { vehicleId, readOnly = false }: Props = $props();
 
 	let policies = $state<InsurancePolicy[]>([]);
+	let claims = $state<InsuranceClaim[]>([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
+	let claimsError = $state<string | null>(null);
+	let claimsLoading = $state(true);
+	let showPastTerms = $state(false);
+
+	let returnTo = $derived(resolve(paramRoutes.vehicle, { id: vehicleId }));
+	let ordered = $derived.by(() => {
+		const { active, inactive } = groupPoliciesByActive(policies);
+		return [...active, ...inactive];
+	});
+	let pastTerms = $derived(
+		ordered.flatMap(policy => {
+			const latest = getLatestTerm(policy.terms);
+			return sortTermsByEndDateDesc(policy.terms)
+				.filter(t => t.id !== latest?.id)
+				.map(term => ({ policy, term }));
+		})
+	);
 
 	onMount(async () => {
 		await loadData();
@@ -39,19 +65,87 @@
 		} finally {
 			isLoading = false;
 		}
+		if (!error) await loadClaims();
+	}
+
+	async function loadClaims() {
+		claimsLoading = true;
+		try {
+			const perPolicy = await Promise.all(policies.map(p => insuranceApi.getClaims(p.id)));
+			claims = perPolicy
+				.flat()
+				.filter(c => !c.vehicleId || c.vehicleId === vehicleId)
+				.sort((a, b) => b.claimDate.localeCompare(a.claimDate));
+			claimsError = null;
+		} catch (err) {
+			claims = [];
+			claimsError = userFacingErrorMessage(err);
+			logLoadFailure(err, "Couldn't load this car's claims");
+		} finally {
+			claimsLoading = false;
+		}
 	}
 
 	function handleAddPolicy() {
-		gotoWithQuery(resolve(routes.insuranceNew), {
-			vehicleId,
-			returnTo: `/vehicles/${vehicleId}`
-		});
+		gotoWithQuery(resolve(routes.insuranceNew), { vehicleId, returnTo });
 	}
 
-	function handleEditPolicy(policy: InsurancePolicy) {
-		gotoWithQuery(resolve(paramRoutes.insurancePolicyEdit, { id: policy.id }), {
-			returnTo: `/vehicles/${vehicleId}`
-		});
+	function policyHref(policy: InsurancePolicy): string {
+		const edit = resolve(paramRoutes.insurancePolicyEdit, { id: policy.id });
+		return `${edit}?returnTo=${encodeURIComponent(returnTo)}`;
+	}
+
+	function coverageText(term: InsuranceTerm | undefined): string {
+		return [
+			term?.coverageDescription?.trim() || null,
+			term?.deductibleAmount ? `${formatCurrency(term.deductibleAmount)} deductible` : null
+		]
+			.filter(Boolean)
+			.join(' · ');
+	}
+
+	function statusTone(days: number): string {
+		if (days <= 7) return 'text-destructive';
+		if (days <= 30) return 'text-warning';
+		return 'text-muted-foreground';
+	}
+
+	function policyMeta(policy: InsurancePolicy, term: InsuranceTerm | undefined): string {
+		return [
+			term?.policyNumber ? `#${term.policyNumber}` : null,
+			term ? `${formatDate(term.startDate)} – ${formatDate(term.endDate)}` : 'No terms yet',
+			policy.isActive ? null : 'Inactive'
+		]
+			.filter(Boolean)
+			.join(' · ');
+	}
+
+	function renewalText(term: InsuranceTerm): string {
+		const days = getDaysRemaining(term.endDate);
+		if (days < 0) return `Expired ${formatDate(term.endDate)}`;
+		if (days === 0) return 'Renews today';
+		if (days === 1) return 'Renews tomorrow';
+		return `Renews in ${days} days`;
+	}
+
+	function costText(term: InsuranceTerm | undefined): string | null {
+		if (term?.totalCost) return formatCurrency(term.totalCost);
+		if (term?.monthlyCost) return `${formatCurrency(term.monthlyCost)}/mo`;
+		return null;
+	}
+
+	function claimTitle(claim: InsuranceClaim): string {
+		return claim.description?.trim() || capitalize(claim.claimType);
+	}
+
+	function claimMeta(claim: InsuranceClaim): string {
+		return [
+			formatDate(claim.claimDate),
+			CLAIM_STATUS_LABELS[claim.status],
+			claim.description?.trim() ? capitalize(claim.claimType) : null
+		]
+			.filter(Boolean)
+			.join(' · ');
 	}
 </script>
 
@@ -85,17 +179,141 @@
 		{/snippet}
 	</EmptyState>
 {:else}
-	<div class="space-y-4">
-		<div class="flex items-center justify-between gap-3">
-			<h2 class="text-lg font-semibold text-foreground">Insurance policies</h2>
-			{#if !readOnly}
-				<Button variant="outline" onclick={handleAddPolicy}>
-					<Plus class="mr-2 h-4 w-4" />
-					Add policy
+	<div class="grid gap-8 lg:grid-cols-2">
+		<section aria-labelledby="vehicle-policies-heading" class="space-y-3">
+			<div class="flex min-h-10 items-center justify-between gap-3">
+				<h2 class="text-lg font-semibold" id="vehicle-policies-heading">Policies</h2>
+				{#if !readOnly}
+					<Button variant="outline" onclick={handleAddPolicy}>
+						<Plus class="mr-2 h-4 w-4" />
+						Add policy
+					</Button>
+				{/if}
+			</div>
+			<ul class="divide-y border-y">
+				{#each ordered as policy (policy.id)}
+					{@const term = getLatestTerm(policy.terms)}
+					{@const cost = costText(term)}
+					{@const days = term ? getDaysRemaining(term.endDate) : null}
+					{@const coverage = coverageText(term)}
+					<li class="flex">
+						<svelte:element
+							this={readOnly ? 'div' : 'a'}
+							href={readOnly ? undefined : policyHref(policy)}
+							class={cn(
+								'flex min-w-0 flex-1 items-center justify-between gap-4 py-3',
+								!readOnly &&
+									'-mx-2 rounded-md px-2 outline-none hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50'
+							)}
+						>
+							<span class="min-w-0">
+								<span class="block font-semibold break-words text-foreground">
+									{policy.company}
+								</span>
+								<span class="block text-sm text-muted-foreground">{policyMeta(policy, term)}</span>
+								{#if coverage}
+									<span class="block text-sm text-muted-foreground">{coverage}</span>
+								{/if}
+								{#if policy.notes?.trim()}
+									<span class="block text-sm break-words text-muted-foreground">
+										{policy.notes}
+									</span>
+								{/if}
+							</span>
+							<span class="shrink-0 text-right">
+								{#if cost}
+									<span class="block font-semibold tabular-nums">{cost}</span>
+								{/if}
+								{#if term && days !== null && policy.isActive}
+									<span class={cn('block text-sm', statusTone(days))}>{renewalText(term)}</span>
+								{/if}
+							</span>
+						</svelte:element>
+					</li>
+				{/each}
+			</ul>
+			{#if pastTerms.length > 0}
+				<Button
+					variant="ghost"
+					class="-ml-3"
+					aria-expanded={showPastTerms}
+					aria-controls="vehicle-past-terms"
+					onclick={() => (showPastTerms = !showPastTerms)}
+				>
+					{showPastTerms
+						? 'Hide past terms'
+						: `Show ${pastTerms.length} past ${pastTerms.length === 1 ? 'term' : 'terms'}`}
 				</Button>
+				{#if showPastTerms}
+					<ul class="divide-y border-y" id="vehicle-past-terms" aria-label="Past terms">
+						{#each pastTerms as { policy, term } (term.id)}
+							{@const cost = costText(term)}
+							<li class="flex items-center justify-between gap-4 py-3">
+								<span class="min-w-0">
+									<span class="block font-semibold break-words text-foreground">
+										{policy.company}
+									</span>
+									<span class="block text-sm text-muted-foreground">
+										{policyMeta({ ...policy, isActive: true }, term)}
+									</span>
+								</span>
+								{#if cost}
+									<span class="shrink-0 font-semibold tabular-nums">{cost}</span>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
 			{/if}
-		</div>
+			{#if !readOnly}
+				<p class="text-sm text-muted-foreground">
+					Documents, filing a claim and renewals are on the
+					<a
+						class="font-semibold text-accent-ink underline-offset-4 hover:underline"
+						href={resolve(routes.insurance)}
+					>
+						Insurance page
+					</a>.
+				</p>
+			{/if}
+		</section>
 
-		<PolicyList {policies} {readOnly} level={3} onEdit={handleEditPolicy} onRefresh={loadData} />
+		<section aria-labelledby="vehicle-claims-heading" class="space-y-3">
+			<h2 class="flex min-h-10 items-center text-lg font-semibold" id="vehicle-claims-heading">
+				Claims
+			</h2>
+			{#if claimsError}
+				<LoadErrorCard
+					compact
+					title="Couldn't load this car's claims"
+					message={claimsError}
+					onRetry={loadClaims}
+				/>
+			{:else if claimsLoading}
+				<div aria-hidden="true" data-testid="claims-loading">
+					<Skeleton class="h-14 w-full" />
+				</div>
+			{:else if claims.length === 0}
+				<p class="border-y py-3 text-sm text-muted-foreground">No claims for this car.</p>
+			{:else}
+				<ul class="divide-y border-y">
+					{#each claims as claim (claim.id)}
+						<li class="flex items-center justify-between gap-4 py-3">
+							<span class="min-w-0">
+								<span class="block font-semibold break-words text-foreground">
+									{claimTitle(claim)}
+								</span>
+								<span class="block text-sm text-muted-foreground">{claimMeta(claim)}</span>
+							</span>
+							{#if claim.payoutAmount != null}
+								<span class="shrink-0 font-semibold tabular-nums">
+									{formatCurrency(claim.payoutAmount)}
+								</span>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
 	</div>
 {/if}

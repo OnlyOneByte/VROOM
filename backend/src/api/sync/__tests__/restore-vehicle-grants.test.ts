@@ -131,11 +131,27 @@ describe('a full restore keeps the per-person grants of current members, from li
     expect(result.grants).toEqual({
       reapplied: 0,
       dropped: [
-        { kind: 'role', vehicleId, reason: 'person_not_active' },
         { kind: 'override', vehicleId, reason: 'person_not_active' },
+        { kind: 'role', vehicleId, reason: 'person_not_active' },
       ],
     });
     expect(await can('late-1', 'vehicle.expense.write')).toBe(false);
+  });
+
+  test('dropped entries come back sorted by car, kind and reason, not in row order', async () => {
+    const zip = await exportZip();
+    await addMember('late-3');
+    await assign('late-3', CUSTOM_ROLE);
+    await override('late-3', 'vehicle.trip.write');
+    await override('late-3', 'vehicle.delete');
+
+    const result = await restore(zip);
+
+    expect(result.grants?.dropped.map((d) => `${d.kind} ${d.reason}`)).toEqual([
+      'override person_not_active',
+      'override person_not_active',
+      'role person_not_active',
+    ]);
   });
 
   test('someone who left and someone whose account is not active are reported the same way', async () => {

@@ -131,7 +131,7 @@ export function writeRouteCalls(vehicleId: string, memberId: string): Record<str
     'POST /api/v1/trips': {
       body: {
         vehicleId,
-        startOdometer: 1000,
+        startOdometer: 1100,
         endOdometer: 1100,
         purpose: 'business',
         tripDate: DATE,

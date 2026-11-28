@@ -26,10 +26,10 @@ const odoCount = async (): Promise<number> =>
     ])) as { n: number }
   ).n;
 
-function trip(endOdometer: number, tripDate: string, timeZone?: string) {
+function trip(endOdometer: number, tripDate: string, timeZone?: string, distance = 200) {
   return createTrip(ctx.user.id, {
     vehicleId,
-    startOdometer: endOdometer - 200,
+    startOdometer: endOdometer - distance,
     endOdometer,
     purpose: 'business',
     tripDate: new Date(tripDate),
@@ -50,7 +50,7 @@ describe('trips service keeps the linked odometer entry in sync', () => {
 
   test('create, edit and delete match the linked entry on the user’s day in their time zone', async () => {
     const evening = await trip(5000, '2024-06-21T03:00:00.000Z', LA);
-    const morning = await trip(5000, '2024-06-20T08:00:00.000Z', LA);
+    const morning = await trip(5000, '2024-06-20T08:00:00.000Z', LA, 0);
     expect(await odoCount(), 'both trips fall on 20 June in Los Angeles').toBe(1);
 
     const edited = await updateTrip(ctx.user.id, morning, { note: 'Commute' }, LA);
@@ -63,7 +63,7 @@ describe('trips service keeps the linked odometer entry in sync', () => {
 
   test('editing a trip onto the next day keeps the entry the other trip on its old day still needs', async () => {
     const evening = await trip(5000, '2024-06-21T03:00:00.000Z', LA);
-    await trip(5000, '2024-06-20T08:00:00.000Z', LA);
+    await trip(5000, '2024-06-20T08:00:00.000Z', LA, 0);
     expect(await odoCount()).toBe(1);
 
     await updateTrip(

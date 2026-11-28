@@ -19,7 +19,7 @@ import type { ApiResponse } from '../../errors';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, requireAuth } from '../../middleware';
 import { authorize, ownAccount, vehicleParam } from '../../permissions/authorize';
-import { loadResolver, vehicleResources } from '../../permissions/grants';
+import { loadResolver, requestResolver, vehicleResources } from '../../permissions/grants';
 import { DEFAULT_UNIT_PREFERENCES, parseUnitPreferences, type UnitPreferences } from '../../types';
 import { getPeriodStartDate, sortExpensesByDate } from '../../utils/calculations';
 import { chunk } from '../../utils/chunk';
@@ -68,6 +68,7 @@ interface SharedAccess {
   level: string;
   sharedBy: string;
   seesFinancials: boolean;
+  writesTrips: boolean;
 }
 
 const VIN_PATTERN = new RegExp(
@@ -313,6 +314,8 @@ routes.get('/', zValidator('query', listVehiclesQuerySchema), authorize(ownAccou
               level: g?.level ?? 'viewer',
               sharedBy: g?.ownerName ?? 'Unknown',
               seesFinancials: financial,
+              writesTrips: resolver.can('vehicle.trip.write', { kind: 'vehicle', vehicleId: v.id })
+                .allow,
             },
           };
         })
@@ -413,6 +416,10 @@ routes.get(
         level: grant?.level ?? access.role,
         sharedBy: grant?.ownerName ?? 'Unknown',
         seesFinancials: seesFinancials(access),
+        writesTrips: requestResolver(c).can('vehicle.trip.write', {
+          kind: 'vehicle',
+          vehicleId: id,
+        }).allow,
       };
     }
 

@@ -32,4 +32,5 @@ export interface SharedAccess {
 	level: ShareLevel;
 	sharedBy: string;
 	seesFinancials?: boolean;
+	writesTrips?: boolean;
 }

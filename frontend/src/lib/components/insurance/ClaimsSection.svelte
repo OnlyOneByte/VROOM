@@ -32,7 +32,7 @@
 		dateOnlyToISO,
 		toDateInputValue
 	} from '#lib/utils/formatters.ts';
-	import { enteredAmount } from '#lib/utils/insurance.ts';
+	import { CLAIM_STATUS_LABELS, enteredAmount } from '#lib/utils/insurance.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import {
 		CLAIM_TYPES,
@@ -93,12 +93,7 @@
 	let faultDesignation = $state<FaultDesignation | ''>('');
 	let description = $state('');
 
-	const STATUS_LABELS: Record<ClaimStatus, string> = {
-		filed: 'Filed',
-		in_progress: 'In progress',
-		settled: 'Settled',
-		denied: 'Denied'
-	};
+	const STATUS_LABELS = CLAIM_STATUS_LABELS;
 	const FAULT_LABELS: Record<FaultDesignation, string> = {
 		at_fault: 'At fault',
 		not_at_fault: 'Not at fault',

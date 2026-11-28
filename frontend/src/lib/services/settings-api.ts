@@ -6,7 +6,20 @@ import type {
 	RestoreResult,
 	UserSettings
 } from '#lib/types/settings.ts';
+import { RequestTimeoutError } from '#lib/utils/error-handling.ts';
 import { apiClient } from './api-client';
+
+export const RESTORE_TIMEOUT_MS = 25 * 60 * 1000;
+
+async function withRestoreDeadline<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(new RequestTimeoutError()), RESTORE_TIMEOUT_MS);
+	try {
+		return await run(controller.signal);
+	} finally {
+		clearTimeout(timer);
+	}
+}
 
 export const settingsApi = {
 	async getSettings(): Promise<UserSettings> {
@@ -60,9 +73,12 @@ export const settingsApi = {
 					}
 				: { providerId: opts.providerId, sourceType: 'sheets', mode: opts.mode };
 
-		return apiClient.post<RestoreResult>('/sync/restore/from-provider', body, {
-			headers: { 'Idempotency-Key': opts.idempotencyKey }
-		});
+		return withRestoreDeadline(signal =>
+			apiClient.post<RestoreResult>('/sync/restore/from-provider', body, {
+				headers: { 'Idempotency-Key': opts.idempotencyKey },
+				signal
+			})
+		);
 	},
 
 	async getRestoreProviders(): Promise<RestoreProviderInfo[]> {
@@ -82,8 +98,11 @@ export const settingsApi = {
 		formData.append('file', file);
 		formData.append('mode', mode);
 
-		return apiClient.post<RestoreResult>('/sync/restore/from-backup', formData, {
-			headers: { 'Idempotency-Key': idempotencyKey }
-		});
+		return withRestoreDeadline(signal =>
+			apiClient.post<RestoreResult>('/sync/restore/from-backup', formData, {
+				headers: { 'Idempotency-Key': idempotencyKey },
+				signal
+			})
+		);
 	}
 };

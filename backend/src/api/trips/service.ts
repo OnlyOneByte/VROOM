@@ -41,6 +41,19 @@ async function deleteEntryPhotosWithRetry(
   }
 }
 
+async function assertNoOverlap(
+  tx: AsyncHandle,
+  span: { vehicleId: string; userId: string; start: number; end: number; excludeTripId?: string }
+): Promise<void> {
+  if (span.start === span.end) return;
+  const other = await repos().trips.findOverlapping(span, tx);
+  if (other) {
+    throw new ValidationError(
+      `This trip overlaps another trip on this vehicle (${other.startOdometer} to ${other.endOdometer})`
+    );
+  }
+}
+
 // Logged, not thrown: a 500 after the write would invite a duplicate retry.
 async function afterOdometerChange(
   userId: string,
@@ -71,6 +84,12 @@ export async function createTrip(
   const check = await readingCheck(data.vehicleId, data.endOdometer, data.tripDate, data.timeZone);
   const trip = await db.transaction(async (tx) => {
     await assertOdometerInOrder(tx, check);
+    await assertNoOverlap(tx, {
+      vehicleId: data.vehicleId,
+      userId,
+      start: data.startOdometer,
+      end: data.endOdometer,
+    });
     const [created] = await tx
       .insert(trips)
       .values({
@@ -129,7 +148,11 @@ export async function updateTrip(
   const tripDate = data.tripDate ?? existing.tripDate;
   const { id, vehicleId } = existing;
   const check = resync ? await readingCheck(vehicleId, end, tripDate, timeZone) : null;
+  const spanChanged = start !== existing.startOdometer || end !== existing.endOdometer;
   const { updated, removedEntryIds } = await db.transaction(async (tx) => {
+    if (spanChanged) {
+      await assertNoOverlap(tx, { vehicleId, userId, start, end, excludeTripId: id });
+    }
     const [row] = await tx
       .update(trips)
       .set({ ...data, updatedAt: new Date() })

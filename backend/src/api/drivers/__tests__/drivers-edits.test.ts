@@ -113,7 +113,11 @@ describe('changing the driver on an existing entry', () => {
   test('a trip edit leaves a reading that now belongs to another trip alone', async () => {
     const guest = await addGuest();
     const first = await created(m.editor.request, '/api/v1/trips', trip({ driverId: guest }));
-    const second = await created(m.editor.request, '/api/v1/trips', trip({ driverId: guest }));
+    const second = await created(
+      m.editor.request,
+      '/api/v1/trips',
+      trip({ driverId: guest, startOdometer: 150 })
+    );
     const editorDriver = await driverOf(m.editor.id);
 
     expect(
