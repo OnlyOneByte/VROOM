@@ -236,7 +236,7 @@
 			{:else if !providerCatalog.loaded}
 				<span class="sr-only">Loading backup options</span>
 			{:else if supportsZipBackup}
-				<div class="flex items-center justify-between">
+				<div class="flex items-center justify-between gap-3">
 					<div class="space-y-0.5">
 						<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
 						<p class="text-xs text-muted-foreground">Store ZIP backups in this storage</p>
