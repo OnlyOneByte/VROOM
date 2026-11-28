@@ -15,6 +15,14 @@ describe('Switch', () => {
 		}
 	});
 
+	test('an off thumb turns light in dark mode so it stands out from the track', () => {
+		const { container } = render(Switch, { props: { 'aria-label': 'Toggle backups' } });
+		const thumb = container.querySelector('[data-slot="switch-thumb"]');
+
+		expect(thumb).toHaveAttribute('data-state', 'unchecked');
+		expect(thumb).toHaveClass('bg-surface', 'dark:data-[state=unchecked]:bg-foreground');
+	});
+
 	test('still toggles when clicked', async () => {
 		render(Switch, { props: { 'aria-label': 'Toggle backups' } });
 		const toggle = screen.getByRole('switch', { name: 'Toggle backups' });

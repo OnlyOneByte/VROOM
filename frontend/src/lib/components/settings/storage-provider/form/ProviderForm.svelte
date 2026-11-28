@@ -386,7 +386,7 @@
 				{@const Icon = pt.icon}
 				<div class="flex items-center gap-3">
 					<div
-						class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+						class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
 						aria-hidden="true"
 					>
 						<Icon class="size-5 text-foreground" />
