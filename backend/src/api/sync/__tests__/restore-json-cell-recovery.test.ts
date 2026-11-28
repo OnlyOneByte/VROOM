@@ -30,7 +30,9 @@ function patchColumn(zipBuffer: Buffer, filename: string, column: string, rawCel
 }
 
 async function vehiclePrefsCell(vehicleId: string): Promise<string> {
-  const row = (await ctx.sql.get('SELECT unit_preferences FROM vehicles WHERE id = ?', [vehicleId])) as { unit_preferences: string } | null;
+  const row = (await ctx.sql.get('SELECT unit_preferences FROM vehicles WHERE id = ?', [
+    vehicleId,
+  ])) as { unit_preferences: string } | null;
   if (!row) throw new Error(`vehicle ${vehicleId} not found`);
   return row.unit_preferences;
 }
@@ -111,7 +113,9 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
     expect(message).toContain('unitPreferences');
     expect(message, 'the offending row is named').toContain(vehicleId);
 
-    expect(await vehiclePrefsCell(vehicleId), 'the stored prefs are untouched').toBe(goodPrefsBefore);
+    expect(await vehiclePrefsCell(vehicleId), 'the stored prefs are untouched').toBe(
+      goodPrefsBefore
+    );
     expect(await expenseCount(), 'the existing expense is untouched').toBe(1);
     expect(
       parseUnitPreferences(JSON.parse(await vehiclePrefsCell(vehicleId))),

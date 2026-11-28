@@ -144,10 +144,13 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect((await shareById('share-real'))?.status, 'a genuine accepted grant round-trips intact').toBe(
-      'accepted'
+    expect(
+      (await shareById('share-real'))?.status,
+      'a genuine accepted grant round-trips intact'
+    ).toBe('accepted');
+    expect((await shareById('share-forged'))?.status, 'the forged grant lands pending').toBe(
+      'pending'
     );
-    expect((await shareById('share-forged'))?.status, 'the forged grant lands pending').toBe('pending');
   });
 
   test('a level outside the route enum is narrowed to viewer rather than stored verbatim', async () => {
@@ -161,8 +164,9 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect((await shareById('share-odd-level'))?.level, 'an unknown level is stored as viewer').toBe(
-      'viewer'
-    );
+    expect(
+      (await shareById('share-odd-level'))?.level,
+      'an unknown level is stored as viewer'
+    ).toBe('viewer');
   });
 });

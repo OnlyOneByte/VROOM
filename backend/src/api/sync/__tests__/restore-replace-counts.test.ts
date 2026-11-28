@@ -75,7 +75,11 @@ describe('replace restore', () => {
     expect(await count("SELECT COUNT(*) AS n FROM photos WHERE id = 'left-out-photo'")).toBe(0);
     expect(await count("SELECT COUNT(*) AS n FROM photos WHERE id = 'kept-photo'")).toBe(1);
     expect(result.imported?.photoRefs).toBe(1);
-    expect(await count("SELECT COUNT(*) AS n FROM photo_refs WHERE photo_id = 'left-out-photo'")).toBe(0);
-    expect(await count("SELECT COUNT(*) AS n FROM photo_refs WHERE photo_id = 'kept-photo'")).toBe(1);
+    expect(
+      await count("SELECT COUNT(*) AS n FROM photo_refs WHERE photo_id = 'left-out-photo'")
+    ).toBe(0);
+    expect(await count("SELECT COUNT(*) AS n FROM photo_refs WHERE photo_id = 'kept-photo'")).toBe(
+      1
+    );
   });
 });

@@ -97,8 +97,10 @@ async function seedFullDataset(): Promise<void> {
     [uid, vehicleId]
   );
 
-  await ctx.sql.run(`INSERT OR IGNORE INTO user_preferences (user_id) VALUES (?)`, [uid]);
-  await ctx.sql.run(`INSERT OR IGNORE INTO sync_state (user_id) VALUES (?)`, [uid]);
+  await ctx.sql.run(`INSERT INTO user_preferences (user_id) VALUES (?) ON CONFLICT DO NOTHING`, [
+    uid,
+  ]);
+  await ctx.sql.run(`INSERT INTO sync_state (user_id) VALUES (?) ON CONFLICT DO NOTHING`, [uid]);
 }
 
 describe('replace-mode restore with a complete FK-linked dataset', () => {

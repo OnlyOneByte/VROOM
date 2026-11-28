@@ -18,10 +18,17 @@ interface DriverRow {
 }
 
 async function drivers(): Promise<DriverRow[]> {
-  return (await ctx.sql.all('SELECT id, vehicle_id, user_id, name FROM vehicle_drivers ORDER BY id')) as DriverRow[];
+  return (await ctx.sql.all(
+    'SELECT id, vehicle_id, user_id, name FROM vehicle_drivers ORDER BY id'
+  )) as DriverRow[];
 }
 
-async function seedDriver(id: string, vehicleId: string, userId: string | null, name: string): Promise<void> {
+async function seedDriver(
+  id: string,
+  vehicleId: string,
+  userId: string | null,
+  name: string
+): Promise<void> {
   await ctx.sql.run(
     'INSERT INTO vehicle_drivers (id, vehicle_id, user_id, name) VALUES (?, ?, ?, ?)',
     [id, vehicleId, userId, name]
@@ -56,7 +63,9 @@ describe('restoring car-share drivers', () => {
     await seedDriver('d-owner', vehicleId, ctx.user.id, 'Owner');
     await seedDriver('d-member', vehicleId, member.id, 'Member');
     await seedDriver('d-guest', vehicleId, null, 'Riley');
-    await ctx.sql.run("UPDATE vehicle_drivers SET created_by = ? WHERE id = 'd-guest'", [member.id]);
+    await ctx.sql.run("UPDATE vehicle_drivers SET created_by = ? WHERE id = 'd-guest'", [
+      member.id,
+    ]);
     await ctx.sql.run(
       "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, driver_id) VALUES ('t1', ?, ?, 100, 150, 'personal', 1700000000, 'd-member')",
       [vehicleId, ctx.user.id]
@@ -73,11 +82,11 @@ describe('restoring car-share drivers', () => {
       { id: 'd-member', vehicle_id: vehicleId, user_id: member.id, name: 'Member' },
       { id: 'd-owner', vehicle_id: vehicleId, user_id: ctx.user.id, name: 'Owner' },
     ]);
-    expect((await ctx.sql.get("SELECT driver_id FROM trips WHERE id = 't1'"))).toEqual({
+    expect(await ctx.sql.get("SELECT driver_id FROM trips WHERE id = 't1'")).toEqual({
       driver_id: 'd-member',
     });
     expect(
-      (await ctx.sql.get("SELECT created_by FROM vehicle_drivers WHERE id = 'd-guest'"))
+      await ctx.sql.get("SELECT created_by FROM vehicle_drivers WHERE id = 'd-guest'")
     ).toEqual({ created_by: member.id });
   });
 
@@ -89,10 +98,10 @@ describe('restoring car-share drivers', () => {
       running: { kind: 'equal' },
       ownership: { kind: 'fixed', shares: { 'd-owner': 70, 'd-guest': 30 } },
     };
-    await ctx.sql.run('UPDATE vehicles SET car_share_enabled = TRUE, car_share_rules = ? WHERE id = ?', [
-      JSON.stringify(rules),
-      vehicleId,
-    ]);
+    await ctx.sql.run(
+      'UPDATE vehicles SET car_share_enabled = TRUE, car_share_rules = ? WHERE id = ?',
+      [JSON.stringify(rules), vehicleId]
+    );
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -101,7 +110,10 @@ describe('restoring car-share drivers', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    const row = (await ctx.sql.get('SELECT car_share_enabled AS enabled, car_share_rules AS rules FROM vehicles WHERE id = ?', [vehicleId])) as { enabled: number; rules: string };
+    const row = (await ctx.sql.get(
+      'SELECT car_share_enabled AS enabled, car_share_rules AS rules FROM vehicles WHERE id = ?',
+      [vehicleId]
+    )) as { enabled: number; rules: string };
     expect(row.enabled).toBe(1);
     expect(JSON.parse(row.rules)).toEqual(rules);
     const res = await ctx.authed('GET', `/api/v1/vehicles/${vehicleId}/drivers/rules`);
@@ -128,9 +140,7 @@ describe('restoring car-share drivers', () => {
       { id: 'd-x', vehicle_id: vehicleId, user_id: null, name: 'Outsider' },
       { id: 'd-y', vehicle_id: vehicleId, user_id: null, name: 'Guest' },
     ]);
-    expect(
-      (await ctx.sql.all('SELECT id, created_by FROM vehicle_drivers ORDER BY id'))
-    ).toEqual([
+    expect(await ctx.sql.all('SELECT id, created_by FROM vehicle_drivers ORDER BY id')).toEqual([
       { id: 'd-x', created_by: null },
       { id: 'd-y', created_by: ctx.user.id },
     ]);
@@ -150,7 +160,7 @@ describe('restoring car-share drivers', () => {
     );
     const result = await restoreService.restoreFromBackup(ctx.user.id, crafted, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect((await ctx.sql.all('SELECT id, color FROM vehicle_drivers ORDER BY id'))).toEqual([
+    expect(await ctx.sql.all('SELECT id, color FROM vehicle_drivers ORDER BY id')).toEqual([
       { id: 'd-bad', color: null },
       { id: 'd-ok', color: 'chart-2' },
     ]);
@@ -200,7 +210,7 @@ describe('restoring car-share drivers', () => {
     await expect(restoreService.restoreFromBackup(ctx.user.id, crafted, 'replace')).rejects.toThrow(
       'Backup validation failed'
     );
-    expect((await ctx.sql.get("SELECT driver_id FROM trips WHERE id = 't1'"))).toEqual({
+    expect(await ctx.sql.get("SELECT driver_id FROM trips WHERE id = 't1'")).toEqual({
       driver_id: null,
     });
   });

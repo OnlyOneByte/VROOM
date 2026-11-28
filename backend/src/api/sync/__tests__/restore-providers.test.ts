@@ -13,7 +13,10 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-async function seedProvider(id: string, options: { accountEmail?: string; status?: string } = {}): Promise<void> {
+async function seedProvider(
+  id: string,
+  options: { accountEmail?: string; status?: string } = {}
+): Promise<void> {
   const config = options.accountEmail ? { accountEmail: options.accountEmail } : {};
   await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
@@ -23,10 +26,10 @@ async function seedProvider(id: string, options: { accountEmail?: string; status
 }
 
 async function seedBackupConfig(providers: Record<string, unknown>): Promise<void> {
-  await ctx.sql.run('INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config', [
-    ctx.user.id,
-    JSON.stringify({ providers }),
-  ]);
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [ctx.user.id, JSON.stringify({ providers })]
+  );
 }
 
 interface RestoreProvidersBody {

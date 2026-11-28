@@ -28,7 +28,9 @@ async function seedSheetsProvider(): Promise<void> {
 }
 
 async function pausedAt(): Promise<unknown> {
-  const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [ctx.user.id])) as { backup_config: string };
+  const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [
+    ctx.user.id,
+  ])) as { backup_config: string };
   return JSON.parse(row.backup_config).providers['prov-sheets'].sheetsAutoPausedAt;
 }
 
@@ -46,7 +48,7 @@ describe('a Sheets restore that fails before validation', () => {
       await expect(
         restoreService.restoreFromSheets(ctx.user.id, 'prov-sheets', 'preview')
       ).rejects.toThrow('missing the Vehicles tab');
-      expect(typeof await pausedAt()).toBe('string');
+      expect(typeof (await pausedAt())).toBe('string');
     } finally {
       spy.mockRestore();
     }
@@ -89,7 +91,10 @@ describe('a refused Sheets restore', () => {
       const details = (refused as ValidationError).details as string[];
       expect(details[0]).toBe(BACKUP_CHECK_REASONS.sheets.metadata);
       expect(details[0]).toContain('use File\u00a0>\u00a0Make a copy');
-      const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [ctx.user.id])) as { backup_config: string };
+      const row = (await ctx.sql.get(
+        'SELECT backup_config FROM user_preferences WHERE user_id = ?',
+        [ctx.user.id]
+      )) as { backup_config: string };
       const settings = JSON.parse(row.backup_config).providers['prov-sheets'];
       expect(typeof settings.sheetsAutoPausedAt).toBe('string');
       expect(settings.sheetsSpreadsheetId).toBe('sheet-1');

@@ -25,7 +25,12 @@ async function seedProvider(id: string, ownerId: string): Promise<string> {
   return id;
 }
 
-async function seedPhotoWithRef(photoId: string, vehicleId: string, refId: string, providerId: string) {
+async function seedPhotoWithRef(
+  photoId: string,
+  vehicleId: string,
+  refId: string,
+  providerId: string
+) {
   await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size, is_cover, sort_order, created_at)
      VALUES (?, ?, 'vehicle', ?, 'photo.jpg', 'image/jpeg', 1024, FALSE, 0, 0)`,

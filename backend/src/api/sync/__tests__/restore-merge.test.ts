@@ -66,8 +66,12 @@ describe('restore merge', () => {
     expect(result.success).toBe(true);
     expect(result.imported?.vehicles).toBe(1);
     expect(result.imported?.expenses).toBe(2);
-    expect(await count('SELECT COUNT(*) AS n FROM vehicles WHERE user_id = ?', ctx.user.id)).toBe(2);
-    expect(await count('SELECT COUNT(*) AS n FROM expenses WHERE user_id = ?', ctx.user.id)).toBe(3);
+    expect(await count('SELECT COUNT(*) AS n FROM vehicles WHERE user_id = ?', ctx.user.id)).toBe(
+      2
+    );
+    expect(await count('SELECT COUNT(*) AS n FROM expenses WHERE user_id = ?', ctx.user.id)).toBe(
+      3
+    );
   });
 
   test('a backup car whose plate is on another car here is skipped with its records', async () => {
@@ -84,10 +88,12 @@ describe('restore merge', () => {
     expect(result.kept?.vehicles).toBe(1);
     expect(result.imported?.expenses, 'its expense has no car to go on').toBe(0);
     expect(result.kept?.expenses).toBe(1);
-    expect(await count('SELECT COUNT(*) AS n FROM vehicles WHERE user_id = ?', ctx.user.id)).toBe(1);
-    expect(await count('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', replacement.id)).toBe(
-      0
+    expect(await count('SELECT COUNT(*) AS n FROM vehicles WHERE user_id = ?', ctx.user.id)).toBe(
+      1
     );
+    expect(
+      await count('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', replacement.id)
+    ).toBe(0);
   });
 
   test('preview reports what a merge would add and keep, and writes nothing', async () => {
@@ -123,7 +129,10 @@ describe('restore merge', () => {
     const gone = await createExpense(car.id, 40);
     const zip = await exportZip();
     await ctx.sql.run('DELETE FROM expenses WHERE id = ?', [gone.id]);
-    const rolesBefore = (await ctx.sql.all('SELECT id, role_id FROM role_assignments WHERE user_id = ? ORDER BY id', [invitee.id]));
+    const rolesBefore = await ctx.sql.all(
+      'SELECT id, role_id FROM role_assignments WHERE user_id = ? ORDER BY id',
+      [invitee.id]
+    );
 
     const result = await restore(zip, 'merge');
 
@@ -132,7 +141,9 @@ describe('restore merge', () => {
     expect(result.kept?.vehicleShares).toBe(1);
     expect(await count("SELECT COUNT(*) AS n FROM permission_overrides WHERE id = 'po-1'")).toBe(1);
     expect(
-      (await ctx.sql.all('SELECT id, role_id FROM role_assignments WHERE user_id = ? ORDER BY id', [invitee.id])),
+      await ctx.sql.all('SELECT id, role_id FROM role_assignments WHERE user_id = ? ORDER BY id', [
+        invitee.id,
+      ]),
       "the sharee's role is not reset"
     ).toEqual(rolesBefore);
   });

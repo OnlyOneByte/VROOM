@@ -64,9 +64,15 @@ async function assign(userId: string, roleId: string): Promise<void> {
 }
 
 async function grantsOf(userId: string) {
-  const overrides = (await ctx.sql.all('SELECT permission, effect FROM permission_overrides WHERE user_id = ? AND scope_id = ? ORDER BY permission', [userId, vehicleId]));
+  const overrides = await ctx.sql.all(
+    'SELECT permission, effect FROM permission_overrides WHERE user_id = ? AND scope_id = ? ORDER BY permission',
+    [userId, vehicleId]
+  );
   const roles = (
-    (await ctx.sql.all('SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id = ? ORDER BY role_id', [userId, vehicleId])) as { role_id: string }[]
+    (await ctx.sql.all(
+      'SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id = ? ORDER BY role_id',
+      [userId, vehicleId]
+    )) as { role_id: string }[]
   ).map((row) => row.role_id);
   return { overrides, roles };
 }
@@ -245,7 +251,7 @@ describe('a full restore keeps the per-person grants of current members, from li
       ],
     });
     expect(
-      (await ctx.sql.all('SELECT id FROM permission_overrides WHERE user_id = ?', ['member-4']))
+      await ctx.sql.all('SELECT id FROM permission_overrides WHERE user_id = ?', ['member-4'])
     ).toEqual([]);
   });
 

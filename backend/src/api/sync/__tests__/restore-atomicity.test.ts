@@ -85,11 +85,7 @@ describe('a restore past its time limit', () => {
       restoreService.restoreFromBackup(ctx.user.id, zip, 'replace', AbortSignal.abort(timedOut))
     ).rejects.toBe(timedOut);
 
-    expect(
-      (await vehicleRows())
-        .map((v) => v.make)
-        .sort()
-    ).toEqual(['Honda', 'Subaru']);
+    expect((await vehicleRows()).map((v) => v.make).sort()).toEqual(['Honda', 'Subaru']);
   });
 });
 
@@ -187,10 +183,6 @@ describe('a restore whose deadline passes while its transaction is open', () => 
       spy.mockRestore();
     }
 
-    expect(
-      (await vehicleRows())
-        .map((v) => v.make)
-        .sort()
-    ).toEqual(['Honda', 'Subaru']);
+    expect((await vehicleRows()).map((v) => v.make).sort()).toEqual(['Honda', 'Subaru']);
   });
 });

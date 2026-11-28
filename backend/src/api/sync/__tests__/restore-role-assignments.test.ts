@@ -43,7 +43,10 @@ async function seedMember(id: string, level: string, status: string): Promise<vo
 
 async function vehicleRoles(userId: string): Promise<string[]> {
   return (
-    (await ctx.sql.all('SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id IS NOT NULL', [userId])) as { role_id: string }[]
+    (await ctx.sql.all(
+      'SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id IS NOT NULL',
+      [userId]
+    )) as { role_id: string }[]
   ).map((row) => row.role_id);
 }
 
@@ -111,7 +114,7 @@ describe('restore re-creates role assignments from restored accepted shares only
 
     await restore(zip.toBuffer());
 
-    const status = (await ctx.sql.get("SELECT status FROM vehicle_shares WHERE id = 'forged-share'"));
+    const status = await ctx.sql.get("SELECT status FROM vehicle_shares WHERE id = 'forged-share'");
     expect(status).toEqual({ status: 'pending' });
     expect(await vehicleRoles('never-accepted-1')).toEqual([]);
   });
@@ -155,11 +158,11 @@ describe('restore re-creates role assignments from restored accepted shares only
 
     await restore(zip.toBuffer());
 
-    expect((await ctx.sql.all('SELECT id FROM roles WHERE built_in = FALSE'))).toEqual([]);
-    expect(
-      (await ctx.sql.all("SELECT id FROM role_assignments WHERE id LIKE 'forged-%'"))
-    ).toEqual([]);
-    expect((await ctx.sql.all('SELECT id FROM permission_overrides'))).toEqual([]);
+    expect(await ctx.sql.all('SELECT id FROM roles WHERE built_in = FALSE')).toEqual([]);
+    expect(await ctx.sql.all("SELECT id FROM role_assignments WHERE id LIKE 'forged-%'")).toEqual(
+      []
+    );
+    expect(await ctx.sql.all('SELECT id FROM permission_overrides')).toEqual([]);
     expect(await vehicleRoles('stranger-1')).toEqual([]);
     expect(
       (await resolverFor(ctx.user.id, [{ kind: 'server' }])).can('server.roles.manage', {

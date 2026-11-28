@@ -69,7 +69,9 @@ async function insertExpense(
 }
 
 async function seedOtherAccountGroup() {
-  await ctx.sql.run("INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')");
+  await ctx.sql.run(
+    "INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')"
+  );
   await ctx.sql.run(
     "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('their-car', 'them', 'Kia', 'Rio', 2020)"
   );
@@ -98,7 +100,10 @@ describe('restore merge with records that depend on other records', () => {
     const result = await merge(zip);
 
     expect(result.imported?.reminderVehicles).toBe(0);
-    const links = (await ctx.sql.all('SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?', [reminderId]));
+    const links = await ctx.sql.all(
+      'SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?',
+      [reminderId]
+    );
     expect(links).toEqual([{ vehicle_id: kept.id }]);
   });
 
@@ -154,9 +159,15 @@ describe('restore merge with records that depend on other records', () => {
 
     expect(result.imported?.vehicles).toBe(0);
     expect(result.imported?.expenses).toBe(0);
-    expect(await count('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', theirCar)).toBe(0);
+    expect(await count('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', theirCar)).toBe(
+      0
+    );
     expect(
-      await count('SELECT COUNT(*) AS n FROM vehicles WHERE id = ? AND user_id = ?', theirCar, owner.id)
+      await count(
+        'SELECT COUNT(*) AS n FROM vehicles WHERE id = ? AND user_id = ?',
+        theirCar,
+        owner.id
+      )
     ).toBe(1);
   });
 
@@ -173,7 +184,9 @@ describe('restore merge with records that depend on other records', () => {
       const result = await restoreService.restoreFromBackup(ctx.user.id, zip, mode);
 
       expect(result.success).toBe(true);
-      expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE group_id = 'their-group'")).toBe(2);
+      expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE group_id = 'their-group'")).toBe(
+        2
+      );
       expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE id = 'my-split'")).toBe(0);
     }
   );
