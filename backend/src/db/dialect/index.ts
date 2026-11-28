@@ -1,4 +1,5 @@
 import { type Column, is, Name, SQL, type SQLWrapper, sql } from 'drizzle-orm';
+import type { AsyncHandle } from '../async-sqlite';
 import { ACTIVE_DIALECT, type DialectName } from './active';
 
 const SQL_TYPES = {
@@ -199,7 +200,7 @@ export function rawJsonValue<T>(value: unknown): T | null {
   return (typeof value === 'string' ? JSON.parse(value) : value) as T;
 }
 
-export interface RawQueryable {
+interface SqliteQueryable {
   all<T>(query: SQL): T[] | Promise<T[]>;
 }
 
@@ -207,11 +208,11 @@ interface PgExecutable {
   execute(query: SQL): Promise<unknown[]>;
 }
 
-export async function rawAll<T>(db: RawQueryable, query: SQL): Promise<T[]> {
+export async function rawAll<T>(db: AsyncHandle, query: SQL): Promise<T[]> {
   if (ACTIVE_DIALECT === 'pg') {
     return (await (db as unknown as PgExecutable).execute(query)) as T[];
   }
-  return db.all<T>(query);
+  return (db as unknown as SqliteQueryable).all<T>(query);
 }
 
 export function countNum(expression: SQLWrapper = sql`*`): SQL<number> {

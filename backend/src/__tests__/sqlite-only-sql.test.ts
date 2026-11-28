@@ -18,6 +18,7 @@ const PATTERNS: Record<string, RegExp> = {
   'CROSS JOIN … ON':
     /\bCROSS\s+JOIN\s+(?:\w+(?:\((?:[^()]|\([^()]*\))*\))?|"[^"]+"|`[^`]+`|\$\{[^}]*\}|\((?:[^()]|\([^()]*\))*\))(?:\s+(?:AS\s+)?\w+)?\s+ON\b/gi,
   'raw db/tx query': /\b(?:db|tx)\.(?:all|get|run|values)\s*(?:<[^(]*?>)?\s*\(\s*sql\b/g,
+  'builder .all()/.get()/.run()': /\)\s*\.(?:all|get|run)\s*\(\s*\)/g,
   SQLITE_: /\bSQLITE_/g,
   sqlite_master: /\bsqlite_master\b/gi,
   randomblob: /\brandomblob\b/gi,
@@ -26,6 +27,8 @@ const PATTERNS: Record<string, RegExp> = {
 
 const BASELINE: Record<string, number> = {
   'api/providers/routes.ts · sql`0`/sql`1` predicate': 1,
+  'db/async-sqlite.ts · builder .all()/.get()/.run()': 1,
+  'db/connection.ts · builder .all()/.get()/.run()': 2,
   'db/connection.ts · PRAGMA': 7,
   'utils/chunk.ts · SQLITE_': 5,
 };
@@ -101,6 +104,12 @@ countRatchet({
     expect(one('this.db.all<{ n: number }>(sql`SELECT 1`)', 'raw db/tx query')).toBe(1);
     expect(one('await tx.all(sql`SELECT 1`)', 'raw db/tx query')).toBe(1);
     expect(one('db.select().from(t).all()', 'raw db/tx query')).toBe(0);
+    const builder = 'builder .all()/.get()/.run()';
+    expect(one('db.select().from(t).all()', builder)).toBe(1);
+    expect(one('tx.select().from(t)\n  .where(x)\n  .get()', builder)).toBe(1);
+    expect(one('tx.insert(t).values(row).run()', builder)).toBe(1);
+    expect(one('cache.get(key)', builder)).toBe(0);
+    expect(one('groupBy(rows).values()', builder)).toBe(0);
     expect(one("code === 'SQLITE_CONSTRAINT_UNIQUE'", 'SQLITE_')).toBe(1);
     expect(one('SELECT name FROM sqlite_master', 'sqlite_master')).toBe(1);
     expect(one('lower(hex(randomblob(12)))', 'randomblob')).toBe(1);

@@ -3,7 +3,7 @@ import { pgTable, text } from 'drizzle-orm/pg-core';
 import { type Adapter, type DatabaseSession, type DatabaseUser, Lucia, TimeSpan } from 'lucia';
 import { CONFIG } from '../../config';
 import type { AsyncPgDatabase } from '../../db/async-postgres';
-import type { AsyncAppDatabase } from '../../db/async-sqlite';
+import type { SqliteAppDatabase } from '../../db/async-sqlite';
 import * as pg from '../../db/pg/schema';
 import type { User } from '../../db/schema';
 import * as sqlite from '../../db/sqlite/schema';
@@ -58,7 +58,7 @@ class SessionAdapter implements Adapter {
 }
 
 type SessionDatabase =
-  | { dialect: 'sqlite'; db: AsyncAppDatabase }
+  | { dialect: 'sqlite'; db: SqliteAppDatabase }
   | { dialect: 'pg'; db: AsyncPgDatabase };
 
 const pgSessions = pgTable('sessions', {
@@ -74,10 +74,10 @@ function driverAdapter(database: SessionDatabase): Adapter {
   return new DrizzleSQLiteAdapter(database.db, sqlite.sessions, sqlite.users);
 }
 
-export function createLucia(db: AsyncAppDatabase): ReturnType<typeof luciaFor>;
+export function createLucia(db: SqliteAppDatabase): ReturnType<typeof luciaFor>;
 export function createLucia(db: AsyncPgDatabase, dialect: 'pg'): ReturnType<typeof luciaFor>;
 export function createLucia(
-  db: AsyncAppDatabase | AsyncPgDatabase,
+  db: SqliteAppDatabase | AsyncPgDatabase,
   dialect: 'sqlite' | 'pg' = 'sqlite'
 ) {
   const target = { dialect, db } as SessionDatabase;
