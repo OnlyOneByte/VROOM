@@ -4,9 +4,12 @@
 	import type { InsuranceResponse } from '#lib/types/index.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
 
-	let { insurance }: { insurance: InsuranceResponse } = $props();
+	let { insurance, fleet = 0 }: { insurance: InsuranceResponse; fleet?: number } = $props();
 
 	let cars = $derived(new Set(insurance.vehicleDetails.map(v => v.vehicleId)).size);
+	let carsText = $derived(
+		fleet > cars ? `${cars} of your ${fleet} cars` : cars === 1 ? 'one car' : `${cars} cars`
+	);
 	let whole = (v: number) => formatCurrency(v, undefined, 0);
 
 	function meta(v: InsuranceResponse['vehicleDetails'][number]): string {
@@ -36,7 +39,7 @@
 			Insurance is <strong class="text-foreground">
 				{formatCurrency(insurance.summary.totalMonthlyPremiums)} a month
 			</strong>
-			across {cars === 1 ? 'one car' : `${cars} cars`}, {whole(insurance.summary.totalAnnualPremiums)} a
+			across {carsText}, {whole(insurance.summary.totalAnnualPremiums)} a
 			year.
 		{:else}
 			No car here has an active insurance policy.

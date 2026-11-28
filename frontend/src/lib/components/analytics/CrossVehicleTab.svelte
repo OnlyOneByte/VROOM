@@ -202,6 +202,7 @@
 
 	let fuelEffConfig = $derived(buildChartConfig(fuelEffSeries));
 
+	let fleet = $derived(financing?.vehicleDetails?.length ?? 0);
 	let loanData = $derived(
 		(financing?.loanBreakdown ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
 	);
@@ -263,10 +264,13 @@
 			distanceUnit={distShortLabel}
 		/>
 
-		<div class="grid gap-8 md:grid-cols-2 md:gap-10">
+		<div
+			class="grid gap-8 md:gap-10 {fleet > 0 ? 'md:grid-cols-2' : ''}"
+			data-loans-insurance
+		>
 			<FinancingAnalytics {financing} />
 
-			<InsuranceAnalytics {insurance} />
+			<InsuranceAnalytics {insurance} {fleet} />
 		</div>
 
 		{#if hasDetail}

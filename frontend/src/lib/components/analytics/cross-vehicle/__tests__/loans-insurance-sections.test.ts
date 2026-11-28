@@ -109,7 +109,7 @@ describe('Loans', () => {
 		expect(within(section).queryByRole('list')).toBeNull();
 	});
 
-	test('a lease and a loan read as "2 loans and leases"; a lease without APR shows payments only', () => {
+	test('a loan and a lease read as "a loan and a lease"; a lease without APR shows payments only', () => {
 		const lease: Detail = {
 			...loan,
 			vehicleId: 'rav4',
@@ -122,10 +122,25 @@ describe('Loans', () => {
 		};
 		render(FinancingAnalytics, { props: { financing: financing([loan, lease], 1, 1) } });
 		const section = screen.getByRole('region', { name: 'Loans' });
-		expect(text(section)).toContain('on 2 loans and leases');
+		expect(text(section)).toContain('on a loan and a lease');
 		expect(text(section)).not.toContain('owned outright');
 		const rows = within(section).getAllByRole('listitem').map(text);
 		expect(rows[1]).toBe('RAV4 Lease · 1 payment to go $300.00/mo');
+	});
+
+	test('two loans and a lease count each kind', () => {
+		const lease: Detail = { ...loan, vehicleId: 'rav4', financingType: 'lease' };
+		const second: Detail = { ...loan, vehicleId: 'civic' };
+		render(FinancingAnalytics, { props: { financing: financing([loan, second, lease], 2, 1) } });
+		expect(text(screen.getByRole('region', { name: 'Loans' }))).toContain('on 2 loans and a lease');
+	});
+
+	test('a loan with no payments left on its schedule shows no "0 payments to go"', () => {
+		render(FinancingAnalytics, {
+			props: { financing: financing([{ ...loan, monthsRemaining: 0 }]) }
+		});
+		const row = within(screen.getByRole('region', { name: 'Loans' })).getByRole('listitem');
+		expect(text(row)).toBe('Daily Driver Loan · 4.5% APR $372.86/mo $12,503 left');
 	});
 
 	test('with no cars to show (none of yours, or none whose finances you can see), nothing renders', () => {
@@ -153,6 +168,18 @@ describe('Insurance', () => {
 		expect(text(section)).not.toMatch(/average across fleet|Deductible —|Coverage —/);
 		expect(within(section).getByRole('link', { name: 'All policies' }).getAttribute('href')).toBe(
 			'/insurance'
+		);
+	});
+
+	test('with the cars in view, the sentence says how many of them are insured', () => {
+		render(InsuranceAnalytics, {
+			props: {
+				insurance: insurance([policy('A', 'Geico', 200), policy('B', 'Geico', 150)]),
+				fleet: 5
+			}
+		});
+		expect(text(screen.getByRole('region', { name: 'Insurance' }))).toContain(
+			'across 2 of your 5 cars, $4,200 a year.'
 		);
 	});
 
