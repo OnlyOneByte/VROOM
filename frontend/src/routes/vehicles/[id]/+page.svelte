@@ -56,7 +56,11 @@
 	import { isDeleteHidden } from '#lib/utils/pending-deletes.svelte.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
-	import { getFuelEfficiencyLabel, getElectricEfficiencyLabel } from '#lib/utils/units.ts';
+	import {
+		getDistanceUnitLabel,
+		getFuelEfficiencyLabel,
+		getElectricEfficiencyLabel
+	} from '#lib/utils/units.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import {
 		buildChartConfig,
@@ -637,7 +641,8 @@
 				policies.status === 'fulfilled' ? policies.value : [],
 				() => undefined,
 				formatDate,
-				Date.now()
+				Date.now(),
+				() => getDistanceUnitLabel(distanceUnit, true)
 			);
 			if (reminders.status === 'rejected') {
 				logLoadFailure(reminders.reason, "Couldn't load this vehicle's reminders");

@@ -199,6 +199,62 @@ describe('dashboard data', () => {
 		]);
 	});
 
+	test('a mileage reminder within about 1,000 miles of its reading is coming up soon, in the car’s unit', () => {
+		const mileage = (id: string, nextDueOdometer: number, currentOdometer: number | null) => ({
+			reminder: { id, name: id, isActive: true, nextDueDate: null, nextDueOdometer },
+			vehicleIds: [id.startsWith('metric') ? 'v2' : 'v1'],
+			mileageDue: false,
+			currentOdometer
+		});
+		const reminders = [
+			mileage('brakes', 41000, 40360),
+			mileage('oil', 43000, 40360),
+			mileage('unread', 41000, null),
+			mileage('metric-close', 50000, 48600),
+			mileage('metric-far', 50000, 48300)
+		] as unknown as ReminderWithVehicles[];
+
+		const items = attentionItems(
+			reminders,
+			[],
+			() => undefined,
+			String,
+			NOW,
+			id => (id === 'v2' ? 'km' : 'mi')
+		);
+
+		expect(items.map(item => [item.title, item.status, item.detail])).toEqual([
+			['brakes', 'soon', 'Due in 640 mi'],
+			['metric-close', 'soon', 'Due in 1,400 km']
+		]);
+	});
+
+	test('a dated reminder due soon is listed by its date even when its mileage is close too', () => {
+		const reminders = [
+			{
+				reminder: {
+					id: 'both',
+					name: 'Service',
+					isActive: true,
+					nextDueDate: new Date(NOW + 3 * 86_400_000).toISOString(),
+					nextDueOdometer: 41000
+				},
+				vehicleIds: ['v1'],
+				mileageDue: false,
+				currentOdometer: 40500
+			}
+		] as unknown as ReminderWithVehicles[];
+
+		const [item] = attentionItems(
+			reminders,
+			[],
+			() => undefined,
+			() => 'in 3 days',
+			NOW
+		);
+		expect(item?.detail).toBe('Due in 3 days');
+	});
+
 	test('the insight names the highest month, and nothing when every month is zero', () => {
 		const aug = new Date(2026, 7, 1);
 		expect(
