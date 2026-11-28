@@ -59,7 +59,7 @@
     "drizzle-orm": "^0.45.4",
     "drizzle-zod": "^0.8.3",
     "googleapis": "^190.0.0",
-    "hono": "^4.13.19",
+    "hono": "^4.13.22",
     "lucia": "^3.2.2",
     "oslo": "^1.2.1",
     "tesseract.js": "^7.0.0",
@@ -72,14 +72,14 @@
     "google-auth-library": "10.5.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.8",
+    "@biomejs/biome": "^2.6.9",
     "@electric-sql/pglite": "^0.6.0",
     "@libsql/client": "^0.18.0",
     "@types/adm-zip": "^0.6.0",
     "@types/web-push": "^3.6.4",
     "bun-types": "^1.4.5",
     "drizzle-kit": "^0.31.11",
-    "fast-check": "^4.10.3",
+    "fast-check": "^4.11.0",
     "typescript": "^7.0.2",
     "yaml": "^2.9.1"
   }
