@@ -896,6 +896,7 @@ async function updateExistingProvider(
         status: 'active',
         lastErrorCode: null,
         failureCount: 0,
+        lastCheckedAt: null,
       }),
       updatedAt: new Date(),
     })
