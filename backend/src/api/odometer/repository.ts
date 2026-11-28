@@ -306,7 +306,7 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
       `
       );
 
-      const totalCount = countResult?.total ?? 0;
+      const totalCount = Number(countResult?.total ?? 0);
 
       const data: OdometerHistoryEntry[] = rows.map((row) => ({
         odometer: Number(row.odometer),

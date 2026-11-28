@@ -77,9 +77,9 @@ describe('PUT /reminders/:id fuel and split', () => {
     });
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
     expect(created.status, JSON.stringify(body)).toBe(201);
-    ctx.sqlite
-      .query("UPDATE reminders SET expense_category = 'fuel' WHERE id = ?")
-      .run(body.data.reminder.id);
+    await ctx.sql.run("UPDATE reminders SET expense_category = 'fuel' WHERE id = ?", [
+      body.data.reminder.id,
+    ]);
     return body.data.reminder.id;
   }
 

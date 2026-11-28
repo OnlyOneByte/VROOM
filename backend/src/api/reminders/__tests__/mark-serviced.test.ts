@@ -24,12 +24,11 @@ interface ReminderRowDb {
   last_triggered_at: number | null;
 }
 
-function reminderRow(id: string): ReminderRowDb {
-  return ctx.sqlite
-    .query(
-      'SELECT trigger_mode, last_service_odometer, next_due_odometer, next_due_date, last_triggered_at FROM reminders WHERE id = ?'
-    )
-    .get(id) as ReminderRowDb;
+async function reminderRow(id: string): Promise<ReminderRowDb> {
+  return (await ctx.sql.get(
+    'SELECT trigger_mode, last_service_odometer, next_due_odometer, next_due_date, last_triggered_at FROM reminders WHERE id = ?',
+    [id]
+  )) as ReminderRowDb;
 }
 
 async function createMileageReminder(
@@ -58,13 +57,13 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
   test('mileage: anchors lastServiceOdometer to current + recomputes nextDueOdometer', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2020 });
     const id = await createMileageReminder(vehicleId);
-    expect(reminderRow(id).next_due_odometer).toBe(35000);
+    expect((await reminderRow(id)).next_due_odometer).toBe(35000);
 
     await addOdometerReading(ctx, vehicleId, 36500);
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status, await res.text()).toBe(200);
 
-    const r = reminderRow(id);
+    const r = await reminderRow(id);
     expect(r.last_service_odometer).toBe(36500);
     expect(r.next_due_odometer, '36500 + 5000 interval').toBe(41500);
     expect(r.last_triggered_at, 'lastTriggeredAt stamped').not.toBeNull();
@@ -76,20 +75,23 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
     await addOdometerReading(ctx, vehicleId, 35200);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
-    const firedCount = () =>
+    const firedCount = async () =>
       (
-        ctx.sqlite
-          .query('SELECT COUNT(*) AS n FROM reminder_notifications WHERE reminder_id = ?')
-          .get(id) as { n: number }
+        (await ctx.sql.get(
+          'SELECT COUNT(*) AS n FROM reminder_notifications WHERE reminder_id = ?',
+          [id]
+        )) as { n: number }
       ).n;
-    expect(firedCount()).toBe(1);
+    expect(await firedCount()).toBe(1);
 
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status).toBe(200);
-    expect(reminderRow(id).next_due_odometer).toBe(40200);
+    expect((await reminderRow(id)).next_due_odometer).toBe(40200);
 
     await ctx.authed('POST', '/api/v1/reminders/trigger');
-    expect(firedCount(), 'no new notification after re-arm moved the milestone ahead').toBe(1);
+    expect(await firedCount(), 'no new notification after re-arm moved the milestone ahead').toBe(
+      1
+    );
   });
 
   test('time: advances nextDueDate one period', async () => {
@@ -104,12 +106,12 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
     expect(created.status, JSON.stringify(body)).toBe(201);
     const id = body.data.reminder.id;
-    const before = reminderRow(id).next_due_date;
+    const before = (await reminderRow(id)).next_due_date;
     expect(before).not.toBeNull();
 
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status).toBe(200);
-    const after = reminderRow(id).next_due_date;
+    const after = (await reminderRow(id)).next_due_date;
     expect(after).not.toBeNull();
     expect((after as number) > (before as number), 'nextDueDate advanced forward').toBe(true);
   });
@@ -130,7 +132,7 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status).toBe(200);
 
-    const after = reminderRow(id).next_due_date;
+    const after = (await reminderRow(id)).next_due_date;
     expect(after).not.toBeNull();
     const nowSeconds = Math.floor(Date.now() / 1000);
     expect((after as number) > nowSeconds, 'serviced reminder is no longer overdue').toBe(true);
@@ -148,12 +150,12 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
     expect(created.status, JSON.stringify(body)).toBe(201);
     const id = body.data.reminder.id;
-    const before = reminderRow(id).next_due_date;
+    const before = (await reminderRow(id)).next_due_date;
     expect(before).not.toBeNull();
 
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status).toBe(200);
-    const after = reminderRow(id).next_due_date;
+    const after = (await reminderRow(id)).next_due_date;
     expect(after).not.toBeNull();
     const deltaDays = ((after as number) - (before as number)) / 86_400;
     expect(deltaDays).toBeGreaterThanOrEqual(364);
@@ -168,13 +170,13 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
       startDate: '2024-02-15T00:00:00.000Z',
     });
     await addOdometerReading(ctx, vehicleId, 38000);
-    const before = reminderRow(id);
+    const before = await reminderRow(id);
     expect(before.next_due_date).not.toBeNull();
 
     const res = await ctx.authed('POST', `/api/v1/reminders/${id}/mark-serviced`);
     expect(res.status).toBe(200);
 
-    const after = reminderRow(id);
+    const after = await reminderRow(id);
     expect(after.next_due_odometer, '38000 + 5000').toBe(43000);
     expect((after.next_due_date as number) > (before.next_due_date as number)).toBe(true);
   });
@@ -197,7 +199,7 @@ describe('POST /:id/mark-serviced re-arms the reminder', () => {
     const resBody = await json<DataEnvelope<{ isActive: boolean }>>(res);
     expect(res.status, JSON.stringify(resBody)).toBe(200);
 
-    const row = ctx.sqlite.query('SELECT is_active FROM reminders WHERE id = ?').get(id) as {
+    const row = (await ctx.sql.get('SELECT is_active FROM reminders WHERE id = ?', [id])) as {
       is_active: number;
     };
     expect(row.is_active, 'a serviced-past-endDate reminder must be deactivated').toBe(0);

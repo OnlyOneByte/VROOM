@@ -14,13 +14,17 @@ let m: Members;
 const SHARED = 'rem-shared-car';
 const PRIVATE = 'rem-private-car';
 
-function reminder(id: string, vehicleIds: string[], createdBy: string | null = null): void {
-  ctx.sqlite.run(
+async function reminder(
+  id: string,
+  vehicleIds: string[],
+  createdBy: string | null = null
+): Promise<void> {
+  await ctx.sql.run(
     "INSERT INTO reminders (id, user_id, name, type, frequency, start_date, created_by) VALUES (?, ?, 'Service', 'notification', 'monthly', 1717200000, ?)",
     [id, ctx.user.id, createdBy]
   );
   for (const vehicleId of vehicleIds) {
-    ctx.sqlite.run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [
+    await ctx.sql.run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [
       id,
       vehicleId,
     ]);
@@ -45,8 +49,8 @@ beforeEach(async () => {
   seedCar(ctx, SHARED);
   seedCar(ctx, PRIVATE);
   m = await seedMembers(ctx, SHARED, 'rem');
-  reminder('both-cars', [SHARED, PRIVATE]);
-  reminder('editors-reminder', [SHARED], m.editor.id);
+  await reminder('both-cars', [SHARED, PRIVATE]);
+  await reminder('editors-reminder', [SHARED], m.editor.id);
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -69,7 +73,7 @@ describe('reminders resolve through can() for every role', () => {
       ['e-shared', SHARED],
       ['e-private', PRIVATE],
     ]) {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, source_type, source_id) VALUES (?, ?, ?, 'maintenance', 1717200000, 900, 'reminder', 'both-cars')",
         [id, vehicleId, ctx.user.id]
       );
@@ -84,7 +88,7 @@ describe('reminders resolve through can() for every role', () => {
   });
 
   test('deletes: editors only their own, co-owners any shared reminder', async () => {
-    reminder('owners-reminder', [SHARED]);
+    await reminder('owners-reminder', [SHARED]);
     expect(await remove(m.editor.request, 'owners-reminder')).toBe(403);
     expect(await remove(m.editor.request, 'editors-reminder')).toBe(200);
     expect(await remove(m.viewer.request, 'owners-reminder')).toBe(403);
@@ -106,7 +110,7 @@ describe('reminders resolve through can() for every role', () => {
   });
 
   test("another person's inbox, costs and reminders stay theirs", async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date) VALUES ('n1', 'both-cars', ?, 1717200000)",
       [ctx.user.id]
     );

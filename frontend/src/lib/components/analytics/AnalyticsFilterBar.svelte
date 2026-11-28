@@ -20,6 +20,7 @@
 		vehiclesError?: string | null;
 		onRetryVehicles?: () => void;
 		inline?: boolean;
+		showRange?: boolean;
 	}
 
 	let {
@@ -28,7 +29,8 @@
 		onChange,
 		vehiclesError,
 		onRetryVehicles,
-		inline = false
+		inline = false,
+		showRange = true
 	}: Props = $props();
 	let group = $state<HTMLElement | null>(null);
 
@@ -50,8 +52,10 @@
 		void loadSheet();
 	}
 
+	let clearable = $derived(showRange ? !isDefaultFilters(filters) : filters.cars.length > 0);
+
 	async function clearFilters() {
-		onChange({ range: DEFAULT_RANGE, cars: [] });
+		onChange(showRange ? { range: DEFAULT_RANGE, cars: [] } : { ...filters, cars: [] });
 		await tick();
 		group?.querySelector<HTMLElement>('button')?.focus();
 	}
@@ -79,10 +83,12 @@
 	role="group"
 	aria-label="Analytics filters"
 >
-	{@render trigger('range', 'Range', currentRangeLabel)}
+	{#if showRange}
+		{@render trigger('range', 'Range', currentRangeLabel)}
+	{/if}
 	{@render trigger('cars', 'Cars', currentCarsLabel)}
 
-	{#if !isDefaultFilters(filters)}
+	{#if clearable}
 		{#if isMobile.current}
 			<Button
 				variant="ghost"
