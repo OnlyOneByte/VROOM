@@ -221,7 +221,7 @@
 			Object.values(counts).reduce((total, count) => total + count, 0);
 		if (result.imported && result.kept) {
 			appStore.showSuccess(
-				`Added ${sum(result.imported)} records from the backup. ${sum(result.kept)} were already here.`
+				`Added ${sum(result.imported)} records from the backup. ${sum(result.kept)} were already here or skipped.`
 			);
 		} else if (result.imported) {
 			appStore.showSuccess(`Successfully restored ${sum(result.imported)} records`);

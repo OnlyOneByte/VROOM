@@ -567,8 +567,8 @@
 					{#if restoreMode === 'merge' && mergePreview}
 						<p class="text-sm text-muted-foreground" data-testid="restore-merge-counts">
 							{total(mergePreview.imported) === 0
-								? `Nothing to add: all ${records(total(mergePreview.kept))} in this backup are already here.`
-								: `${records(total(mergePreview.imported))} to add, ${total(mergePreview.kept)} already here.`}
+								? `Nothing to add: all ${records(total(mergePreview.kept))} in this backup are already here or skipped.`
+								: `${records(total(mergePreview.imported))} to add, ${total(mergePreview.kept)} already here or skipped.`}
 						</p>
 					{/if}
 				</div>

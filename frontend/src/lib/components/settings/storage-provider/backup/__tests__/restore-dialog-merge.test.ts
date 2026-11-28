@@ -57,7 +57,7 @@ describe('RestoreDialog merge', () => {
 		expect(screen.getByRole('radio', { name: /Merge with what's here/ })).toBeChecked();
 		expect(screen.getByText(/Keeps anything you added since the backup/)).toBeInTheDocument();
 		expect(screen.getByTestId('restore-merge-counts')).toHaveTextContent(
-			'3 records to add, 5 already here.'
+			'3 records to add, 5 already here or skipped.'
 		);
 		expect(screen.getByRole('button', { name: 'Merge' })).toBeEnabled();
 	});
@@ -70,7 +70,7 @@ describe('RestoreDialog merge', () => {
 		await openSheetsPreview();
 
 		expect(screen.getByTestId('restore-merge-counts')).toHaveTextContent(
-			'Nothing to add: all 8 records in this backup are already here.'
+			'Nothing to add: all 8 records in this backup are already here or skipped.'
 		);
 	});
 
