@@ -1,25 +1,26 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
+  openAnalyticsTestDb,
+  type AnalyticsTestDb,
+} from './analytics-test-db';
+import {
   type TestExpense,
 } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 const USER = { id: 'user-fleet', email: 'fleet@test.com', displayName: 'Fleet' };
@@ -58,14 +59,14 @@ function rangeAll() {
 
 describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', () => {
   test('totalDistance is the SUM of each vehicle (max − min) span, not pooled across the whole fleet', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
 
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
 
     const stats = await repo.getFuelStats(USER.id, rangeAll());
 
@@ -73,18 +74,18 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('a MIXED mi+km fleet converts each span to the user unit before summing (no raw mi+km pool)', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
 
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
 
     const stats = await repo.getFuelStats(USER.id, rangeAll());
 
@@ -93,14 +94,14 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('volume.currentYear + fillupDetails pool gal/L by RAW summation across the fleet', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
 
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
 
     const stats = await repo.getFuelStats(USER.id, rangeAll());
 
@@ -111,18 +112,18 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('a MIXED gal+L fleet converts each volume to the user unit before pooling (no raw gal+L sum)', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'miles', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
 
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
 
     const stats = await repo.getFuelStats(USER.id, rangeAll());
 
@@ -134,10 +135,10 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('volume.previousYear converts each vehicle prev-window sum to the user unit before pooling (mixed gal+L)', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'miles', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
@@ -153,9 +154,9 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       fuelType: 'Regular',
       missedFillup: false,
     });
-    seedExpense(testDb.sqlite, d2023(2, 1));
-    seedExpense(testDb.sqlite, d2023(5, 1));
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, d2023(2, 1));
+    await seedExpense(testDb.sql, d2023(5, 1));
+    await seedExpense(testDb.sql, {
       id: 'p-b1',
       vehicleId: VEH_B.id,
       category: 'fuel',
@@ -166,7 +167,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       fuelType: 'Regular',
       missedFillup: false,
     });
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: 'p-b2',
       vehicleId: VEH_B.id,
       category: 'fuel',
@@ -189,11 +190,11 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('fillups.previousYear excludes volume-null split siblings', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
 
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: 'py-real-a',
       vehicleId: VEH_A.id,
       category: 'fuel',
@@ -204,7 +205,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       fuelType: 'Regular',
       missedFillup: false,
     });
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: 'py-real-b',
       vehicleId: VEH_B.id,
       category: 'fuel',
@@ -215,7 +216,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       fuelType: 'Regular',
       missedFillup: false,
     });
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: 'py-split-a',
       vehicleId: VEH_A.id,
       category: 'fuel',
@@ -226,7 +227,7 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       fuelType: null,
       missedFillup: false,
     });
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: 'py-split-b',
       vehicleId: VEH_B.id,
       category: 'fuel',
@@ -249,18 +250,18 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('monthlyConsumption volume is converted to the user unit before pooling on a MIXED gal+L fleet (no raw gal+L sum)', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'miles', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
 
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
 
     const stats = await repo.getFuelStats(USER.id, rangeAll());
     const totalVolume = stats.monthlyConsumption.reduce((s, m) => s + m.volume, 0);
@@ -270,14 +271,14 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('best/worst cost-per-distance span the per-pair values across the WHOLE fleet (un-normalized scalars)', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
 
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 20));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_800, 40, 30, 20));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 40, 60, 5));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_200, 40, 30, 5));
 
     const stats = await repo.getFuelStats(USER.id, rangeAll());
 
@@ -286,10 +287,10 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('seasonal avgEfficiency converts each gas pair to the user unit before pooling on a MIXED mi/gal+km/L fleet', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
@@ -312,10 +313,10 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       fuelType: 'Regular',
       missedFillup: false,
     });
-    seedExpense(testDb.sqlite, fuelOn('a1', VEH_A.id, 10_000, 10, 5));
-    seedExpense(testDb.sqlite, fuelOn('a2', VEH_A.id, 10_300, 10, 10));
-    seedExpense(testDb.sqlite, fuelOn('b1', VEH_B.id, 50_000, 8, 6));
-    seedExpense(testDb.sqlite, fuelOn('b2', VEH_B.id, 50_320, 8, 11));
+    await seedExpense(testDb.sql, fuelOn('a1', VEH_A.id, 10_000, 10, 5));
+    await seedExpense(testDb.sql, fuelOn('a2', VEH_A.id, 10_300, 10, 10));
+    await seedExpense(testDb.sql, fuelOn('b1', VEH_B.id, 50_000, 8, 6));
+    await seedExpense(testDb.sql, fuelOn('b2', VEH_B.id, 50_320, 8, 11));
 
     const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
     const winter = adv.seasonalEfficiency.find((s) => s.season === 'Winter');
@@ -327,10 +328,10 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('dayOfWeek avgVolume converts each fillup volume to the user unit before pooling on a MIXED gal+L fleet', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'miles', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
@@ -353,10 +354,10 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       fuelType: 'Regular',
       missedFillup: false,
     });
-    seedExpense(testDb.sqlite, fuelOn('a1', VEH_A.id, 10_000, 10, 1));
-    seedExpense(testDb.sqlite, fuelOn('a2', VEH_A.id, 10_300, 10, 8));
-    seedExpense(testDb.sqlite, fuelOn('b1', VEH_B.id, 50_000, 8, 15));
-    seedExpense(testDb.sqlite, fuelOn('b2', VEH_B.id, 50_320, 8, 22));
+    await seedExpense(testDb.sql, fuelOn('a1', VEH_A.id, 10_000, 10, 1));
+    await seedExpense(testDb.sql, fuelOn('a2', VEH_A.id, 10_300, 10, 8));
+    await seedExpense(testDb.sql, fuelOn('b1', VEH_B.id, 50_000, 8, 15));
+    await seedExpense(testDb.sql, fuelOn('b2', VEH_B.id, 50_320, 8, 22));
 
     const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
     const monday = adv.dayOfWeekPatterns.find((d) => d.day === 'Monday');
@@ -370,18 +371,18 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('vehicleRadar fuelEfficiency normalizes CONVERTED gas-MPG so a mixed mi/gal+km/L fleet ranks like-with-like', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
 
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_300, 40, 30, 10));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 20));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_360, 40, 30, 20));
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_300, 40, 30, 10));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 40, 60, 20));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_360, 40, 30, 20));
 
     const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
     const a = adv.vehicleRadar.find((r) => r.vehicleId === VEH_A.id);
@@ -393,10 +394,10 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('year-end efficiencyTrend, avgEfficiency and totalDistance convert each vehicle before pooling on a MIXED mi/gal+km/L fleet', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
@@ -412,10 +413,10 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       fuelType: 'Regular',
       missedFillup: false,
     });
-    seedExpense(testDb.sqlite, fuelOn('a1', VEH_A.id, 10_000, 10, 5));
-    seedExpense(testDb.sqlite, fuelOn('a2', VEH_A.id, 10_300, 10, 10));
-    seedExpense(testDb.sqlite, fuelOn('b1', VEH_B.id, 50_000, 8, 6));
-    seedExpense(testDb.sqlite, fuelOn('b2', VEH_B.id, 50_320, 8, 11));
+    await seedExpense(testDb.sql, fuelOn('a1', VEH_A.id, 10_000, 10, 5));
+    await seedExpense(testDb.sql, fuelOn('a2', VEH_A.id, 10_300, 10, 10));
+    await seedExpense(testDb.sql, fuelOn('b1', VEH_B.id, 50_000, 8, 6));
+    await seedExpense(testDb.sql, fuelOn('b2', VEH_B.id, 50_320, 8, 11));
 
     const ye = await repo.getYearEnd(USER.id, 2024);
     const expectedAvg = (300 + 320 / 1.609344) / (10 + 8 / 3.785411784);
@@ -427,17 +428,17 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('summary converts the same as the standalone getters on a MIXED fleet', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_300, 40, 30, 10));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 20));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_360, 40, 30, 20));
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_300, 40, 30, 10));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 40, 60, 20));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_360, 40, 30, 20));
 
     const summary = await repo.getSummary(USER.id, rangeAll());
     const [quick, stats, adv] = await Promise.all([
@@ -454,18 +455,18 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('quick stats cost per distance divides the spending of vehicles with a distance by the fleet distance in user units', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_300, 40, 30, 10));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 40, 60, 20));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_360, 40, 30, 20));
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_300, 40, 30, 10));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 40, 60, 20));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_360, 40, 30, 20));
+    await seedExpense(testDb.sql, {
       ...fillup('m1', VEH_A.id, 0, 100, 20, 0),
       category: 'maintenance',
       mileage: null,
@@ -481,13 +482,13 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('cost per distance leaves out the spending of a vehicle with no distance in the range', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 150, 60, 10));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 11_000, 150, 30, 10));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 200, 40, 10));
-    seedExpense(testDb.sqlite, {
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 150, 60, 10));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 11_000, 150, 30, 10));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 200, 40, 10));
+    await seedExpense(testDb.sql, {
       ...fillup('i1', VEH_B.id, 0, 500, 20, 0),
       category: 'financial',
       mileage: null,
@@ -508,9 +509,9 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('year-end cost per distance leaves out the spending of a vehicle with no distance', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
     const at = (
       id: string,
       vehicleId: string,
@@ -522,10 +523,10 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
       date: new Date(Date.UTC(2024, 3, day, 12)),
       mileage,
     });
-    seedExpense(testDb.sqlite, at('a1', VEH_A.id, 10_000, 150, 1));
-    seedExpense(testDb.sqlite, at('a2', VEH_A.id, 11_000, 150, 20));
-    seedExpense(testDb.sqlite, at('b1', VEH_B.id, 50_000, 200, 10));
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, at('a1', VEH_A.id, 10_000, 150, 1));
+    await seedExpense(testDb.sql, at('a2', VEH_A.id, 11_000, 150, 20));
+    await seedExpense(testDb.sql, at('b1', VEH_B.id, 50_000, 200, 10));
+    await seedExpense(testDb.sql, {
       ...at('f1', VEH_B.id, null, 500, 15),
       category: 'financial',
       volume: null,
@@ -539,9 +540,9 @@ describe('fleet-wide fuel-stats pools per-vehicle distance by raw summation', ()
   });
 
   test('quick stats have no cost per distance without two odometer readings', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 40, 60, 10));
 
     const quick = await repo.getQuickStats(USER.id, rangeAll());
 
@@ -554,22 +555,22 @@ describe('a mixed mpg + km/L fleet pools efficiency, cost and price in the user 
   const LITERS_PER_GALLON = 3.785411784;
   const toMpg = (kmPerLiter: number) => (kmPerLiter * LITERS_PER_GALLON) / KM_PER_MILE;
 
-  function seedMixedFleet(bMileage: number, bVolume: number): void {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
+  async function seedMixedFleet(bMileage: number, bVolume: number): Promise<void> {
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [
       JSON.stringify({ distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' }),
       VEH_B.id,
     ]);
-    seedExpense(testDb.sqlite, fillup('a1', VEH_A.id, 10_000, 4000, 60, 10));
-    seedExpense(testDb.sqlite, fillup('a2', VEH_A.id, 10_300, 4000, 30, 10));
-    seedExpense(testDb.sqlite, fillup('b1', VEH_B.id, 50_000, 4000, 60, 25));
-    seedExpense(testDb.sqlite, fillup('b2', VEH_B.id, 50_000 + bMileage, 4000, 30, bVolume));
+    await seedExpense(testDb.sql, fillup('a1', VEH_A.id, 10_000, 4000, 60, 10));
+    await seedExpense(testDb.sql, fillup('a2', VEH_A.id, 10_300, 4000, 30, 10));
+    await seedExpense(testDb.sql, fillup('b1', VEH_B.id, 50_000, 4000, 60, 25));
+    await seedExpense(testDb.sql, fillup('b2', VEH_B.id, 50_000 + bMileage, 4000, 30, bVolume));
   }
 
   test('best/avg/worst MPG, cost per mile and $/gal are converted before pooling', async () => {
-    seedMixedFleet(375, 25);
+    await seedMixedFleet(375, 25);
     const stats = await repo.getFuelStats(USER.id, rangeAll());
     const quick = await repo.getQuickStats(USER.id, rangeAll());
 
@@ -594,7 +595,7 @@ describe('a mixed mpg + km/L fleet pools efficiency, cost and price in the user 
   });
 
   test('sanity bands run in mpg and miles: a 4 km/L fill-up 1200 km later is kept', async () => {
-    seedMixedFleet(1200, 300);
+    await seedMixedFleet(1200, 300);
     const stats = await repo.getFuelStats(USER.id, rangeAll());
     expect(stats.fuelConsumption.worstEfficiency).toBeCloseTo(toMpg(4), 6);
   });
@@ -622,11 +623,11 @@ describe('one vehicle with a short top-up: every average is total distance over 
   });
 
   test('gas: quick stats, fuel stats, monthly consumption and year-end agree on 320 / 10.5', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedExpense(testDb.sqlite, fill('a1', VEH_A.id, 10_000, 10, 5));
-    seedExpense(testDb.sqlite, fill('a2', VEH_A.id, 10_300, 10, 10));
-    seedExpense(testDb.sqlite, fill('a3', VEH_A.id, 10_320, 0.5, 12));
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedExpense(testDb.sql, fill('a1', VEH_A.id, 10_000, 10, 5));
+    await seedExpense(testDb.sql, fill('a2', VEH_A.id, 10_300, 10, 10));
+    await seedExpense(testDb.sql, fill('a3', VEH_A.id, 10_320, 0.5, 12));
 
     const pooled = 320 / 10.5;
     const [quick, stats, yearEnd] = await Promise.all([
@@ -646,22 +647,22 @@ describe('one vehicle with a short top-up: every average is total distance over 
   });
 
   test('charging: the mi/kWh average pools distance over energy', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_B);
-    seedExpense(testDb.sqlite, fill('c1', VEH_B.id, 1000, 30, 5, 'Electric'));
-    seedExpense(testDb.sqlite, fill('c2', VEH_B.id, 1120, 40, 10, 'Electric'));
-    seedExpense(testDb.sqlite, fill('c3', VEH_B.id, 1130, 2, 12, 'Electric'));
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_B);
+    await seedExpense(testDb.sql, fill('c1', VEH_B.id, 1000, 30, 5, 'Electric'));
+    await seedExpense(testDb.sql, fill('c2', VEH_B.id, 1120, 40, 10, 'Electric'));
+    await seedExpense(testDb.sql, fill('c3', VEH_B.id, 1130, 2, 12, 'Electric'));
 
     const stats = await repo.getFuelStats(USER.id, rangeAll());
     expect(stats.charging.efficiency.avgEfficiency).toBeCloseTo(130 / 42, 6);
   });
 
   test('a missed fill-up skips only the interval ending at it, so the next interval still counts', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedExpense(testDb.sqlite, fill('a1', VEH_A.id, 10_000, 10, 5));
-    seedExpense(testDb.sqlite, { ...fill('a2', VEH_A.id, 10_300, 15, 10), missedFillup: true });
-    seedExpense(testDb.sqlite, fill('a3', VEH_A.id, 10_600, 10, 15));
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedExpense(testDb.sql, fill('a1', VEH_A.id, 10_000, 10, 5));
+    await seedExpense(testDb.sql, { ...fill('a2', VEH_A.id, 10_300, 15, 10), missedFillup: true });
+    await seedExpense(testDb.sql, fill('a3', VEH_A.id, 10_600, 10, 15));
 
     const [quick, stats] = await Promise.all([
       repo.getQuickStats(USER.id, rangeAll()),
@@ -673,14 +674,14 @@ describe('one vehicle with a short top-up: every average is total distance over 
   });
 
   test('the vehicle radar ranks fuel efficiency by each vehicle’s pooled average', async () => {
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEH_A);
-    seedVehicle(testDb.sqlite, VEH_B);
-    seedExpense(testDb.sqlite, fill('a1', VEH_A.id, 10_000, 10, 5));
-    seedExpense(testDb.sqlite, fill('a2', VEH_A.id, 10_300, 10, 10));
-    seedExpense(testDb.sqlite, fill('a3', VEH_A.id, 10_320, 0.5, 12));
-    seedExpense(testDb.sqlite, fill('b1', VEH_B.id, 50_000, 10, 6));
-    seedExpense(testDb.sqlite, fill('b2', VEH_B.id, 50_330, 10, 11));
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEH_A);
+    await seedVehicle(testDb.sql, VEH_B);
+    await seedExpense(testDb.sql, fill('a1', VEH_A.id, 10_000, 10, 5));
+    await seedExpense(testDb.sql, fill('a2', VEH_A.id, 10_300, 10, 10));
+    await seedExpense(testDb.sql, fill('a3', VEH_A.id, 10_320, 0.5, 12));
+    await seedExpense(testDb.sql, fill('b1', VEH_B.id, 50_000, 10, 6));
+    await seedExpense(testDb.sql, fill('b2', VEH_B.id, 50_330, 10, 11));
 
     const adv = await repo.getFuelAdvanced(USER.id, rangeAll());
     const a = adv.vehicleRadar.find((r) => r.vehicleId === VEH_A.id);

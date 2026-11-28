@@ -1,42 +1,43 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
-  expenseArb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
+  openAnalyticsTestDb,
+  type AnalyticsTestDb,
+} from './analytics-test-db';
+import {
+  expenseArb,
   type TestExpense,
   type TestVehicle,
 } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 const TEST_YEAR = 2024;
 
-function resetDb(): void {
-  testDb.sqlite.run('DELETE FROM expenses');
-  testDb.sqlite.run('DELETE FROM vehicles');
-  testDb.sqlite.run('DELETE FROM users');
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+async function resetDb(): Promise<void> {
+  await testDb.sql.run('DELETE FROM expenses');
+  await testDb.sql.run('DELETE FROM vehicles');
+  await testDb.sql.run('DELETE FROM users');
+  repo = new AnalyticsRepository(testDb.asyncDb);
 }
 
-function setupUserAndVehicle(): { userId: string; vehicle: TestVehicle } {
+async function setupUserAndVehicle(): Promise<{ userId: string; vehicle: TestVehicle }> {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-  seedUser(testDb.sqlite, user);
+  await seedUser(testDb.sql, user);
 
   const v: TestVehicle = {
     id: 'vehicle-user-1-0',
@@ -45,7 +46,7 @@ function setupUserAndVehicle(): { userId: string; vehicle: TestVehicle } {
     model: 'Camry',
     year: 2022,
   };
-  seedVehicle(testDb.sqlite, v);
+  await seedVehicle(testDb.sql, v);
 
   return { userId: user.id, vehicle: v };
 }
@@ -54,8 +55,8 @@ describe('Biggest expense is the maximum', () => {
   test('biggest expense amount >= every other expense amount in that year', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 10 }), async (expenseCount) => {
-        resetDb();
-        const { userId, vehicle } = setupUserAndVehicle();
+        await resetDb();
+        const { userId, vehicle } = await setupUserAndVehicle();
 
         const generated = fc.sample(expenseArb(vehicle.id, 0, TEST_YEAR), expenseCount);
         const seededExpenses: TestExpense[] = [];
@@ -63,7 +64,7 @@ describe('Biggest expense is the maximum', () => {
           const e = generated[i];
           if (!e) continue;
           const expense = { ...e, id: `expense-${i}` } as TestExpense;
-          seedExpense(testDb.sqlite, expense);
+          await seedExpense(testDb.sql, expense);
           seededExpenses.push(expense);
         }
 
@@ -88,19 +89,19 @@ describe('Biggest expense is the maximum', () => {
   });
 });
 
-function seedExpensesForYear(
+async function seedExpensesForYear(
   vehicleId: string,
   year: number,
   count: number,
   prefix: string
-): number {
+): Promise<number> {
   const generated = fc.sample(expenseArb(vehicleId, 0, year), count);
   let total = 0;
   for (let i = 0; i < generated.length; i++) {
     const e = generated[i];
     if (!e) continue;
     const expense = { ...e, id: `${prefix}-${i}` } as TestExpense;
-    seedExpense(testDb.sqlite, expense);
+    await seedExpense(testDb.sql, expense);
     total += expense.expenseAmount;
   }
   return total;
@@ -113,11 +114,11 @@ describe('Year-over-year percentage change formula', () => {
         fc.integer({ min: 1, max: 5 }),
         fc.integer({ min: 1, max: 5 }),
         async (currentYearCount, prevYearCount) => {
-          resetDb();
-          const { userId, vehicle } = setupUserAndVehicle();
+          await resetDb();
+          const { userId, vehicle } = await setupUserAndVehicle();
 
-          const prevTotal = seedExpensesForYear(vehicle.id, TEST_YEAR - 1, prevYearCount, 'prev');
-          const currentTotal = seedExpensesForYear(vehicle.id, TEST_YEAR, currentYearCount, 'curr');
+          const prevTotal = await seedExpensesForYear(vehicle.id, TEST_YEAR - 1, prevYearCount, 'prev');
+          const currentTotal = await seedExpensesForYear(vehicle.id, TEST_YEAR, currentYearCount, 'curr');
 
           const result = await repo.getYearEnd(userId, TEST_YEAR);
 
@@ -153,13 +154,13 @@ const YEAR_END_KEYS = [
 
 describe('getYearEnd — response shape matches the frontend contract', () => {
   test('the response has exactly the frontend YearEndResponse top-level keys', async () => {
-    const { userId } = setupUserAndVehicle();
+    const { userId } = await setupUserAndVehicle();
     const result = await repo.getYearEnd(userId, TEST_YEAR);
     expect(Object.keys(result).sort()).toEqual(YEAR_END_KEYS);
   });
 
   test('biggestExpense/previousYearComparison are null on an empty year (not absent keys)', async () => {
-    const { userId } = setupUserAndVehicle();
+    const { userId } = await setupUserAndVehicle();
     const result = await repo.getYearEnd(userId, TEST_YEAR);
     expect(result.biggestExpense).toBeNull();
     expect(result.previousYearComparison).toBeNull();

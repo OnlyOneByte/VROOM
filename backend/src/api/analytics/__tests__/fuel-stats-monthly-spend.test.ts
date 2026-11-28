@@ -1,33 +1,34 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
+  openAnalyticsTestDb,
+  type AnalyticsTestDb,
+} from './analytics-test-db';
+import {
   type TestExpense,
   yearToRange,
 } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
 const USER = { id: 'user-spend', email: 'spend@test.com', displayName: 'Spend' };
 const GAS = { id: 'veh-gas', userId: USER.id, make: 'Honda', model: 'Civic', year: 2020 };
 const EV = { id: 'veh-ev', userId: USER.id, make: 'Kia', model: 'Niro EV', year: 2022 };
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
-  seedUser(testDb.sqlite, USER);
-  seedVehicle(testDb.sqlite, GAS);
-  seedVehicle(testDb.sqlite, EV);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
+  await seedUser(testDb.sql, USER);
+  await seedVehicle(testDb.sql, GAS);
+  await seedVehicle(testDb.sql, EV);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): TestExpense {
@@ -43,15 +44,15 @@ function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): Te
   };
 }
 
-function seedSecondHalf(withCharging: boolean): void {
+async function seedSecondHalf(withCharging: boolean): Promise<void> {
   for (let month = 6; month < 12; month++) {
-    seedExpense(
-      testDb.sqlite,
+    await seedExpense(
+      testDb.sql,
       fuel({ id: `g${month}`, date: new Date(Date.UTC(2024, month, 10)), expenseAmount: 4550 })
     );
     if (withCharging) {
-      seedExpense(
-        testDb.sqlite,
+      await seedExpense(
+        testDb.sql,
         fuel({
           id: `c${month}`,
           vehicleId: EV.id,
@@ -67,7 +68,7 @@ function seedSecondHalf(withCharging: boolean): void {
 
 describe('monthly fuel spend', () => {
   test('a mixed fleet splits fuel from charging, averaged from the first expense', async () => {
-    seedSecondHalf(true);
+    await seedSecondHalf(true);
     const { monthlySpend } = await repo.getFuelStats(USER.id, yearToRange(2024));
     expect(monthlySpend?.months).toBe(6);
     expect(monthlySpend?.fuel).toBeCloseTo(4550, 9);
@@ -75,22 +76,22 @@ describe('monthly fuel spend', () => {
   });
 
   test('a gas-only fleet has no charging figure', async () => {
-    seedSecondHalf(false);
+    await seedSecondHalf(false);
     const { monthlySpend } = await repo.getFuelStats(USER.id, yearToRange(2024));
     expect(monthlySpend).toEqual({ months: 6, fuel: 4550, charging: null });
   });
 
   test('a month with no fill-up after the first one still counts', async () => {
-    seedExpense(testDb.sqlite, fuel({ id: 'g1', date: new Date(Date.UTC(2024, 9, 5)) }));
-    seedExpense(testDb.sqlite, fuel({ id: 'g2', date: new Date(Date.UTC(2024, 11, 5)) }));
+    await seedExpense(testDb.sql, fuel({ id: 'g1', date: new Date(Date.UTC(2024, 9, 5)) }));
+    await seedExpense(testDb.sql, fuel({ id: 'g2', date: new Date(Date.UTC(2024, 11, 5)) }));
     const { monthlySpend } = await repo.getFuelStats(USER.id, yearToRange(2024));
     expect(monthlySpend).toEqual({ months: 3, fuel: 80 / 3, charging: null });
   });
 
   test('a rolling year that starts mid-month counts as 12 months, not 13', async () => {
     for (let i = 0; i < 12; i++) {
-      seedExpense(
-        testDb.sqlite,
+      await seedExpense(
+        testDb.sql,
         fuel({ id: `r${i}`, date: new Date(Date.UTC(2024, 2 + i, 16)), expenseAmount: 6000 })
       );
     }

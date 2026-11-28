@@ -1,14 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
-  expenseListArb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
+  openAnalyticsTestDb,
+  type AnalyticsTestDb,
+} from './analytics-test-db';
+import {
+  expenseListArb,
   type TestExpense,
   type TestVehicle,
   vehicleArb,
@@ -28,16 +29,16 @@ describe('Summary data equivalence', () => {
           return fc.tuple(...vehicleArbs);
         }),
         async (targetYear, vehiclesArr) => {
-          const testDb: TestDb = createTestDb();
+          const testDb: AnalyticsTestDb = await openAnalyticsTestDb();
           try {
-            const repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+            const repo = new AnalyticsRepository(testDb.asyncDb);
 
             const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-            seedUser(testDb.sqlite, user);
+            await seedUser(testDb.sql, user);
 
             const vehicles: TestVehicle[] = vehiclesArr as TestVehicle[];
             for (const v of vehicles) {
-              seedVehicle(testDb.sqlite, v);
+              await seedVehicle(testDb.sql, v);
             }
 
             const allExpenses: TestExpense[] = [];
@@ -55,7 +56,7 @@ describe('Summary data equivalence', () => {
             }
 
             for (const e of allExpenses) {
-              seedExpense(testDb.sqlite, e);
+              await seedExpense(testDb.sql, e);
             }
 
             const range = yearToRange(targetYear);
@@ -85,7 +86,7 @@ describe('Summary data equivalence', () => {
 
             expect(summary.fuelAdvanced).toEqual(fuelAdvanced);
           } finally {
-            testDb.sqlite.close();
+            testDb.close();
           }
         }
       ),

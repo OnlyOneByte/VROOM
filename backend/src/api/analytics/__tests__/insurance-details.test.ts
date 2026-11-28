@@ -1,24 +1,23 @@
 import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
   seedInsurancePolicy,
   seedInsuranceTermVehicle,
   seedUser,
   seedVehicle,
-  type TestDb,
-} from './analytics-test-generators';
+  openAnalyticsTestDb,
+  type AnalyticsTestDb,
+} from './analytics-test-db';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 const USER = 'user-ins';
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
-  seedUser(testDb.sqlite, { id: USER, email: 'ins@example.com', displayName: 'Ins' });
-  seedVehicle(testDb.sqlite, {
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
+  await seedUser(testDb.sql, { id: USER, email: 'ins@example.com', displayName: 'Ins' });
+  await seedVehicle(testDb.sql, {
     id: 'veh-1',
     userId: USER,
     make: 'Honda',
@@ -28,24 +27,24 @@ beforeEach(() => {
 });
 afterEach(() => {
   setSystemTime();
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 
-function policy(id: string, company: string, isActive = true): void {
-  seedInsurancePolicy(testDb.sqlite, { id, userId: USER, company, isActive });
+async function policy(id: string, company: string, isActive = true): Promise<void> {
+  await seedInsurancePolicy(testDb.sql, { id, userId: USER, company, isActive });
 }
 
-function term(opts: {
+async function term(opts: {
   id: string;
   policyId: string;
   startMs: number;
   endMs: number;
   monthlyCost?: number | null;
   totalCost?: number | null;
-}): void {
-  testDb.sqlite.run(
+}): Promise<void> {
+  await testDb.sql.run(
     'INSERT INTO insurance_terms (id, policy_id, start_date, end_date, monthly_cost, total_cost) VALUES (?, ?, ?, ?, ?, ?)',
     [
       opts.id,
@@ -62,15 +61,15 @@ const now = Date.now();
 
 describe('getInsurance — cost-shape handling', () => {
   test('an explicit monthlyCost flows straight into the monthly + annual totals', async () => {
-    policy('p1', 'GEICO');
-    term({
+    await policy('p1', 'GEICO');
+    await term({
       id: 't1',
       policyId: 'p1',
       startMs: now - 30 * MS_DAY,
       endMs: now + 335 * MS_DAY,
       monthlyCost: 100,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(100, 2);
@@ -79,15 +78,15 @@ describe('getInsurance — cost-shape handling', () => {
   });
 
   test('a lump-sum totalCost (no monthlyCost) is amortized across the term span, not zeroed', async () => {
-    policy('p1', 'GEICO');
-    term({
+    await policy('p1', 'GEICO');
+    await term({
       id: 't1',
       policyId: 'p1',
       startMs: now - 30 * MS_DAY,
       endMs: now + 335 * MS_DAY,
       totalCost: 1200,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.totalMonthlyPremiums).toBeGreaterThan(0);
@@ -95,61 +94,61 @@ describe('getInsurance — cost-shape handling', () => {
 });
 
 describe('getInsurance — latest-term selection', () => {
-  test('the latest term (by endDate) wins when a policy has several', async () => {
-    policy('p1', 'GEICO');
-    term({
+  test('the latest await term (by endDate) wins when a policy has several', async () => {
+    await policy('p1', 'GEICO');
+    await term({
       id: 'old',
       policyId: 'p1',
       startMs: now - 400 * MS_DAY,
       endMs: now - 40 * MS_DAY,
       monthlyCost: 80,
     });
-    term({
+    await term({
       id: 'new',
       policyId: 'p1',
       startMs: now - 30 * MS_DAY,
       endMs: now + 335 * MS_DAY,
       monthlyCost: 120,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'new', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'new', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(120, 2);
   });
 
   test('equal-endDate terms break the tie by the later startDate (deterministic)', async () => {
-    policy('p1', 'GEICO');
+    await policy('p1', 'GEICO');
     const sharedEnd = now + 335 * MS_DAY;
-    term({
+    await term({
       id: 'earlier-start',
       policyId: 'p1',
       startMs: now - 60 * MS_DAY,
       endMs: sharedEnd,
       monthlyCost: 100,
     });
-    term({
+    await term({
       id: 'later-start',
       policyId: 'p1',
       startMs: now - 20 * MS_DAY,
       endMs: sharedEnd,
       monthlyCost: 130,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'later-start', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'later-start', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(130, 2);
   });
 
   test('an INACTIVE policy is excluded from the premium totals', async () => {
-    policy('p1', 'GEICO', false);
-    term({
+    await policy('p1', 'GEICO', false);
+    await term({
       id: 't1',
       policyId: 'p1',
       startMs: now - 30 * MS_DAY,
       endMs: now + 335 * MS_DAY,
       monthlyCost: 100,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.activePoliciesCount).toBe(0);
@@ -159,31 +158,31 @@ describe('getInsurance — latest-term selection', () => {
 
 describe('getInsurance — per-vehicle attribution scopes to the LATEST term, not all terms', () => {
   test('a vehicle dropped from the latest term gets NO premium; the kept vehicle gets the FULL latest premium', async () => {
-    seedVehicle(testDb.sqlite, {
+    await seedVehicle(testDb.sql, {
       id: 'veh-2',
       userId: USER,
       make: 'Toyota',
       model: 'Corolla',
       year: 2021,
     });
-    policy('p1', 'GEICO');
-    term({
+    await policy('p1', 'GEICO');
+    await term({
       id: 'old',
       policyId: 'p1',
       startMs: now - 400 * MS_DAY,
       endMs: now - 40 * MS_DAY,
       monthlyCost: 80,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'old', vehicleId: 'veh-1' });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'old', vehicleId: 'veh-2' });
-    term({
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'old', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'old', vehicleId: 'veh-2' });
+    await term({
       id: 'new',
       policyId: 'p1',
       startMs: now - 30 * MS_DAY,
       endMs: now + 335 * MS_DAY,
       monthlyCost: 120,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'new', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'new', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
 
@@ -200,23 +199,23 @@ describe('getInsurance — per-vehicle attribution scopes to the LATEST term, no
   });
 
   test('when coverage is unchanged across terms, a multi-vehicle split is still correct', async () => {
-    seedVehicle(testDb.sqlite, {
+    await seedVehicle(testDb.sql, {
       id: 'veh-2',
       userId: USER,
       make: 'Toyota',
       model: 'Corolla',
       year: 2021,
     });
-    policy('p1', 'GEICO');
-    term({
+    await policy('p1', 'GEICO');
+    await term({
       id: 'new',
       policyId: 'p1',
       startMs: now - 30 * MS_DAY,
       endMs: now + 335 * MS_DAY,
       monthlyCost: 120,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'new', vehicleId: 'veh-1' });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'new', vehicleId: 'veh-2' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'new', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'new', vehicleId: 'veh-2' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(120, 2);
@@ -229,15 +228,15 @@ describe('getInsurance — per-vehicle attribution scopes to the LATEST term, no
 
 describe('getInsurance — only a term in force today counts toward the totals', () => {
   test('an active policy whose only term already EXPIRED adds no premium, vehicle or carrier', async () => {
-    policy('p1', 'GEICO');
-    term({
+    await policy('p1', 'GEICO');
+    await term({
       id: 'lapsed',
       policyId: 'p1',
       startMs: now - 400 * MS_DAY,
       endMs: now - 40 * MS_DAY,
       monthlyCost: 90,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'lapsed', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'lapsed', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.totalMonthlyPremiums).toBe(0);
@@ -248,23 +247,23 @@ describe('getInsurance — only a term in force today counts toward the totals',
   });
 
   test('a policy renewed for a future term counts its current term, not the future one', async () => {
-    policy('p1', 'GEICO');
-    term({
+    await policy('p1', 'GEICO');
+    await term({
       id: 'current',
       policyId: 'p1',
       startMs: now - 100 * MS_DAY,
       endMs: now + 30 * MS_DAY,
       monthlyCost: 80,
     });
-    term({
+    await term({
       id: 'next',
       policyId: 'p1',
       startMs: now + 31 * MS_DAY,
       endMs: now + 395 * MS_DAY,
       monthlyCost: 95,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'current', vehicleId: 'veh-1' });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'next', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'current', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'next', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(80, 2);
@@ -275,15 +274,15 @@ describe('getInsurance — only a term in force today counts toward the totals',
     const lateToday = new Date('2026-06-15T23:59:59.000Z');
     const startOfToday = Date.UTC(2026, 5, 15);
     setSystemTime(lateToday);
-    policy('p1', 'GEICO');
-    term({
+    await policy('p1', 'GEICO');
+    await term({
       id: 'ends-today',
       policyId: 'p1',
       startMs: startOfToday - 180 * MS_DAY,
       endMs: startOfToday,
       monthlyCost: 70,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 'ends-today', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 'ends-today', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.totalMonthlyPremiums).toBeCloseTo(70, 2);
@@ -294,17 +293,17 @@ describe('getInsurance — only a term in force today counts toward the totals',
 
 describe('getInsurance — term-less active policies excluded from activePoliciesCount', () => {
   test('an active policy with NO terms is not counted (count matches the policies contributing premiums)', async () => {
-    policy('p-withterm', 'GEICO');
-    term({
+    await policy('p-withterm', 'GEICO');
+    await term({
       id: 't1',
       policyId: 'p-withterm',
       startMs: now - 30 * MS_DAY,
       endMs: now + 335 * MS_DAY,
       monthlyCost: 100,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
-    policy('p-noterm', 'Allstate');
+    await policy('p-noterm', 'Allstate');
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.activePoliciesCount).toBe(1);
@@ -312,22 +311,22 @@ describe('getInsurance — term-less active policies excluded from activePolicie
   });
 
   test('an active policy with a term is still counted', async () => {
-    policy('p1', 'GEICO');
-    term({
+    await policy('p1', 'GEICO');
+    await term({
       id: 't1',
       policyId: 'p1',
       startMs: now - 30 * MS_DAY,
       endMs: now + 335 * MS_DAY,
       monthlyCost: 75,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.activePoliciesCount).toBe(1);
   });
 
   test('a term-less active policy alongside ZERO termed policies yields count 0 + $0', async () => {
-    policy('p-noterm', 'Allstate');
+    await policy('p-noterm', 'Allstate');
 
     const result = await repo.getInsurance(USER);
     expect(result.summary.activePoliciesCount).toBe(0);
@@ -345,15 +344,15 @@ describe('getInsurance — empty / no-data', () => {
   });
 });
 
-function termSeconds(opts: {
+async function termSeconds(opts: {
   id: string;
   policyId: string;
   startMs: number;
   endMs: number;
   monthlyCost?: number | null;
   totalCost?: number | null;
-}): void {
-  testDb.sqlite.run(
+}): Promise<void> {
+  await testDb.sql.run(
     'INSERT INTO insurance_terms (id, policy_id, start_date, end_date, monthly_cost, total_cost) VALUES (?, ?, ?, ?, ?, ?)',
     [
       opts.id,
@@ -368,15 +367,15 @@ function termSeconds(opts: {
 
 describe('getInsurance — monthlyPremiumTrend bucketing', () => {
   test('a term contributes its monthly premium to EACH month it spans (inclusive both ends)', async () => {
-    policy('p1', 'GEICO');
-    termSeconds({
+    await policy('p1', 'GEICO');
+    await termSeconds({
       id: 't1',
       policyId: 'p1',
       startMs: Date.UTC(2024, 0, 1),
       endMs: Date.UTC(2024, 2, 31),
       monthlyCost: 100,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.monthlyPremiumTrend).toEqual([
@@ -387,24 +386,24 @@ describe('getInsurance — monthlyPremiumTrend bucketing', () => {
   });
 
   test('overlapping policies SUM their premiums in the shared months', async () => {
-    policy('p1', 'GEICO');
-    policy('p2', 'Allstate');
-    termSeconds({
+    await policy('p1', 'GEICO');
+    await policy('p2', 'Allstate');
+    await termSeconds({
       id: 't1',
       policyId: 'p1',
       startMs: Date.UTC(2024, 0, 10),
       endMs: Date.UTC(2024, 1, 20),
       monthlyCost: 100,
     });
-    termSeconds({
+    await termSeconds({
       id: 't2',
       policyId: 'p2',
       startMs: Date.UTC(2024, 1, 5),
       endMs: Date.UTC(2024, 2, 5),
       monthlyCost: 30,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't2', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't2', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     const byMonth = new Map(result.monthlyPremiumTrend.map((p) => [p.month, p.premiums]));
@@ -414,15 +413,15 @@ describe('getInsurance — monthlyPremiumTrend bucketing', () => {
   });
 
   test('a six-month term ending on its anniversary day charges six months, not seven', async () => {
-    policy('p1', 'GEICO');
-    termSeconds({
+    await policy('p1', 'GEICO');
+    await termSeconds({
       id: 't1',
       policyId: 'p1',
       startMs: Date.UTC(2024, 0, 1, 12),
       endMs: Date.UTC(2024, 6, 1, 12),
       totalCost: 600,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.monthlyPremiumTrend.map((p) => p.month)).toEqual([
@@ -436,15 +435,15 @@ describe('getInsurance — monthlyPremiumTrend bucketing', () => {
   });
 
   test('a totalCost-only term spreads its AMORTIZED monthly premium across each spanned month', async () => {
-    policy('p1', 'GEICO');
-    termSeconds({
+    await policy('p1', 'GEICO');
+    await termSeconds({
       id: 't1',
       policyId: 'p1',
       startMs: Date.UTC(2024, 0, 1),
       endMs: Date.UTC(2024, 2, 31),
       totalCost: 300,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(result.monthlyPremiumTrend).toEqual([
@@ -480,15 +479,15 @@ describe('getInsurance — response shape matches the frontend contract', () => 
   });
 
   test('a POPULATED response keeps the same top-level/summary keys + the vehicleDetails + array item shapes', async () => {
-    policy('p1', 'GEICO');
-    term({
+    await policy('p1', 'GEICO');
+    await term({
       id: 't1',
       policyId: 'p1',
       startMs: now - 30 * MS_DAY,
       endMs: now + 335 * MS_DAY,
       monthlyCost: 100,
     });
-    seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+    await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
     const result = await repo.getInsurance(USER);
     expect(Object.keys(result).sort()).toEqual(INSURANCE_TOP_KEYS);
@@ -516,15 +515,15 @@ describe('getInsurance — month buckets do not depend on the server timezone', 
   for (const tz of ['America/Los_Angeles', 'Pacific/Auckland']) {
     test(`a Jan–Mar term charts Jan, Feb and Mar with TZ=${tz}`, async () => {
       process.env.TZ = tz;
-      policy('p1', 'GEICO');
-      termSeconds({
+      await policy('p1', 'GEICO');
+      await termSeconds({
         id: 't1',
         policyId: 'p1',
         startMs: Date.UTC(2024, 0, 1),
         endMs: Date.UTC(2024, 2, 31),
         monthlyCost: 100,
       });
-      seedInsuranceTermVehicle(testDb.sqlite, { termId: 't1', vehicleId: 'veh-1' });
+      await seedInsuranceTermVehicle(testDb.sql, { termId: 't1', vehicleId: 'veh-1' });
 
       const result = await repo.getInsurance(USER);
       expect(result.monthlyPremiumTrend.map((p) => p.month)).toEqual([
