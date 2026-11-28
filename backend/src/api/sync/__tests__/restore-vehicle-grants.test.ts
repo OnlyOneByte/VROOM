@@ -221,11 +221,11 @@ describe('a full restore keeps the per-person grants of current members, from li
     expect(
       [...(result.grants?.dropped ?? [])].map((d) => `${d.userId} ${d.kind} ${d.reason}`).sort()
     ).toEqual([
-      'disabled-1 override account_inactive',
+      'disabled-1 override member_not_active',
       'member-3 override granted_by_non_member',
       'member-3 override permission_not_grantable',
       'member-3 role role_not_assignable',
-      'waiting-1 role account_inactive',
+      'waiting-1 role member_not_active',
     ]);
     expect(grantsOf('waiting-1').roles).toEqual([builtInRoleId('viewer')]);
   });
@@ -293,5 +293,54 @@ describe('a full restore keeps the per-person grants of current members, from li
     ]);
     expect(await can('limited-1', 'vehicle.photo.read')).toBe(false);
     expect(await can('limited-1', 'vehicle.expense.read')).toBe(false);
+  });
+
+  test('a deny on someone with no share left on the car is cleaned up, one on an open invite stays', async () => {
+    await addMember('left-1');
+    await addMember('invited-1');
+    override('left-1', 'vehicle.trip.read', ctx.user.id, 'deny');
+    override('invited-1', 'vehicle.trip.read', ctx.user.id, 'deny');
+    const zip = new AdmZip(await exportZip());
+    const shares = zip.getEntry('vehicle_shares.csv')?.getData().toString('utf-8') ?? '';
+    zip.updateFile(
+      'vehicle_shares.csv',
+      Buffer.from(
+        shares
+          .split('\n')
+          .filter((line) => !line.includes('left-1'))
+          .join('\n'),
+        'utf-8'
+      )
+    );
+    ctx.sqlite.run("UPDATE vehicle_shares SET status = 'pending' WHERE shared_with_id = ?", [
+      'invited-1',
+    ]);
+
+    const result = await restore(zip.toBuffer());
+
+    expect(result.grants).toEqual({
+      reapplied: 1,
+      dropped: [{ kind: 'override', vehicleId, userId: 'left-1', reason: 'no_accepted_share' }],
+    });
+    expect(grantsOf('left-1').overrides).toEqual([]);
+    expect(grantsOf('invited-1').overrides).toEqual([
+      { permission: 'vehicle.trip.read', effect: 'deny' },
+    ]);
+  });
+
+  test('merge and preview restores leave per-person grants alone and report none', async () => {
+    await addMember('member-5');
+    override('member-5', 'vehicle.expense.write');
+    const zip = await exportZip();
+    const { restoreService } = await import('../restore');
+
+    for (const mode of ['merge', 'preview'] as const) {
+      const result = await restoreService.restoreFromBackup(ctx.user.id, zip, mode);
+      expect(result.success).toBe(true);
+      expect('grants' in result, mode).toBe(false);
+    }
+    expect(grantsOf('member-5').overrides).toEqual([
+      { permission: 'vehicle.expense.write', effect: 'allow' },
+    ]);
   });
 });

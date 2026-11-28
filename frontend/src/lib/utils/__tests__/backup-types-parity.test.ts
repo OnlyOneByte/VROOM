@@ -129,6 +129,18 @@ describe('backup types parity with the backend', () => {
 		);
 	});
 
+	it('RestoreDroppedReason lists the backend DroppedGrantReason values', () => {
+		const grantsSrc = readFileSync(`${BACKEND_SYNC}/restore-grants.ts`, 'utf8');
+		const union = (src: string, name: string) => {
+			const body = src.match(new RegExp(`export type ${name} =([^;]+);`))?.[1];
+			if (!body) throw new Error(`${name} not found`);
+			return [...body.matchAll(/'([^']+)'/g)].map(m => m[1]).sort();
+		};
+		const backend = union(grantsSrc, 'DroppedGrantReason');
+		expect(backend.length).toBeGreaterThan(0);
+		expect(union(frontendSrc, 'RestoreDroppedReason')).toEqual(backend);
+	});
+
 	it('BackupOrchestratorResult.outcome lists the backend BackupOutcome values', () => {
 		const strategySrc = readFileSync(`${BACKEND_SYNC}/backup-strategy.ts`, 'utf8');
 		const union = strategySrc.match(/export type BackupOutcome = ([^;]+);/)?.[1];
