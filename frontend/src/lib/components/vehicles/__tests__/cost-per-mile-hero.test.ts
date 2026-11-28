@@ -88,6 +88,23 @@ describe('CostPerMileHero', () => {
 		expect(labels).toEqual(['0', '30', '60', '90', '120']);
 	});
 
+	test('a cost that rounds to a dollar reads $1.00, never 100¢', () => {
+		render(CostPerMileHero, {
+			summary: summary({
+				costBuckets: { ownershipTotal: 0, runningTotal: 9960, previous: null, byVehicle: [] }
+			}),
+			distance: 10000,
+			distanceUnit: 'miles'
+		});
+		expect(screen.getByTestId('cost-sentence')).toHaveTextContent(
+			'This car costs $1.00 a mile to run over 10,000 miles.'
+		);
+		expect(screen.getByRole('img', { name: /\$1\.00, all running/ })).toHaveTextContent(
+			'ALL-IN USD / MI'
+		);
+		expect(document.body.textContent).not.toContain('100¢');
+	});
+
 	test('from a dollar a mile up, the sentence, legend and dial read in dollars', () => {
 		render(CostPerMileHero, {
 			summary: summary({

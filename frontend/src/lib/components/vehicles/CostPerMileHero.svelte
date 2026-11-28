@@ -51,7 +51,9 @@
 	let owns = $derived(!!perDistance && perDistance.ownership > 0);
 
 	function rate(value: number): string {
-		return cents && value < 1 ? `${formatNumberUpTo(value * 100, 0)}¢` : formatCurrency(value);
+		return cents && Math.round(value * 100) < 100
+			? `${formatNumberUpTo(value * 100, 0)}¢`
+			: formatCurrency(value);
 	}
 
 	function dialMax(value: number, floor: number): number {
@@ -64,7 +66,7 @@
 	let dial = $derived.by(() => {
 		if (!perDistance) return null;
 		const all = owns ? perDistance.total : perDistance.running;
-		const inCents = cents && all < 1;
+		const inCents = cents && Math.round(all * 100) < 100;
 		const factor = inCents ? 100 : 1;
 		const running = perDistance.running * factor;
 		const ownership = owns ? perDistance.ownership * factor : 0;
