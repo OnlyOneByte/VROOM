@@ -98,4 +98,17 @@ describe('reminder list: mileage milestone reached', () => {
 
     expect(body.data.find((row) => row.reminder.id === 'rem-shared')?.mileageDue).toBe(true);
   });
+
+  test('the reading itself is returned to the owner only', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    await seedMileageReminder(ctx, 'rem-own', vehicleId, 10000);
+    await addOdometerReading(ctx, vehicleId, 9500);
+    const viewer = await createInvitee(ctx, 'reading-viewer');
+    await viewer.acceptShare(vehicleId, 'viewer');
+
+    const res = await viewer.request('GET', `/api/v1/reminders?vehicleId=${vehicleId}`);
+    const body = await json<DataEnvelope<(Row & { currentOdometer: number | null })[]>>(res);
+
+    expect(body.data.find((row) => row.reminder.id === 'rem-own')?.currentOdometer).toBeNull();
+  });
 });

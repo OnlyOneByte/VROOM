@@ -214,7 +214,11 @@ const TOOL_LIST: AssistantTool[] = [
     schema: emptyArgs,
     read: async (_args, userId) => {
       const rows = await repos().reminders.findByUserId(userId, { isActive: true });
-      return withMileageDue(rows, new Map(rows.map((row) => [row.reminder.id, row.vehicleIds])));
+      return withMileageDue(
+        rows,
+        new Map(rows.map((row) => [row.reminder.id, row.vehicleIds])),
+        userId
+      );
     },
     toApi: (rows, scale) => rows.map((row) => reminderWithVehiclesToApi(row, scale)),
   }),

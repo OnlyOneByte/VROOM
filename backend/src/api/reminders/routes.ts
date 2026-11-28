@@ -466,7 +466,7 @@ routes.get('/', authorize(fromQueryVehicle), async (c) => {
         ).then((rows) => rows.filter((row) => row.seen).map(({ seen: _seen, ...row }) => row));
   const scale = await repos().preferences.moneyScale(listUserId);
   const fullVehicleIds = new Map(reminders.map((row) => [row.reminder.id, row.vehicleIds]));
-  const withDue = await withMileageDue(visible, fullVehicleIds);
+  const withDue = await withMileageDue(visible, fullVehicleIds, user.id);
   return c.json({ success: true, data: withDue.map((r) => reminderWithVehiclesToApi(r, scale)) });
 });
 

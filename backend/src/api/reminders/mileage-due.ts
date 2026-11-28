@@ -3,7 +3,8 @@ import type { ReminderWithVehicles } from './repository';
 
 export async function withMileageDue<T extends ReminderWithVehicles>(
   rows: T[],
-  fullVehicleIds: Map<string, string[]>
+  fullVehicleIds: Map<string, string[]>,
+  viewerId: string
 ): Promise<(T & { mileageDue: boolean; currentOdometer: number | null })[]> {
   const readings = new Map<string, Promise<number | null>>();
   const reading = (vehicleId: string, ownerId: string) => {
@@ -35,7 +36,7 @@ export async function withMileageDue<T extends ReminderWithVehicles>(
       return {
         ...row,
         mileageDue: current !== null && current >= milestone,
-        currentOdometer: current,
+        currentOdometer: reminder.userId === viewerId ? current : null,
       };
     })
   );
