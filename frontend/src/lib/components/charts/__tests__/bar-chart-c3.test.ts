@@ -294,6 +294,7 @@ describe('C3 bar columns', () => {
 			]
 		});
 		expect(seen.chart?.['seriesLayout']).toBe('stack');
+		expect(seen.chart?.['y']).toBeUndefined();
 		cleanup();
 		await mount(SINGLE);
 		expect(seen.chart?.['seriesLayout']).toBeUndefined();
