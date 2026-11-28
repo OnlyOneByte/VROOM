@@ -246,10 +246,24 @@ routes.delete('/:id', zValidator('param', idParamSchema), authorize(fromPolicyOw
         entityType: 'insurance_claim',
         entityIds: (await repos().insuranceClaims.findByPolicyId(id)).map((claim) => claim.id),
       },
+      {
+        entityType: 'expense',
+        entityIds: (
+          await Promise.all(
+            termIds.map((termId) =>
+              repos().expenses.findBySource('insurance_term', termId, user.id)
+            )
+          )
+        )
+          .flat()
+          .map((expense) => expense.id),
+      },
     ],
     async () => {
       await repos().insurancePolicies.delete(id, user.id);
-      for (const termId of termIds) await deleteTermExpenses(termId, user.id);
+      for (const termId of termIds) {
+        await repos().expenses.deleteBySource('insurance_term', termId, user.id);
+      }
     }
   );
   return c.json({ success: true, message: 'Insurance policy deleted successfully' });
