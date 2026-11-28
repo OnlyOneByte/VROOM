@@ -35,7 +35,7 @@ const mount = () =>
 		props: {
 			open: true,
 			vehicleId: 'car',
-			drivers: [{ id: 'd1', userId: 'u1', name: 'Sam', color: null, archived: false }]
+			drivers: [{ id: 'd1', guest: false, name: 'Sam', color: null, archived: false }]
 		}
 	});
 

@@ -8,7 +8,13 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { createInvitee } from '../../../test-helpers/invitee';
-import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
+import {
+  type Members,
+  memberDriverId,
+  overrideOn,
+  seedCar,
+  seedMembers,
+} from '../../../test-helpers/members';
 
 let ctx: TestApp;
 let m: Members;
@@ -16,11 +22,6 @@ const CAR = 'de-car';
 const OTHER = 'de-other';
 const drivers = `/api/v1/vehicles/${CAR}/drivers`;
 const sharing = `/api/v1/vehicles/${CAR}/car-share`;
-
-interface Driver {
-  id: string;
-  userId: string | null;
-}
 
 beforeEach(async () => {
   ctx = await createTestApp();
@@ -35,10 +36,9 @@ const status = (request: RequestFn, method: string, path: string, body?: unknown
   request(method, path, body).then((res) => res.status);
 
 async function driverOf(userId: string): Promise<string> {
-  const list = (await json<DataEnvelope<Driver[]>>(await ctx.authed('GET', drivers))).data;
-  const found = list.find((d) => d.userId === userId);
+  const found = await memberDriverId(ctx, CAR, userId);
   if (!found) throw new Error(`no driver for ${userId}`);
-  return found.id;
+  return found;
 }
 
 async function addGuest(): Promise<string> {

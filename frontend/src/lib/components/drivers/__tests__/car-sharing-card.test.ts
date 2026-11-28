@@ -35,8 +35,8 @@ afterEach(() => {
 describe('CarSharingCard', () => {
 	test('loads the drivers once and lists guests with their actions', async () => {
 		list.mockResolvedValue([
-			{ id: 'd-1', userId: 'u-1', name: 'Sam', color: 'chart-1', archived: false },
-			{ id: 'd-2', userId: null, name: 'Riley', color: 'chart-3', archived: false }
+			{ id: 'd-1', guest: false, name: 'Sam', color: 'chart-1', archived: false },
+			{ id: 'd-2', guest: true, name: 'Riley', color: 'chart-3', archived: false }
 		]);
 		render(CarSharingCard, { props: { vehicleId: 'car', enabled: true } });
 		await settle();

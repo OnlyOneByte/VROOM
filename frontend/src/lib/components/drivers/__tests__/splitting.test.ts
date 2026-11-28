@@ -15,8 +15,8 @@ vi.mock('#lib/services/driver-api.ts', () => ({
 import SplittingSection from '../SplittingSection.svelte';
 
 const drivers = [
-	{ id: 'a', userId: 'u1', name: 'Alex', color: null, archived: false },
-	{ id: 's', userId: null, name: 'Sam', color: null, archived: false }
+	{ id: 'a', guest: false, name: 'Alex', color: null, archived: false },
+	{ id: 's', guest: true, name: 'Sam', color: null, archived: false }
 ];
 
 const settle = async () => {

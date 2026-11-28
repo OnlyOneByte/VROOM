@@ -5,7 +5,13 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
+import {
+  type Members,
+  memberDriverId,
+  overrideOn,
+  seedCar,
+  seedMembers,
+} from '../../../test-helpers/members';
 
 let ctx: TestApp;
 let m: Members;
@@ -45,11 +51,10 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 async function driverOf(userId: string | null, name?: string): Promise<string> {
+  if (userId) return (await memberDriverId(ctx, CAR, userId)) ?? '';
   const res = await ctx.authed('GET', base);
-  const list = (
-    await json<DataEnvelope<{ id: string; userId: string | null; name: string }[]>>(res)
-  ).data;
-  return list.find((d) => (userId ? d.userId === userId : d.name === name))?.id ?? '';
+  const list = (await json<DataEnvelope<{ id: string; name: string }[]>>(res)).data;
+  return list.find((d) => d.name === name)?.id ?? '';
 }
 
 async function post<T>(path: string, body?: unknown, status = 200): Promise<T> {

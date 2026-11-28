@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { appContext, repos } from '../../app-context';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../errors';
@@ -18,6 +18,7 @@ import {
 import {
   addGuestDriver,
   DRIVER_COLORS,
+  type DriverView,
   findDriver,
   listDrivers,
   ownDriverId,
@@ -46,6 +47,15 @@ const updateSchema = z.strictObject({
   archived: z.boolean().optional(),
 });
 
+function forCaller(c: Context, { userId, ...driver }: DriverView) {
+  const own = userId !== null && userId === c.get('user').id;
+  return { ...driver, guest: userId === null, ...(own && { userId }) };
+}
+
+async function callerDrivers(c: Context, vehicleId: string) {
+  return (await listDrivers(appContext().asyncDb, vehicleId)).map((d) => forCaller(c, d));
+}
+
 async function requireCarShare(vehicleId: string): Promise<void> {
   const vehicle = await repos().vehicles.findById(vehicleId);
   if (!vehicle?.carShareEnabled) throw new NotFoundError('Car sharing');
@@ -62,7 +72,7 @@ driverRoutes.get(
   async (c) => {
     const { vehicleId } = c.req.valid('param');
     await requireCarShare(vehicleId);
-    return c.json({ success: true, data: await listDrivers(appContext().asyncDb, vehicleId) });
+    return c.json({ success: true, data: await callerDrivers(c, vehicleId) });
   }
 );
 
@@ -193,7 +203,7 @@ driverRoutes.post(
     await requireCarShare(vehicleId);
     const { asyncDb } = appContext();
     const id = await addGuestDriver(asyncDb, vehicleId, c.req.valid('json'), c.get('user').id);
-    const created = (await listDrivers(asyncDb, vehicleId)).find((d) => d.id === id);
+    const created = (await callerDrivers(c, vehicleId)).find((d) => d.id === id);
     return c.json({ success: true, data: created }, 201);
   }
 );
@@ -318,7 +328,7 @@ driverRoutes.patch(
       ...(newColor !== undefined && { color: newColor }),
       ...(archived !== undefined && { archivedAt: archived ? new Date() : null }),
     });
-    const updated = (await listDrivers(asyncDb, vehicleId)).find((d) => d.id === driverId);
+    const updated = (await callerDrivers(c, vehicleId)).find((d) => d.id === driverId);
     return c.json({ success: true, data: updated });
   }
 );
@@ -339,7 +349,7 @@ carShareRoutes.put(
     await setCarShare(asyncDb, vehicleId, enabled);
     return c.json({
       success: true,
-      data: { enabled, drivers: enabled ? await listDrivers(asyncDb, vehicleId) : [] },
+      data: { enabled, drivers: enabled ? await callerDrivers(c, vehicleId) : [] },
     });
   }
 );

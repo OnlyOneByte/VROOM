@@ -41,7 +41,7 @@
 	let backfillOpen = $state(false);
 
 	let active = $derived(drivers.filter(d => !d.archived));
-	let archivedGuests = $derived(drivers.filter(d => d.archived && !d.userId));
+	let archivedGuests = $derived(drivers.filter(d => d.archived && d.guest));
 
 	$effect(() => {
 		enabled = initiallyEnabled;
@@ -111,7 +111,7 @@
 	}
 
 	function roleOf(driver: Driver): string {
-		if (!driver.userId) return 'guest';
+		if (driver.guest) return 'guest';
 		return driver.userId === authStore.user?.id ? 'you' : '';
 	}
 </script>
@@ -175,7 +175,7 @@
 										· {roleOf(driver)}
 									</span>{/if}
 							</span>
-							{#if !driver.userId}
+							{#if driver.guest}
 								<Button
 									size="lg"
 									class="px-3"

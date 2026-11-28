@@ -16,7 +16,7 @@ test('the chip shows only when the car shares and you may record drivers', () =>
 
 const driver = (id: string, extra: Partial<Driver> = {}): Driver => ({
 	id,
-	userId: null,
+	guest: false,
 	name: id,
 	color: null,
 	archived: false,
@@ -25,8 +25,8 @@ const driver = (id: string, extra: Partial<Driver> = {}): Driver => ({
 
 const drivers = [
 	driver('me', { userId: 'u-me' }),
-	driver('sam', { userId: 'u-sam' }),
-	driver('riley'),
+	driver('sam'),
+	driver('riley', { guest: true }),
 	driver('gone', { archived: true })
 ];
 
