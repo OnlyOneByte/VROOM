@@ -10,8 +10,8 @@ export interface InsuranceTerm {
 	agentName?: string;
 	agentPhone?: string;
 	agentEmail?: string;
-	totalCost?: number;
-	monthlyCost?: number;
+	totalCost?: number | null;
+	monthlyCost?: number | null;
 	premiumFrequency?: string;
 	paymentAmount?: number;
 	createdAt: string;

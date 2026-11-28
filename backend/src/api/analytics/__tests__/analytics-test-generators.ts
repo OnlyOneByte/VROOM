@@ -114,62 +114,6 @@ export function createTestDb(): TestDb {
   return { sqlite, drizzle: drizzle(sqlite, { schema }) };
 }
 
-export function seedUser(db: Database, user: TestUser): void {
-  db.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
-    user.id,
-    user.email,
-    user.displayName,
-  ]);
-}
-
-export function seedVehicle(db: Database, vehicle: TestVehicle): void {
-  db.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
-    vehicle.id,
-    vehicle.userId,
-    vehicle.make,
-    vehicle.model,
-    vehicle.year,
-  ]);
-}
-
-export function seedExpense(db: Database, expense: TestExpense): void {
-  const dateUnix = Math.floor(expense.date.getTime() / 1000);
-  if (Number.isNaN(dateUnix)) {
-    throw new Error(`Invalid date for expense ${expense.id}: ${expense.date}`);
-  }
-  let userId = expense.userId;
-  if (!userId) {
-    const row = db.query('SELECT user_id FROM vehicles WHERE id = ?').get(expense.vehicleId) as {
-      user_id: string;
-    } | null;
-    userId = row?.user_id ?? 'unknown';
-  }
-  db.run(
-    'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage, volume, fuel_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [
-      expense.id,
-      expense.vehicleId,
-      userId,
-      expense.category,
-      expense.expenseAmount,
-      dateUnix,
-      expense.mileage,
-      expense.volume,
-      expense.fuelType,
-      expense.missedFillup ? 1 : 0,
-    ]
-  );
-}
-
-export function seedInsurancePolicy(db: Database, policy: TestInsurancePolicy): void {
-  db.run('INSERT INTO insurance_policies (id, user_id, company, is_active) VALUES (?, ?, ?, ?)', [
-    policy.id,
-    policy.userId,
-    policy.company,
-    policy.isActive ? 1 : 0,
-  ]);
-}
-
 export interface TestVehicleFinancing {
   id: string;
   vehicleId: string;
@@ -183,35 +127,9 @@ export interface TestVehicleFinancing {
   isActive: boolean;
 }
 
-export function seedVehicleFinancing(db: Database, fin: TestVehicleFinancing): void {
-  const startDateUnix = Math.floor(fin.startDate.getTime() / 1000);
-  db.run(
-    'INSERT INTO vehicle_financing (id, vehicle_id, financing_type, provider, original_amount, apr, term_months, start_date, payment_amount, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [
-      fin.id,
-      fin.vehicleId,
-      fin.financingType,
-      fin.provider,
-      fin.originalAmount,
-      fin.apr,
-      fin.termMonths,
-      startDateUnix,
-      fin.paymentAmount,
-      fin.isActive ? 1 : 0,
-    ]
-  );
-}
-
 export interface TestInsuranceTermVehicle {
   termId: string;
   vehicleId: string;
-}
-
-export function seedInsuranceTermVehicle(db: Database, row: TestInsuranceTermVehicle): void {
-  db.run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [
-    row.termId,
-    row.vehicleId,
-  ]);
 }
 
 export function yearToRange(year: number): { start: number; end: number } {

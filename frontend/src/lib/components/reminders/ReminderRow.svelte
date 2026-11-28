@@ -9,7 +9,7 @@
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import type { ReminderWithVehicles } from '#lib/types/index.ts';
 	import { formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
-	import { frequencyLabel, isMileageTracking } from '#lib/utils/reminder-helpers.ts';
+	import { frequencyLabel, isMileageTracking, soonDistance } from '#lib/utils/reminder-helpers.ts';
 
 	interface Props {
 		item: ReminderWithVehicles;
@@ -41,7 +41,6 @@
 
 	const DAY_MS = 86_400_000;
 	const SOON_DAYS = 30;
-	let soonDistance = $derived(distanceLabel === 'km' ? 1600 : 1000);
 
 	let menuOpen = $state(false);
 
@@ -79,7 +78,7 @@
 			const left = Math.max(0, reminder.nextDueOdometer - current);
 			return {
 				text: `In ${formatNumber(left, 0)} ${distanceLabel}`,
-				tone: left <= soonDistance ? 'warning' : 'muted'
+				tone: left <= soonDistance(distanceLabel) ? 'warning' : 'muted'
 			};
 		}
 		return { text: 'Scheduled', tone: 'muted' };
@@ -104,6 +103,7 @@
 	});
 
 	let canResume = $derived(group === 'paused' && vehicleIds.length > 0);
+	let markingNote = $derived(servicing ? 'Marking serviced…' : '');
 
 	function choose(action: (_item: ReminderWithVehicles) => void) {
 		menuOpen = false;
@@ -150,6 +150,9 @@
 		>
 			{status.text}
 		</p>
+		<p class={group === 'due' ? 'sr-only' : 'text-xs text-muted-foreground'} role="status">
+			{markingNote}
+		</p>
 		{#if group === 'due' && mileage}
 			<Button
 				variant="link"
@@ -159,8 +162,6 @@
 			>
 				{servicing ? 'Marking…' : 'Mark serviced'}
 			</Button>
-		{:else if servicing}
-			<p class="text-xs text-muted-foreground" role="status">Marking serviced…</p>
 		{:else if canResume}
 			<Button variant="link" class="h-10 px-0" onclick={() => onToggleActive(item)}>Resume</Button>
 		{/if}

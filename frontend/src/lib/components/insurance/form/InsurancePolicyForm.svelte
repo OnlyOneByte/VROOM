@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { focusFirstProblem } from '#lib/utils/focus.ts';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { goto } from '$app/navigation';
 	import FormActionBar from '#lib/components/common/form-action-bar.svelte';
 	import DemoSaveNote, { DEMO_SAVE_NOTE_ID } from '#lib/components/common/demo-save-note.svelte';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
@@ -9,11 +8,9 @@
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
-	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { trackPendingSave } from '#lib/utils/pending-saves.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
-	import { routes } from '#lib/routes.ts';
 	import { gotoDynamic } from '#lib/utils/navigation.ts';
 	import { ArrowLeft, Shield, Trash2, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -234,7 +231,7 @@
 					isActive
 				});
 				appStore.showSuccess('Policy created successfully');
-				goto(resolve(routes.insurance));
+				gotoDynamic(returnTo);
 			}
 		} catch (err) {
 			appStore.showError(
@@ -255,7 +252,7 @@
 		try {
 			await insuranceApi.deletePolicy(policy.id);
 			appStore.showSuccess('Policy deleted successfully');
-			goto(resolve(routes.insurance));
+			gotoDynamic(returnTo);
 		} catch (err) {
 			appStore.showError(`Couldn't delete the policy. ${userFacingErrorMessage(err)}`);
 		} finally {
@@ -565,9 +562,10 @@
 											}}
 										>
 											<Select.Trigger id="premium-frequency" class="w-full">
-												{premiumFrequency || 'Select frequency'}
+												{premiumFrequency || 'Not specified'}
 											</Select.Trigger>
 											<Select.Content>
+												<Select.Item value="" label="Not specified">Not specified</Select.Item>
 												<Select.Item value="Monthly" label="Monthly">Monthly</Select.Item>
 												<Select.Item value="Quarterly" label="Quarterly">Quarterly</Select.Item>
 												<Select.Item value="Semi-Annual" label="Semi-Annual">

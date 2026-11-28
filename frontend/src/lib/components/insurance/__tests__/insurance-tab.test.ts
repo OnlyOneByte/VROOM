@@ -244,8 +244,19 @@ describe('InsuranceTab policies', () => {
 			'Old Mutual'
 		]);
 		expect(rows[1]).toHaveTextContent('Inactive');
-		expect(rows[1]).toHaveTextContent('$90.00/mo');
+		expect(rows[1]).toHaveTextContent('$630.00');
 		expect(rows[1]).not.toHaveTextContent(/Renews|Expired/);
+	});
+
+	test('a monthly-only term shows the total its premium expense books, like the policy card', async () => {
+		onNov23();
+		getPoliciesForVehicle.mockResolvedValue([lapsed]);
+		mount();
+		await settle();
+
+		const [row] = within(screen.getByRole('region', { name: 'Policies' })).getAllByRole('listitem');
+		expect(row).toHaveTextContent('$630.00');
+		expect(row).not.toHaveTextContent('/mo');
 	});
 
 	test('an active policy whose terms have all ended says Expired in red, and renewal within 30 days is amber', async () => {

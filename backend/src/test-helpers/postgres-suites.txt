@@ -2,10 +2,13 @@ src/__tests__/api-cache-control.test.ts
 src/__tests__/backend-env-example.test.ts
 src/__tests__/csrf-state-change-protection.test.ts
 src/__tests__/deployment-examples.test.ts
+src/__tests__/long-request-idle-timeout.test.ts
 src/__tests__/not-found-envelope.test.ts
 src/__tests__/shared-limits.test.ts
 src/__tests__/vehicle-access-routes.test.ts
 src/api/analytics/__tests__/analytics-assistant-authorize.test.ts
+src/api/analytics/__tests__/analytics-insights.test.ts
+src/api/analytics/__tests__/analytics-query.test.ts
 src/api/analytics/__tests__/analytics-routes-http.test.ts
 src/api/analytics/__tests__/analytics-units.property.test.ts
 src/api/analytics/__tests__/analytics-user-timezone.test.ts
@@ -18,10 +21,12 @@ src/api/analytics/__tests__/fuel-stats-calendar-month.test.ts
 src/api/analytics/__tests__/fuel-stats-fleet-distance-pooling.test.ts
 src/api/analytics/__tests__/fuel-stats-monthly-spend.test.ts
 src/api/analytics/__tests__/fuel-stats-previous-window.test.ts
+src/api/analytics/__tests__/fuel-stats.property.test.ts
 src/api/analytics/__tests__/insurance-details.test.ts
 src/api/analytics/__tests__/per-vehicle.property.test.ts
 src/api/analytics/__tests__/query-shared-vehicles.test.ts
 src/api/analytics/__tests__/query-totals-dialect.test.ts
+src/api/analytics/__tests__/quick-stats.property.test.ts
 src/api/analytics/__tests__/shared-analytics-read.test.ts
 src/api/analytics/__tests__/shared-summary-cross-vehicle.test.ts
 src/api/analytics/__tests__/summary-route.test.ts

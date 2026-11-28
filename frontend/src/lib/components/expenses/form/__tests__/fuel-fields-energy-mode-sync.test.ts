@@ -397,7 +397,7 @@ describe('mounted: opening the form', () => {
 		expect(section.heading()).toBe(HEADING_FOR_MODE.fuel);
 		expect(section.visibleEnergyField()).toBe('volume');
 		expect(section.form.fuelType).toBe('');
-		expect(section.fuelTypeTrigger()).toBe('Select fuel type (optional)');
+		expect(section.fuelTypeTrigger()).toBe('Select fuel type');
 		expectRequiredFieldVisible(section);
 	});
 

@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
+import { sqliteTestSql } from '../../../test-helpers/test-sql';
 import {
   ChargeUnit,
   DEFAULT_UNIT_PREFERENCES,
@@ -9,11 +10,8 @@ import {
   type UnitPreferences,
   VolumeUnit,
 } from '../../../types';
-import {
-  createTestDb,
-  seedUser,
-  type TestDb,
-} from '../../analytics/__tests__/analytics-test-generators';
+import { seedUser } from '../../analytics/__tests__/analytics-test-db';
+import { createTestDb, type TestDb } from '../../analytics/__tests__/analytics-test-generators';
 
 const distanceUnitArb = fc.constantFrom(DistanceUnit.MILES, DistanceUnit.KILOMETERS);
 const volumeUnitArb = fc.constantFrom(
@@ -297,18 +295,18 @@ describe('global settings change does not affect vehicles', () => {
     return JSON.parse(row.unit_preferences) as UnitPreferences;
   }
 
-  test('updating user_preferences unit_preferences does not change existing vehicles', () => {
-    fc.assert(
-      fc.property(
+  test('updating user_preferences unit_preferences does not change existing vehicles', async () => {
+    await fc.assert(
+      fc.asyncProperty(
         validUnitPreferencesArb,
         validUnitPreferencesArb,
         fc.integer({ min: 1, max: 5 }),
-        (initialUnits, updatedUnits, vehicleCount) => {
+        async (initialUnits, updatedUnits, vehicleCount) => {
           testDb.sqlite.close();
           testDb = createTestDb();
 
           const userId = 'user-prop17';
-          seedUser(testDb.sqlite, {
+          await seedUser(sqliteTestSql(testDb.sqlite), {
             id: userId,
             email: 'prop17@test.com',
             displayName: 'Prop17 User',

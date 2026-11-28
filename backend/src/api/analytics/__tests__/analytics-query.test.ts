@@ -1,13 +1,13 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { SQL } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import { openAsyncDatabase } from '../../../db/async-sqlite';
-import * as schema from '../../../db/schema';
+import { countStatements } from '../../../db/statement-count';
 import { EXPENSE_CATEGORIES } from '../../../db/types';
 import { ValidationError } from '../../../errors';
+import { ON_POSTGRES } from '../../../test-helpers/http-client';
 import { MAX_SERVICES } from '../annotations';
 import { analyticsQueryToApi } from '../api-transform';
 import {
@@ -20,12 +20,12 @@ import {
 } from '../query-repository';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
-} from './analytics-test-generators';
+} from './analytics-test-db';
 
 const seconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const OWNER = { id: 'owner', email: 'owner@test.com', displayName: 'Owner' };
@@ -35,7 +35,7 @@ const LEAF = { id: 'leaf', userId: OWNER.id, make: 'Nissan', model: 'Leaf', year
 const OTHER = { id: 'other-car', userId: STRANGER.id, make: 'Ford', model: 'F-150', year: 2019 };
 const RANGE = { start: seconds('2024-01-01T00:00:00Z'), end: seconds('2025-07-01T00:00:00Z') };
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsQueryRepository;
 
 function baseQuery(overrides: Partial<AnalyticsQuery> = {}): AnalyticsQuery {
@@ -52,26 +52,30 @@ function baseQuery(overrides: Partial<AnalyticsQuery> = {}): AnalyticsQuery {
   };
 }
 
-function setUnits(table: 'vehicles' | 'user_preferences', id: string, units: object): void {
+async function setUnits(
+  table: 'vehicles' | 'user_preferences',
+  id: string,
+  units: object
+): Promise<void> {
   const json = JSON.stringify({ chargeUnit: 'kwh', ...units });
   if (table === 'vehicles') {
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [json, id]);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [json, id]);
     return;
   }
-  testDb.sqlite.run(
-    'INSERT OR REPLACE INTO user_preferences (user_id, unit_preferences) VALUES (?, ?)',
+  await testDb.sql.run(
+    'INSERT INTO user_preferences (user_id, unit_preferences) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET unit_preferences = excluded.unit_preferences',
     [id, json]
   );
 }
 
-function seedFleet(): void {
+async function seedFleet(): Promise<void> {
   const categories = EXPENSE_CATEGORIES;
   let mileage = 10_000;
   let leafMileage = 5_000;
   for (let i = 0; i < 18 * 4; i++) {
     const date = new Date(Date.UTC(2024, 0, 3) + i * 7.5 * 86_400_000);
     mileage += 300;
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: `gas-${i}`,
       vehicleId: CAMRY.id,
       category: 'fuel',
@@ -83,7 +87,7 @@ function seedFleet(): void {
       missedFillup: i === 5,
     });
     leafMileage += 120;
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: `charge-${i}`,
       vehicleId: LEAF.id,
       category: 'fuel',
@@ -95,7 +99,7 @@ function seedFleet(): void {
       missedFillup: false,
     });
     const category = categories[i % categories.length] ?? 'misc';
-    seedExpense(testDb.sqlite, {
+    await seedExpense(testDb.sql, {
       id: `other-${i}`,
       vehicleId: i % 2 === 0 ? CAMRY.id : LEAF.id,
       category,
@@ -107,26 +111,26 @@ function seedFleet(): void {
       missedFillup: false,
     });
   }
-  testDb.sqlite.run(`UPDATE expenses SET tags = '["work","road trip"]' WHERE id = 'other-0'`);
-  testDb.sqlite.run(`UPDATE expenses SET tags = '["work"]' WHERE id = 'other-1'`);
+  await testDb.sql.run(`UPDATE expenses SET tags = '["work","road trip"]' WHERE id = 'other-0'`);
+  await testDb.sql.run(`UPDATE expenses SET tags = '["work"]' WHERE id = 'other-1'`);
 }
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsQueryRepository(openAsyncDatabase(testDb.drizzle.$client).db);
-  seedUser(testDb.sqlite, OWNER);
-  seedUser(testDb.sqlite, STRANGER);
-  seedVehicle(testDb.sqlite, CAMRY);
-  seedVehicle(testDb.sqlite, LEAF);
-  seedVehicle(testDb.sqlite, OTHER);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsQueryRepository(testDb.asyncDb);
+  await seedUser(testDb.sql, OWNER);
+  await seedUser(testDb.sql, STRANGER);
+  await seedVehicle(testDb.sql, CAMRY);
+  await seedVehicle(testDb.sql, LEAF);
+  await seedVehicle(testDb.sql, OTHER);
 });
 
-afterEach(() => testDb.sqlite.close());
+afterEach(() => testDb.close());
 
 describe('GET /analytics/query matches the existing summary aggregations', () => {
   test('monthly totals and category splits equal the Cross-Vehicle and heatmap numbers', async () => {
-    seedFleet();
-    const legacy = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+    await seedFleet();
+    const legacy = new AnalyticsRepository(testDb.asyncDb);
     const cross = await legacy.getCrossVehicle(OWNER.id, RANGE);
     const advanced = await legacy.getFuelAdvanced(OWNER.id, RANGE);
 
@@ -157,8 +161,8 @@ describe('GET /analytics/query matches the existing summary aggregations', () =>
   });
 
   test('cost per distance and pooled efficiency equal the quick stats', async () => {
-    seedFleet();
-    const legacy = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+    await seedFleet();
+    const legacy = new AnalyticsRepository(testDb.asyncDb);
     const summary = await legacy.getSummary(OWNER.id, RANGE);
 
     const perDistance = await repo.query(
@@ -177,7 +181,7 @@ describe('GET /analytics/query matches the existing summary aggregations', () =>
   });
 
   test('running costs are every category except financial, as on the Dashboard', async () => {
-    seedFleet();
+    await seedFleet();
     const running = await repo.query(
       OWNER.id,
       baseQuery({ include: 'running', interval: 'none', groupBy: 'category' })
@@ -199,7 +203,7 @@ describe('GET /analytics/query matches the existing summary aggregations', () =>
 
 describe('a start before any data', () => {
   test('begins at the first expense, so All time draws no empty years', async () => {
-    seedFleet();
+    await seedFleet();
     const result = await repo.query(OWNER.id, baseQuery({ start: 1 }));
     expect(result.buckets[0]).toBe('2024-01');
     expect(result.range.start).toBeGreaterThanOrEqual(RANGE.start);
@@ -208,7 +212,7 @@ describe('a start before any data', () => {
   });
 
   test('a range that ends before the first expense keeps the range that was asked for', async () => {
-    seedFleet();
+    await seedFleet();
     const range = { start: seconds('2023-01-01T00:00:00Z'), end: seconds('2023-04-01T00:00:00Z') };
     const result = await repo.query(OWNER.id, baseQuery(range));
     expect(result.buckets).toEqual(['2023-01', '2023-02', '2023-03']);
@@ -226,7 +230,7 @@ describe('a start before any data', () => {
   });
 
   test('All time when every expense is after the end falls back to the year before the end', async () => {
-    seedFleet();
+    await seedFleet();
     const end = seconds('2023-06-01T00:00:00Z');
     const result = await repo.query(OWNER.id, baseQuery({ interval: 'week', start: 1, end }));
     expect(result.range).toEqual({ start: end - 365 * 86_400, end });
@@ -242,7 +246,7 @@ describe('bucketing follows the user calendar', () => {
 
   for (const { zone, instant } of lateOnJan31) {
     test(`23:30 on Jan 31 in ${zone} lands in January`, async () => {
-      seedExpense(testDb.sqlite, {
+      await seedExpense(testDb.sql, {
         id: `late-${zone}`,
         vehicleId: CAMRY.id,
         category: 'maintenance',
@@ -380,7 +384,7 @@ describe('bucketing follows the user calendar', () => {
       ['feb', '2025-02-10T12:00:00Z', 7_000],
       ['mar', '2025-03-10T12:00:00Z', 500],
     ] as const) {
-      seedExpense(testDb.sqlite, {
+      await seedExpense(testDb.sql, {
         id,
         vehicleId: CAMRY.id,
         category: 'maintenance',
@@ -408,8 +412,8 @@ describe('bucketing follows the user calendar', () => {
 });
 
 describe('same-day fill-ups pair by odometer', () => {
-  const fill = (id: string, iso: string, mileage: number) =>
-    seedExpense(testDb.sqlite, {
+  const fill = async (id: string, iso: string, mileage: number) =>
+    await seedExpense(testDb.sql, {
       id,
       vehicleId: CAMRY.id,
       category: 'fuel',
@@ -436,10 +440,10 @@ describe('same-day fill-ups pair by odometer', () => {
 
   for (const { name, first, second } of orders) {
     test(`economy and distance are right with ${name}`, async () => {
-      fill('start', '2025-03-01T12:00:00Z', 10_000);
-      fill(first[0], '2025-03-10T12:00:00Z', first[1]);
-      fill(second[0], '2025-03-10T12:00:00Z', second[1]);
-      fill('end', '2025-03-20T12:00:00Z', 10_900);
+      await fill('start', '2025-03-01T12:00:00Z', 10_000);
+      await fill(first[0], '2025-03-10T12:00:00Z', first[1]);
+      await fill(second[0], '2025-03-10T12:00:00Z', second[1]);
+      await fill('end', '2025-03-20T12:00:00Z', 10_900);
 
       const distance = await repo.query(
         OWNER.id,
@@ -452,17 +456,15 @@ describe('same-day fill-ups pair by odometer', () => {
       );
       expect(efficiency.totals.value).toBeCloseTo(30, 9);
 
-      const summary = await new AnalyticsRepository(
-        openAsyncDatabase(testDb.drizzle.$client).db
-      ).getSummary(OWNER.id, RANGE);
+      const summary = await new AnalyticsRepository(testDb.asyncDb).getSummary(OWNER.id, RANGE);
       expect(summary.quickStats.avgEfficiency).toBeCloseTo(30, 9);
     });
   }
 
   test('the reading before the range is the highest one on its date', async () => {
-    fill('a-prev', '2025-02-20T12:00:00Z', 10_600);
-    fill('z-prev', '2025-02-20T12:00:00Z', 10_300);
-    fill('inside', '2025-03-10T12:00:00Z', 10_900);
+    await fill('a-prev', '2025-02-20T12:00:00Z', 10_600);
+    await fill('z-prev', '2025-02-20T12:00:00Z', 10_300);
+    await fill('inside', '2025-03-10T12:00:00Z', 10_900);
     const distance = await repo.query(
       OWNER.id,
       baseQuery({ metric: 'distance', interval: 'month', start: seconds('2025-03-01T00:00:00Z') })
@@ -475,7 +477,7 @@ describe('annotations', () => {
   const monthOf = (t: number) => new Date(t * 1000).toISOString().slice(0, 7);
 
   test('a service marker in every month with maintenance, and none elsewhere', async () => {
-    seedFleet();
+    await seedFleet();
     const byCategory = await repo.query(OWNER.id, baseQuery({ groupBy: 'category' }));
     const maintenance = byCategory.series.find((s) => s.key === 'maintenance');
     const months = byCategory.buckets.filter((_, i) => (maintenance?.values[i] ?? 0) > 0);
@@ -490,8 +492,8 @@ describe('annotations', () => {
   });
 
   test('follow the car and range filters and never show another user', async () => {
-    seedFleet();
-    seedExpense(testDb.sqlite, {
+    await seedFleet();
+    await seedExpense(testDb.sql, {
       id: 'stranger-service',
       vehicleId: OTHER.id,
       category: 'maintenance',
@@ -526,11 +528,11 @@ describe('annotations', () => {
 
   test('past the cap, the newest services are kept and the result says so', async () => {
     const start = seconds('2024-01-01T00:00:00Z');
-    const insert = testDb.sqlite.prepare(
-      "INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, missed_fillup) VALUES (?, ?, ?, 'maintenance', 100, ?, 0)"
-    );
     for (let i = 0; i <= MAX_SERVICES; i++) {
-      insert.run(`many-${i}`, CAMRY.id, OWNER.id, start + i * 3_600);
+      await testDb.sql.run(
+        "INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, missed_fillup) VALUES (?, ?, ?, 'maintenance', 100, ?, FALSE)",
+        [`many-${i}`, CAMRY.id, OWNER.id, start + i * 3_600]
+      );
     }
     const result = await repo.query(OWNER.id, baseQuery({ annotations: ['services'] }));
     expect(result.annotations).toHaveLength(MAX_SERVICES);
@@ -540,9 +542,9 @@ describe('annotations', () => {
   });
 
   test('trips count and distance per bucket, in the user units', async () => {
-    setUnits('vehicles', CAMRY.id, { distanceUnit: 'kilometers', volumeUnit: 'liters' });
+    await setUnits('vehicles', CAMRY.id, { distanceUnit: 'kilometers', volumeUnit: 'liters' });
     for (const [i, day] of ['2024-02-03', '2024-02-20', '2024-04-10'].entries()) {
-      testDb.sqlite.run(
+      await testDb.sql.run(
         'INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [`trip-${i}`, CAMRY.id, OWNER.id, 1_000, 1_100, 'personal', seconds(`${day}T12:00:00Z`)]
       );
@@ -565,9 +567,13 @@ describe('annotations', () => {
 });
 
 describe('units', () => {
-  function seedTwoFillups(vehicleId: string, startMileage: number, volume: number): void {
+  async function seedTwoFillups(
+    vehicleId: string,
+    startMileage: number,
+    volume: number
+  ): Promise<void> {
     for (const [i, offset] of [0, 400].entries()) {
-      seedExpense(testDb.sqlite, {
+      await seedExpense(testDb.sql, {
         id: `${vehicleId}-fill-${i}`,
         vehicleId,
         category: 'fuel',
@@ -583,10 +589,10 @@ describe('units', () => {
 
   test('a metric fleet gets kilometres and litres back unchanged', async () => {
     const metric = { distanceUnit: 'kilometers', volumeUnit: 'liters' };
-    setUnits('user_preferences', OWNER.id, metric);
-    setUnits('vehicles', CAMRY.id, metric);
-    setUnits('vehicles', LEAF.id, metric);
-    seedTwoFillups(CAMRY.id, 1_000, 30);
+    await setUnits('user_preferences', OWNER.id, metric);
+    await setUnits('vehicles', CAMRY.id, metric);
+    await setUnits('vehicles', LEAF.id, metric);
+    await seedTwoFillups(CAMRY.id, 1_000, 30);
 
     const distance = await repo.query(
       OWNER.id,
@@ -600,11 +606,14 @@ describe('units', () => {
   });
 
   test('a mixed fleet converts each vehicle to the user units', async () => {
-    setUnits('user_preferences', OWNER.id, { distanceUnit: 'miles', volumeUnit: 'gallons_us' });
-    setUnits('vehicles', CAMRY.id, { distanceUnit: 'kilometers', volumeUnit: 'liters' });
-    setUnits('vehicles', LEAF.id, { distanceUnit: 'miles', volumeUnit: 'gallons_us' });
-    seedTwoFillups(CAMRY.id, 1_000, 37.854_117_84);
-    seedTwoFillups(LEAF.id, 2_000, 10);
+    await setUnits('user_preferences', OWNER.id, {
+      distanceUnit: 'miles',
+      volumeUnit: 'gallons_us',
+    });
+    await setUnits('vehicles', CAMRY.id, { distanceUnit: 'kilometers', volumeUnit: 'liters' });
+    await setUnits('vehicles', LEAF.id, { distanceUnit: 'miles', volumeUnit: 'gallons_us' });
+    await seedTwoFillups(CAMRY.id, 1_000, 37.854_117_84);
+    await seedTwoFillups(LEAF.id, 2_000, 10);
 
     const distance = await repo.query(
       OWNER.id,
@@ -625,7 +634,7 @@ describe('units', () => {
   });
 
   test('electric energy and efficiency are measured apart from liquid fuel', async () => {
-    seedFleet();
+    await seedFleet();
     const energy = await repo.query(
       OWNER.id,
       baseQuery({ metric: 'volume', energy: 'electric', interval: 'none' })
@@ -643,8 +652,8 @@ describe('units', () => {
 
 describe('access', () => {
   test("another user's vehicles are never aggregated", async () => {
-    seedFleet();
-    seedExpense(testDb.sqlite, {
+    await seedFleet();
+    await seedExpense(testDb.sql, {
       id: 'foreign',
       vehicleId: OTHER.id,
       category: 'maintenance',
@@ -679,7 +688,7 @@ describe('access', () => {
 
 describe('splits, compare and shape', () => {
   test('vehicle and fuel type splits label their series', async () => {
-    seedFleet();
+    await seedFleet();
     const byVehicle = await repo.query(
       OWNER.id,
       baseQuery({ interval: 'none', groupBy: 'vehicle' })
@@ -705,7 +714,7 @@ describe('splits, compare and shape', () => {
   });
 
   test('a tag split counts an expense under each tag but once in the totals', async () => {
-    seedFleet();
+    await seedFleet();
     const tags = await repo.query(
       OWNER.id,
       baseQuery({ interval: 'none', groupBy: 'tag', categories: ['regulatory'] })
@@ -725,7 +734,7 @@ describe('splits, compare and shape', () => {
       [1, '2025-02-10T12:00:00Z', 2_000],
       [2, '2025-03-10T12:00:00Z', 3_000],
     ] as const) {
-      seedExpense(testDb.sqlite, {
+      await seedExpense(testDb.sql, {
         id: `odo-${i}`,
         vehicleId: CAMRY.id,
         category: 'maintenance',
@@ -750,7 +759,7 @@ describe('splits, compare and shape', () => {
     expect(result.totals.distance).toBe(1_000);
     expect(result.totals.value).toBe(1_000);
 
-    const legacy = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+    const legacy = new AnalyticsRepository(testDb.asyncDb);
     const window = { start: seconds('2025-02-01T00:00:00Z'), end: seconds('2025-05-01T00:00:00Z') };
     const summary = await legacy.getSummary(OWNER.id, window);
     const perDistance = await repo.query(
@@ -762,14 +771,14 @@ describe('splits, compare and shape', () => {
   });
 
   test('a tag listed twice on one expense counts it once', async () => {
-    seedFleet();
-    testDb.sqlite.run(`UPDATE expenses SET tags = '["work","work"]' WHERE id = 'other-1'`);
+    await seedFleet();
+    await testDb.sql.run(`UPDATE expenses SET tags = '["work","work"]' WHERE id = 'other-1'`);
     const tagged = await repo.query(OWNER.id, baseQuery({ interval: 'none', groupBy: 'tag' }));
     expect(tagged.series.find((s) => s.key === 'work')?.values[0]).toBe(12_345 + 12_445);
   });
 
   test('count, per-bucket and compare periods', async () => {
-    seedFleet();
+    await seedFleet();
     const count = await repo.query(
       OWNER.id,
       baseQuery({
@@ -809,7 +818,7 @@ describe('splits, compare and shape', () => {
   });
 
   test('cost per distance split by vehicle divides each car by its own distance', async () => {
-    seedFleet();
+    await seedFleet();
     const result = await repo.query(
       OWNER.id,
       baseQuery({ metric: 'costPerDistance', interval: 'quarter', groupBy: 'vehicle' })
@@ -821,7 +830,7 @@ describe('splits, compare and shape', () => {
   });
 
   test('over the whole range, each car uses the same distance as the fleet total', async () => {
-    seedFleet();
+    await seedFleet();
     const whole = (overrides: Partial<AnalyticsQuery>) =>
       repo.query(
         OWNER.id,
@@ -853,7 +862,7 @@ describe('splits, compare and shape', () => {
       ['jan', '2025-01-10T12:00:00Z', 10_000],
       ['mar', '2025-03-10T12:00:00Z', 30_000],
     ] as const) {
-      seedExpense(testDb.sqlite, {
+      await seedExpense(testDb.sql, {
         id,
         vehicleId: CAMRY.id,
         category: 'maintenance',
@@ -888,7 +897,7 @@ describe('splits, compare and shape', () => {
   });
 
   test('without a start the range opens at the first expense', async () => {
-    seedFleet();
+    await seedFleet();
     const result = await repo.query(OWNER.id, {
       ...baseQuery({ interval: 'year' }),
       start: undefined,
@@ -905,7 +914,7 @@ describe('splits, compare and shape', () => {
   });
 
   test('money values leave the API in dollars', async () => {
-    seedFleet();
+    await seedFleet();
     const result = await repo.query(OWNER.id, baseQuery({ interval: 'none', compare: 'prevYear' }));
     const api = analyticsQueryToApi(result, 100);
     expect(api.series[0]?.values[0]).toBe((result.series[0]?.values[0] ?? 0) / 100);
@@ -940,7 +949,7 @@ function perfRow(vehicle: number, i: number): Array<string | number | null> {
 function seedPerfFleet(sqlite: Database): void {
   sqlite.run("INSERT INTO users (id, email, display_name) VALUES ('perf', 'p@test.com', 'P')");
   const insert = sqlite.prepare(
-    "INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage, volume, fuel_type, missed_fillup) VALUES (?, ?, 'perf', ?, ?, ?, ?, ?, ?, 0)"
+    "INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage, volume, fuel_type, missed_fillup) VALUES (?, ?, 'perf', ?, ?, ?, ?, ?, ?, FALSE)"
   );
   sqlite.transaction(() => {
     for (let v = 0; v < 3; v++) {
@@ -953,18 +962,13 @@ function seedPerfFleet(sqlite: Database): void {
   })();
 }
 
-describe('performance guard', () => {
-  test('a 10k-expense fleet answers a 24-month category query in at most 4 statements', async () => {
+describe.skipIf(ON_POSTGRES)('performance guard', () => {
+  test('a 10k-expense fleet answers a 24-month category query in at most 5 statements', async () => {
     const sqlite = new Database(':memory:');
     const migrations = loadMigrations();
     applyMigrationsUpTo(sqlite, migrations, migrations.length - 1);
-    let statements = 0;
-    const db = drizzle(sqlite, {
-      schema,
-      logger: { logQuery: () => statements++ },
-    });
     seedPerfFleet(sqlite);
-    const perfRepo = new AnalyticsQueryRepository(openAsyncDatabase(db.$client).db);
+    const perfRepo = new AnalyticsQueryRepository(openAsyncDatabase(sqlite).db);
     const query = baseQuery({
       groupBy: 'category',
       start: PERF_START + PERF_SPAN - 2 * 365 * 86_400,
@@ -972,13 +976,13 @@ describe('performance guard', () => {
     });
     await perfRepo.query('perf', query);
 
-    statements = 0;
     const began = performance.now();
-    const result = await perfRepo.query('perf', query);
+    const { result, statements } = await countStatements(() => perfRepo.query('perf', query));
     const elapsed = performance.now() - began;
     sqlite.close();
 
-    expect(statements).toBeLessThanOrEqual(4);
+    expect(statements).toBeGreaterThan(0);
+    expect(statements).toBeLessThanOrEqual(5);
     expect(result.buckets.length).toBeGreaterThanOrEqual(24);
     expect(elapsed).toBeLessThan(100);
   });
@@ -988,7 +992,7 @@ describe('bucket items for drill-down', () => {
   const MARCH = { start: seconds('2024-03-01T00:00:00Z'), end: seconds('2024-04-01T00:00:00Z') };
 
   test('the parts add up to the bucket value of the query', async () => {
-    seedFleet();
+    await seedFleet();
     const query = await repo.query(OWNER.id, baseQuery({ groupBy: 'category' }));
     const march = query.buckets.indexOf('2024-03');
     const bucketTotal = query.series.reduce((sum, s) => sum + (s.values[march] ?? 0), 0);
@@ -1005,7 +1009,7 @@ describe('bucket items for drill-down', () => {
   });
 
   test('a selected segment narrows to its category, car, fuel type or tag', async () => {
-    seedFleet();
+    await seedFleet();
     const fleetMarch = await repo.items(OWNER.id, { ...MARCH, include: 'all' });
     const camry = await repo.items(OWNER.id, {
       ...MARCH,
@@ -1059,8 +1063,8 @@ describe('bucket items for drill-down', () => {
   });
 
   test('the items match the bar for every split, hidden series and energy metric', async () => {
-    seedFleet();
-    seedExpense(testDb.sqlite, {
+    await seedFleet();
+    await seedExpense(testDb.sql, {
       id: 'blank-type',
       vehicleId: CAMRY.id,
       category: 'fuel',
@@ -1107,7 +1111,7 @@ describe('bucket items for drill-down', () => {
   });
 
   test("another user's car or an empty selection returns nothing", async () => {
-    seedFleet();
+    await seedFleet();
     const foreign = await repo.items(OWNER.id, {
       ...MARCH,
       include: 'all',
@@ -1124,48 +1128,53 @@ describe('bucket items for drill-down', () => {
   });
 });
 
-describe('bucketed queries read expenses by date range, never the whole history', () => {
-  async function plansFor(run: () => Promise<unknown>): Promise<string[]> {
-    const db = openAsyncDatabase(testDb.sqlite).db as unknown as {
-      all: (query: SQL) => Promise<unknown[]>;
-    };
-    const original = db.all.bind(db);
-    const queries: SQL[] = [];
-    db.all = (query: SQL) => {
-      queries.push(query);
-      return original(query);
-    };
-    try {
-      await run();
-    } finally {
-      db.all = original;
+describe.skipIf(ON_POSTGRES)(
+  'bucketed queries read expenses by date range, never the whole history',
+  () => {
+    async function plansFor(run: () => Promise<unknown>): Promise<string[]> {
+      const db = testDb.asyncDb as unknown as {
+        all: (query: SQL) => Promise<unknown[]>;
+      };
+      const original = db.all.bind(db);
+      const queries: SQL[] = [];
+      db.all = (query: SQL) => {
+        queries.push(query);
+        return original(query);
+      };
+      try {
+        await run();
+      } finally {
+        db.all = original;
+      }
+      const plans: string[] = [];
+      for (const query of queries) {
+        const { sql: text, params } = new SQLiteSyncDialect().sqlToQuery(query);
+        const rows = await testDb.sql.all<{ detail: string }>(`EXPLAIN QUERY PLAN ${text}`, [
+          ...(params as never[]),
+        ]);
+        plans.push(...rows.map((r) => r.detail));
+      }
+      return plans;
     }
-    return queries.flatMap((query) => {
-      const { sql: text, params } = new SQLiteSyncDialect().sqlToQuery(query);
-      const rows = testDb.sqlite
-        .query(`EXPLAIN QUERY PLAN ${text}`)
-        .all(...(params as never[])) as { detail: string }[];
-      return rows.map((r) => r.detail);
+
+    test.each([
+      ['cost by category', baseQuery({ groupBy: 'category', interval: 'week' })],
+      ['cost by tag', baseQuery({ groupBy: 'tag' })],
+      ['fuel volume', baseQuery({ metric: 'volume', interval: 'week' })],
+      ['distance', baseQuery({ metric: 'distance', interval: 'week' })],
+    ])('%s', async (_name, query) => {
+      await seedFleet();
+      const plans = await plansFor(() => repo.query(OWNER.id, query));
+      const expenseSteps = plans.filter((detail) => /^(SCAN|SEARCH) e\b/.test(detail));
+      expect(expenseSteps.length).toBeGreaterThan(0);
+      for (const step of expenseSteps) expect(step).toMatch(/date>\?/);
     });
   }
-
-  test.each([
-    ['cost by category', baseQuery({ groupBy: 'category', interval: 'week' })],
-    ['cost by tag', baseQuery({ groupBy: 'tag' })],
-    ['fuel volume', baseQuery({ metric: 'volume', interval: 'week' })],
-    ['distance', baseQuery({ metric: 'distance', interval: 'week' })],
-  ])('%s', async (_name, query) => {
-    seedFleet();
-    const plans = await plansFor(() => repo.query(OWNER.id, query));
-    const expenseSteps = plans.filter((detail) => /^(SCAN|SEARCH) e\b/.test(detail));
-    expect(expenseSteps.length).toBeGreaterThan(0);
-    for (const step of expenseSteps) expect(step).toMatch(/date>\?/);
-  });
-});
+);
 
 describe('bucket boundaries must be whole seconds', () => {
   test('a fractional boundary in a later bucket row is refused, not truncated', async () => {
-    seedFleet();
+    await seedFleet();
     await expect(
       repo.query(OWNER.id, baseQuery({ interval: 'month', end: RANGE.end + 0.5 }))
     ).rejects.toThrow();

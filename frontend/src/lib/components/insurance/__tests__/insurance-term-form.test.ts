@@ -495,6 +495,16 @@ describe('InsuranceTermForm edit mode', () => {
 		expect(body?.vehicleCoverage?.vehicleIds).toEqual(['v2']);
 	});
 
+	test('a set premium frequency can be cleared back to Not specified', async () => {
+		await mount({ termId: 't1' });
+		await fireEvent.click(document.getElementById('premium-frequency') as HTMLElement);
+		await settle();
+		await fireEvent.pointerUp(screen.getByRole('option', { name: 'Not specified' }));
+		await settle();
+		await clickSave(/Update term/);
+		expect(updateTerm.mock.calls[0]?.[2]?.premiumFrequency).toBeNull();
+	});
+
 	test('an update failure reports with the update verb', async () => {
 		updateTerm.mockRejectedValue(new ApiError('Internal server error', 500));
 		await mount({ termId: 't1' });

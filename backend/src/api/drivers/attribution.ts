@@ -102,9 +102,13 @@ export function memberView<T extends object>(
   value: T,
   fields?: readonly DriverField[]
 ): T {
-  const shown = hideDriverFields(c, vehicleId, value, fields) as Record<string, unknown>;
-  if (shown['userId'] === c.get('user').id) return shown as T;
-  if (!('userId' in shown) && !('createdBy' in shown)) return shown as T;
+  return withoutOwnerIds(c, hideDriverFields(c, vehicleId, value, fields));
+}
+
+export function withoutOwnerIds<T extends object>(c: Context, value: T): T {
+  const shown = value as Record<string, unknown>;
+  if (shown['userId'] === c.get('user').id) return value;
+  if (!('userId' in shown) && !('createdBy' in shown)) return value;
   const { userId: _userId, createdBy: _createdBy, ...rest } = shown;
   return rest as T;
 }

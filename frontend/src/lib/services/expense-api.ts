@@ -74,7 +74,11 @@ type ExpenseExportParams = Pick<
 > & { vehicleId?: string };
 
 // Tags must travel as one comma-joined param: a repeated `tags=` key fails backend validation.
-export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string): string {
+export function buildExpenseQuery(
+	params?: ExpenseListParams,
+	vehicleId?: string,
+	withTimeZone = false
+): string {
 	return buildQueryString({
 		vehicleId: vehicleId || undefined,
 		limit: params?.limit || undefined,
@@ -82,7 +86,7 @@ export function buildExpenseQuery(params?: ExpenseListParams, vehicleId?: string
 		category: params?.category || undefined,
 		startDate: params?.startDate || undefined,
 		endDate: params?.endDate || undefined,
-		timeZone: params?.startDate || params?.endDate ? userTimeZone() : undefined,
+		timeZone: withTimeZone || params?.startDate || params?.endDate ? userTimeZone() : undefined,
 		period: params?.period || undefined,
 		search: params?.search?.trim() || undefined,
 		sortBy: params?.sortBy,
@@ -141,7 +145,9 @@ export const expenseApi = {
 
 	async downloadExpensesCsv(params?: ExpenseExportParams): Promise<void> {
 		const { vehicleId, ...filters } = params ?? {};
-		const res = await apiClient.raw(`/expenses/export${buildExpenseQuery(filters, vehicleId)}`);
+		const res = await apiClient.raw(
+			`/expenses/export${buildExpenseQuery(filters, vehicleId, true)}`
+		);
 		const blob = await res.blob();
 		triggerBlobDownload(blob, `vroom-expenses-${toDateInputValue(new Date())}.csv`);
 	},

@@ -443,6 +443,7 @@
 							{faultDesignation ? FAULT_LABELS[faultDesignation] : 'Not specified'}
 						</Select.Trigger>
 						<Select.Content>
+							<Select.Item value="" label="Not specified">Not specified</Select.Item>
 							{#each FAULT_DESIGNATIONS as f (f)}
 								<Select.Item value={f} label={FAULT_LABELS[f]}>{FAULT_LABELS[f]}</Select.Item>
 							{/each}
@@ -459,6 +460,7 @@
 									: 'Not specified'}
 							</Select.Trigger>
 							<Select.Content>
+								<Select.Item value="" label="Not specified">Not specified</Select.Item>
 								{#each claimableVehicles as v (v.id)}
 									<Select.Item value={v.id} label={getVehicleDisplayName(v)}>
 										{getVehicleDisplayName(v)}

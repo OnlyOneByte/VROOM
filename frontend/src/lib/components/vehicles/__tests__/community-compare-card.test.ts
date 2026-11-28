@@ -201,7 +201,7 @@ describe('CommunityCompareCard', () => {
 			"Your 34.0 mi/gal is above the others' average of 31.0 mi/gal"
 		);
 		expect(
-			screen.getByText('Updated daily. Anonymous averages from opted-in owners, including you.')
+			screen.getByText('Updated about once a month. Anonymous averages from opted-in owners.')
 		).toBeInTheDocument();
 	});
 
@@ -310,7 +310,9 @@ describe('CommunityCompareCard', () => {
 		compare.mockResolvedValue(data(metric('efficiency', { status: 'no_data' })));
 		await mount({ vehicle: { ...VEHICLE, catalogModelId: 'honda-civic' } });
 		expect(
-			screen.getByText('Log at least 3 fill-ups with odometer readings to compare.')
+			screen.getByText(
+				'Log at least 4 fill-ups with odometer readings in the last 12 months to compare.'
+			)
 		).toBeInTheDocument();
 	});
 

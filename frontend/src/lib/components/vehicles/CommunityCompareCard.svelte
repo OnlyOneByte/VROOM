@@ -179,7 +179,7 @@
 		}
 		switch (metric.metric) {
 			case 'efficiency':
-				return 'Log at least 3 fill-ups with odometer readings to compare.';
+				return 'Log at least 4 fill-ups with odometer readings in the last 12 months to compare.';
 			case 'running_cost':
 				return `Log fuel or maintenance with odometer readings over at least ${units.distanceUnit === 'miles' ? '310 mi' : '500 km'} to compare.`;
 			case 'maintenance':
@@ -350,7 +350,7 @@
 			{/if}
 			{#if anyOk}
 				<p class="text-xs text-muted-foreground">
-					Updated daily. Anonymous averages from opted-in owners, including you.
+					Updated about once a month. Anonymous averages from opted-in owners.
 				</p>
 			{/if}
 		{/if}

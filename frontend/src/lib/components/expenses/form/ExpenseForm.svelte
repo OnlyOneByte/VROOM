@@ -207,6 +207,7 @@
 	let detailsOpen = $state(false);
 
 	const quickAdd = $derived(!form.isEditMode && !form.queuedExpense);
+	const rowBreak = $derived(quickAdd && form.canSplit && !form.isSplit);
 	const sinceLast = $derived(distanceSinceLast(form.formData.mileage, form.previousFuelHint));
 	const payerEntry = $derived(
 		form.originalExpense
@@ -761,7 +762,14 @@
 				<div class="space-y-2 empty:hidden {quickAdd ? '-mt-2 text-center' : ''}">
 					{#if !form.isEditMode}
 						<div class="flex flex-wrap items-center gap-2 {quickAdd ? 'justify-center' : ''}">
-							{#if !form.isSplit}
+							{#if rowBreak}
+								<div
+									class="flex basis-full items-center justify-center gap-2 sm:contents"
+									data-testid="quick-vehicle-row"
+								>
+									{@render vehicleField(false)}
+								</div>
+							{:else if !form.isSplit}
 								{@render vehicleField(false)}
 							{/if}
 							<Label for="date" class="sr-only">Date *</Label>

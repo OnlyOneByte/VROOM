@@ -5,7 +5,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
 	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
-	import { hasTermEnded } from '#lib/utils/insurance.ts';
+	import { hasTermEnded, termFigures } from '#lib/utils/insurance.ts';
 	import type { InsuranceTerm } from '#lib/types/index.ts';
 
 	interface Props {
@@ -21,8 +21,9 @@
 	let confirmOpen = $state(false);
 	let menuOpen = $state(false);
 	let ended = $derived(hasTermEnded(term));
+	let figures = $derived(termFigures(term));
 	const figure =
-		'font-(family-name:--font-fig) text-lg leading-tight font-semibold text-foreground tabular-nums';
+		'font-(family-name:--font-fig) text-lg leading-tight font-semibold break-words text-foreground tabular-nums';
 	let termLabel = $derived(isCurrent ? (ended ? 'Latest term' : 'Current term') : 'Past term');
 </script>
 
@@ -83,7 +84,7 @@
 
 	<dl
 		class={isCurrent
-			? 'grid grid-cols-3 gap-x-4 gap-y-3 sm:gap-x-6'
+			? 'grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 sm:gap-x-6'
 			: 'grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs'}
 	>
 		{#if isCurrent}
@@ -91,16 +92,16 @@
 				<dt class="text-xs text-muted-foreground">{ended ? 'Ended' : 'Expires'}</dt>
 				<dd class={figure}>{formatDate(term.endDate)}</dd>
 			</div>
-			{#if term.totalCost !== undefined}
+			{#if figures.total != null}
 				<div>
 					<dt class="text-xs text-muted-foreground">Total cost</dt>
-					<dd class={figure}>{formatCurrency(term.totalCost)}</dd>
+					<dd class={figure}>{formatCurrency(figures.total)}</dd>
 				</div>
 			{/if}
-			{#if term.monthlyCost !== undefined}
+			{#if figures.monthly != null}
 				<div>
 					<dt class="text-xs text-muted-foreground">Monthly</dt>
-					<dd class={figure}>{formatCurrency(term.monthlyCost)}/mo</dd>
+					<dd class={figure}>{formatCurrency(figures.monthly)}/mo</dd>
 				</div>
 			{/if}
 			{#if vehicleNames.length > 0}
@@ -116,16 +117,16 @@
 			<dd class="font-medium text-foreground">{formatDate(term.startDate)}</dd>
 			<dt class="text-muted-foreground">End</dt>
 			<dd class="font-medium text-foreground">{formatDate(term.endDate)}</dd>
-			{#if term.totalCost !== undefined}
+			{#if figures.total != null}
 				<dt class="text-muted-foreground">Total cost</dt>
 				<dd class="font-semibold text-foreground tabular-nums">
-					{formatCurrency(term.totalCost)}
+					{formatCurrency(figures.total)}
 				</dd>
 			{/if}
-			{#if term.monthlyCost !== undefined}
+			{#if figures.monthly != null}
 				<dt class="text-muted-foreground">Monthly</dt>
 				<dd class="font-medium text-foreground tabular-nums">
-					{formatCurrency(term.monthlyCost)}/mo
+					{formatCurrency(figures.monthly)}/mo
 				</dd>
 			{/if}
 			{#if vehicleNames.length > 0}

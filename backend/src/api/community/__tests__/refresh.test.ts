@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { CONFIG } from '../../../config';
 import { getColumnNames } from '../../../db/__tests__/migration-helpers';
 import { openAsyncDatabase } from '../../../db/async-sqlite';
+import { sqliteTestSql } from '../../../test-helpers/test-sql';
 import { logger } from '../../../utils/logger';
 import {
-  createTestDb,
   seedExpense,
   seedInsurancePolicy,
   seedUser,
-  type TestDb,
-} from '../../analytics/__tests__/analytics-test-generators';
+} from '../../analytics/__tests__/analytics-test-db';
+import { createTestDb, type TestDb } from '../../analytics/__tests__/analytics-test-generators';
 import {
   COMMUNITY_SCHEMA_VERSION,
   firstRunDelayMs,
@@ -25,8 +25,8 @@ const PERIOD = CONFIG.communityStats.releasePeriodMs;
 let db: TestDb;
 let repository: CommunityStatsRepository;
 
-function seedOwner(sqlite: Database, id: string, optIn: boolean): void {
-  seedUser(sqlite, { id, email: `${id}@example.com`, displayName: id });
+async function seedOwner(sqlite: Database, id: string, optIn: boolean): Promise<void> {
+  await seedUser(sqliteTestSql(sqlite), { id, email: `${id}@example.com`, displayName: id });
   sqlite.run('INSERT INTO user_preferences (user_id, community_stats_opt_in) VALUES (?, ?)', [
     id,
     optIn ? 1 : 0,
@@ -36,7 +36,7 @@ function seedOwner(sqlite: Database, id: string, optIn: boolean): void {
     [`${id}-car`, id, `VIN${id}`, `PLATE-${id}`]
   );
   for (let i = 0; i < 6; i++) {
-    seedExpense(sqlite, {
+    await seedExpense(sqliteTestSql(sqlite), {
       id: `${id}-fuel-${i}`,
       vehicleId: `${id}-car`,
       category: 'fuel',
@@ -90,8 +90,8 @@ afterEach(() => {
 
 describe('community stats refresh against the database', () => {
   test('owners who have not opted in are never counted', async () => {
-    for (let i = 0; i < 29; i++) seedOwner(db.sqlite, `in-${i}`, true);
-    for (let i = 0; i < 5; i++) seedOwner(db.sqlite, `out-${i}`, false);
+    for (let i = 0; i < 29; i++) await seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 5; i++) await seedOwner(db.sqlite, `out-${i}`, false);
 
     const result = await refreshCommunityStats(repository, NOW, NO_NOISE);
 
@@ -100,8 +100,8 @@ describe('community stats refresh against the database', () => {
   });
 
   test('opting in counts from the next release, and opting out withdraws the groups on the next run', async () => {
-    for (let i = 0; i < 29; i++) seedOwner(db.sqlite, `in-${i}`, true);
-    seedOwner(db.sqlite, 'late', false);
+    for (let i = 0; i < 29; i++) await seedOwner(db.sqlite, `in-${i}`, true);
+    await seedOwner(db.sqlite, 'late', false);
     await refreshCommunityStats(repository, NOW, NO_NOISE);
     expect(efficiencyRows()).toEqual([]);
 
@@ -120,7 +120,7 @@ describe('community stats refresh against the database', () => {
   });
 
   test('a deleted account withdraws its groups on the next run', async () => {
-    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 30; i++) await seedOwner(db.sqlite, `in-${i}`, true);
     await refreshCommunityStats(repository, NOW, NO_NOISE);
     expect(efficiencyRows()).toEqual([{ n_published: 30 }]);
 
@@ -130,7 +130,7 @@ describe('community stats refresh against the database', () => {
   });
 
   test("a group's figures stay as released until the period ends, even when its data changes", async () => {
-    for (let i = 0; i < 40; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 40; i++) await seedOwner(db.sqlite, `in-${i}`, true);
     const snapshot = () =>
       db.sqlite
         .query('SELECT bucket_key, n_published, mean FROM community_stats ORDER BY bucket_key')
@@ -139,7 +139,7 @@ describe('community stats refresh against the database', () => {
     const released = snapshot();
     expect(released.length).toBeGreaterThan(0);
 
-    for (let i = 40; i < 60; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 40; i < 60; i++) await seedOwner(db.sqlite, `in-${i}`, true);
     for (const day of [DAY, 7 * DAY, PERIOD - DAY]) {
       expect(await refreshCommunityStats(repository, at(day))).toBeNull();
       expect(snapshot()).toEqual(released);
@@ -151,7 +151,7 @@ describe('community stats refresh against the database', () => {
   });
 
   test('rows released before groups recorded their owners are released again on the next run', async () => {
-    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 30; i++) await seedOwner(db.sqlite, `in-${i}`, true);
     await refreshCommunityStats(repository, NOW, NO_NOISE);
     db.sqlite.run('DELETE FROM community_release_members');
 
@@ -190,7 +190,7 @@ describe('community stats refresh against the database', () => {
   test('the noise key is made once per scope, kept across runs, and never stored with the stats', async () => {
     const first = await repository.noiseKey('local');
     expect(first).toMatch(/^[0-9a-f]{64}$/);
-    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 30; i++) await seedOwner(db.sqlite, `in-${i}`, true);
     await refreshCommunityStats(repository, NOW);
     expect(await repository.noiseKey('local')).toBe(first);
     expect(await repository.noiseKey('other')).not.toBe(first);
@@ -200,7 +200,7 @@ describe('community stats refresh against the database', () => {
   });
 
   test('a rerun over unchanged data publishes the same numbers', async () => {
-    for (let i = 0; i < 40; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 40; i++) await seedOwner(db.sqlite, `in-${i}`, true);
     const snapshot = () =>
       db.sqlite
         .query('SELECT bucket_key, n_published, mean FROM community_stats ORDER BY bucket_key')
@@ -212,7 +212,7 @@ describe('community stats refresh against the database', () => {
   });
 
   test('each run replaces the local rows and never stores identifiers', async () => {
-    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 30; i++) await seedOwner(db.sqlite, `in-${i}`, true);
     await refreshCommunityStats(repository, NOW, NO_NOISE);
     await refreshCommunityStats(repository, new Date(NOW.getTime() + DAY), NO_NOISE);
 
@@ -230,7 +230,7 @@ describe('community stats refresh against the database', () => {
   });
 
   test('records from before the window let maintenance count, read end to end', async () => {
-    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    for (let i = 0; i < 30; i++) await seedOwner(db.sqlite, `in-${i}`, true);
     const maintenance = () =>
       db.sqlite
         .query("SELECT n_published FROM community_stats WHERE metric = 'maintenance'")
@@ -239,7 +239,7 @@ describe('community stats refresh against the database', () => {
     expect(maintenance()).toEqual([]);
 
     for (let i = 0; i < 30; i++) {
-      seedExpense(db.sqlite, {
+      await seedExpense(sqliteTestSql(db.sqlite), {
         id: `in-${i}-old`,
         vehicleId: `in-${i}-car`,
         category: 'maintenance',
@@ -278,14 +278,19 @@ describe('community stats refresh against the database', () => {
   });
 
   test('only fuel and maintenance expenses load as expenses, and premiums come with their term', async () => {
-    seedOwner(db.sqlite, 'in-0', true);
-    seedInsurancePolicy(db.sqlite, { id: 'pol', userId: 'in-0', company: 'Acme', isActive: true });
+    await seedOwner(db.sqlite, 'in-0', true);
+    await seedInsurancePolicy(sqliteTestSql(db.sqlite), {
+      id: 'pol',
+      userId: 'in-0',
+      company: 'Acme',
+      isActive: true,
+    });
     const unix = (days: number) => Math.floor((NOW.getTime() + days * DAY) / 1000);
     db.sqlite.run(
       'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
       ['term-1', 'pol', unix(-500), unix(-135)]
     );
-    seedExpense(db.sqlite, {
+    await seedExpense(sqliteTestSql(db.sqlite), {
       id: 'premium',
       vehicleId: 'in-0-car',
       category: 'financial',
@@ -299,8 +304,12 @@ describe('community stats refresh against the database', () => {
     db.sqlite.run(
       "UPDATE expenses SET source_type = 'insurance_term', source_id = 'term-1' WHERE id = 'premium'"
     );
-    seedUser(db.sqlite, { id: 'stranger', email: 'stranger@example.com', displayName: 'S' });
-    seedInsurancePolicy(db.sqlite, {
+    await seedUser(sqliteTestSql(db.sqlite), {
+      id: 'stranger',
+      email: 'stranger@example.com',
+      displayName: 'S',
+    });
+    await seedInsurancePolicy(sqliteTestSql(db.sqlite), {
       id: 'pol-x',
       userId: 'stranger',
       company: 'X',
@@ -318,7 +327,7 @@ describe('community stats refresh against the database', () => {
       ['foreign-premium', 'term-x'],
       ['old-premium', 'term-old'],
     ] as const) {
-      seedExpense(db.sqlite, {
+      await seedExpense(sqliteTestSql(db.sqlite), {
         id,
         vehicleId: 'in-0-car',
         category: 'financial',
@@ -338,7 +347,7 @@ describe('community stats refresh against the database', () => {
       ['loan', 'financial'],
       ['parking', 'misc'],
     ] as const) {
-      seedExpense(db.sqlite, {
+      await seedExpense(sqliteTestSql(db.sqlite), {
         id,
         vehicleId: 'in-0-car',
         category,

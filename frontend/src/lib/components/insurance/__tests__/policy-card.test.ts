@@ -443,3 +443,26 @@ describe('PolicyCard in the demo', () => {
 		}
 	});
 });
+
+describe('PolicyCard details', () => {
+	test('notes show on a policy with a single term', () => {
+		mount({ policy: makePolicy({ terms: [CURRENT], notes: 'Roadside assistance included' }) });
+		expect(screen.getByText('Roadside assistance included')).toBeInTheDocument();
+	});
+
+	test('the current term lists only the cars it covers', () => {
+		mount({
+			policy: makePolicy({
+				terms: [PAST, CURRENT],
+				termVehicleCoverage: [
+					{ termId: 't-past', vehicleId: 'v2' },
+					{ termId: 't-current', vehicleId: 'v1' }
+				]
+			}),
+			vehicles: VEHICLES,
+			vehicleNames: ['Daily', '2019 Honda Civic']
+		});
+		expect(screen.getByText('Daily')).toBeInTheDocument();
+		expect(screen.queryByText(/2019 Honda Civic/)).toBeNull();
+	});
+});

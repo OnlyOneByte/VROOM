@@ -66,6 +66,18 @@ export function effectiveTermCost(term: {
 	return fromMinor(toMinor(monthlyCost) * months);
 }
 
+export function termFigures(term: InsuranceTerm): { total: number | null; monthly: number | null } {
+	const months = termBillingMonths(new Date(term.startDate), new Date(term.endDate));
+	const total = term.totalCost ?? 0;
+	const monthly = term.monthlyCost ?? 0;
+	if (total > 0) return { total, monthly: total / months };
+	if (monthly > 0) return { total: fromMinor(toMinor(monthly) * months), monthly };
+	return {
+		total: term.totalCost === 0 ? 0 : null,
+		monthly: term.monthlyCost === 0 ? 0 : null
+	};
+}
+
 export function sortTermsByEndDateDesc(terms: InsuranceTerm[]): InsuranceTerm[] {
 	return [...terms].sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
 }

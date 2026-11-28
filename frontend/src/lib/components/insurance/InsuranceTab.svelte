@@ -15,7 +15,8 @@
 		CLAIM_STATUS_LABELS,
 		getDaysRemaining,
 		groupPoliciesByActive,
-		splitTermsByToday
+		splitTermsByToday,
+		termFigures
 	} from '#lib/utils/insurance.ts';
 	import { cn } from '#lib/utils.js';
 	import type { InsuranceClaim, InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
@@ -131,9 +132,8 @@
 	}
 
 	function costText(term: InsuranceTerm | undefined): string | null {
-		if (term?.totalCost) return formatCurrency(term.totalCost);
-		if (term?.monthlyCost) return `${formatCurrency(term.monthlyCost)}/mo`;
-		return null;
+		const total = term ? termFigures(term).total : null;
+		return total ? formatCurrency(total) : null;
 	}
 
 	function claimTitle(claim: InsuranceClaim): string {

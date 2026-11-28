@@ -1,0 +1,61 @@
+name: Refresh image packages
+
+# The backend runtime stage runs `apk upgrade`, but the main build reuses that layer from the
+# Actions cache. Rebuilding the stage here and writing it back to the same cache scope lets the
+# next main build ship current Alpine fixes. Nothing is pushed or published.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh backend image (${{ matrix.arch }})
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Rebuild the runtime stage without cache
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          push: false
+          tags: vroom-backend:refresh
+          no-cache-filters: production
+          cache-from: type=gha,scope=backend-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=backend-${{ matrix.arch }}
+
+      - name: Check the image starts its runtime
+        run: docker run --rm vroom-backend:refresh bun -e "process.exit(0)"
+
+      # Pinned by commit, not tag: this action's tags were once rewritten in a supply-chain attack.
+      - name: List fixable high and critical findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: vroom-backend:refresh
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true

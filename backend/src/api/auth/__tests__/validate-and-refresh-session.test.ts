@@ -1,7 +1,8 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { Hono } from 'hono';
 import type { Lucia } from 'lucia';
 import { CONFIG } from '../../../config';
+import { logger } from '../../../utils/logger';
 import { validateAndRefreshSession } from '../utils';
 
 const USER = { id: 'u-1' } as { id: string };
@@ -96,5 +97,20 @@ describe('validateAndRefreshSession', () => {
     expect(result?.refreshed).toBe(true);
     expect(result?.session.id).toBe(extended.id);
     expect(result?.session.expiresAt).toEqual(extended.expiresAt);
+  });
+
+  test('the log line for an extended session names the user but not the session', async () => {
+    const { lucia } = makeLucia({
+      validate: { session: session({ fresh: true, expiresInMs: 1000 }), user: USER },
+    });
+    const infoSpy = spyOn(logger, 'info').mockImplementation(() => {});
+    try {
+      await runWithContext(lucia);
+      const logged = JSON.stringify(infoSpy.mock.calls);
+      expect(logged).toContain(USER.id);
+      expect(logged).not.toContain('session-1');
+    } finally {
+      infoSpy.mockRestore();
+    }
   });
 });

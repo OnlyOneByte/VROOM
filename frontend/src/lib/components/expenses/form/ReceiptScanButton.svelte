@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Sparkles, LoaderCircle } from '@lucide/svelte';
+	import { ScanText, LoaderCircle } from '@lucide/svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.ts';
 	import { vlmApi, type ReceiptDraft } from '#lib/services/vlm-api.ts';
@@ -98,10 +98,10 @@
 	>
 		{#if isScanning}
 			<LoaderCircle class="h-4 w-4 animate-spin" />
-			<span class="max-sm:sr-only">Reading receipt…</span>
+			<span>Reading<span class="max-sm:sr-only">&nbsp;receipt</span>…</span>
 		{:else}
-			<Sparkles class="h-4 w-4" />
-			<span class="max-sm:sr-only">Scan receipt</span>
+			<ScanText class="h-4 w-4" />
+			<span>Scan<span class="max-sm:sr-only">&nbsp;receipt</span></span>
 		{/if}
 	</Button>
 
