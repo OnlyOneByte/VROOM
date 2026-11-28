@@ -20,8 +20,7 @@ export type LiveVehicleGrants = Awaited<ReturnType<typeof perPersonVehicleGrants
 
 export type DroppedGrantReason =
   | 'vehicle_not_restored'
-  | 'no_accepted_share'
-  | 'member_not_active'
+  | 'person_not_active'
   | 'granted_by_non_member'
   | 'role_not_assignable'
   | 'permission_not_grantable';
@@ -64,7 +63,7 @@ async function denyCheck(
     .from(vehicleShares)
     .where(and(eq(vehicleShares.vehicleId, vehicleId), eq(vehicleShares.sharedWithId, userId)))
     .then(firstRow);
-  return share ? null : 'no_accepted_share';
+  return share ? null : 'person_not_active';
 }
 
 async function personCheck(
@@ -76,13 +75,13 @@ async function personCheck(
 ): Promise<DroppedGrantReason | null> {
   const noCar = await carCheck(tx, ownerId, vehicleId);
   if (noCar) return noCar;
-  if (!(await isVehicleMember(tx, vehicleId, userId))) return 'no_accepted_share';
+  if (!(await isVehicleMember(tx, vehicleId, userId))) return 'person_not_active';
   const person = await tx
     .select({ disabledAt: users.disabledAt, pendingApprovalAt: users.pendingApprovalAt })
     .from(users)
     .where(eq(users.id, userId))
     .then(firstRow);
-  if (!person || person.disabledAt || person.pendingApprovalAt) return 'member_not_active';
+  if (!person || person.disabledAt || person.pendingApprovalAt) return 'person_not_active';
   if (grantor !== ownerId && !(grantor && (await isVehicleMember(tx, vehicleId, grantor)))) {
     return 'granted_by_non_member';
   }

@@ -42,8 +42,7 @@
 
 	const DROPPED_REASONS: Record<RestoreDroppedReason, string> = {
 		vehicle_not_restored: "the car isn't in this backup",
-		no_accepted_share: 'the person no longer has this car shared with them',
-		member_not_active: "the member isn't active on this car",
+		person_not_active: "the person isn't active on this car any more",
 		granted_by_non_member: 'whoever set it no longer has this car shared with them',
 		role_not_assignable: "that role isn't available any more",
 		permission_not_grantable: "that permission can't be given on a car"
@@ -86,6 +85,7 @@
 	let mergeInstead = $state(false);
 	let restoreMode = $state<'replace' | 'merge'>('merge');
 	let isProcessing = $state(false);
+	let restoring = $state(false);
 	let error = $state<string | null>(null);
 	let droppedGrants = $state<DroppedGrant[]>([]);
 	let carNames = $state<Record<string, string>>({});
@@ -226,6 +226,7 @@
 
 	async function handleRestore() {
 		isProcessing = true;
+		restoring = true;
 		error = null;
 		mergeInstead = false;
 		try {
@@ -257,6 +258,7 @@
 			} else {
 				throw new Error('Invalid restore configuration');
 			}
+			restoring = false;
 			onRestore(result);
 			const dropped = result.grants?.dropped ?? [];
 			if (dropped.length === 0) {
@@ -274,6 +276,7 @@
 			if (selectedSourceType === 'sheets') void settingsStore.load();
 		} finally {
 			isProcessing = false;
+			restoring = false;
 		}
 	}
 
@@ -393,7 +396,12 @@
 		}
 	}}
 >
-	<Dialog.Content class="max-w-2xl max-h-[90vh] overflow-y-auto">
+	<Dialog.Content
+		class="max-w-2xl max-h-[90vh] overflow-y-auto"
+		showCloseButton={!restoring}
+		escapeKeydownBehavior={restoring ? 'ignore' : 'close'}
+		interactOutsideBehavior={restoring ? 'ignore' : 'close'}
+	>
 		<Dialog.Header>
 			<Dialog.Title>{dialogTitle}</Dialog.Title>
 			<Dialog.Description>{dialogDescription}</Dialog.Description>
@@ -679,7 +687,7 @@
 			{#if step === 4}
 				<Button bind:ref={doneButton} onclick={close}>Done</Button>
 			{:else}
-				<Button variant="outline" onclick={close}>Cancel</Button>
+				<Button variant="outline" onclick={close} disabled={restoring}>Cancel</Button>
 			{/if}
 			{#if step === 3 && restorePreview}
 				<Button disabled={isProcessing} onclick={handleRestore}>

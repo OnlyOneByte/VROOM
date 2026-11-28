@@ -133,11 +133,37 @@ describe('a full restore keeps the per-person grants of current members, from li
     expect(result.grants).toEqual({
       reapplied: 0,
       dropped: [
-        { kind: 'role', vehicleId, userId: 'late-1', reason: 'no_accepted_share' },
-        { kind: 'override', vehicleId, userId: 'late-1', reason: 'no_accepted_share' },
+        { kind: 'role', vehicleId, userId: 'late-1', reason: 'person_not_active' },
+        { kind: 'override', vehicleId, userId: 'late-1', reason: 'person_not_active' },
       ],
     });
     expect(await can('late-1', 'vehicle.expense.write')).toBe(false);
+  });
+
+  test('someone who left and someone whose account is not active are reported the same way', async () => {
+    await addMember('left-2');
+    await addMember('off-2');
+    override('left-2', 'vehicle.trip.write');
+    override('off-2', 'vehicle.trip.write');
+    const zip = new AdmZip(await exportZip());
+    const shares = zip.getEntry('vehicle_shares.csv')?.getData().toString('utf-8') ?? '';
+    zip.updateFile(
+      'vehicle_shares.csv',
+      Buffer.from(
+        shares
+          .split('\n')
+          .filter((line) => !line.includes('left-2'))
+          .join('\n'),
+        'utf-8'
+      )
+    );
+    ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', ['off-2']);
+
+    const result = await restore(zip.toBuffer());
+
+    const reasons = new Set(result.grants?.dropped.map((d) => d.reason));
+    expect(result.grants?.dropped.map((d) => d.userId).sort()).toEqual(['left-2', 'off-2']);
+    expect([...reasons]).toEqual(['person_not_active']);
   });
 
   test('a crafted backup cannot add or widen any grant', async () => {
@@ -221,11 +247,11 @@ describe('a full restore keeps the per-person grants of current members, from li
     expect(
       [...(result.grants?.dropped ?? [])].map((d) => `${d.userId} ${d.kind} ${d.reason}`).sort()
     ).toEqual([
-      'disabled-1 override member_not_active',
+      'disabled-1 override person_not_active',
       'member-3 override granted_by_non_member',
       'member-3 override permission_not_grantable',
       'member-3 role role_not_assignable',
-      'waiting-1 role member_not_active',
+      'waiting-1 role person_not_active',
     ]);
     expect(grantsOf('waiting-1').roles).toEqual([builtInRoleId('viewer')]);
   });
@@ -320,7 +346,7 @@ describe('a full restore keeps the per-person grants of current members, from li
 
     expect(result.grants).toEqual({
       reapplied: 1,
-      dropped: [{ kind: 'override', vehicleId, userId: 'left-1', reason: 'no_accepted_share' }],
+      dropped: [{ kind: 'override', vehicleId, userId: 'left-1', reason: 'person_not_active' }],
     });
     expect(grantsOf('left-1').overrides).toEqual([]);
     expect(grantsOf('invited-1').overrides).toEqual([

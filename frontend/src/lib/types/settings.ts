@@ -104,8 +104,7 @@ export interface RestoreResult {
 
 export type RestoreDroppedReason =
 	| 'vehicle_not_restored'
-	| 'no_accepted_share'
-	| 'member_not_active'
+	| 'person_not_active'
 	| 'granted_by_non_member'
 	| 'role_not_assignable'
 	| 'permission_not_grantable';
