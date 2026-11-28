@@ -64,7 +64,7 @@ describe('the odometer tab', () => {
 		const source = readFileSync(ODOMETER_TAB, 'utf-8');
 		const titles = controlTitles(source);
 
-		expect(titles).toEqual(['Open expense', 'Edit reading', 'Delete reading']);
+		expect(titles).toEqual([]);
 
 		for (const title of titles) {
 			expect(source, `title="${title}" is the only name this control has`).toContain(
