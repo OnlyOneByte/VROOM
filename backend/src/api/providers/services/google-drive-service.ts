@@ -48,9 +48,8 @@ export class GoogleDriveService {
 
   async findFolder(name: string, parentId?: string): Promise<DriveFolder | null> {
     const escapedName = escapeDriveQuery(name);
-    const query = parentId
-      ? `name='${escapedName}' and '${escapeDriveQuery(parentId)}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
-      : `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const parent = escapeDriveQuery(parentId ?? 'root');
+    const query = `name='${escapedName}' and '${parent}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
     const response = await this.drive.files.list({
       q: query,

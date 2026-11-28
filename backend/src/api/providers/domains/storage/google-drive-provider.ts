@@ -13,6 +13,7 @@ import { credentialFailureOf } from './storage-provider';
 export class GoogleDriveProvider implements StorageProvider {
   readonly type = 'google-drive';
   private driveService: GoogleDriveService;
+  private readonly folderLookups = new Map<string, Promise<string>>();
 
   constructor(refreshToken: string, driveService?: GoogleDriveService) {
     this.driveService = driveService ?? new GoogleDriveService(refreshToken);
@@ -80,13 +81,7 @@ export class GoogleDriveProvider implements StorageProvider {
     let parentId: string | undefined;
 
     for (const segment of segments) {
-      const existing = await this.driveService.findFolder(segment, parentId);
-      if (existing) {
-        parentId = existing.id;
-      } else {
-        const created = await this.driveService.createFolder(segment, parentId);
-        parentId = created.id;
-      }
+      parentId = await this.findOrCreateFolder(segment, parentId);
     }
 
     if (!parentId) {
@@ -94,6 +89,20 @@ export class GoogleDriveProvider implements StorageProvider {
     }
 
     return parentId;
+  }
+
+  private findOrCreateFolder(name: string, parentId: string | undefined): Promise<string> {
+    const key = `${parentId ?? 'root'}/${name}`;
+    const pending = this.folderLookups.get(key);
+    if (pending) return pending;
+    const lookup = (async () => {
+      const existing = await this.driveService.findFolder(name, parentId);
+      return existing ? existing.id : (await this.driveService.createFolder(name, parentId)).id;
+    })();
+    this.folderLookups.set(key, lookup);
+    const forget = () => this.folderLookups.delete(key);
+    lookup.then(forget, forget);
+    return lookup;
   }
 
   private async resolveExistingFolderPath(pathHint: string): Promise<string | null> {
