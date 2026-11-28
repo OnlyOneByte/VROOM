@@ -49,27 +49,27 @@ async function installCountingProvider(): Promise<void> {
   };
 }
 
-function seedServablePhoto(): void {
-  ctx.sqlite.run(
+async function seedServablePhoto(): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-1', ?, 'Toyota', 'Camry', 2022)`,
     [ctx.user.id]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
      VALUES ('exp-1', 'veh-1', ?, 'maintenance', 1700000000, 100.0)`,
     [ctx.user.id]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
      VALUES ('prov-1', ?, 'storage', 'fake', 'Fake storage', 'unused', 'active')`,
     [ctx.user.id]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
      VALUES ('photo-1', ?, 'expense', 'exp-1', 'receipt.jpg', 'image/jpeg', ?)`,
     [ctx.user.id, PHOTO_BYTES.length]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
      VALUES ('ref-1', 'photo-1', 'prov-1', ?, 'active')`,
     [STORAGE_KEY]
@@ -90,7 +90,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   downloads = 0;
   await installCountingProvider();
-  seedServablePhoto();
+  await seedServablePhoto();
 }, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
@@ -142,17 +142,17 @@ describe('photo serve: conditional GET', () => {
   });
 
   test("a conditional GET for another user's photo is still 404, never 304", async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@test.com', 'Other')`
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-2', 'other-user', 'Honda', 'Fit', 2020)`
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
        VALUES ('exp-2', 'veh-2', 'other-user', 'maintenance', 1700000000, 50.0)`
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-foreign', 'other-user', 'expense', 'exp-2', 'theirs.jpg', 'image/jpeg', 1024)`
     );
@@ -165,12 +165,12 @@ describe('photo serve: conditional GET', () => {
   });
 
   test("another photo's validator never short-circuits this one", async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-2', ?, 'expense', 'exp-1', 'receipt-2.jpg', 'image/jpeg', ?)`,
       [ctx.user.id, PHOTO_BYTES.length - 1]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
        VALUES ('ref-2', 'photo-2', 'prov-1', ?, 'active')`,
       [STORAGE_KEY]

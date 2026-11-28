@@ -19,15 +19,12 @@ let storage: FakePhotoStorage;
 beforeEach(async () => {
   ctx = await createTestApp();
   for (const id of VEHICLES) {
-    ctx.sqlite.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
-      id,
-      ctx.user.id,
-      'Toyota',
-      'Camry',
-      2022,
-    ]);
+    await ctx.sql.run(
+      'INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)',
+      [id, ctx.user.id, 'Toyota', 'Camry', 2022]
+    );
   }
-  storage = installFakePhotoStorage(ctx);
+  storage = await installFakePhotoStorage(ctx);
 }, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
@@ -43,20 +40,20 @@ function jpeg(): File {
   });
 }
 
-function photoCount(vehicleId: string): number {
+async function photoCount(vehicleId: string): Promise<number> {
   return (
-    ctx.sqlite
-      .query("SELECT COUNT(*) AS n FROM photos WHERE entity_type = 'vehicle' AND entity_id = ?")
-      .get(vehicleId) as { n: number }
+    (await ctx.sql.get(
+      "SELECT COUNT(*) AS n FROM photos WHERE entity_type = 'vehicle' AND entity_id = ?",
+      [vehicleId]
+    )) as { n: number }
   ).n;
 }
 
-function dbState(vehicleId: string): { id: string; isCover: boolean }[] {
-  const rows = ctx.sqlite
-    .query(
-      "SELECT id, is_cover FROM photos WHERE entity_type = 'vehicle' AND entity_id = ? ORDER BY id"
-    )
-    .all(vehicleId) as { id: string; is_cover: number }[];
+async function dbState(vehicleId: string): Promise<{ id: string; isCover: boolean }[]> {
+  const rows = (await ctx.sql.all(
+    "SELECT id, is_cover FROM photos WHERE entity_type = 'vehicle' AND entity_id = ? ORDER BY id",
+    [vehicleId]
+  )) as { id: string; is_cover: number }[];
   return rows.map((r) => ({ id: r.id, isCover: r.is_cover === 1 }));
 }
 
@@ -79,7 +76,7 @@ describe('upload validation (before any storage work)', () => {
       ),
       { numRuns: 100 }
     );
-    expect(photoCount('veh-1')).toBe(0);
+    expect(await photoCount('veh-1')).toBe(0);
   });
 
   test('any size above MAX_FILE_SIZE is rejected with 413 and writes nothing', async () => {
@@ -100,7 +97,7 @@ describe('upload validation (before any storage work)', () => {
       ),
       { numRuns: 100 }
     );
-    expect(photoCount('veh-1')).toBe(0);
+    expect(await photoCount('veh-1')).toBe(0);
   });
 
   test('a photo over the limit answers with the PAYLOAD_TOO_LARGE code the app has a message for', async () => {
@@ -126,7 +123,7 @@ describe('upload validation (before any storage work)', () => {
     const file = new File([new Uint8Array([9])], 'ok.png', { type: 'image/png' });
     const photo = await uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, file);
     expect(photo.mimeType).toBe('image/png');
-    expect(photoCount('veh-1')).toBe(1);
+    expect(await photoCount('veh-1')).toBe(1);
   });
 
   test('the allowlist is exactly JPEG, PNG, WebP, and PDF; the size cap is 10 MiB', () => {
@@ -168,7 +165,7 @@ async function uploadOp(photos: ModelPhoto[], vehicleId: string, seq: number): P
   const photo = await uploadPhotoForEntity('vehicle', vehicleId, ctx.user.id, jpeg());
   photos.push({ id: photo.id, isCover: photos.length === 0, seq });
   // created_at has 1s resolution, so pin the creation order for deterministic promotion.
-  ctx.sqlite.run('UPDATE photos SET created_at = ? WHERE id = ?', [seq, photo.id]);
+  await ctx.sql.run('UPDATE photos SET created_at = ? WHERE id = ?', [seq, photo.id]);
 }
 
 async function setCoverOp(photos: ModelPhoto[], vehicleId: string, target: ModelPhoto) {
@@ -204,10 +201,10 @@ async function applyOp(model: Model, op: Op, seq: number): Promise<number> {
   return seq;
 }
 
-function expectDbMatchesModel(model: Model): void {
+async function expectDbMatchesModel(model: Model): Promise<void> {
   for (const vehicleId of VEHICLES) {
     const expected = (model.get(vehicleId) ?? []).map((p) => ({ id: p.id, isCover: p.isCover }));
-    const actual = dbState(vehicleId);
+    const actual = await dbState(vehicleId);
     expect(actual.sort(byId)).toEqual(expected.sort(byId));
     expect(actual.filter((p) => p.isCover).length).toBeLessThanOrEqual(1);
   }
@@ -217,13 +214,13 @@ describe('cover rules through the real service', () => {
   test('after every upload, cover change, or delete, the database matches the cover model on both vehicles', async () => {
     await fc.assert(
       fc.asyncProperty(fc.array(opArb, { minLength: 1, maxLength: 20 }), async (ops) => {
-        ctx.sqlite.run('DELETE FROM photos');
+        await ctx.sql.run('DELETE FROM photos');
         const model: Model = new Map(VEHICLES.map((v) => [v, []]));
         let seq = 0;
 
         for (const op of ops) {
           seq = await applyOp(model, op, seq);
-          expectDbMatchesModel(model);
+          await expectDbMatchesModel(model);
         }
       }),
       { numRuns: 40 }
@@ -237,17 +234,17 @@ describe('cover rules through the real service', () => {
     await expect(
       setCoverPhotoForEntity('vehicle', 'veh-1', other.id, ctx.user.id)
     ).rejects.toBeInstanceOf(NotFoundError);
-    expect(dbState('veh-2').find((p) => p.id === other.id)?.isCover).toBe(true);
+    expect((await dbState('veh-2')).find((p) => p.id === other.id)?.isCover).toBe(true);
   });
 
   test('deleting a non-cover photo leaves the cover unchanged', async () => {
     await uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg());
     const second = await uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, jpeg());
-    const cover = dbState('veh-1').find((p) => p.isCover);
+    const cover = (await dbState('veh-1')).find((p) => p.isCover);
 
     await deletePhotoForEntity('vehicle', 'veh-1', second.id, ctx.user.id);
 
-    expect(dbState('veh-1').find((p) => p.isCover)?.id).toBe(cover?.id);
+    expect((await dbState('veh-1')).find((p) => p.isCover)?.id).toBe(cover?.id);
   });
 
   test('a photo cannot be deleted through another entity type that shares its entity id', async () => {
@@ -255,7 +252,7 @@ describe('cover rules through the real service', () => {
     await expect(
       deletePhotoForEntity('expense', 'veh-1', photo.id, ctx.user.id)
     ).rejects.toBeInstanceOf(AppError);
-    expect(dbState('veh-1').map((p) => p.id)).toContain(photo.id);
+    expect((await dbState('veh-1')).map((p) => p.id)).toContain(photo.id);
   });
 });
 

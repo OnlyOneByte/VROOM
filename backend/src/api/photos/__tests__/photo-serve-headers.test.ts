@@ -9,11 +9,11 @@ let photoId: string;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-1', ?, 'Toyota', 'Camry', 2022)`,
     [ctx.user.id]
   );
-  storage = installFakePhotoStorage(ctx);
+  storage = await installFakePhotoStorage(ctx);
   const photo = await uploadPhotoForEntity(
     'vehicle',
     'veh-1',

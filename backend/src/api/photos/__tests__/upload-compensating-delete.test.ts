@@ -12,11 +12,11 @@ let storage: FakePhotoStorage;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-1', ?, 'Toyota', 'Camry', 2022)`,
     [ctx.user.id]
   );
-  storage = installFakePhotoStorage(ctx);
+  storage = await installFakePhotoStorage(ctx);
 }, SETUP_TIMEOUT_MS);
 
 afterEach(() => {
@@ -28,8 +28,8 @@ function jpeg(): File {
   return new File([new Uint8Array([1, 2, 3])], 'receipt.jpg', { type: 'image/jpeg' });
 }
 
-function photoRowCount(): number {
-  return (ctx.sqlite.query('SELECT COUNT(*) AS n FROM photos').get() as { n: number }).n;
+async function photoRowCount(): Promise<number> {
+  return ((await ctx.sql.get('SELECT COUNT(*) AS n FROM photos')) as { n: number }).n;
 }
 
 describe('upload compensates when the DB write fails after the provider upload', () => {
@@ -44,7 +44,7 @@ describe('upload compensates when the DB write fails after the provider upload',
 
     const uploaded = (await uploadSpy.mock.results[0].value) as StorageRef;
     expect(await storage.provider.getExternalUrl(uploaded)).toBeNull();
-    expect(photoRowCount()).toBe(0);
+    expect(await photoRowCount()).toBe(0);
 
     refSpy.mockRestore();
     uploadSpy.mockRestore();
@@ -80,7 +80,7 @@ describe('upload refusals are validation errors', () => {
     const upload = uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, gif);
     await expect(upload).rejects.toBeInstanceOf(ValidationError);
     await expect(upload).rejects.toMatchObject({ statusCode: 400 });
-    expect(photoRowCount()).toBe(0);
+    expect(await photoRowCount()).toBe(0);
   });
 
   test('a PDF to an images-only provider is a 400 ValidationError and stores nothing', async () => {
@@ -89,6 +89,6 @@ describe('upload refusals are validation errors', () => {
     const upload = uploadPhotoForEntity('vehicle', 'veh-1', ctx.user.id, pdf);
     await expect(upload).rejects.toBeInstanceOf(ValidationError);
     await expect(upload).rejects.toMatchObject({ statusCode: 400 });
-    expect(photoRowCount()).toBe(0);
+    expect(await photoRowCount()).toBe(0);
   });
 });
