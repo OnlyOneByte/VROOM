@@ -552,7 +552,7 @@ class ReminderTriggerService {
     const distanceUnit = await vehicleDistanceUnit(vehicleId);
     const dueOdometer = reminder.nextDueOdometer;
     const { created, booked } = await appContext().asyncDb.transaction(async (tx) => {
-      if (!(await repos().reminders.stillDueAt(reminder.id, dueOdometer))) {
+      if (!(await repos().reminders.stillDueAt(reminder.id, reminder.userId, dueOdometer))) {
         return { created: null, booked: [] };
       }
       const claimed = await repos().reminders.createMileageNotification(

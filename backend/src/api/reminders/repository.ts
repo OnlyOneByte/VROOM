@@ -266,7 +266,13 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     const [claimed] = await tx
       .update(reminders)
       .set({ nextDueDate, lastTriggeredAt, updatedAt: new Date() })
-      .where(and(eq(reminders.id, id), eq(reminders.nextDueDate, expectedCurrentDueDate)))
+      .where(
+        and(
+          eq(reminders.id, id),
+          eq(reminders.nextDueDate, expectedCurrentDueDate),
+          eq(reminders.isActive, true)
+        )
+      )
       .returning();
     return claimed ?? null;
   }
@@ -339,13 +345,14 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     });
   }
 
-  async stillDueAt(id: string, dueOdometer: number): Promise<boolean> {
+  async stillDueAt(id: string, userId: string, dueOdometer: number): Promise<boolean> {
     const rows = await this.db
       .update(reminders)
       .set({ updatedAt: new Date() })
       .where(
         and(
           eq(reminders.id, id),
+          eq(reminders.userId, userId),
           eq(reminders.nextDueOdometer, dueOdometer),
           eq(reminders.isActive, true)
         )
