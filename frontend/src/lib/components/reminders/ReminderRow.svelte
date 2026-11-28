@@ -9,7 +9,7 @@
 	import * as Popover from '#lib/components/ui/popover/index.ts';
 	import type { ReminderWithVehicles } from '#lib/types/index.ts';
 	import { formatCurrency, formatDate, formatNumber } from '#lib/utils/formatters.ts';
-	import { frequencyLabel, isMileageTracking } from '#lib/utils/reminder-helpers.ts';
+	import { frequencyLabel, isMileageTracking, soonDistance } from '#lib/utils/reminder-helpers.ts';
 
 	interface Props {
 		item: ReminderWithVehicles;
@@ -41,7 +41,6 @@
 
 	const DAY_MS = 86_400_000;
 	const SOON_DAYS = 30;
-	let soonDistance = $derived(distanceLabel === 'km' ? 1600 : 1000);
 
 	let menuOpen = $state(false);
 
@@ -79,7 +78,7 @@
 			const left = Math.max(0, reminder.nextDueOdometer - current);
 			return {
 				text: `In ${formatNumber(left, 0)} ${distanceLabel}`,
-				tone: left <= soonDistance ? 'warning' : 'muted'
+				tone: left <= soonDistance(distanceLabel) ? 'warning' : 'muted'
 			};
 		}
 		return { text: 'Scheduled', tone: 'muted' };

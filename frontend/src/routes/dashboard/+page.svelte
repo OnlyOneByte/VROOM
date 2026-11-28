@@ -191,7 +191,15 @@
 
 	let attention = $derived.by(() => {
 		const names = new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)]));
-		return attentionItems(remindersList, policies, id => names.get(id), formatDate, Date.now());
+		const units = new Map(vehicles.map(v => [v.id, v.unitPreferences?.distanceUnit]));
+		return attentionItems(
+			remindersList,
+			policies,
+			id => names.get(id),
+			formatDate,
+			Date.now(),
+			id => getDistanceUnitLabel(units.get(id) ?? settingsStore.unitPreferences.distanceUnit, true)
+		);
 	});
 
 	onMount(loadDashboardData);
