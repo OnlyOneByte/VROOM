@@ -169,10 +169,7 @@ function visibleShare<R extends { expenseAmount: number | null; expenseSplitConf
   const split = reminder.expenseSplitConfig as SplitConfig | null;
   const shown = new Set(visible);
   if (!split || reminder.expenseAmount == null) {
-    const charged = vehicleIds[0];
-    return charged && shown.has(charged)
-      ? reminder
-      : { ...reminder, expenseAmount: null, expenseSplitConfig: null };
+    return { ...reminder, expenseAmount: null, expenseSplitConfig: null };
   }
   const allocations = expenseSplitService
     .computeAllocations(split, reminder.expenseAmount)

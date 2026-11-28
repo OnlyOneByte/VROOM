@@ -98,7 +98,7 @@ describe('reminder details for someone a car is shared with', () => {
     expect(JSON.stringify(row)).not.toContain(other);
   });
 
-  test('an amount charged to a car that is not shared is not shown', async () => {
+  test('an unsplit amount on cars not all shared is not shown', async () => {
     await reminder({ vehicleIds: [other, shared], expenseAmount: 120 });
 
     const [row] = await viewersList();
