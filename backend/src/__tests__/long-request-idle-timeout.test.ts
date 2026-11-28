@@ -96,6 +96,7 @@ describe('long requests outlive the idle timeout', () => {
           body: JSON.stringify({ syncTypes: ['backup'] }),
         });
         expect(res.status).toBe(200);
+        expect(spy).toHaveBeenCalledTimes(1);
         expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
       } finally {
         spy.mockRestore();
@@ -276,18 +277,18 @@ describe('long requests outlive the idle timeout', () => {
           } as never)
         );
         spies.push(spyOn(llmRegistry, 'getLlmProvider').mockResolvedValue({} as never));
-        spies.push(
-          spyOn(llmOrchestrator, 'runAssistant').mockImplementation(async () => {
-            await Bun.sleep(SLOW_MS);
-            return { reply: 'done', toolsUsed: [] };
-          })
-        );
+        const assistant = spyOn(llmOrchestrator, 'runAssistant').mockImplementation(async () => {
+          await Bun.sleep(SLOW_MS);
+          return { reply: 'done', toolsUsed: [] };
+        });
+        spies.push(assistant);
         const res = await fetch(url('/assistant/chat'), {
           method: 'POST',
           headers: { cookie: ctx.cookie, origin: TEST_ORIGIN, 'content-type': 'application/json' },
           body: JSON.stringify({ message: 'hi' }),
         });
         expect(res.status).toBe(200);
+        expect(assistant).toHaveBeenCalledTimes(1);
         expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
       } finally {
         for (const spy of spies) spy.mockRestore();
@@ -299,6 +300,7 @@ describe('long requests outlive the idle timeout', () => {
   test(
     'a receipt scan that takes longer than the idle timeout still answers',
     async () => {
+      let scans = 0;
       const spies: { mockRestore(): void }[] = [];
       try {
         spies.push(
@@ -310,6 +312,7 @@ describe('long requests outlive the idle timeout', () => {
         spies.push(
           spyOn(vlmRegistry, 'getVlmProvider').mockResolvedValue({
             extractReceipt: async () => {
+              scans++;
               await Bun.sleep(SLOW_MS);
               return '{"amount": 12.5}';
             },
@@ -323,6 +326,7 @@ describe('long requests outlive the idle timeout', () => {
           body: form,
         });
         expect(res.status).toBe(200);
+        expect(scans).toBe(1);
         expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
       } finally {
         for (const spy of spies) spy.mockRestore();

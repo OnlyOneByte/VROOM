@@ -136,7 +136,7 @@ describe('PUT /settings never overwrites server-owned backup fields', () => {
   });
 
   test('saving settings keeps the server-written backup warning', async () => {
-    seedProvider('drive-w', 'Drive W');
+    await seedProvider('drive-w', 'Drive W');
     await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: { providers: { 'drive-w': providerSettings('drive-w') } },
     });
@@ -160,7 +160,7 @@ describe('PUT /settings never overwrites server-owned backup fields', () => {
   });
 
   test('turning ZIP backup off clears a stored backup warning', async () => {
-    seedProvider('drive-x', 'Drive X');
+    await seedProvider('drive-x', 'Drive X');
     await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: { providers: { 'drive-x': providerSettings('drive-x') } },
     });
