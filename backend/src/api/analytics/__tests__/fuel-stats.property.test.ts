@@ -1,28 +1,25 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
-  type TestExpense,
-  type TestVehicle,
-  yearToRange,
-} from './analytics-test-generators';
+} from './analytics-test-db';
+import { type TestExpense, type TestVehicle, yearToRange } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 function fuelExpenseArb(vehicleId: string, index: number, year: number): fc.Arbitrary<TestExpense> {
@@ -33,7 +30,7 @@ function fuelExpenseArb(vehicleId: string, index: number, year: number): fc.Arbi
     id: fc.constant(`fuel-${vehicleId}-${index}`),
     vehicleId: fc.constant(vehicleId),
     category: fc.constant('fuel' as string),
-    expenseAmount: fc.double({ min: 5, max: 200, noNaN: true, noDefaultInfinity: true }),
+    expenseAmount: fc.integer({ min: 5, max: 200 }),
     date: fc.integer({ min: minTs, max: maxTs }).map((ts) => new Date(ts)),
     mileage: fc.constant(null as number | null),
     volume: fc.double({ min: 1, max: 30, noNaN: true, noDefaultInfinity: true }),
@@ -46,12 +43,12 @@ describe('Fuel volume ordering invariant', () => {
   test('fillupDetails.minVolume <= fillupDetails.avgVolume <= fillupDetails.maxVolume', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 8 }), async (expenseCount) => {
-        testDb.sqlite.close();
-        testDb = createTestDb();
-        repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+        testDb.close();
+        testDb = await openAnalyticsTestDb();
+        repo = new AnalyticsRepository(testDb.asyncDb);
 
         const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-        seedUser(testDb.sqlite, user);
+        await seedUser(testDb.sql, user);
 
         const vehicle: TestVehicle = {
           id: 'vehicle-user-1-0',
@@ -60,7 +57,7 @@ describe('Fuel volume ordering invariant', () => {
           model: 'Camry',
           year: 2022,
         };
-        seedVehicle(testDb.sqlite, vehicle);
+        await seedVehicle(testDb.sql, vehicle);
 
         const expensesArr =
           fc.sample(
@@ -77,7 +74,7 @@ describe('Fuel volume ordering invariant', () => {
         }));
 
         for (const e of uniqueExpenses) {
-          seedExpense(testDb.sqlite, e);
+          await seedExpense(testDb.sql, e);
         }
 
         const result = await repo.getFuelStats(user.id, yearToRange(2024));
@@ -107,14 +104,14 @@ describe('MPG computation from consecutive expenses', () => {
         fc.integer({ min: 10000, max: 50000 }),
         fc.integer({ min: 100, max: 500 }),
         fc.double({ min: 5, max: 25, noNaN: true, noDefaultInfinity: true }),
-        fc.double({ min: 10, max: 100, noNaN: true, noDefaultInfinity: true }),
+        fc.integer({ min: 10, max: 100 }),
         async (startMileage, milesDriven, volume, expenseAmount) => {
-          testDb.sqlite.close();
-          testDb = createTestDb();
-          repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+          testDb.close();
+          testDb = await openAnalyticsTestDb();
+          repo = new AnalyticsRepository(testDb.asyncDb);
 
           const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-          seedUser(testDb.sqlite, user);
+          await seedUser(testDb.sql, user);
 
           const vehicle: TestVehicle = {
             id: 'vehicle-user-1-0',
@@ -123,7 +120,7 @@ describe('MPG computation from consecutive expenses', () => {
             model: 'Camry',
             year: 2022,
           };
-          seedVehicle(testDb.sqlite, vehicle);
+          await seedVehicle(testDb.sql, vehicle);
 
           const endMileage = startMileage + milesDriven;
           const expectedMpg = milesDriven / volume;
@@ -155,8 +152,8 @@ describe('MPG computation from consecutive expenses', () => {
             missedFillup: false,
           };
 
-          seedExpense(testDb.sqlite, expense1);
-          seedExpense(testDb.sqlite, expense2);
+          await seedExpense(testDb.sql, expense1);
+          await seedExpense(testDb.sql, expense2);
 
           const result = await repo.getFuelStats(user.id, yearToRange(2024));
 
@@ -174,12 +171,12 @@ describe('Monthly arrays bounded to 12 entries', () => {
   test('monthlyConsumption has at most 12 entries', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 20 }), async (expenseCount) => {
-        testDb.sqlite.close();
-        testDb = createTestDb();
-        repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+        testDb.close();
+        testDb = await openAnalyticsTestDb();
+        repo = new AnalyticsRepository(testDb.asyncDb);
 
         const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-        seedUser(testDb.sqlite, user);
+        await seedUser(testDb.sql, user);
 
         const vehicle: TestVehicle = {
           id: 'vehicle-user-1-0',
@@ -188,7 +185,7 @@ describe('Monthly arrays bounded to 12 entries', () => {
           model: 'Camry',
           year: 2022,
         };
-        seedVehicle(testDb.sqlite, vehicle);
+        await seedVehicle(testDb.sql, vehicle);
 
         for (let i = 0; i < expenseCount; i++) {
           const month = i % 12;
@@ -203,7 +200,7 @@ describe('Monthly arrays bounded to 12 entries', () => {
             fuelType: 'Regular',
             missedFillup: false,
           };
-          seedExpense(testDb.sqlite, expense);
+          await seedExpense(testDb.sql, expense);
         }
 
         const result = await repo.getFuelStats(user.id, yearToRange(2024));
@@ -218,7 +215,7 @@ describe('Monthly arrays bounded to 12 entries', () => {
 describe('total distance is summed per vehicle across multiple vehicles', () => {
   test('two vehicles in disjoint odometer ranges sum per-car distance, not pooled max-min', async () => {
     const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-    seedUser(testDb.sqlite, user);
+    await seedUser(testDb.sql, user);
 
     const carA: TestVehicle = {
       id: 'veh-A',
@@ -234,8 +231,8 @@ describe('total distance is summed per vehicle across multiple vehicles', () => 
       model: 'Civic',
       year: 2021,
     };
-    seedVehicle(testDb.sqlite, carA);
-    seedVehicle(testDb.sqlite, carB);
+    await seedVehicle(testDb.sql, carA);
+    await seedVehicle(testDb.sql, carB);
 
     const rows: TestExpense[] = [
       {
@@ -283,7 +280,7 @@ describe('total distance is summed per vehicle across multiple vehicles', () => 
         missedFillup: false,
       },
     ];
-    for (const r of rows) seedExpense(testDb.sqlite, r);
+    for (const r of rows) await seedExpense(testDb.sql, r);
 
     const result = await repo.getFuelStats(user.id, yearToRange(2024));
 
@@ -294,7 +291,7 @@ describe('total distance is summed per vehicle across multiple vehicles', () => 
 describe('cross-fleet fillup count excludes split siblings', () => {
   test('a split fuel expense (volume-null siblings) counts as zero fillups, not N', async () => {
     const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-    seedUser(testDb.sqlite, user);
+    await seedUser(testDb.sql, user);
 
     const carA: TestVehicle = {
       id: 'veh-A',
@@ -310,8 +307,8 @@ describe('cross-fleet fillup count excludes split siblings', () => {
       model: 'Civic',
       year: 2021,
     };
-    seedVehicle(testDb.sqlite, carA);
-    seedVehicle(testDb.sqlite, carB);
+    await seedVehicle(testDb.sql, carA);
+    await seedVehicle(testDb.sql, carB);
 
     const realFillups: TestExpense[] = [
       {
@@ -343,7 +340,7 @@ describe('cross-fleet fillup count excludes split siblings', () => {
         id: 'split-A',
         vehicleId: 'veh-A',
         category: 'fuel',
-        expenseAmount: 12.5,
+        expenseAmount: 13,
         date: new Date(2024, 4, 1),
         mileage: null,
         volume: null,
@@ -354,7 +351,7 @@ describe('cross-fleet fillup count excludes split siblings', () => {
         id: 'split-B',
         vehicleId: 'veh-B',
         category: 'fuel',
-        expenseAmount: 12.5,
+        expenseAmount: 13,
         date: new Date(2024, 4, 1),
         mileage: null,
         volume: null,
@@ -363,7 +360,7 @@ describe('cross-fleet fillup count excludes split siblings', () => {
       },
     ];
 
-    for (const r of [...realFillups, ...splitSiblings]) seedExpense(testDb.sqlite, r);
+    for (const r of [...realFillups, ...splitSiblings]) await seedExpense(testDb.sql, r);
 
     const result = await repo.getFuelStats(user.id, yearToRange(2024));
 
@@ -376,12 +373,12 @@ describe('Gas price always positive', () => {
   test('all gasPriceHistory entries have positive pricePerVolume', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 10 }), async (expenseCount) => {
-        testDb.sqlite.close();
-        testDb = createTestDb();
-        repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+        testDb.close();
+        testDb = await openAnalyticsTestDb();
+        repo = new AnalyticsRepository(testDb.asyncDb);
 
         const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-        seedUser(testDb.sqlite, user);
+        await seedUser(testDb.sql, user);
 
         const vehicle: TestVehicle = {
           id: 'vehicle-user-1-0',
@@ -390,7 +387,7 @@ describe('Gas price always positive', () => {
           model: 'Camry',
           year: 2022,
         };
-        seedVehicle(testDb.sqlite, vehicle);
+        await seedVehicle(testDb.sql, vehicle);
 
         const expensesArr =
           fc.sample(
@@ -407,7 +404,7 @@ describe('Gas price always positive', () => {
         }));
 
         for (const e of uniqueExpenses) {
-          seedExpense(testDb.sqlite, e);
+          await seedExpense(testDb.sql, e);
         }
 
         const result = await repo.getFuelStats(user.id, yearToRange(2024));
@@ -423,8 +420,8 @@ describe('Gas price always positive', () => {
 
 describe('monthlyConsumption keeps the most recent 12 months', () => {
   test('with 14 months of fill-ups, returns 2023-03 .. 2024-02', async () => {
-    seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
-    seedVehicle(testDb.sqlite, {
+    await seedUser(testDb.sql, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+    await seedVehicle(testDb.sql, {
       id: 'vehicle-1',
       userId: 'user-1',
       make: 'Toyota',
@@ -432,7 +429,7 @@ describe('monthlyConsumption keeps the most recent 12 months', () => {
       year: 2022,
     });
     for (let i = 0; i < 14; i++) {
-      seedExpense(testDb.sqlite, {
+      await seedExpense(testDb.sql, {
         id: `fuel-${i}`,
         vehicleId: 'vehicle-1',
         category: 'fuel',
@@ -458,8 +455,8 @@ describe('monthlyConsumption keeps the most recent 12 months', () => {
 
 describe('monthlyConsumption efficiency without an interval', () => {
   test('a month with a fill-up but no efficiency interval reports null, not 0', async () => {
-    seedUser(testDb.sqlite, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
-    seedVehicle(testDb.sqlite, {
+    await seedUser(testDb.sql, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+    await seedVehicle(testDb.sql, {
       id: 'vehicle-1',
       userId: 'user-1',
       make: 'Toyota',
@@ -467,7 +464,7 @@ describe('monthlyConsumption efficiency without an interval', () => {
       year: 2022,
     });
     for (const [i, day] of [10, 10, 20].entries()) {
-      seedExpense(testDb.sqlite, {
+      await seedExpense(testDb.sql, {
         id: `fuel-${i}`,
         vehicleId: 'vehicle-1',
         category: 'fuel',

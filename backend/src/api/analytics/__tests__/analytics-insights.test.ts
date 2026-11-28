@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import { openAsyncDatabase } from '../../../db/async-sqlite';
 import * as schema from '../../../db/schema';
+import { ON_POSTGRES } from '../../../test-helpers/http-client';
 import {
   AnalyticsInsightsRepository,
   type Insight,
@@ -14,12 +15,12 @@ import {
 } from '../insights';
 import { AnalyticsQueryRepository } from '../query-repository';
 import {
-  createTestDb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
-} from './analytics-test-generators';
+} from './analytics-test-db';
 
 const seconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 const OWNER = { id: 'owner', email: 'owner@test.com', displayName: 'Owner' };
@@ -27,7 +28,7 @@ const CAMRY = { id: 'camry', userId: OWNER.id, make: 'Toyota', model: 'Camry', y
 const LEAF = { id: 'leaf', userId: OWNER.id, make: 'Nissan', model: 'Leaf', year: 2022 };
 const RANGE = { start: seconds('2025-01-01T00:00:00Z'), end: seconds('2026-01-01T00:00:00Z') };
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsInsightsRepository;
 
 function insights(overrides: Partial<{ start: number; end: number; timeZone: string }> = {}) {
@@ -39,7 +40,7 @@ function find(list: Insight[], id: Insight['id']) {
 }
 
 let n = 0;
-function expense(
+async function expense(
   vehicleId: string,
   category: string,
   iso: string,
@@ -47,7 +48,7 @@ function expense(
   extra: Partial<{ mileage: number; volume: number; fuelType: string; description: string }> = {}
 ) {
   const id = `x-${n++}`;
-  seedExpense(testDb.sqlite, {
+  await seedExpense(testDb.sql, {
     id,
     vehicleId,
     category,
@@ -59,28 +60,31 @@ function expense(
     missedFillup: false,
   });
   if (extra.description) {
-    testDb.sqlite.run('UPDATE expenses SET description = ? WHERE id = ?', [extra.description, id]);
+    await testDb.sql.run('UPDATE expenses SET description = ? WHERE id = ?', [
+      extra.description,
+      id,
+    ]);
   }
   return id;
 }
 
-function setPrefs(units: object, currency = 'USD') {
+async function setPrefs(units: object, currency = 'USD') {
   const json = JSON.stringify({ chargeUnit: 'kwh', ...units });
-  testDb.sqlite.run(
-    'INSERT OR REPLACE INTO user_preferences (user_id, unit_preferences, currency_unit) VALUES (?, ?, ?)',
+  await testDb.sql.run(
+    'INSERT INTO user_preferences (user_id, unit_preferences, currency_unit) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET unit_preferences = excluded.unit_preferences, currency_unit = excluded.currency_unit',
     [OWNER.id, json, currency]
   );
-  testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ?', [json]);
+  await testDb.sql.run('UPDATE vehicles SET unit_preferences = ?', [json]);
 }
 
-function setUnits(target: 'user' | 'cars', units: object, currency = 'USD') {
+async function setUnits(target: 'user' | 'cars', units: object, currency = 'USD') {
   const json = JSON.stringify({ chargeUnit: 'kwh', ...units });
   if (target === 'cars') {
-    testDb.sqlite.run('UPDATE vehicles SET unit_preferences = ?', [json]);
+    await testDb.sql.run('UPDATE vehicles SET unit_preferences = ?', [json]);
     return;
   }
-  testDb.sqlite.run(
-    'INSERT OR REPLACE INTO user_preferences (user_id, unit_preferences, currency_unit) VALUES (?, ?, ?)',
+  await testDb.sql.run(
+    'INSERT INTO user_preferences (user_id, unit_preferences, currency_unit) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET unit_preferences = excluded.unit_preferences, currency_unit = excluded.currency_unit',
     [OWNER.id, json, currency]
   );
 }
@@ -88,36 +92,44 @@ function setUnits(target: 'user' | 'cars', units: object, currency = 'USD') {
 const MILES = { distanceUnit: 'miles', volumeUnit: 'gallons_us' };
 const METRIC = { distanceUnit: 'kilometers', volumeUnit: 'liters' };
 
-function trip(vehicleId: string, iso: string, start: number, distance: number, purpose: string) {
-  testDb.sqlite.run(
+async function trip(
+  vehicleId: string,
+  iso: string,
+  start: number,
+  distance: number,
+  purpose: string
+) {
+  await testDb.sql.run(
     'INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [`t-${n++}`, vehicleId, OWNER.id, start, start + distance, purpose, seconds(iso)]
   );
 }
 
-beforeEach(() => {
-  testDb = createTestDb();
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
   repo = new AnalyticsInsightsRepository(
-    openAsyncDatabase(testDb.drizzle.$client).db,
-    new AnalyticsQueryRepository(openAsyncDatabase(testDb.drizzle.$client).db)
+    testDb.asyncDb,
+    new AnalyticsQueryRepository(testDb.asyncDb)
   );
-  seedUser(testDb.sqlite, OWNER);
-  seedVehicle(testDb.sqlite, CAMRY);
-  seedVehicle(testDb.sqlite, LEAF);
+  await seedUser(testDb.sql, OWNER);
+  await seedVehicle(testDb.sql, CAMRY);
+  await seedVehicle(testDb.sql, LEAF);
 });
 
-afterEach(() => testDb.sqlite.close());
+afterEach(() => testDb.close());
 
 describe('record month', () => {
-  function seedMonths() {
-    expense(CAMRY.id, 'maintenance', '2025-02-10T12:00:00Z', 10_000);
-    expense(CAMRY.id, 'maintenance', '2025-03-10T12:00:00Z', 20_000);
-    expense(CAMRY.id, 'maintenance', '2025-06-03T12:00:00Z', 30_000, { description: 'Brake pads' });
-    expense(LEAF.id, 'misc', '2025-06-20T12:00:00Z', 5_000);
+  async function seedMonths() {
+    await expense(CAMRY.id, 'maintenance', '2025-02-10T12:00:00Z', 10_000);
+    await expense(CAMRY.id, 'maintenance', '2025-03-10T12:00:00Z', 20_000);
+    await expense(CAMRY.id, 'maintenance', '2025-06-03T12:00:00Z', 30_000, {
+      description: 'Brake pads',
+    });
+    await expense(LEAF.id, 'misc', '2025-06-20T12:00:00Z', 5_000);
   }
 
   test('names the costliest month and its largest expense', async () => {
-    seedMonths();
+    await seedMonths();
     const record = find(await insights(), 'recordMonth');
     expect(record?.value).toBe(350);
     expect(record?.unit).toBe('money');
@@ -133,22 +145,24 @@ describe('record month', () => {
   });
 
   test('counts running costs, as the chart does by default', async () => {
-    seedMonths();
-    expense(CAMRY.id, 'financial', '2025-03-01T12:00:00Z', 120_000, { description: 'Insurance' });
+    await seedMonths();
+    await expense(CAMRY.id, 'financial', '2025-03-01T12:00:00Z', 120_000, {
+      description: 'Insurance',
+    });
     const record = find(await insights(), 'recordMonth');
     expect(record?.value).toBe(350);
     expect(record?.sentence).not.toContain('Insurance');
   });
 
   test('needs three months with costs', async () => {
-    expense(CAMRY.id, 'maintenance', '2025-02-10T12:00:00Z', 10_000);
-    expense(CAMRY.id, 'maintenance', '2025-03-10T12:00:00Z', 20_000);
+    await expense(CAMRY.id, 'maintenance', '2025-02-10T12:00:00Z', 10_000);
+    await expense(CAMRY.id, 'maintenance', '2025-03-10T12:00:00Z', 20_000);
     expect(find(await insights(), 'recordMonth')).toBeUndefined();
   });
 
   test('writes money in the user currency', async () => {
-    seedMonths();
-    setPrefs({ distanceUnit: 'kilometers', volumeUnit: 'liters' }, 'EUR');
+    await seedMonths();
+    await setPrefs({ distanceUnit: 'kilometers', volumeUnit: 'liters' }, 'EUR');
     expect(find(await insights(), 'recordMonth')?.sentence).toContain('€300.00');
   });
 });
@@ -159,9 +173,15 @@ describe('repair-free streak', () => {
   afterEach(() => setSystemTime());
 
   test('counts days since the last repair, skipping routine work', async () => {
-    expense(CAMRY.id, 'maintenance', '2025-01-01T00:00:00Z', 40_000, { description: 'Alternator' });
-    expense(CAMRY.id, 'maintenance', '2025-07-04T00:00:00Z', 30_000, { description: 'Brake pads' });
-    expense(CAMRY.id, 'maintenance', '2025-10-01T00:00:00Z', 7_000, { description: 'Oil change' });
+    await expense(CAMRY.id, 'maintenance', '2025-01-01T00:00:00Z', 40_000, {
+      description: 'Alternator',
+    });
+    await expense(CAMRY.id, 'maintenance', '2025-07-04T00:00:00Z', 30_000, {
+      description: 'Brake pads',
+    });
+    await expense(CAMRY.id, 'maintenance', '2025-10-01T00:00:00Z', 7_000, {
+      description: 'Oil change',
+    });
     const streak = find(await insights({ end: END }), 'repairFree');
     expect(streak?.value).toBe(150);
     expect(streak?.sentence).toContain('2020 Toyota Camry: no repairs since Jul 4, 2025.');
@@ -170,16 +190,22 @@ describe('repair-free streak', () => {
   });
 
   test('says nothing for a range that ended in the past', async () => {
-    expense(CAMRY.id, 'maintenance', '2025-01-01T00:00:00Z', 40_000, { description: 'Alternator' });
+    await expense(CAMRY.id, 'maintenance', '2025-01-01T00:00:00Z', 40_000, {
+      description: 'Alternator',
+    });
     expect(
       find(await insights({ end: seconds('2025-09-01T00:00:00Z') }), 'repairFree')
     ).toBeUndefined();
   });
 
   test('says nothing without a repair, or right after one', async () => {
-    expense(CAMRY.id, 'maintenance', '2025-03-01T00:00:00Z', 7_000, { description: 'Oil change' });
+    await expense(CAMRY.id, 'maintenance', '2025-03-01T00:00:00Z', 7_000, {
+      description: 'Oil change',
+    });
     expect(find(await insights({ end: END }), 'repairFree')).toBeUndefined();
-    expense(CAMRY.id, 'maintenance', '2025-11-20T00:00:00Z', 30_000, { description: 'Brake pads' });
+    await expense(CAMRY.id, 'maintenance', '2025-11-20T00:00:00Z', 30_000, {
+      description: 'Brake pads',
+    });
     expect(find(await insights({ end: END }), 'repairFree')).toBeUndefined();
   });
 
@@ -196,15 +222,15 @@ describe('repair-free streak', () => {
 });
 
 describe('winter penalty', () => {
-  function seedCharges(years: number[], winter: number[]) {
-    testDb.sqlite.run("UPDATE vehicles SET vehicle_type = 'electric' WHERE id = ?", [LEAF.id]);
+  async function seedCharges(years: number[], winter: number[]) {
+    await testDb.sql.run("UPDATE vehicles SET vehicle_type = 'electric' WHERE id = ?", [LEAF.id]);
     let odometer = 1_000;
     for (const year of years) {
       for (let month = 1; month <= 12; month++) {
         for (const day of ['05', '20']) {
           odometer += winter.includes(month) ? 90 : 120;
           const iso = `${year}-${String(month).padStart(2, '0')}-${day}T12:00:00Z`;
-          expense(LEAF.id, 'fuel', iso, 900, {
+          await expense(LEAF.id, 'fuel', iso, 900, {
             mileage: odometer,
             volume: 30,
             fuelType: 'Level 2 (AC)',
@@ -215,7 +241,7 @@ describe('winter penalty', () => {
   }
 
   test('compares the three coldest months with the rest over two winters', async () => {
-    seedCharges([2024, 2025], [12, 1, 2]);
+    await seedCharges([2024, 2025], [12, 1, 2]);
     const winter = find(await insights(), 'winterPenalty');
     expect(winter?.value).toBe(33);
     expect(winter?.sentence).toBe(
@@ -226,16 +252,16 @@ describe('winter penalty', () => {
 
   test('a southern time zone uses June to August', async () => {
     expect(winterMonths('Australia/Sydney')).toEqual([6, 7, 8]);
-    seedCharges([2024, 2025], [6, 7, 8]);
+    await seedCharges([2024, 2025], [6, 7, 8]);
     const winter = find(await insights({ timeZone: 'Australia/Sydney' }), 'winterPenalty');
     expect(winter?.sentence).toContain('in Jun, Jul, Aug');
   });
 
   test('needs two winters, and says per km in metric', async () => {
-    seedCharges([2025], [12, 1, 2]);
+    await seedCharges([2025], [12, 1, 2]);
     expect(find(await insights(), 'winterPenalty')).toBeUndefined();
-    seedCharges([2024], [12, 1, 2]);
-    setPrefs({ distanceUnit: 'kilometers', volumeUnit: 'liters' });
+    await seedCharges([2024], [12, 1, 2]);
+    await setPrefs({ distanceUnit: 'kilometers', volumeUnit: 'liters' });
     expect(find(await insights(), 'winterPenalty')?.sentence).toContain('more kWh per km');
   });
 
@@ -249,20 +275,20 @@ describe('winter penalty', () => {
 });
 
 describe('cost per trip', () => {
-  function seedTrips(count: number) {
-    expense(CAMRY.id, 'fuel', '2025-03-01T12:00:00Z', 4_000, {
+  async function seedTrips(count: number) {
+    await expense(CAMRY.id, 'fuel', '2025-03-01T12:00:00Z', 4_000, {
       mileage: 10_000,
       volume: 10,
       fuelType: 'Regular',
     });
-    expense(CAMRY.id, 'fuel', '2025-09-01T12:00:00Z', 4_000, {
+    await expense(CAMRY.id, 'fuel', '2025-09-01T12:00:00Z', 4_000, {
       mileage: 11_000,
       volume: 10,
       fuelType: 'Regular',
     });
     const distances = [10, 20, 30];
     for (let i = 0; i < count; i++) {
-      trip(
+      await trip(
         CAMRY.id,
         `2025-0${4 + i}-10T12:00:00Z`,
         10_100 + i * 100,
@@ -273,7 +299,7 @@ describe('cost per trip', () => {
   }
 
   test('multiplies cost per mile by the average trip', async () => {
-    seedTrips(3);
+    await seedTrips(3);
     const trip = find(await insights(), 'costPerTrip');
     expect(trip?.value).toBe(1.6);
     expect(trip?.sentence).toBe(
@@ -282,46 +308,46 @@ describe('cost per trip', () => {
   });
 
   test('needs three trips', async () => {
-    seedTrips(2);
+    await seedTrips(2);
     expect(find(await insights(), 'costPerTrip')).toBeUndefined();
   });
 
   test('uses kilometres when the user does', async () => {
-    seedTrips(3);
-    setPrefs({ distanceUnit: 'kilometers', volumeUnit: 'liters' });
+    await seedTrips(3);
+    await setPrefs({ distanceUnit: 'kilometers', volumeUnit: 'liters' });
     expect(find(await insights(), 'costPerTrip')?.sentence).toContain('Your average trip is 20 km');
   });
 
   test('converts a car in kilometres for a user in miles', async () => {
-    seedTrips(3);
-    setUnits('cars', METRIC);
-    setUnits('user', MILES);
+    await seedTrips(3);
+    await setUnits('cars', METRIC);
+    await setUnits('user', MILES);
     const trip = find(await insights(), 'costPerTrip');
     expect(trip?.value).toBe(1.6);
     expect(trip?.sentence).toContain('Your average trip is 12 mi, at $0.13 per mile');
   });
 
   test('writes money in the user currency', async () => {
-    seedTrips(3);
-    setUnits('user', MILES, 'EUR');
+    await seedTrips(3);
+    await setUnits('user', MILES, 'EUR');
     expect(find(await insights(), 'costPerTrip')?.sentence).toContain('€0.08 per mile');
   });
 });
 
 describe('cheapest station', () => {
-  function fillAt(location: string, count: number, cents: number, fuelType = 'Regular') {
+  async function fillAt(location: string, count: number, cents: number, fuelType = 'Regular') {
     for (let i = 0; i < count; i++) {
-      const id = expense(CAMRY.id, 'fuel', `2025-0${1 + i}-15T12:00:00Z`, cents, {
+      const id = await expense(CAMRY.id, 'fuel', `2025-0${1 + i}-15T12:00:00Z`, cents, {
         volume: 10,
         fuelType,
       });
-      testDb.sqlite.run('UPDATE expenses SET location = ? WHERE id = ?', [location, id]);
+      await testDb.sql.run('UPDATE expenses SET location = ? WHERE id = ?', [location, id]);
     }
   }
 
   test('finds the lowest average price with three fill-ups', async () => {
-    fillAt('Costco', 3, 3_000);
-    fillAt('Shell', 3, 4_000);
+    await fillAt('Costco', 3, 3_000);
+    await fillAt('Shell', 3, 4_000);
     const station = find(await insights(), 'cheapestStation');
     expect(station?.value).toBe(3);
     expect(station?.unit).toBe('moneyPerVolume');
@@ -331,48 +357,48 @@ describe('cheapest station', () => {
   });
 
   test('needs three fill-ups at the station and elsewhere', async () => {
-    fillAt('Costco', 2, 3_000);
-    fillAt('Shell', 3, 4_000);
+    await fillAt('Costco', 2, 3_000);
+    await fillAt('Shell', 3, 4_000);
     expect(find(await insights(), 'cheapestStation')).toBeUndefined();
   });
 
   test('a saving under 2% is not worth a card', async () => {
-    fillAt('Costco', 3, 3_950);
-    fillAt('Shell', 3, 4_000);
+    await fillAt('Costco', 3, 3_950);
+    await fillAt('Shell', 3, 4_000);
     expect(find(await insights(), 'cheapestStation')).toBeUndefined();
   });
 
   test('compares stations only within one fuel grade', async () => {
-    fillAt('Costco', 3, 3_000);
-    fillAt('Arco', 3, 3_050);
-    fillAt('Shell', 3, 5_000, 'Premium');
+    await fillAt('Costco', 3, 3_000);
+    await fillAt('Arco', 3, 3_050);
+    await fillAt('Shell', 3, 5_000, 'Premium');
     expect(find(await insights(), 'cheapestStation')).toBeUndefined();
   });
 
   test('converts a car in liters for a user in gallons, in the user currency', async () => {
-    fillAt('Costco', 3, 3_000);
-    fillAt('Shell', 3, 4_000);
-    setUnits('cars', METRIC);
-    setUnits('user', MILES, 'EUR');
+    await fillAt('Costco', 3, 3_000);
+    await fillAt('Shell', 3, 4_000);
+    await setUnits('cars', METRIC);
+    await setUnits('user', MILES, 'EUR');
     expect(find(await insights(), 'cheapestStation')?.sentence).toContain(
       'Costco averaged €11.36 per gallon of Regular'
     );
   });
 
   test('prices per liter when the user does', async () => {
-    fillAt('Costco', 3, 3_000);
-    fillAt('Shell', 3, 4_000);
-    setPrefs({ distanceUnit: 'kilometers', volumeUnit: 'liters' });
+    await fillAt('Costco', 3, 3_000);
+    await fillAt('Shell', 3, 4_000);
+    await setPrefs({ distanceUnit: 'kilometers', volumeUnit: 'liters' });
     expect(find(await insights(), 'cheapestStation')?.sentence).toContain('per liter');
   });
 });
 
 describe('insights scope', () => {
   test("another user's cars give nothing", async () => {
-    seedUser(testDb.sqlite, { id: 'stranger', email: 's@test.com', displayName: 'S' });
-    expense(CAMRY.id, 'maintenance', '2025-02-10T12:00:00Z', 10_000);
-    expense(CAMRY.id, 'maintenance', '2025-03-10T12:00:00Z', 20_000);
-    expense(CAMRY.id, 'maintenance', '2025-06-03T12:00:00Z', 30_000);
+    await seedUser(testDb.sql, { id: 'stranger', email: 's@test.com', displayName: 'S' });
+    await expense(CAMRY.id, 'maintenance', '2025-02-10T12:00:00Z', 10_000);
+    await expense(CAMRY.id, 'maintenance', '2025-03-10T12:00:00Z', 20_000);
+    await expense(CAMRY.id, 'maintenance', '2025-06-03T12:00:00Z', 30_000);
     const list = await repo.insights('stranger', { ...RANGE, timeZone: 'UTC' });
     expect(list).toEqual([]);
     const forced = await repo.insights('stranger', {
@@ -407,7 +433,7 @@ function perfRow(v: number, i: number): Array<string | number | null> {
 function seedPerfFleet(sqlite: Database): void {
   sqlite.run("INSERT INTO users (id, email, display_name) VALUES ('perf', 'p@test.com', 'P')");
   const insert = sqlite.prepare(
-    "INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage, volume, fuel_type, location, missed_fillup) VALUES (?, ?, 'perf', ?, ?, ?, ?, ?, ?, ?, 0)"
+    "INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, mileage, volume, fuel_type, location, missed_fillup) VALUES (?, ?, 'perf', ?, ?, ?, ?, ?, ?, ?, FALSE)"
   );
   sqlite.transaction(() => {
     for (let v = 0; v < 3; v++) {
@@ -420,7 +446,7 @@ function seedPerfFleet(sqlite: Database): void {
   })();
 }
 
-describe('insights performance guard', () => {
+describe.skipIf(ON_POSTGRES)('insights performance guard', () => {
   test('a 10k-expense fleet answers in under 120 ms', async () => {
     const sqlite = new Database(':memory:');
     const migrations = loadMigrations();

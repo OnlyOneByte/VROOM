@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
 import {
-  createTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
+} from '../../../api/analytics/__tests__/analytics-test-db';
+import {
+  createTestDb,
   type TestDb,
 } from '../../../api/analytics/__tests__/analytics-test-generators';
+import { sqliteTestSql } from '../../../test-helpers/test-sql';
 import { openAsyncDatabase } from '../../async-sqlite';
 import { expenses } from '../../schema';
 import {
@@ -31,10 +34,14 @@ let testDb: TestDb;
 const USER_ID = 'user-1';
 const VEHICLE_ID = 'veh-1';
 
-beforeEach(() => {
+beforeEach(async () => {
   testDb = createTestDb();
-  seedUser(testDb.sqlite, { id: USER_ID, email: 'test@test.com', displayName: 'Test' });
-  seedVehicle(testDb.sqlite, {
+  await seedUser(sqliteTestSql(testDb.sqlite), {
+    id: USER_ID,
+    email: 'test@test.com',
+    displayName: 'Test',
+  });
+  await seedVehicle(sqliteTestSql(testDb.sqlite), {
     id: VEHICLE_ID,
     userId: USER_ID,
     make: 'Toyota',
@@ -47,8 +54,8 @@ afterEach(() => {
   testDb.sqlite.close();
 });
 
-function seedAt(id: string, date: Date): string {
-  seedExpense(testDb.sqlite, {
+async function seedAt(id: string, date: Date): Promise<string> {
+  await seedExpense(sqliteTestSql(testDb.sqlite), {
     id,
     vehicleId: VEHICLE_ID,
     category: 'fuel',
@@ -64,7 +71,7 @@ function seedAt(id: string, date: Date): string {
 
 describe('sql-helpers over real SQLite', () => {
   test('extractMonth returns the 1-12 calendar month', async () => {
-    seedAt('e-mar', new Date(2024, 2, 15));
+    await seedAt('e-mar', new Date(2024, 2, 15));
     const [row] = await testDb.drizzle
       .select({ month: extractMonth(expenses.date) })
       .from(expenses)
@@ -73,8 +80,8 @@ describe('sql-helpers over real SQLite', () => {
   });
 
   test('extractMonth covers the boundary months (January → 1, December → 12)', async () => {
-    seedAt('e-jan', new Date(2024, 0, 1));
-    seedAt('e-dec', new Date(2024, 11, 31));
+    await seedAt('e-jan', new Date(2024, 0, 1));
+    await seedAt('e-dec', new Date(2024, 11, 31));
 
     const [jan] = await testDb.drizzle
       .select({ month: extractMonth(expenses.date) })
@@ -90,7 +97,7 @@ describe('sql-helpers over real SQLite', () => {
   });
 
   test('formatYearMonth returns YYYY-MM', async () => {
-    seedAt('e-ym', new Date(2024, 2, 15));
+    await seedAt('e-ym', new Date(2024, 2, 15));
     const [row] = await testDb.drizzle
       .select({ ym: formatYearMonth(expenses.date) })
       .from(expenses)
@@ -99,8 +106,8 @@ describe('sql-helpers over real SQLite', () => {
   });
 
   test('formatYearMonth keeps distinct months in distinct buckets', async () => {
-    seedAt('e-a', new Date(2024, 0, 10));
-    seedAt('e-b', new Date(2024, 1, 10));
+    await seedAt('e-a', new Date(2024, 0, 10));
+    await seedAt('e-b', new Date(2024, 1, 10));
 
     const rows = await testDb.drizzle.select({ ym: formatYearMonth(expenses.date) }).from(expenses);
     const keys = rows.map((r) => r.ym).sort();
@@ -108,7 +115,7 @@ describe('sql-helpers over real SQLite', () => {
   });
 
   test('toDateTimeString returns a UTC datetime string', async () => {
-    seedAt('e-dt', new Date(Date.UTC(2024, 2, 15, 0, 0, 0)));
+    await seedAt('e-dt', new Date(Date.UTC(2024, 2, 15, 0, 0, 0)));
     const [row] = await testDb.drizzle
       .select({ dt: toDateTimeString(expenses.date) })
       .from(expenses)
@@ -131,15 +138,15 @@ describe('portable fragments over real SQLite', () => {
   }
 
   test('sqlTrue() and sqlFalse() keep or drop every row', async () => {
-    seedAt('e-1', new Date(2024, 0, 1));
+    await seedAt('e-1', new Date(2024, 0, 1));
     expect(await idsWhere(sqlTrue())).toEqual(['e-1']);
     expect(await idsWhere(sqlFalse())).toEqual([]);
   });
 
   test('jsonArraySome and jsonArrayIsEmpty read a JSON array column', async () => {
-    tag(seedAt('e-road', new Date(2024, 0, 1)), ['road trip', 'work']);
-    tag(seedAt('e-none', new Date(2024, 0, 2)), []);
-    tag(seedAt('e-null', new Date(2024, 0, 3)), null);
+    tag(await seedAt('e-road', new Date(2024, 0, 1)), ['road trip', 'work']);
+    tag(await seedAt('e-none', new Date(2024, 0, 2)), []);
+    tag(await seedAt('e-null', new Date(2024, 0, 3)), null);
 
     expect(await idsWhere(jsonArraySome(expenses.tags, (el) => sql`${el} = ${'work'}`))).toEqual([
       'e-road',
@@ -160,8 +167,8 @@ describe('portable fragments over real SQLite', () => {
   });
 
   test('countNum and sumNum return numbers, and sumNum of no rows is 0', async () => {
-    seedAt('e-a', new Date(2024, 0, 1));
-    seedAt('e-b', new Date(2024, 0, 2));
+    await seedAt('e-a', new Date(2024, 0, 1));
+    await seedAt('e-b', new Date(2024, 0, 2));
     const [all] = await testDb.drizzle
       .select({ n: countNum(), total: sumNum(expenses.expenseAmount) })
       .from(expenses);
