@@ -97,7 +97,7 @@
 
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
-		<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
+		<h2 class="text-sm font-medium text-foreground">Photos & receipts</h2>
 		<Button
 			bind:ref={uploadButton}
 			variant="outline"
@@ -166,7 +166,7 @@
 	{#await mediaDialog then { default: MediaCaptureDialog }}
 		<MediaCaptureDialog
 			bind:open={showUploadDialog}
-			title="Upload Photos & Receipts"
+			title="Upload photos & receipts"
 			description="Add photos or receipt images for this {ENTITY_NOUN[entityType]}"
 			acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
 			onUpload={file => expenseApi.uploadPhoto(entityType, entityId, file)}

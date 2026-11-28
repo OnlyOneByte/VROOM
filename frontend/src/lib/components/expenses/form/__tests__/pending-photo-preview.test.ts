@@ -97,7 +97,7 @@ describe('PendingPhotoPreview', () => {
 		const { onAdd } = mount([]);
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-		expect(await screen.findByText('Add Photos & Receipts')).toBeInTheDocument();
+		expect(await screen.findByText('Add photos & receipts')).toBeInTheDocument();
 		const input = (await waitFor(() => {
 			const el = document.querySelector('input[type="file"]');
 			expect(el).not.toBeNull();

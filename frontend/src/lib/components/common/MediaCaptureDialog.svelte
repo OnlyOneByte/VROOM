@@ -29,7 +29,7 @@
 
 	let {
 		open = $bindable(),
-		title = 'Upload Photos',
+		title = 'Upload photos',
 		description = 'Select, drag, or capture photos',
 		acceptedTypes = DEFAULT_IMAGE_TYPES,
 		maxFileSize = DEFAULT_MAX_SIZE,

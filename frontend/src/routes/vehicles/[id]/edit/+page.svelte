@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-	<title>Edit Vehicle - VROOM Car Tracker</title>
+	<title>Edit vehicle - VROOM Car Tracker</title>
 	<meta name="description" content="Edit vehicle information" />
 </svelte:head>
 

@@ -35,8 +35,8 @@ async function saveFromVehicle(page: Page) {
 	await page.getByRole('radio', { name: 'Misc' }).click();
 	await page.getByLabel('Amount *').fill('12.34');
 	await page.getByRole('button', { name: /More details/ }).click();
-	await page.getByLabel('Description (Optional)').fill('Car wash on Elm');
-	await page.getByRole('button', { name: 'Save Expense' }).click();
+	await page.getByLabel('Description (optional)').fill('Car wash on Elm');
+	await page.getByRole('button', { name: 'Save expense' }).click();
 	await expect(page).toHaveURL(new RegExp(`${VEHICLE}$`));
 }
 

@@ -152,8 +152,8 @@ describe('ExpensesTable empty state', () => {
 		mountTable({ expenses: [], hasActiveFilters: true, onClearFilters });
 
 		expect(screen.getByText('No matching expenses')).toBeTruthy();
-		expect(screen.queryByRole('link', { name: 'Add First Expense' })).toBeNull();
-		await fireEvent.click(screen.getByRole('button', { name: 'Clear Filters' }));
+		expect(screen.queryByRole('link', { name: 'Add first expense' })).toBeNull();
+		await fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
 		expect(onClearFilters).toHaveBeenCalledTimes(1);
 	});
 
@@ -161,7 +161,7 @@ describe('ExpensesTable empty state', () => {
 		mountTable({ expenses: [], hasActiveFilters: true });
 
 		expect(screen.getByText('No matching expenses')).toBeTruthy();
-		expect(screen.getByRole('link', { name: 'Add First Expense' })).toBeTruthy();
+		expect(screen.getByRole('link', { name: 'Add first expense' })).toBeTruthy();
 	});
 });
 

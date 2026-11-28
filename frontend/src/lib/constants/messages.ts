@@ -2,12 +2,12 @@ export const COMMON_MESSAGES = {
 	NO_EXPENSES: 'No expenses yet',
 	NO_FUEL_DATA: 'No fuel data yet',
 
-	ADD_EXPENSE: 'Add Expense',
-	ADD_FIRST_EXPENSE: 'Add First Expense',
-	ADD_FUEL_EXPENSE: 'Add Fuel Expense',
-	CLEAR_FILTERS: 'Clear Filters',
+	ADD_EXPENSE: 'Add expense',
+	ADD_FIRST_EXPENSE: 'Add first expense',
+	ADD_FUEL_EXPENSE: 'Add fuel expense',
+	CLEAR_FILTERS: 'Clear filters',
 
-	ALL_VEHICLES: 'All Vehicles'
+	ALL_VEHICLES: 'All vehicles'
 } as const;
 
 export const VEHICLE_MESSAGES = {
@@ -18,9 +18,9 @@ export const VEHICLE_MESSAGES = {
 } as const;
 
 export const EXPENSE_MESSAGES = {
-	EXPENSES_BY_CATEGORY: 'Expenses by Category',
-	PENDING_SYNC: 'Pending Sync',
-	RECENTLY_SYNCED: 'Recently Synced',
+	EXPENSES_BY_CATEGORY: 'Expenses by category',
+	PENDING_SYNC: 'Pending sync',
+	RECENTLY_SYNCED: 'Recently synced',
 	NO_EXPENSES_DESC: 'Start tracking your vehicle expenses to see insights and analytics.',
 	ADD_FUEL_DESC: 'Add fuel expenses with mileage to see detailed fuel statistics'
 } as const;

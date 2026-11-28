@@ -196,7 +196,7 @@ describe('CameraTab: capturing', () => {
 		const { onUploadCapture } = mount();
 		await fireEvent.click(await waitForViewfinder());
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Use Photo' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Use photo' }));
 
 		await waitFor(() => expect(onUploadCapture).toHaveBeenCalledOnce());
 		const file = vi.mocked(onUploadCapture).mock.calls[0]?.[0];

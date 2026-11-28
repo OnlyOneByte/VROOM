@@ -152,7 +152,7 @@
 </script>
 
 <svelte:head>
-	<title>Edit Odometer Reading - VROOM Car Tracker</title>
+	<title>Edit odometer reading - VROOM Car Tracker</title>
 	<meta name="description" content="Edit an odometer reading" />
 </svelte:head>
 

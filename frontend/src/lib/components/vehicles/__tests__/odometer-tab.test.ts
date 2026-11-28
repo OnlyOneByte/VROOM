@@ -107,23 +107,23 @@ describe('OdometerTab load states', () => {
 		expect(getHistory).toHaveBeenCalledWith('v1', { limit: 20, offset: 0 });
 	});
 
-	test('an empty history shows the empty state with an Add Reading link for writers', async () => {
+	test('an empty history shows the empty state with an Add reading link for writers', async () => {
 		mount();
 		await settle();
 
 		expect(screen.getByText('No odometer readings yet')).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Add Reading' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'Add reading' })).toHaveAttribute(
 			'href',
 			'/vehicles/v1/odometer/new'
 		);
 	});
 
-	test('a read-only viewer sees the empty state without Add Reading', async () => {
+	test('a read-only viewer sees the empty state without Add reading', async () => {
 		mount({ canWrite: false });
 		await settle();
 
 		expect(screen.getByText('No odometer readings yet')).toBeInTheDocument();
-		expect(screen.queryByRole('link', { name: 'Add Reading' })).toBeNull();
+		expect(screen.queryByRole('link', { name: 'Add reading' })).toBeNull();
 	});
 
 	test('a load failure shows the error and Retry reloads from the first page', async () => {
@@ -175,12 +175,12 @@ describe('OdometerTab entry list', () => {
 		expect(screen.getByText(/72,000\s+km/)).toBeInTheDocument();
 	});
 
-	test('writers get Add Reading, edit and delete actions with an edit link back to the vehicle', async () => {
+	test('writers get Add reading, edit and delete actions with an edit link back to the vehicle', async () => {
 		getHistory.mockResolvedValue(page([entry({ sourceId: 'o7' })]));
 		mount();
 		await settle();
 
-		expect(screen.getByRole('link', { name: 'Add Reading' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Add reading' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Edit reading' })).toHaveAttribute(
 			'href',
 			'/vehicles/v1/odometer/o7/edit?returnTo=/vehicles/v1'
@@ -194,7 +194,7 @@ describe('OdometerTab entry list', () => {
 		await settle();
 
 		expect(screen.getByText('Readings (1)')).toBeInTheDocument();
-		expect(screen.queryByRole('link', { name: 'Add Reading' })).toBeNull();
+		expect(screen.queryByRole('link', { name: 'Add reading' })).toBeNull();
 		expect(screen.queryByRole('link', { name: 'Edit reading' })).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Delete reading' })).toBeNull();
 	});

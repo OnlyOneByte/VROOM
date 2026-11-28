@@ -42,7 +42,7 @@
 		<div class="flex items-center justify-between">
 			<CardTitle level={2} class="flex items-center gap-2">
 				<Car class="h-5 w-5" />
-				Vehicle Information
+				Vehicle information
 			</CardTitle>
 			{#if isOwner}
 				<Button
@@ -88,7 +88,7 @@
 
 			{#if vehicle.licensePlate}
 				<div class="space-y-1">
-					<p class="text-sm font-medium text-muted-foreground">License Plate</p>
+					<p class="text-sm font-medium text-muted-foreground">License plate</p>
 					<p class="text-base font-semibold font-mono">{vehicle.licensePlate}</p>
 				</div>
 			{/if}
@@ -102,7 +102,7 @@
 
 			{#if vehicle.initialMileage}
 				<div class="space-y-1">
-					<p class="text-sm font-medium text-muted-foreground">Initial Mileage</p>
+					<p class="text-sm font-medium text-muted-foreground">Initial mileage</p>
 					<p class="text-base font-semibold">
 						{formatNumber(vehicle.initialMileage, 0)}
 						{distanceLabel}
@@ -112,7 +112,7 @@
 
 			{#if vehicle.purchaseDate}
 				<div class="space-y-1">
-					<p class="text-sm font-medium text-muted-foreground">Purchase Date</p>
+					<p class="text-sm font-medium text-muted-foreground">Purchase date</p>
 					<p class="text-base font-semibold">
 						{formatDate(new Date(vehicle.purchaseDate))}
 					</p>
@@ -121,7 +121,7 @@
 
 			{#if vehicle.purchasePrice}
 				<div class="space-y-1">
-					<p class="text-sm font-medium text-muted-foreground">Purchase Price</p>
+					<p class="text-sm font-medium text-muted-foreground">Purchase price</p>
 					<p class="text-base font-semibold">{formatCurrency(vehicle.purchasePrice)}</p>
 				</div>
 			{/if}

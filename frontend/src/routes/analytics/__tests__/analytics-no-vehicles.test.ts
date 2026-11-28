@@ -31,12 +31,12 @@ vi.mock('#lib/services/analytics-api.ts', () => ({
 import Page from '../+page.svelte';
 
 describe('analytics with no vehicles', () => {
-	test('shows the Add Vehicle empty state instead of zero tiles and tabs', async () => {
+	test('shows the Add vehicle empty state instead of zero tiles and tabs', async () => {
 		vehicleCount.value = 0;
 		const { container } = render(Page);
 
 		await screen.findByRole('heading', { name: 'Add a vehicle first' });
-		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'Add vehicle' })).toHaveAttribute(
 			'href',
 			'/vehicles/new'
 		);

@@ -39,7 +39,7 @@ const TRIP = {
 } as unknown as Trip;
 
 function logTripControls() {
-	return screen.queryAllByRole('button', { name: 'Log Trip' });
+	return screen.queryAllByRole('button', { name: 'Log trip' });
 }
 
 beforeEach(() => {
@@ -47,7 +47,7 @@ beforeEach(() => {
 });
 
 describe('/trips primary action', () => {
-	test('the empty state offers Log Trip once', async () => {
+	test('the empty state offers Log trip once', async () => {
 		listTrips.mockImplementation(() =>
 			Promise.resolve({ data: [], pagination: { totalCount: 0, limit: 100, offset: 0 } })
 		);
@@ -57,7 +57,7 @@ describe('/trips primary action', () => {
 		expect(logTripControls()).toHaveLength(1);
 	});
 
-	test('a populated list offers Log Trip once', async () => {
+	test('a populated list offers Log trip once', async () => {
 		listTrips.mockImplementation(() =>
 			Promise.resolve({ data: [TRIP], pagination: { totalCount: 1, limit: 100, offset: 0 } })
 		);

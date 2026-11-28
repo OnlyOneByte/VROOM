@@ -193,18 +193,18 @@ afterEach(() => {
 const SEARCH_DEBOUNCE_WAIT = { timeout: 4000 };
 
 describe('/expenses with no vehicles', () => {
-	test('shows only the Add Vehicle empty state: no filters, overview, list or Add Expense', async () => {
+	test('shows only the Add vehicle empty state: no filters, overview, list or Add expense', async () => {
 		getVehicles.mockResolvedValue([]);
 		getAllExpenses.mockResolvedValue(pageOf([], 0));
 		getExpenseSummary.mockResolvedValue({ ...SUMMARY, totalAmount: 0, expenseCount: 0 });
 		render(Page);
 
 		await screen.findByRole('heading', { name: 'Add a vehicle first' });
-		expect(screen.getByRole('link', { name: 'Add Vehicle' }).getAttribute('href')).toBe(
+		expect(screen.getByRole('link', { name: 'Add vehicle' }).getAttribute('href')).toBe(
 			'/vehicles/new'
 		);
 		expect(screen.queryByRole('textbox', { name: 'Search expenses and vehicles' })).toBeNull();
-		expect(screen.queryByText('Search & Filters')).toBeNull();
+		expect(screen.queryByText('Search & filters')).toBeNull();
 		expect(screen.queryByText('Expense Overview')).toBeNull();
 		expect(captured.table['expenses']).toBeUndefined();
 		expect(screen.queryByRole('link', { name: /add expense/i })).toBeNull();
@@ -279,7 +279,7 @@ describe('/expenses first screen', () => {
 		expect(await screen.findByText('1 expense matches your filters')).toBeInTheDocument();
 	});
 
-	test('while Clear Filters reloads, the table keeps the filter state of the rows it shows', async () => {
+	test('while Clear filters reloads, the table keeps the filter state of the rows it shows', async () => {
 		await mountLoaded();
 		getAllExpenses.mockResolvedValue(pageOf([], 0));
 		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses and vehicles' }), {
@@ -297,7 +297,7 @@ describe('/expenses first screen', () => {
 					release = () => resolve(pageOf(ROWS));
 				})
 		);
-		await fireEvent.click(screen.getByRole('button', { name: 'Clear Filters' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
 		expect(captured.table['hasActiveFilters']).toBe(true);
 		expect(screen.getByText('0 expenses match your filters')).toBeInTheDocument();
 
@@ -397,7 +397,7 @@ describe('/expenses loading states', () => {
 describe('/expenses filters', () => {
 	test('picking a vehicle filters the list and summary and offers to clear filters', async () => {
 		await mountLoaded();
-		expect(screen.queryByRole('button', { name: /Clear Filters/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Clear filters/ })).toBeNull();
 		expect(captured.table['hasActiveFilters']).toBe(false);
 
 		await chooseVehicle('2020 Nissan Leaf');
@@ -409,11 +409,11 @@ describe('/expenses filters', () => {
 			'aria-pressed',
 			'true'
 		);
-		expect(screen.getByRole('button', { name: /Clear Filters/ })).toBeTruthy();
+		expect(screen.getByRole('button', { name: /Clear filters/ })).toBeTruthy();
 		expect(captured.table['hasActiveFilters']).toBe(true);
 	});
 
-	test('picking All Vehicles drops the vehicle filter again', async () => {
+	test('picking All vehicles drops the vehicle filter again', async () => {
 		await mountLoaded();
 		await chooseVehicle('Daily Driver');
 		await waitFor(() => expect(lastListParams()).toMatchObject({ vehicleId: 'v1' }));
@@ -659,7 +659,7 @@ describe('/expenses filters', () => {
 		);
 		const calls = getAllExpenses.mock.calls.length;
 
-		await fireEvent.click(screen.getByRole('button', { name: /Clear Filters/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
 
 		await waitFor(
 			() => expect(getAllExpenses.mock.calls.length).toBe(calls + 1),
@@ -669,7 +669,7 @@ describe('/expenses filters', () => {
 		expect(params).not.toHaveProperty('vehicleId');
 		expect(params).not.toHaveProperty('category');
 		expect(params).not.toHaveProperty('tags');
-		expect(screen.queryByRole('button', { name: /Clear Filters/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Clear filters/ })).toBeNull();
 		expect(captured.table['hasActiveFilters']).toBe(false);
 	});
 });

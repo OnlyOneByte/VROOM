@@ -42,7 +42,7 @@ function mount(
 }
 
 function paymentInput(): HTMLInputElement {
-	return screen.getByLabelText(/Monthly Payment/) as HTMLInputElement;
+	return screen.getByLabelText(/Monthly payment/) as HTMLInputElement;
 }
 
 function saveButton(): HTMLButtonElement {

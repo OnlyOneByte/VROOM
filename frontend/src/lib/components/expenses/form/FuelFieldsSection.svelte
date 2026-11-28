@@ -242,7 +242,7 @@
 </script>
 
 <div class={quick ? 'space-y-5' : 'space-y-3'}>
-	<h2 class="sr-only">{charging ? 'Charging Details' : 'Fuel Details'}</h2>
+	<h2 class="sr-only">{charging ? 'Charging details' : 'Fuel details'}</h2>
 	{#if showToggle}
 		<div class="flex gap-1 rounded-lg bg-muted p-1">
 			<Button

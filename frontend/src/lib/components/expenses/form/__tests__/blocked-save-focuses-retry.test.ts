@@ -56,7 +56,7 @@ afterEach(() => {
 });
 
 function saveBarButton(): HTMLButtonElement {
-	return screen.getByRole('button', { name: /Save Expense/ });
+	return screen.getByRole('button', { name: /Save expense/ });
 }
 
 describe('a Save blocked by a failed vehicle load', () => {

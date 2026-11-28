@@ -81,7 +81,7 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="sm:max-w-lg max-h-[90vh] overflow-y-auto">
 		<Dialog.Header>
-			<Dialog.Title>{isEdit ? 'Edit Reminder' : 'New Reminder'}</Dialog.Title>
+			<Dialog.Title>{isEdit ? 'Edit reminder' : 'New reminder'}</Dialog.Title>
 			<Dialog.Description>
 				Get notified about recurring maintenance or events on your vehicles.
 			</Dialog.Description>
@@ -142,7 +142,7 @@
 						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 						{isEdit ? 'Saving…' : 'Creating…'}
 					{:else}
-						{isEdit ? 'Save Changes' : 'Create Reminder'}
+						{isEdit ? 'Save changes' : 'Create reminder'}
 					{/if}
 				</Button>
 			</Dialog.Footer>

@@ -210,7 +210,7 @@ describe('charging fields', () => {
 	test('labels the charge input in kWh and offers the charging types', async () => {
 		const section = mount({ ...EV });
 		expect(screen.getByText('kWh *')).toBeInTheDocument();
-		expect(screen.getByText('Charging Type')).toBeInTheDocument();
+		expect(screen.getByText('Charging type')).toBeInTheDocument();
 		await openSelect(section.trigger());
 		const options = await screen.findAllByRole('option');
 		expect(options.map(option => option.textContent?.trim())).toEqual([
@@ -282,7 +282,7 @@ describe('hybrid toggle', () => {
 		const section = mount({ ...HYBRID, volume: '12', fuelType: '87 (Regular)' });
 		await fireEvent.click(screen.getByRole('button', { name: 'Fuel' }));
 		expect(section.form).toMatchObject({ volume: '12', fuelType: '87 (Regular)' });
-		expect(screen.getByText('Fuel Details')).toBeInTheDocument();
+		expect(screen.getByText('Fuel details')).toBeInTheDocument();
 	});
 });
 

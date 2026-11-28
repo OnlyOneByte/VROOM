@@ -242,7 +242,7 @@
 			{#if canWrite}
 				<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
 					<Plus class="h-4 w-4 mr-2" />
-					Add Reading
+					Add reading
 				</Button>
 			{/if}
 		{/snippet}
@@ -253,14 +253,14 @@
 			<div class="flex justify-end">
 				<Button href={resolve(paramRoutes.vehicleOdometerNew, { id: vehicleId })}>
 					<Plus class="h-4 w-4 mr-2" />
-					Add Reading
+					Add reading
 				</Button>
 			</div>
 		{/if}
 
 		{#if chartError || chartData.length >= MIN_CHART_POINTS}
 			<AppLineChart
-				title="Mileage Over Time"
+				title="Mileage over time"
 				description={chartIsCapped
 					? `Your latest ${CHART_READING_LIMIT} readings`
 					: 'Odometer readings plotted by date'}
@@ -405,7 +405,7 @@
 <Dialog.Root bind:open={deleteDialogOpen}>
 	<Dialog.Content class="sm:max-w-sm">
 		<Dialog.Header>
-			<Dialog.Title>Delete Reading</Dialog.Title>
+			<Dialog.Title>Delete reading</Dialog.Title>
 			<Dialog.Description>
 				Are you sure you want to delete this odometer reading
 				{#if deletingEntry}

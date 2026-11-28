@@ -248,7 +248,7 @@ describe('MediaCaptureDialog: camera', () => {
 		await fireEvent.click(tab);
 		await waitFor(() => expect(screen.getByRole('button', { name: 'Take photo' })).toBeEnabled());
 		await fireEvent.click(screen.getByRole('button', { name: 'Take photo' }));
-		await fireEvent.click(await screen.findByRole('button', { name: 'Use Photo' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Use photo' }));
 
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 		expect(onUpload).toHaveBeenCalledWith(expect.objectContaining({ type: 'image/jpeg' }));
@@ -267,7 +267,7 @@ describe('MediaCaptureDialog: camera', () => {
 		await fireEvent.click(tab);
 		await waitFor(() => expect(screen.getByRole('button', { name: 'Take photo' })).toBeEnabled());
 		await fireEvent.click(screen.getByRole('button', { name: 'Take photo' }));
-		await fireEvent.click(await screen.findByRole('button', { name: 'Use Photo' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Use photo' }));
 
 		const cameraPanel = await screen.findByRole('tabpanel');
 		expect(

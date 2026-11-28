@@ -20,11 +20,11 @@ describe('getVehicleDisplayName', () => {
 		).toBe('2020 Toyota Camry');
 	});
 
-	test('null vehicle → "Unknown Vehicle" (deleted-vehicle fallback, never dereferences null)', () => {
-		expect(getVehicleDisplayName(null)).toBe('Unknown Vehicle');
+	test('null vehicle → "Unknown vehicle" (deleted-vehicle fallback, never dereferences null)', () => {
+		expect(getVehicleDisplayName(null)).toBe('Unknown vehicle');
 	});
 
-	test('undefined vehicle → "Unknown Vehicle" (transient/loading data)', () => {
-		expect(getVehicleDisplayName(undefined)).toBe('Unknown Vehicle');
+	test('undefined vehicle → "Unknown vehicle" (transient/loading data)', () => {
+		expect(getVehicleDisplayName(undefined)).toBe('Unknown vehicle');
 	});
 });

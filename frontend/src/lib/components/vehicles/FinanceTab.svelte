@@ -186,7 +186,7 @@
 	{:else}
 		<Alert variant="destructive">
 			<CircleAlert class="h-4 w-4" />
-			<AlertTitle>Invalid Financing Data</AlertTitle>
+			<AlertTitle>Invalid financing data</AlertTitle>
 			<AlertDescription>
 				The financing information for this vehicle is incomplete or invalid. Please update the
 				financing details.
@@ -210,9 +210,9 @@
 	{#if vehicle.financing.financingType === 'loan' && (!vehicle.financing.apr || vehicle.financing.apr <= 0)}
 		<Alert>
 			<CircleAlert class="h-4 w-4" />
-			<AlertTitle>APR Not Set</AlertTitle>
+			<AlertTitle>APR not set</AlertTitle>
 			<AlertDescription>
-				The APR (Annual Percentage Rate) is not set for this loan. Some features like the
+				The APR (annual percentage rate) is not set for this loan. Some features like the
 				amortization schedule and interest calculations will not be available.
 			</AlertDescription>
 		</Alert>

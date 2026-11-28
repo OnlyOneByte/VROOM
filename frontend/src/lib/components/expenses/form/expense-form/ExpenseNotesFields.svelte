@@ -24,7 +24,7 @@
 </script>
 
 <div class="space-y-2">
-	<Label for="description">Description (Optional)</Label>
+	<Label for="description">Description (optional)</Label>
 	<Textarea
 		id="description"
 		bind:value={description}
@@ -35,7 +35,7 @@
 </div>
 
 <div class="space-y-2">
-	<Label for="location">Location (Optional)</Label>
+	<Label for="location">Location (optional)</Label>
 	<Input
 		id="location"
 		bind:value={location}

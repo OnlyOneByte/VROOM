@@ -258,14 +258,14 @@ describe('ExpenseForm create mode', () => {
 		}
 	);
 
-	test('with no vehicles the form gives way to an Add Vehicle empty state', async () => {
+	test('with no vehicles the form gives way to an Add vehicle empty state', async () => {
 		getVehicles.mockResolvedValue([]);
 		render(ExpenseForm, { props: { preselectedCategory: 'misc', preselectedAmount: '5' } });
 
 		await screen.findByRole('heading', { name: 'Add a vehicle first' });
 
 		expect(screen.getByRole('heading', { name: 'New expense' })).toBeTruthy();
-		expect(screen.getByRole('link', { name: 'Add Vehicle' }).getAttribute('href')).toBe(
+		expect(screen.getByRole('link', { name: 'Add vehicle' }).getAttribute('href')).toBe(
 			'/vehicles/new'
 		);
 		expect(document.getElementById('vehicle')).toBeNull();
@@ -1042,7 +1042,7 @@ describe('ExpenseForm loading and load failures', () => {
 		render(ExpenseForm, { props: { expenseId: 'exp-1' } });
 
 		const card = await screen.findByTestId('vehicles-load-error');
-		expect(screen.getByRole('heading', { name: 'Edit Expense' })).toBeTruthy();
+		expect(screen.getByRole('heading', { name: 'Edit expense' })).toBeTruthy();
 		expect(card).toHaveTextContent("Couldn't load your vehicles");
 		expect(card).toHaveTextContent(/offline/i);
 
@@ -1075,7 +1075,7 @@ describe('ExpenseForm loading and load failures', () => {
 		render(ExpenseForm, { props: { expenseId: 'e1' } });
 
 		await screen.findByTestId('vehicles-load-error');
-		expect(screen.getByRole('heading', { name: 'Edit Split Expense' })).toBeTruthy();
+		expect(screen.getByRole('heading', { name: 'Edit split expense' })).toBeTruthy();
 	});
 });
 
@@ -1115,11 +1115,11 @@ describe('ExpenseForm financing and insurance links', () => {
 		});
 		render(ExpenseForm, { props: { expenseId: 'ins-1', returnTo: '/vehicles/v1' } });
 
-		await screen.findByRole('heading', { name: 'Insurance Expense' });
+		await screen.findByRole('heading', { name: 'Insurance expense' });
 		expect(screen.getByText('Managed by insurance policy')).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /save changes/i })).toBeNull();
 
-		await fireEvent.click(screen.getByRole('button', { name: /Force Delete/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Force delete/ }));
 		expect(await screen.findByRole('alertdialog')).toBeTruthy();
 
 		await fireEvent.click(screen.getByRole('button', { name: /Back to Expenses/ }));

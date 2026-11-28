@@ -419,13 +419,13 @@
 			return {
 				title: 'End the lease?',
 				description: `Switching to Own ends the lease${lender}. It will no longer show on the Finance tab. Lease payments you already logged stay in your expenses.`,
-				confirmLabel: 'End Lease'
+				confirmLabel: 'End lease'
 			};
 		}
 		return {
 			title: 'Mark the loan as paid off?',
 			description: `Switching to Own marks the loan${lender} as paid off. It will no longer show on the Finance tab. Loan payments you already logged stay in your expenses.`,
-			confirmLabel: 'Mark Paid Off'
+			confirmLabel: 'Mark paid off'
 		};
 	});
 
@@ -1085,7 +1085,7 @@
 		<AlertDialog bind:open={showDeleteConfirm}>
 			<AlertDialogContent>
 				<AlertDialogHeader>
-					<AlertDialogTitle>Delete Vehicle</AlertDialogTitle>
+					<AlertDialogTitle>Delete vehicle</AlertDialogTitle>
 					<AlertDialogDescription>
 						Are you sure you want to delete this vehicle? This permanently deletes the vehicle and
 						everything attached to it — all expenses, fuel and charging history, odometer readings,
@@ -1127,7 +1127,7 @@
 							Deleting...
 						{:else}
 							<Trash2 class="h-4 w-4 mr-2" />
-							Delete Vehicle
+							Delete vehicle
 						{/if}
 					</AlertDialogAction>
 				</AlertDialogFooter>
@@ -1147,7 +1147,7 @@
 			bind:open={showUnitChangeConfirm}
 			title="Change units for this vehicle?"
 			description={unitChangeDescription}
-			confirmLabel="Change Units"
+			confirmLabel="Change units"
 			destructive={false}
 			onConfirm={() => saveVehicle(true)}
 		/>

@@ -201,7 +201,7 @@ describe('/expenses initial load', () => {
 		expect(await screen.findByText("You're offline")).toBeInTheDocument();
 		expect(screen.queryByText("Couldn't load expenses")).not.toBeInTheDocument();
 		expect(screen.getByText(/Queued oil top-up/)).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: /Add Expense/ })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: /Add expense/ })).toHaveAttribute(
 			'href',
 			'/expenses/new'
 		);

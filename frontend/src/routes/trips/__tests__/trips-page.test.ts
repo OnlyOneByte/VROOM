@@ -159,28 +159,28 @@ describe('trips page load states', () => {
 		expect(screen.getByText(UNEXPECTED_FAILURE_MESSAGE)).toBeInTheDocument();
 	});
 
-	test('no trips shows the empty state and Log Trip opens the form', async () => {
+	test('no trips shows the empty state and Log trip opens the form', async () => {
 		render(Page);
 		await settle();
 
 		expect(screen.getByText('No trips yet')).toBeInTheDocument();
-		await fireEvent.click(screen.getByRole('button', { name: 'Log Trip' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Log trip' }));
 
 		expect(formProps['open']).toBe(true);
 		expect(formProps['trip']).toBeNull();
 	});
 
-	test('with no vehicles the empty state asks for a vehicle first and links to Add Vehicle', async () => {
+	test('with no vehicles the empty state asks for a vehicle first and links to Add vehicle', async () => {
 		getVehicles.mockResolvedValue([]);
 		render(Page);
 		await settle();
 
 		expect(screen.getByText('Add a vehicle first')).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'Add vehicle' })).toHaveAttribute(
 			'href',
 			'/vehicles/new'
 		);
-		expect(screen.queryByRole('button', { name: 'Log Trip' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Log trip' })).toBeNull();
 		expect(screen.queryByText('No trips yet')).toBeNull();
 	});
 });
@@ -193,7 +193,7 @@ describe('trips page list', () => {
 
 		const card = screen.getByTestId('trip-summary-card');
 		const text = card.textContent?.replace(/\s+/g, ' ');
-		expect(within(card).getByText('Mileage Summary')).toBeInTheDocument();
+		expect(within(card).getByText('Mileage summary')).toBeInTheDocument();
 		expect(within(card).getByText('Business mileage value')).toBeInTheDocument();
 		expect(text).toContain('$603.00');
 		expect(text).toContain('900 mi business at $0.67/mi');
@@ -345,7 +345,7 @@ describe('trips page delete', () => {
 		const dialog = await openDelete();
 		expect(within(dialog).getByRole('checkbox')).toBeChecked();
 
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Trip' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete trip' }));
 		await settle();
 
 		expect(deleteTrip).toHaveBeenCalledWith('t5', true);
@@ -358,7 +358,7 @@ describe('trips page delete', () => {
 		const dialog = await openDelete();
 
 		await fireEvent.click(within(dialog).getByRole('checkbox'));
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Trip' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete trip' }));
 		await settle();
 
 		expect(deleteTrip).toHaveBeenCalledWith('t5', false);
@@ -378,7 +378,7 @@ describe('trips page delete', () => {
 		deleteTrip.mockRejectedValue(new ApiError('Trip not found', 404));
 		const dialog = await openDelete();
 
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Trip' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete trip' }));
 		await settle();
 
 		expect(notify).toHaveBeenCalledWith(
@@ -396,7 +396,7 @@ describe('trips page delete', () => {
 		deleteTrip.mockReturnValue(new Promise(() => {}));
 		const dialog = await openDelete();
 
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Trip' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete trip' }));
 		await settle();
 
 		expect(within(dialog).getByRole('button', { name: 'Working…' })).toHaveAttribute(
@@ -457,6 +457,6 @@ describe('trips on cars shared with you', () => {
 		render(Page);
 		await settle();
 
-		expect(screen.queryByRole('button', { name: /Log Trip/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Log trip/ })).toBeNull();
 	});
 });
