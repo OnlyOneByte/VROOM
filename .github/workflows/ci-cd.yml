@@ -156,11 +156,11 @@ jobs:
       - name: Seed an account on SQLite and export its backup
         run: |
           DATABASE_URL="$SQLITE_URL" bun run db:seed
-          session=$(DATABASE_URL="$SQLITE_URL" bun src/scripts/postgres-move-smoke.ts session-sqlite "$SQLITE_URL")
+          session=$(DATABASE_URL="$SQLITE_URL" bun src/db/postgres-move-smoke.ts session-sqlite "$SQLITE_URL")
           DATABASE_URL="$SQLITE_URL" nohup bun src/index.ts > "$RUNNER_TEMP/sqlite.log" 2>&1 &
           pid=$!
           curl --retry 30 --retry-delay 1 --retry-all-errors -fsS http://127.0.0.1:3001/health
-          bun src/scripts/postgres-move-smoke.ts export http://127.0.0.1:3001 "$session" "$RUNNER_TEMP/sqlite.zip"
+          bun src/db/postgres-move-smoke.ts export http://127.0.0.1:3001 "$session" "$RUNNER_TEMP/sqlite.zip"
           kill "$pid"
           wait "$pid" || true
 
@@ -170,8 +170,8 @@ jobs:
           pid=$!
           curl --retry 30 --retry-delay 1 --retry-all-errors -fsS http://127.0.0.1:3001/health | tee "$RUNNER_TEMP/health.json"
           jq -e '.status == "ok"' "$RUNNER_TEMP/health.json"
-          session=$(bun src/scripts/postgres-move-smoke.ts session-postgres "$POSTGRES_URL")
-          bun src/scripts/postgres-move-smoke.ts restore http://127.0.0.1:3001 "$session" "$RUNNER_TEMP/sqlite.zip"
+          session=$(bun src/db/postgres-move-smoke.ts session-postgres "$POSTGRES_URL")
+          bun src/db/postgres-move-smoke.ts restore http://127.0.0.1:3001 "$session" "$RUNNER_TEMP/sqlite.zip"
           echo "MOVE_SESSION=$session" >> "$GITHUB_ENV"
           kill "$pid"
           wait "$pid" || true
@@ -181,10 +181,10 @@ jobs:
           DATABASE_URL="$POSTGRES_URL" nohup bun src/index.ts > "$RUNNER_TEMP/postgres-again.log" 2>&1 &
           pid=$!
           curl --retry 30 --retry-delay 1 --retry-all-errors -fsS http://127.0.0.1:3001/health
-          bun src/scripts/postgres-move-smoke.ts export http://127.0.0.1:3001 "$MOVE_SESSION" "$RUNNER_TEMP/postgres.zip"
+          bun src/db/postgres-move-smoke.ts export http://127.0.0.1:3001 "$MOVE_SESSION" "$RUNNER_TEMP/postgres.zip"
           kill "$pid"
           wait "$pid" || true
-          bun src/scripts/postgres-move-smoke.ts compare "$RUNNER_TEMP/sqlite.zip" "$RUNNER_TEMP/postgres.zip"
+          bun src/db/postgres-move-smoke.ts compare "$RUNNER_TEMP/sqlite.zip" "$RUNNER_TEMP/postgres.zip"
 
       - name: Upload the backend logs
         if: ${{ !cancelled() }}
