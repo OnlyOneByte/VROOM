@@ -184,6 +184,13 @@ function spending(db: AsyncAppDatabase, vehicleId: string, options: BalanceOptio
     );
 }
 
+function tally(rows: { cents: number; payer: string | null }[]) {
+  const paidBy = new Map<string | null, number>();
+  for (const r of rows) paidBy.set(r.payer, (paidBy.get(r.payer) ?? 0) + r.cents);
+  const groupTotal = rows.reduce((sum, r) => sum + r.cents, 0);
+  return { paidBy, groupTotal, withPayer: groupTotal - (paidBy.get(null) ?? 0) };
+}
+
 export async function computeBalances(
   db: AsyncAppDatabase,
   vehicleId: string,
@@ -208,12 +215,11 @@ export async function computeBalances(
   let total = 0;
   for (const group of Object.keys(GROUP_CATEGORIES) as Group[]) {
     const categories: readonly string[] = GROUP_CATEGORIES[group];
-    const inGroup = rows.filter((r) => categories.includes(r.category));
-    const paidBy = new Map<string | null, number>();
-    for (const r of inGroup) paidBy.set(r.payer, (paidBy.get(r.payer) ?? 0) + r.cents);
-    const groupTotal = inGroup.reduce((sum, r) => sum + r.cents, 0);
+    const { paidBy, groupTotal, withPayer } = tally(
+      rows.filter((r) => categories.includes(r.category))
+    );
     const result = splitGroup(rules[group], {
-      total: groupTotal,
+      total: withPayer,
       paidBy,
       distance,
       unattributed: stats.distance?.unattributed ?? 0,
