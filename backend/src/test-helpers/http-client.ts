@@ -92,12 +92,35 @@ export async function openPostgresTestDatabase(): Promise<import('@electric-sql/
     return postgres;
   }
   const client = await postgres;
-  const tables = await client.query<{ name: string }>(
-    "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'"
-  );
-  const list = tables.rows.map((row) => `"${row.name}"`).join(', ');
-  await client.exec(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
+  await emptyWrittenTables(client);
   return client;
+}
+
+let filledTablesQuery: string | undefined;
+
+async function emptyWrittenTables(client: import('@electric-sql/pglite').PGlite): Promise<void> {
+  if (!filledTablesQuery) {
+    const tables = await client.query<{ name: string }>(
+      "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public'"
+    );
+    filledTablesQuery = tables.rows
+      .map(({ name }) => `SELECT '"${name}"' AS name WHERE EXISTS (SELECT 1 FROM "${name}")`)
+      .join(' UNION ALL ');
+  }
+  const filled = await client.query<{ name: string }>(filledTablesQuery);
+  if (filled.rows.length > 0) {
+    const deletes = filled.rows.map((row) => `DELETE FROM ${row.name};`).join(' ');
+    await client.exec('SET session_replication_role = replica');
+    try {
+      await client.exec(deletes);
+    } finally {
+      await client.exec('SET session_replication_role = DEFAULT');
+    }
+  }
+  const used = await client.query<{ name: string }>(
+    "SELECT format('%I.%I', schemaname, sequencename) AS name FROM pg_sequences WHERE schemaname = 'public' AND last_value IS NOT NULL"
+  );
+  for (const { name } of used.rows) await client.exec(`ALTER SEQUENCE ${name} RESTART`);
 }
 
 async function createPostgresTestApp(seedUser: Partial<TestUser>): Promise<TestApp> {
