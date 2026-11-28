@@ -67,7 +67,7 @@ function memberRows() {
 const RELEASE_DUE = {
   noiseKey: async () => 'key',
   lastRefreshedAt: async () => null,
-  releasedWithoutMembers: async () => false,
+  releaseOutdated: async () => false,
 };
 
 const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);
@@ -158,6 +158,33 @@ describe('community stats refresh against the database', () => {
     expect(await refreshCommunityStats(repository, at(DAY), NO_NOISE)).not.toBeNull();
     expect(new Set(memberRows().map((row) => row.member_tag)).size).toBe(30);
     expect(await repository.lastRefreshedAt('local')).toEqual(at(DAY));
+  });
+
+  test('rows stored under an older schema version are released again on the next run', async () => {
+    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    db.sqlite.run('UPDATE community_stats SET schema_version = ?', [COMMUNITY_SCHEMA_VERSION - 1]);
+
+    expect(await refreshCommunityStats(repository, at(DAY), NO_NOISE)).not.toBeNull();
+    expect(
+      db.sqlite.query('SELECT DISTINCT schema_version AS v FROM community_stats').all()
+    ).toEqual([{ v: COMMUNITY_SCHEMA_VERSION }]);
+  });
+
+  test('opting out and back in between releases keeps the withdrawn groups hidden until the next release', async () => {
+    for (let i = 0; i < 30; i++) seedOwner(db.sqlite, `in-${i}`, true);
+    await refreshCommunityStats(repository, NOW, NO_NOISE);
+    expect(efficiencyRows()).toEqual([{ n_published: 30 }]);
+
+    setOptIn('in-0', false);
+    await refreshCommunityStats(repository, at(DAY), NO_NOISE);
+    setOptIn('in-0', true);
+    for (const day of [2 * DAY, PERIOD - DAY]) {
+      expect(await refreshCommunityStats(repository, at(day), NO_NOISE)).toBeNull();
+      expect(efficiencyRows()).toEqual([]);
+    }
+    await refreshCommunityStats(repository, at(PERIOD), NO_NOISE);
+    expect(efficiencyRows()).toEqual([{ n_published: 30 }]);
   });
 
   test('the noise key is made once per scope, kept across runs, and never stored with the stats', async () => {

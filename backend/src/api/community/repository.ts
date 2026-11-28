@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, getTableColumns, gte, inArray, isNull, lte, min } from 'drizzle-orm';
+import { and, eq, getTableColumns, gte, inArray, isNull, lte, min, ne, or } from 'drizzle-orm';
 import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { firstRow } from '../../db/first-row';
 import {
@@ -306,7 +306,8 @@ export class CommunityStatsRepository {
     return row?.refreshedAt ?? null;
   }
 
-  async releasedWithoutMembers(scope: string): Promise<boolean> {
+  /** True when a stored row has no member tags or an older schema version, so it needs a new release. */
+  async releaseOutdated(scope: string): Promise<boolean> {
     const row = await this.db
       .select({ bucketKey: communityStats.bucketKey })
       .from(communityStats)
@@ -317,7 +318,15 @@ export class CommunityStatsRepository {
           eq(communityReleaseMembers.bucketKey, communityStats.bucketKey)
         )
       )
-      .where(and(eq(communityStats.scope, scope), isNull(communityReleaseMembers.memberTag)))
+      .where(
+        and(
+          eq(communityStats.scope, scope),
+          or(
+            isNull(communityReleaseMembers.memberTag),
+            ne(communityStats.schemaVersion, COMMUNITY_SCHEMA_VERSION)
+          )
+        )
+      )
       .limit(1)
       .then(firstRow);
     return row !== undefined;
