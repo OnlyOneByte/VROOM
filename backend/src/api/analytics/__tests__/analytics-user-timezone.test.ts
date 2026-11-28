@@ -3,13 +3,13 @@ import { zonedCalendar } from '../../../utils/analytics-charts';
 import { cachedTimeZoneCount, calendarDayIn, zonedMidnight } from '../../../utils/time-zone';
 import { AnalyticsRepository, calendarYearRange } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedInsurancePolicy,
   seedInsuranceTermVehicle,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
 
 let testDb: AnalyticsTestDb;

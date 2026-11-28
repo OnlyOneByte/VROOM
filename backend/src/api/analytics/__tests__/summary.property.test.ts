@@ -2,11 +2,11 @@ import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
 import {
   expenseListArb,

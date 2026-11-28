@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedInsurancePolicy,
   seedInsuranceTermVehicle,
   seedUser,
   seedVehicle,
   seedVehicleFinancing,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
 
 const OWNER = { id: 'owner', email: 'o@test.com', displayName: 'O' };

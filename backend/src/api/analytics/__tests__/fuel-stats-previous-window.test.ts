@@ -1,16 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
-import {
-  type TestExpense,
-  yearToRange,
-} from './analytics-test-generators';
+import { type TestExpense, yearToRange } from './analytics-test-generators';
 
 let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
@@ -44,7 +41,12 @@ function fuel(over: Partial<TestExpense> & Pick<TestExpense, 'id' | 'date'>): Te
   };
 }
 
-async function seedFillups(year: number, startMileage: number, milesPer: number, cost: number): Promise<void> {
+async function seedFillups(
+  year: number,
+  startMileage: number,
+  milesPer: number,
+  cost: number
+): Promise<void> {
   for (let m = 0; m < 4; m++) {
     await seedExpense(
       testDb.sql,

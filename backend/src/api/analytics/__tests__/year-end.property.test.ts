@@ -2,17 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
-import {
-  expenseArb,
-  type TestExpense,
-  type TestVehicle,
-} from './analytics-test-generators';
+import { expenseArb, type TestExpense, type TestVehicle } from './analytics-test-generators';
 
 let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
@@ -117,8 +113,18 @@ describe('Year-over-year percentage change formula', () => {
           await resetDb();
           const { userId, vehicle } = await setupUserAndVehicle();
 
-          const prevTotal = await seedExpensesForYear(vehicle.id, TEST_YEAR - 1, prevYearCount, 'prev');
-          const currentTotal = await seedExpensesForYear(vehicle.id, TEST_YEAR, currentYearCount, 'curr');
+          const prevTotal = await seedExpensesForYear(
+            vehicle.id,
+            TEST_YEAR - 1,
+            prevYearCount,
+            'prev'
+          );
+          const currentTotal = await seedExpensesForYear(
+            vehicle.id,
+            TEST_YEAR,
+            currentYearCount,
+            'curr'
+          );
 
           const result = await repo.getYearEnd(userId, TEST_YEAR);
 
