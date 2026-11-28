@@ -3,6 +3,7 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  ON_POSTGRES,
   SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../http-client';
@@ -37,5 +38,25 @@ describe('createTestApp harness', () => {
     const body = await json<DataEnvelope<unknown[]>>(res);
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data).toHaveLength(0);
+  });
+});
+
+describe.skipIf(!ON_POSTGRES)('Postgres reset between test apps', () => {
+  test('empties every written table and restarts used sequences', async () => {
+    await ctx.sql.run(
+      "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('reset-car', ?, 'M', 'X', 2020)",
+      [ctx.user.id]
+    );
+    await ctx.sql.get("SELECT nextval('server_settings_id_seq') AS id");
+    await ctx.sql.get("SELECT nextval('server_settings_id_seq') AS id");
+
+    ctx = await createTestApp();
+
+    expect(await ctx.sql.all('SELECT id FROM vehicles')).toEqual([]);
+    expect(await ctx.sql.all('SELECT id FROM users')).toEqual([{ id: ctx.user.id }]);
+    const next = await ctx.sql.get<{ id: number }>(
+      "SELECT nextval('server_settings_id_seq') AS id"
+    );
+    expect(next?.id).toBe(1);
   });
 });
