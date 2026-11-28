@@ -13,6 +13,7 @@
 	import { loadPeriodSpend, type PeriodData } from '#lib/components/dashboard/period-spend.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { shareApi } from '#lib/services/share-api.ts';
+	import { pendingInvitations } from '#lib/utils/share-helpers.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
 	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
@@ -213,7 +214,7 @@
 			<h2 id="garage-shared" class="font-semibold">Shared with you</h2>
 			<SharedWithMeCard
 				title={null}
-				pending={invitations}
+				{invitations}
 				loadError={invitationsError}
 				onRetry={fetchInvitations}
 				onAccepted={load}
@@ -225,7 +226,7 @@
 						{@render vehicleRow(v)}
 					{/each}
 				</ul>
-			{:else if !invitations.some(s => s.status === 'pending') && !invitationsError}
+			{:else if pendingInvitations(invitations).length === 0 && !invitationsError}
 				<p class="text-sm text-muted-foreground">No one has shared a vehicle with you yet.</p>
 			{/if}
 		</section>

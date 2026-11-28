@@ -17,7 +17,7 @@ const input = fc
     payments: fc.array(
       fc.record({
         payer: fc.constantFrom('a', 'b', 'c', null),
-        cents: fc.integer({ min: 1, max: 50_000 }),
+        cents: fc.integer({ min: -50_000, max: 50_000 }).filter((n) => n !== 0),
       }),
       { maxLength: 12 }
     ),
