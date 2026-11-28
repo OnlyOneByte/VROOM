@@ -40,8 +40,12 @@ Delete the `cloudflared` service unless you are using a tunnel — with an empty
 Both example stacks publish the backend on `127.0.0.1` only, so the API port is not open to
 the network by default (Docker's published ports bypass host firewalls such as ufw). To use
 VROOM from other machines, put a reverse proxy in front that sends `/api/*` to the backend
-(see [Reverse Proxy + SSL](#reverse-proxy--ssl)) or use the tunnel. Publishing the backend
-on every interface means deleting the `127.0.0.1:` prefix yourself.
+(see [Reverse Proxy + SSL](#reverse-proxy--ssl)) or use the tunnel.
+
+> **Breaking change for direct-IP installs (#2073):** if your browser reaches the backend at
+> `<server-ip>:3001` with no proxy in front (`PUBLIC_API_URL=http://<server-ip>:3001`), the
+> updated compose files stop that from working. Add a reverse proxy or the tunnel, or keep
+> publishing on every interface by deleting the `127.0.0.1:` prefix in your copy.
 
 Examples in [`docs/examples/`](examples/):
 
