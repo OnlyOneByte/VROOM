@@ -6,6 +6,7 @@ import {
   type GoogleDriveStrategyDeps,
 } from '../backup-strategies/google-drive-strategy';
 import type { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
+import { healthFailure } from '../provider-status';
 import type { GoogleSheetsService } from '../services/google-sheets-service';
 
 let mockUpload: ReturnType<typeof mock>;
@@ -75,6 +76,50 @@ describe('GoogleDriveStrategy', () => {
     expect(result.capabilities.sheets).toBeUndefined();
     expect(mockUpload).toHaveBeenCalledTimes(1);
     expect(mockEnforceRetention).toHaveBeenCalledTimes(1);
+  });
+
+  test('a revoked sign-in fails the ZIP upload as an auth failure with the reconnect message', async () => {
+    mockUpload = mock(() => Promise.reject(new Error('invalid_grant: Token has been revoked')));
+    strategy = new GoogleDriveStrategy(makeDeps());
+
+    const result = await strategy.execute(createContext());
+
+    expect(result.success).toBe(false);
+    expect(result.capabilities.zip?.failure).toBe('auth');
+    expect(result.capabilities.zip?.message).toBe(healthFailure('auth').message);
+    expect(result.capabilities.zip?.message).not.toContain('invalid_grant');
+  });
+
+  test('refused access fails Sheets sync as a permission failure', async () => {
+    mockCreateOrUpdate = mock(() =>
+      Promise.reject(Object.assign(new Error('Forbidden'), { response: { status: 403 } }))
+    );
+    strategy = new GoogleDriveStrategy(makeDeps());
+
+    const result = await strategy.execute(
+      createContext({
+        providerConfig: {
+          enabled: false,
+          folderPath: 'B',
+          retentionCount: 10,
+          sheetsSyncEnabled: true,
+        },
+        zipBuffer: null,
+      })
+    );
+
+    expect(result.capabilities.sheets?.failure).toBe('permission');
+    expect(result.capabilities.sheets?.message).toBe(healthFailure('permission').message);
+  });
+
+  test('an ordinary upload error keeps its message and has no failure class', async () => {
+    mockUpload = mock(() => Promise.reject(new Error('Upload network error')));
+    strategy = new GoogleDriveStrategy(makeDeps());
+
+    const result = await strategy.execute(createContext());
+
+    expect(result.capabilities.zip?.failure).toBeUndefined();
+    expect(result.capabilities.zip?.message).toBe('Upload network error');
   });
 
   test('Sheets only — syncs sheets when only sheetsSyncEnabled=true', async () => {

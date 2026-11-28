@@ -20,7 +20,7 @@ import type {
   StorageRef,
   UploadParams,
 } from './storage-provider';
-import { credentialFailureOf } from './storage-provider';
+import { credentialFailureOf, ProviderConfigError } from './storage-provider';
 
 interface S3Credentials {
   accessKeyId: string;
@@ -210,12 +210,30 @@ export class S3CompatProvider implements StorageProvider {
       if (error instanceof ValidationError) throw error;
       const credentialFailure = credentialFailureOf(error);
       if (credentialFailure) throw credentialFailure;
+      const configProblem = this.bucketProblemOf(error);
+      if (configProblem) throw new ProviderConfigError(configProblem);
       logger.warn('S3 health check failed', {
         bucket: this.bucket,
         error: error instanceof Error ? error.message : String(error),
       });
       return false;
     }
+  }
+
+  private bucketProblemOf(error: unknown): string | null {
+    const shaped = error as {
+      $metadata?: { httpStatusCode?: number };
+      $response?: { headers?: Record<string, string | undefined> };
+    };
+    const status = shaped?.$metadata?.httpStatusCode;
+    if (status === 404) {
+      return `The bucket "${this.bucket}" doesn't exist. Check the bucket name, then test again.`;
+    }
+    if (status !== 301) return null;
+    const region = shaped.$response?.headers?.['x-amz-bucket-region'];
+    return region
+      ? `The bucket "${this.bucket}" is in region ${region}. Set the region to ${region}, then test again.`
+      : `The bucket "${this.bucket}" is in a different region. Check the region, then test again.`;
   }
 
   async list(folderPath: string): Promise<StorageFileInfo[]> {

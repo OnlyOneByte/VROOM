@@ -15,6 +15,7 @@ export interface BackupStrategyContext {
 export interface BackupCapabilityResult {
   success: boolean;
   message?: string;
+  failure?: 'auth' | 'permission';
   metadata?: Record<string, unknown>;
 }
 

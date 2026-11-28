@@ -244,6 +244,53 @@ describe('BackupOrchestrator.execute() outcome', () => {
     }
   });
 
+  test('a backup refused for its credentials marks the provider as needing reconnect', async () => {
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    backupStrategyRegistry.register('fake-revoked', {
+      async execute(): Promise<BackupStrategyResult> {
+        return {
+          success: false,
+          message: 'revoked',
+          capabilities: { zip: { success: false, failure: 'auth', message: 'revoked' } },
+        };
+      },
+    });
+    try {
+      await seedEnabledProvider(ctx, 'prv', 'fake-revoked');
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult;
+      expect(result.outcome).toBe('failed');
+
+      const row = (await ctx.sql.get(
+        'SELECT status, last_error_code FROM user_providers WHERE id = ?',
+        ['prv']
+      )) as { status: string; last_error_code: string | null } | null;
+      expect(row?.status).toBe('needs_reauth');
+      expect(row?.last_error_code).toBe('auth');
+    } finally {
+      unregister('fake-revoked');
+    }
+  });
+
+  test('a backup that fails for another reason leaves the provider status alone', async () => {
+    registerFake('fake-flaky', false);
+    try {
+      await seedEnabledProvider(ctx, 'pfl', 'fake-flaky');
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      await backupOrchestrator.execute(ctx.user.id, 'U', true);
+      const row = (await ctx.sql.get('SELECT status FROM user_providers WHERE id = ?', [
+        'pfl',
+      ])) as { status: string } | null;
+      expect(row?.status).toBe('active');
+    } finally {
+      unregister('fake-flaky');
+    }
+  });
+
   test('provider succeeds → outcome success', async () => {
     registerFake('fake-ok', true);
     try {

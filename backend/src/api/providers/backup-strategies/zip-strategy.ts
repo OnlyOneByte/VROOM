@@ -7,7 +7,8 @@ import type {
   BackupStrategyResult,
 } from '../../sync/backup-strategy';
 import { storageProviderRegistry } from '../domains/storage/registry';
-import type { StorageProvider } from '../domains/storage/storage-provider';
+import { credentialCodeOf, type StorageProvider } from '../domains/storage/storage-provider';
+import { healthFailure } from '../provider-status';
 
 export async function uploadZipBackup(
   context: BackupStrategyContext,
@@ -51,11 +52,14 @@ export async function uploadZipBackup(
       providerId: context.providerId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'ZIP upload failed',
-    };
+    return capabilityFailure(error, 'ZIP upload failed');
   }
+}
+
+export function capabilityFailure(error: unknown, fallback: string): BackupCapabilityResult {
+  const failure = credentialCodeOf(error);
+  if (failure) return { success: false, failure, message: healthFailure(failure).message };
+  return { success: false, message: error instanceof Error ? error.message : fallback };
 }
 
 export class ZipBackupStrategy implements BackupStrategy {

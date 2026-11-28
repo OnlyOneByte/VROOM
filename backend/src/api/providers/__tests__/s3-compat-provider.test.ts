@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { ALLOW_PRIVATE, BLOCK_PRIVATE, EndpointNotAllowedError } from '../../../utils/outbound-url';
 import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
-import type { StorageRef } from '../domains/storage/storage-provider';
+import { ProviderConfigError, type StorageRef } from '../domains/storage/storage-provider';
 
 const mockSend = mock<(command: unknown) => Promise<unknown>>(() => Promise.resolve({}));
 
@@ -241,6 +241,25 @@ describe('S3CompatProvider', () => {
 
       const result = await provider.healthCheck();
       expect(result).toBe(false);
+    });
+
+    test('a missing bucket is a settings problem that names the bucket', async () => {
+      mockSend.mockRejectedValueOnce(
+        Object.assign(new Error('UnknownError'), { $metadata: { httpStatusCode: 404 } })
+      );
+      const failure = provider.healthCheck();
+      await expect(failure).rejects.toBeInstanceOf(ProviderConfigError);
+      await expect(failure).rejects.toThrow('The bucket "test-bucket" doesn\'t exist');
+    });
+
+    test('a bucket in another region is a settings problem that names the region', async () => {
+      mockSend.mockRejectedValueOnce(
+        Object.assign(new Error('UnknownError'), {
+          $metadata: { httpStatusCode: 301 },
+          $response: { headers: { 'x-amz-bucket-region': 'eu-west-2' } },
+        })
+      );
+      await expect(provider.healthCheck()).rejects.toThrow('is in region eu-west-2');
     });
   });
 });
