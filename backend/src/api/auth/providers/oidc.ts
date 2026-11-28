@@ -27,6 +27,12 @@ export function oidcDiscovered(): boolean {
   return endpoints !== null;
 }
 
+function describeClaim(value: unknown): string {
+  if (value === undefined) return 'missing';
+  if (typeof value === 'boolean' || typeof value === 'string') return String(value).slice(0, 32);
+  return `a ${value === null ? 'null' : typeof value}`;
+}
+
 function issuerUrl(): string {
   return CONFIG.auth.oidc.issuer.replace(/\/+$/, '');
 }
@@ -126,7 +132,7 @@ export const oidcAuthProvider: OAuthProviderConfig = {
       logger.warn('OIDC sign-in refused: the user info has no verified email', {
         provider: CONFIG.auth.oidc.displayName,
         email: typeof data.email === 'string' ? 'present' : 'missing',
-        emailVerified: data.email_verified === undefined ? 'missing' : String(data.email_verified),
+        emailVerified: describeClaim(data.email_verified),
       });
       throw new NoVerifiedEmailError(CONFIG.auth.oidc.displayName);
     }

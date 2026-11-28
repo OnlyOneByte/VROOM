@@ -118,23 +118,29 @@ describe('a deployment with only OIDC configured', () => {
     return done.headers.get('location');
   }
 
-  test.each([
-    ['false', false],
-    ['the string "false"', 'false'],
-    ['missing', undefined],
-  ])('refuses an account whose email_verified is %s, and logs why', async (_, emailVerified) => {
-    issuer.user = { ...issuer.user, email_verified: emailVerified };
-    const warn = spyOn(logger, 'warn').mockImplementation(() => {});
-    try {
-      expect(await signInLocation()).toBe(`${config.frontend.url}/auth?auth_error=no_email`);
-      const logged = JSON.stringify(warn.mock.calls);
-      expect(logged).toContain('no verified email');
-      expect(logged).toContain(emailVerified === undefined ? 'missing' : 'false');
-      expect(logged).not.toContain('pat@example.com');
-    } finally {
-      warn.mockRestore();
+  test.each<[string, unknown, string]>([
+    ['false', false, '"emailVerified":"false"'],
+    ['the string "false"', 'false', '"emailVerified":"false"'],
+    ['the string "True"', 'True', '"emailVerified":"True"'],
+    ['the string "1"', '1', '"emailVerified":"1"'],
+    ['missing', undefined, '"emailVerified":"missing"'],
+    ['an object', { toString: 1 }, '"emailVerified":"a object"'],
+  ])(
+    'refuses an account whose email_verified is %s, and logs why',
+    async (_, emailVerified, cause) => {
+      issuer.user = { ...issuer.user, email_verified: emailVerified };
+      const warn = spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        expect(await signInLocation()).toBe(`${config.frontend.url}/auth?auth_error=no_email`);
+        const logged = JSON.stringify(warn.mock.calls);
+        expect(logged).toContain('no verified email');
+        expect(logged).toContain(cause);
+        expect(logged).not.toContain('pat@example.com');
+      } finally {
+        warn.mockRestore();
+      }
     }
-  });
+  );
 
   test('accepts email_verified sent as the string "true", as some issuers do', async () => {
     issuer.user = { ...issuer.user, email_verified: 'true' };

@@ -1,7 +1,7 @@
 export interface FakeOidcUser {
   sub: string;
   email: string;
-  email_verified?: boolean | string;
+  email_verified?: unknown;
   name?: string;
 }
 
