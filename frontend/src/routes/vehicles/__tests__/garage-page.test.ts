@@ -160,6 +160,57 @@ describe('the Garage', () => {
 		expect(within(sharedList).getByText('Shared by Sam')).toBeInTheDocument();
 	});
 
+	test('a share I already accepted is listed as a car, with no Accept or Decline and one "Shared with you" heading', async () => {
+		getVehicles.mockResolvedValue([CAMRY, LENT]);
+		listReceived.mockResolvedValue([
+			{
+				id: 's1',
+				vehicleId: 'v3',
+				ownerId: 'sam',
+				sharedWithId: 'me',
+				level: 'viewer',
+				status: 'accepted',
+				createdAt: '2026-01-01T00:00:00.000Z',
+				updatedAt: '2026-01-01T00:00:00.000Z',
+				vehicleName: '2019 Honda Civic',
+				sharedBy: 'Sam'
+			} as ReceivedShare
+		]);
+		render(Page);
+
+		const sharedList = await screen.findByRole('list', { name: 'Vehicles shared with you' });
+		expect(within(sharedList).getByRole('link', { name: '2019 Honda Civic' })).toBeInTheDocument();
+		await waitFor(() => expect(listReceived).toHaveBeenCalled());
+		expect(screen.queryByRole('button', { name: /Accept/ })).toBeNull();
+		expect(screen.getAllByText('Shared with you')).toHaveLength(1);
+	});
+
+	test('a pending invitation is offered under the page heading, without a second title', async () => {
+		listReceived.mockResolvedValue([
+			{
+				id: 's2',
+				vehicleId: 'v9',
+				ownerId: 'sam',
+				sharedWithId: 'me',
+				level: 'editor',
+				status: 'pending',
+				createdAt: '2026-01-01T00:00:00.000Z',
+				updatedAt: '2026-01-01T00:00:00.000Z',
+				vehicleName: 'Family SUV',
+				sharedBy: 'Sam'
+			} as ReceivedShare
+		]);
+		render(Page);
+
+		const invites = await screen.findByRole('list', { name: 'Invitations to accept' });
+		expect(within(invites).getByText('Family SUV')).toBeInTheDocument();
+		expect(
+			within(invites).getByRole('button', { name: /Accept access to Family SUV/ })
+		).toBeTruthy();
+		expect(screen.getAllByText('Shared with you')).toHaveLength(1);
+		expect(screen.queryByText('No one has shared a vehicle with you yet.')).toBeNull();
+	});
+
 	test('with no vehicles of my own, shows the first-run empty state and no Add vehicle header button', async () => {
 		getVehicles.mockResolvedValue([]);
 		render(Page);

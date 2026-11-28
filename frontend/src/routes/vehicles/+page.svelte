@@ -212,6 +212,7 @@
 		<section aria-labelledby="garage-shared" class="space-y-3">
 			<h2 id="garage-shared" class="font-semibold">Shared with you</h2>
 			<SharedWithMeCard
+				title={null}
 				pending={invitations}
 				loadError={invitationsError}
 				onRetry={fetchInvitations}
@@ -224,7 +225,7 @@
 						{@render vehicleRow(v)}
 					{/each}
 				</ul>
-			{:else if invitations.length === 0 && !invitationsError}
+			{:else if !invitations.some(s => s.status === 'pending') && !invitationsError}
 				<p class="text-sm text-muted-foreground">No one has shared a vehicle with you yet.</p>
 			{/if}
 		</section>

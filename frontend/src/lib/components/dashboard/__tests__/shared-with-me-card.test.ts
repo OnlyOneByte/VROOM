@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { ReceivedShare } from '#lib/types/index.ts';
 import { ApiError, UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 
@@ -48,10 +48,17 @@ async function settle() {
 	for (let i = 0; i < 10; i++) await new Promise(r => setTimeout(r, 0));
 }
 
-function mount(props: { pending?: ReceivedShare[]; loadError?: string | null } = {}) {
+function mount(
+	props: { pending?: ReceivedShare[]; loadError?: string | null; title?: string | null } = {}
+) {
 	const handlers = { onRetry: vi.fn(), onAccepted: vi.fn(), onDeclined: vi.fn() };
 	const view = render(SharedWithMeCard, {
-		props: { pending: props.pending ?? [share()], loadError: props.loadError ?? null, ...handlers }
+		props: {
+			pending: props.pending ?? [share()],
+			loadError: props.loadError ?? null,
+			...(props.title !== undefined ? { title: props.title } : {}),
+			...handlers
+		}
 	});
 	return { ...view, ...handlers };
 }
@@ -78,6 +85,33 @@ describe('SharedWithMeCard listing', () => {
 		expect(screen.getByText('Shared with you')).toBeInTheDocument();
 		expect(screen.getByText('Family Van')).toBeInTheDocument();
 		expect(screen.getByText('Editor · Shared by Alex')).toBeInTheDocument();
+	});
+
+	test('an invitation already accepted is not offered again', () => {
+		const { container } = mount({
+			pending: [share({ id: 'done', status: 'accepted', vehicleName: 'Old Van' })]
+		});
+		expect(container.textContent?.trim()).toBe('');
+		expect(screen.queryByRole('button', { name: /Accept/ })).toBeNull();
+	});
+
+	test('only the pending ones are listed when both kinds come in', () => {
+		mount({
+			pending: [
+				share({ id: 'done', status: 'accepted', vehicleName: 'Old Van' }),
+				share({ id: 'new', status: 'pending', vehicleName: 'Family Van' })
+			]
+		});
+		const list = screen.getByRole('list', { name: 'Invitations to accept' });
+		expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+		expect(within(list).getByText('Family Van')).toBeInTheDocument();
+		expect(screen.queryByText('Old Van')).toBeNull();
+	});
+
+	test('a page with its own heading can leave the card title out', () => {
+		mount({ title: null });
+		expect(screen.queryByText('Shared with you')).toBeNull();
+		expect(screen.getByRole('list', { name: 'Invitations to accept' })).toBeInTheDocument();
 	});
 
 	test('a load failure shows its message, and Retry asks the page to reload', async () => {
