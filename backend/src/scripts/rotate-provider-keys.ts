@@ -77,6 +77,8 @@ export async function rotateProviderKeys(
 }
 
 if (import.meta.main) {
+  const { ACTIVE_DIALECT } = await import('../db/dialect/active');
+  if (ACTIVE_DIALECT === 'pg') await (await import('../db/connection')).runMigrations();
   const { appContext } = await import('../app-context');
   const report = await rotateProviderKeys(appContext().asyncDb);
   console.log(
