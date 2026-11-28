@@ -7,6 +7,7 @@ import {
 	type BucketAmounts,
 	type CostBucket
 } from '#lib/utils/cost-bucket.ts';
+import { formatNumber } from '#lib/utils/formatters.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const REMINDER_WINDOW_DAYS = 14;
@@ -107,15 +108,28 @@ export function attentionItems(
 	const lapsedSince = now - LAPSED_RENEWAL_DAYS * DAY_MS;
 	const items: AttentionItem[] = [];
 
-	for (const { reminder, vehicleIds } of reminders) {
-		if (!reminder.isActive || !reminder.nextDueDate) continue;
+	for (const { reminder, vehicleIds, mileageDue } of reminders) {
+		if (!reminder.isActive) continue;
+		const names = vehicleIds.map(vehicleName).filter(Boolean).join(', ');
+		const title = names ? `${reminder.name} · ${names}` : reminder.name;
+		if (mileageDue && reminder.nextDueOdometer !== null) {
+			items.push({
+				id: `reminder-${reminder.id}`,
+				title,
+				detail: `Reached ${formatNumber(reminder.nextDueOdometer, 0)} on the odometer`,
+				status: 'overdue',
+				dueAt: now,
+				href: 'reminders'
+			});
+			continue;
+		}
+		if (!reminder.nextDueDate) continue;
 		const dueAt = new Date(reminder.nextDueDate).getTime();
 		if (dueAt > reminderHorizon) continue;
-		const names = vehicleIds.map(vehicleName).filter(Boolean).join(', ');
 		const overdue = dueAt <= now;
 		items.push({
 			id: `reminder-${reminder.id}`,
-			title: names ? `${reminder.name} · ${names}` : reminder.name,
+			title,
 			detail: `${overdue ? 'Was due' : 'Due'} ${formatDay(new Date(dueAt))}`,
 			status: overdue ? 'overdue' : 'soon',
 			dueAt,
