@@ -551,25 +551,27 @@
 			{/if}
 
 			<FormActionBar>
-				{#if saveBlocker && !isSaving}
-					<p id="provider-save-blocker" class="ml-auto text-sm text-muted-foreground">
-						{saveBlocker}
-					</p>
-				{/if}
-				<Button
-					size="lg"
-					class={saveBlocker && !isSaving ? 'rounded-full' : 'ml-auto rounded-full'}
-					onclick={handleSave}
-					aria-disabled={!canSave || isSaving || undefined}
-					aria-describedby={saveBlocker && !isSaving ? 'provider-save-blocker' : undefined}
-				>
-					{#if isSaving}
-						<LoaderCircle class="animate-spin" aria-hidden="true" />
-						Saving…
-					{:else}
-						{isEditMode ? 'Save changes' : 'Save storage'}
+				<div class="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+					{#if saveBlocker && !isSaving}
+						<p id="provider-save-blocker" class="text-right text-sm text-muted-foreground">
+							{saveBlocker}
+						</p>
 					{/if}
-				</Button>
+					<Button
+						size="lg"
+						class="rounded-full"
+						onclick={handleSave}
+						aria-disabled={!canSave || isSaving || undefined}
+						aria-describedby={saveBlocker && !isSaving ? 'provider-save-blocker' : undefined}
+					>
+						{#if isSaving}
+							<LoaderCircle class="animate-spin" aria-hidden="true" />
+							Saving…
+						{:else}
+							{isEditMode ? 'Save changes' : 'Save storage'}
+						{/if}
+					</Button>
+				</div>
 			</FormActionBar>
 
 			{#if isEditMode}
