@@ -225,11 +225,17 @@ routes.post('/', zValidator('json', inviteSchema), authorize(fromInviteVehicle),
 
   const response: ApiResponse<GrantedShare> = {
     success: true,
-    data: toOwnerView(created),
+    data: withoutShareOwner(c, toOwnerView(created)),
     message: 'Invitation sent. They will see it when they sign in to VROOM with that email.',
   };
   return c.json(response, 201);
 });
+
+function withoutShareOwner<T extends { ownerId: string }>(c: Context, share: T): T {
+  if (share.ownerId === c.get('user').id) return share;
+  const { ownerId: _ownerId, ...rest } = share;
+  return rest as T;
+}
 
 routes.get('/granted', authorize(ownAccount), async (c) => {
   const user = c.get('user');
@@ -286,7 +292,11 @@ routes.put(
         },
       }
     );
-    return c.json({ success: true, data: toOwnerView(updated), message: 'Share level updated' });
+    return c.json({
+      success: true,
+      data: withoutShareOwner(c, toOwnerView(updated)),
+      message: 'Share level updated',
+    });
   }
 );
 
@@ -323,7 +333,7 @@ routes.get('/received', authorize(ownAccount), async (c) => {
   const shares = await repos().vehicleShares.findReceivedByUser(user.id);
   const response: ApiResponse<ReceivedShare[]> = {
     success: true,
-    data: shares,
+    data: shares.map((share) => withoutShareOwner(c, share)),
     message: `Found ${shares.length} share${shares.length !== 1 ? 's' : ''}`,
   };
   return c.json(response);
@@ -364,7 +374,11 @@ routes.post(
         },
       }
     );
-    return c.json({ success: true, data: updated, message: 'Invitation accepted' });
+    return c.json({
+      success: true,
+      data: withoutShareOwner(c, updated),
+      message: 'Invitation accepted',
+    });
   }
 );
 
