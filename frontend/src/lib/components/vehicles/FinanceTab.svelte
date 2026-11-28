@@ -152,17 +152,23 @@
 			/>
 		{/if}
 
-		{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
-			<NextPaymentCard
-				financing={vehicle.financing}
-				lastPayment={payments.at(-1)}
-				{paymentsLoaded}
-				{isOwner}
-				recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&financingId=${vehicle.financing.id}&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-				showProgress={vehicle.financing.financingType !== 'loan'}
-				onChangePayment={() => (showPaymentPlanner = true)}
-			/>
-		{/if}
+		<div
+			class="grid gap-6 empty:hidden lg:grid-cols-2 lg:items-start lg:[&>:only-child]:col-span-2"
+			data-testid="finance-next-payment-grid"
+		>
+			{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
+				<NextPaymentCard
+					financing={vehicle.financing}
+					lastPayment={payments.at(-1)}
+					{paymentsLoaded}
+					{isOwner}
+					recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&financingId=${vehicle.financing.id}&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+					showProgress={vehicle.financing.financingType !== 'loan'}
+					onChangePayment={() => (showPaymentPlanner = true)}
+				/>
+			{/if}
+			<FinancingCharts financing={vehicle.financing} {amortizationSchedule} />
+		</div>
 
 		{#if vehicle.financing.financingType !== 'loan' && vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
 			<PaymentMetricsGrid
@@ -217,8 +223,6 @@
 			</AlertDescription>
 		</Alert>
 	{/if}
-
-	<FinancingCharts financing={vehicle.financing} {amortizationSchedule} />
 
 	{#if vehicle.financing.financingType === 'loan'}
 		<PaymentPlannerDialog

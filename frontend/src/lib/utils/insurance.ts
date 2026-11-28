@@ -1,5 +1,12 @@
-import type { InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
+import type { ClaimStatus, InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
 import { dateOnlyToISO, fromMinor, toMinor } from '#lib/utils/formatters.ts';
+
+export const CLAIM_STATUS_LABELS: Record<ClaimStatus, string> = {
+	filed: 'Filed',
+	in_progress: 'In progress',
+	settled: 'Settled',
+	denied: 'Denied'
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
