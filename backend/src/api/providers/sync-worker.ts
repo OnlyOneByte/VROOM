@@ -372,7 +372,8 @@ async function recordSyncFailure(
       error: errorMessage,
     }
   );
-  return healthCodeOf(error) === 'unreachable' ? 'unreachable' : undefined;
+  const code = healthCodeOf(error);
+  return code === 'unreachable' || code === 'busy' ? 'unreachable' : undefined;
 }
 
 export function startSyncWorker(): void {

@@ -158,6 +158,7 @@ async function createPostgresTestApp(seedUser: Partial<TestUser>): Promise<TestA
 }
 
 export async function createTestApp(seedUser: Partial<TestUser> = {}): Promise<TestApp> {
+  (await import('../middleware/rate-limit')).clearRateLimits();
   if (ON_POSTGRES) return createPostgresTestApp(seedUser);
   const { getDb, runMigrations } = await import('../db/connection');
   const db = getDb();

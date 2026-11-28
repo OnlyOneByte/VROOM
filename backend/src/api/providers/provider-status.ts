@@ -9,7 +9,7 @@ import { resolveModelSettings } from './domains/model/model-registry';
 import { getStorageProviderRegistry } from './domains/storage/registry';
 import { credentialFailureOf, ProviderConfigError } from './domains/storage/storage-provider';
 
-export type HealthCode = 'auth' | 'permission' | 'unreachable' | 'config' | 'endpoint';
+export type HealthCode = 'auth' | 'permission' | 'unreachable' | 'busy' | 'config' | 'endpoint';
 
 export interface HealthResult {
   ok: boolean;
@@ -56,6 +56,7 @@ const HEALTH_MESSAGES: Record<HealthCode, string> = {
   permission:
     "The provider is connected but isn't allowed to do this. Reconnect it and grant access.",
   unreachable: "Couldn't reach the provider. Check its address and your network, then test again.",
+  busy: 'The provider is busy or limiting requests right now. Wait a few minutes, then test again.',
   config: 'The provider settings are incomplete or invalid. Edit them, then test again.',
   endpoint:
     "This server only lets providers reach public https:// addresses. Change the provider's address, then test again.",
@@ -70,13 +71,16 @@ export function healthCodeOf(error: unknown): HealthCode {
   if (credentialFailure) {
     return credentialFailure.code === SyncErrorCode.PERMISSION_DENIED ? 'permission' : 'auth';
   }
-  if (isSyncError(error)) return 'unreachable';
+  if (isSyncError(error)) {
+    return error.code === SyncErrorCode.QUOTA_EXCEEDED ? 'busy' : 'unreachable';
+  }
   if (error instanceof EndpointNotAllowedError) return 'endpoint';
   if (error instanceof ValidationError || error instanceof ProviderConfigError) return 'config';
   const message = error instanceof Error ? error.message : '';
   if (/HTTP 401\b/.test(message)) return 'auth';
   if (/HTTP 403\b/.test(message)) return 'permission';
   if (/HTTP (400|404|422)\b/.test(message)) return 'config';
+  if (/HTTP (429|5\d\d)\b/.test(message)) return 'busy';
   return 'unreachable';
 }
 

@@ -1011,7 +1011,7 @@ async function validateProviderCsrf(
 }
 
 // Must never create or modify the login session.
-routes.get('/callback/provider/google', async (c) => {
+routes.get('/callback/provider/google', authRateLimiter, async (c) => {
   const url = new URL(c.req.url);
   const code = url.searchParams.get('code');
   const stateParam = url.searchParams.get('state');

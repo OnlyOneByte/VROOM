@@ -205,6 +205,16 @@ describe('POST /providers/:id/test works for every capability', () => {
     }
   );
 
+  test.each([429, 503])(
+    'a model answering %i is reported busy, not unreachable',
+    async (status) => {
+      const id = await createModel('llm');
+      answerModelCalls(status);
+      expect((await testProvider(id)).data).toMatchObject({ ok: false, code: 'busy' });
+      expect(await statusOf(id)).toMatchObject({ status: 'active', last_error_code: 'busy' });
+    }
+  );
+
   test.each([
     ['an empty reply', JSON.stringify({ choices: [{ message: { content: '' } }] })],
     ['a page that is not a model reply', '<html>Welcome</html>'],
