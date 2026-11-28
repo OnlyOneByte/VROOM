@@ -94,6 +94,8 @@ export function compareBackups(before: string, after: string): string[] {
 }
 
 if (import.meta.main) {
+  console.info = console.error;
+  console.debug = console.error;
   const [command, ...args] = process.argv.slice(2);
   const need = (i: number) => {
     const value = args[i];
