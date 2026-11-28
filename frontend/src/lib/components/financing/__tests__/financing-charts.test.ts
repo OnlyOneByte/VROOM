@@ -19,6 +19,7 @@ interface CapturedChartProps {
 	data: ChartRow[];
 	x: string;
 	y: string[];
+	seriesLayout?: string;
 	props: { xAxis: { ticks: number; format: (v: number) => string } };
 }
 
@@ -83,6 +84,7 @@ describe('FinancingCharts', () => {
 		expect(screen.getByText(/with 5 payments/)).toBeTruthy();
 		expect(captured.props?.x).toBe('paymentNumber');
 		expect(captured.props?.y).toEqual(['principal', 'interest']);
+		expect(captured.props?.seriesLayout).toBe('stack');
 		const rows = captured.props!.data;
 		expect(rows.map(r => r.paymentNumber)).toEqual([1, 2, 3, 4, 5]);
 		expect(rows[0]).toMatchObject({ principal: 480, interest: 20, isPaid: true });

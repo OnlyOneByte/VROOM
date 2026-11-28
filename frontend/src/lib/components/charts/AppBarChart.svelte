@@ -265,7 +265,7 @@
 					{y}
 					series={plottedSeries}
 					{orientation}
-					{seriesLayout}
+					seriesLayout={seriesLayout ?? (series.length > 1 ? 'group' : undefined)}
 					{yDomain}
 					padding={resolvedPadding}
 					props={{

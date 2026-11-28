@@ -169,6 +169,7 @@
 			data={loanBreakdownData}
 			x="date"
 			y={['principal', 'interest']}
+			seriesLayout="stack"
 			series={loanSeries}
 			config={loanChartConfig}
 		/>
