@@ -102,9 +102,9 @@
 		hasLoaded && !loadError && ownedVehicles.length > 0 && (allTimeSummary?.expenseCount ?? 0) === 0
 	);
 	let onboardingSteps = $derived([
-		{ label: 'Add a vehicle', route: routes.vehicleNew, done: ownedVehicles.length > 0 },
-		{ label: 'Log an expense or fill-up', route: routes.expenseNew, done: false },
-		{ label: 'See what it costs', route: routes.analytics, done: false }
+		{ label: 'Add a vehicle', done: ownedVehicles.length > 0 },
+		{ label: 'Log an expense or fill-up', done: false },
+		{ label: 'See what it costs', done: false }
 	]);
 	let currentStep = $derived(onboardingSteps.findIndex(step => !step.done));
 
@@ -461,12 +461,8 @@
 						{:else if i === currentStep}
 							<span class="text-sm font-medium text-foreground">{step.label}</span>
 						{:else}
-							<a
-								href={resolve(step.route)}
-								class="inline-flex min-h-10 items-center text-sm text-accent-ink underline-offset-4 hover:underline"
-							>
-								{step.label}
-							</a>
+							<!-- A later step stays plain text: it can't be done until the one before it is. -->
+							<span class="text-sm text-muted-foreground">{step.label}</span>
 						{/if}
 					</li>
 				{/each}

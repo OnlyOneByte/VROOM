@@ -23,6 +23,7 @@ vi.mock('$app/navigation', () => ({
 }));
 
 const getVehicle = vi.fn<(id: string) => Promise<Vehicle>>();
+const getVehicles = vi.fn<() => Promise<Vehicle[]>>();
 const getFinancing = vi.fn<(id: string) => Promise<VehicleFinancing | null>>();
 const createVehicle = vi.fn<(data: Partial<Vehicle>) => Promise<Vehicle>>();
 const updateVehicle = vi.fn<(id: string, data: UpdateVehicleRequest) => Promise<Vehicle>>();
@@ -37,6 +38,7 @@ const getVehicleStats =
 vi.mock('#lib/services/vehicle-api.ts', () => ({
 	vehicleApi: {
 		getVehicle,
+		getVehicles,
 		getFinancing,
 		getVehicleStats,
 		createVehicle,
@@ -140,6 +142,7 @@ beforeEach(() => {
 	vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
 	vi.clearAllMocks();
 	getFinancing.mockResolvedValue(null);
+	getVehicles.mockResolvedValue([EXISTING, { ...EXISTING, id: 'new-1' }]);
 	getVehicleStats.mockRejectedValue(new Error('no stats in this test'));
 	appStore.clearNotifications();
 	appStore.setVehicles([]);
@@ -332,6 +335,31 @@ describe('VehicleForm create mode', () => {
 		expect(appStore.vehicles).toContainEqual(saved);
 		expect(notificationMessages()).toContain('Vehicle added successfully!');
 		expect(refreshAll).not.toHaveBeenCalled();
+	});
+
+	test('the first vehicle returns to the dashboard checklist, where the next step is a fill-up', async () => {
+		const saved: Vehicle = { ...EXISTING, id: 'new-1', make: 'Toyota', model: 'Camry' };
+		createVehicle.mockResolvedValue(saved);
+		getVehicles.mockResolvedValue([saved]);
+		await renderCreate();
+		await fillRequired();
+
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
+
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/dashboard'));
+		expect(notificationMessages()).toContain('Vehicle added successfully!');
+	});
+
+	test('if the vehicle count cannot load after a create, it still lands on the Garage', async () => {
+		createVehicle.mockResolvedValue({ ...EXISTING, id: 'new-1' });
+		getVehicles.mockRejectedValue(new ApiError('Network error', 0));
+		await renderCreate();
+		await fillRequired();
+
+		await fireEvent.click(screen.getByRole('button', { name: /save vehicle/i }));
+
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles'));
+		expect(notificationMessages()).toEqual(['Vehicle added successfully!']);
 	});
 
 	test('a failed create keeps the user on the form with an error notification', async () => {

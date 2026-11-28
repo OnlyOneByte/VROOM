@@ -9,7 +9,10 @@
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
 	import SharedWithMeCard from '#lib/components/dashboard/SharedWithMeCard.svelte';
-	import { combinePeriodSpend } from '#lib/components/dashboard/dashboard-data.ts';
+	import {
+		combinePeriodSpend,
+		noPerDistanceNote
+	} from '#lib/components/dashboard/dashboard-data.ts';
 	import { loadPeriodSpend, type PeriodData } from '#lib/components/dashboard/period-spend.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { shareApi } from '#lib/services/share-api.ts';
@@ -208,6 +211,11 @@
 					{@render vehicleRow(v)}
 				{/each}
 			</ul>
+			{#if owned.some(v => running(v) === null)}
+				<p class="text-sm text-muted-foreground" data-testid="no-per-distance-note">
+					{noPerDistanceNote(distanceLabel)}
+				</p>
+			{/if}
 		{/if}
 
 		<section aria-labelledby="garage-shared" class="space-y-3">

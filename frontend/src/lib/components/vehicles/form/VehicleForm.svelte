@@ -616,7 +616,14 @@
 					type: 'success',
 					message: 'Vehicle added successfully!'
 				});
-				goto(resolve(routes.vehicles));
+				// The first car goes back to the dashboard checklist, whose next step is the first fill-up.
+				let ownedCount = 0;
+				try {
+					ownedCount = (await vehicleApi.getVehicles()).length;
+				} catch {
+					// The garage is still a fine place to land.
+				}
+				goto(resolve(ownedCount === 1 ? routes.dashboard : routes.vehicles));
 			}
 		} catch (error) {
 			if (!confirmUnitChange && needsUnitChangeConfirmation(error)) {

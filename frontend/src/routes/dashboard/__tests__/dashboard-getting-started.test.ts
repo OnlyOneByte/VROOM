@@ -114,25 +114,21 @@ describe('dashboard getting started', () => {
 
 		await screen.findByRole('heading', { name: 'Log your first expense' });
 		expect(steps()[0]).toBe('Add a vehicle (done)');
-		expect(screen.getByRole('link', { name: 'See what it costs' })).toHaveAttribute(
-			'href',
-			'/analytics'
-		);
+		expect(screen.queryByRole('link', { name: 'See what it costs' })).toBeNull();
 		expect(controls('Add expense')).toHaveLength(0);
 		expect(controls('Log fill-up').length).toBeGreaterThan(0);
 		expect(screen.queryByText('Total expenses')).toBeNull();
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
 	});
 
-	test('steps that are not current are 40px links that look like links', async () => {
+	test('steps still to come are muted text, not links to pages that need the step before', async () => {
 		getVehicles.mockResolvedValue([]);
 		render(Page);
 
 		await screen.findByRole('heading', { name: 'Add your first vehicle' });
 		for (const name of ['Log an expense or fill-up', 'See what it costs']) {
-			const link = screen.getByRole('link', { name });
-			expect(link).toHaveClass('inline-flex', 'min-h-10', 'items-center', 'text-accent-ink');
-			expect(link).not.toHaveClass('text-muted-foreground');
+			expect(screen.queryByRole('link', { name })).toBeNull();
+			expect(screen.getByText(name)).toHaveClass('text-muted-foreground');
 		}
 	});
 

@@ -50,4 +50,19 @@ describe('VehicleRowsCard', () => {
 		expect(first?.textContent).toContain('$0.13/mi, 30 days');
 		expect(second?.textContent).toContain('No running cost per mi for this period');
 	});
+
+	test('a row with no cost per distance gets one note saying what will fill it in', () => {
+		const { unmount } = render(VehicleRowsCard, {
+			props: { rows: ROWS, periodLabel: '30 days', distanceLabel: 'mi' }
+		});
+		expect(screen.getByTestId('no-per-distance-note')).toHaveTextContent(
+			'— means no cost per mi yet. It shows once there’s a newer odometer reading, like the one your next fill-up records.'
+		);
+		unmount();
+
+		render(VehicleRowsCard, {
+			props: { rows: [ROWS[0]!], periodLabel: '30 days', distanceLabel: 'mi' }
+		});
+		expect(screen.queryByTestId('no-per-distance-note')).toBeNull();
+	});
 });

@@ -4,7 +4,7 @@
 	import { paramRoutes, routes } from '#lib/routes.ts';
 	import { buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
-	import type { VehicleRow } from './dashboard-data';
+	import { noPerDistanceNote, type VehicleRow } from './dashboard-data';
 
 	interface Props {
 		rows: VehicleRow[];
@@ -64,5 +64,10 @@
 				</li>
 			{/each}
 		</ul>
+		{#if rows.some(row => row.runningPerDistance === null)}
+			<p class="mt-2 text-sm text-muted-foreground" data-testid="no-per-distance-note">
+				{noPerDistanceNote(distanceLabel)}
+			</p>
+		{/if}
 	</Card.Content>
 </Card.Root>

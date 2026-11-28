@@ -128,6 +128,24 @@ describe('the Garage', () => {
 		);
 	});
 
+	test('a car with no cost per mile gets one note under the list saying what fills it in', async () => {
+		render(Page);
+		expect(await screen.findByTestId('no-per-distance-note')).toHaveTextContent(
+			'— means no cost per mi yet. It shows once there’s a newer odometer reading'
+		);
+
+		query.mockResolvedValue({
+			series: [
+				{ key: 'v1', label: 'Daily Driver', values: [0.2] },
+				{ key: 'v2', label: 'Tesla', values: [0.05] }
+			]
+		} as unknown as AnalyticsQueryResponse);
+		document.body.innerHTML = '';
+		render(Page);
+		await screen.findByRole('heading', { level: 1, name: '2 vehicles' });
+		expect(screen.queryByTestId('no-per-distance-note')).toBeNull();
+	});
+
 	test("labels each odometer in the car's own unit and falls back to its other readings", async () => {
 		const metric = {
 			...TESLA,
