@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
-import type { Table } from 'drizzle-orm';
+import type { Column, Table } from 'drizzle-orm';
 import { and, eq, getTableColumns, getTableName, inArray } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import type { z } from 'zod';
@@ -340,6 +340,10 @@ for (const [key, table] of Object.entries(TABLE_SCHEMA_MAP)) {
   TABLE_SCHEMAS[key] = createInsertSchema(table);
 }
 
+function isEpochSecondsColumn(col: Column): boolean {
+  return col.columnType === 'PgCustomColumn' && col.getSQLType() === 'bigint';
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Column type coercion requires checking multiple column types
 export function coerceRow(row: Record<string, unknown>, table: Table): Record<string, unknown> {
   const columns = getTableColumns(table);
@@ -376,7 +380,7 @@ export function coerceRow(row: Record<string, unknown>, table: Table): Record<st
       continue;
     }
 
-    if (TIMESTAMP_TYPES.has(col.columnType)) {
+    if (TIMESTAMP_TYPES.has(col.columnType) || isEpochSecondsColumn(col)) {
       const date = new Date(strVal);
       coerced[columnName] = Number.isNaN(date.getTime()) ? null : date;
     } else if (BOOLEAN_TYPES.has(col.columnType)) {
