@@ -117,6 +117,11 @@
 			.join(' · ');
 	}
 
+	function termState(term: InsuranceTerm): string {
+		if (getDaysRemaining(term.startDate) > 0) return 'Upcoming';
+		return getDaysRemaining(term.endDate) < 0 ? 'Ended' : 'In force';
+	}
+
 	function renewalText(term: InsuranceTerm): string {
 		const days = getDaysRemaining(term.endDate);
 		if (days < 0) return `Expired ${formatDate(term.endDate)}`;
@@ -218,13 +223,14 @@
 									<span class="block font-semibold whitespace-nowrap tabular-nums">{cost}</span>
 								{/if}
 								{#if term && days !== null && policy.isActive}
-									{#if split?.startsLater && term}
+									{#if split?.startsLater}
 										<span class="block text-sm text-muted-foreground">
-											Starts {formatDate(term.startDate)}
+											Starts <span class="whitespace-nowrap">{formatDate(term.startDate)}</span>
 										</span>
 									{:else if split?.upcoming && days >= 0}
 										<span class="block text-sm text-muted-foreground">
-											Next term from {formatDate(split.upcoming.startDate)}
+											Next term from
+											<span class="whitespace-nowrap">{formatDate(split.upcoming.startDate)}</span>
 										</span>
 									{:else}
 										<span class={cn('block text-sm', statusTone(days))}>{renewalText(term)}</span>
@@ -260,7 +266,7 @@
 										{policy.company}
 									</span>
 									<span class="block text-sm text-muted-foreground">
-										{policyMeta({ ...policy, isActive: true }, term)}
+										{policyMeta({ ...policy, isActive: true }, term)} · {termState(term)}
 									</span>
 								</span>
 								{#if cost}
