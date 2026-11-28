@@ -11,8 +11,8 @@ let ctx: TestApp;
 let m: Members;
 const CAR = 'photo-car';
 
-function photo(id: string, createdBy: string | null, entityType = 'vehicle', entityId = CAR) {
-  ctx.sqlite.run(
+async function photo(id: string, createdBy: string | null, entityType = 'vehicle', entityId = CAR) {
+  await ctx.sql.run(
     "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size, created_by) VALUES (?, ?, ?, ?, 'a.jpg', 'image/jpeg', 10, ?)",
     [id, ctx.user.id, entityType, entityId, createdBy]
   );
@@ -38,8 +38,8 @@ beforeEach(async () => {
   ctx = await createTestApp();
   await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'photo');
-  photo('owners-photo', null);
-  photo('editors-photo', m.editor.id);
+  await photo('owners-photo', null);
+  await photo('editors-photo', m.editor.id);
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -71,16 +71,16 @@ describe('photos resolve through can() for every role', () => {
   });
 
   test('receipts follow a deny on their expense or reading', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('exp-1', ?, ?, 'fuel', 1717200000, 100)",
       [CAR, ctx.user.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       'INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at) VALUES (?, ?, ?, 10, 1717200000)',
       ['odo-1', CAR, ctx.user.id]
     );
-    photo('receipt', null, 'expense', 'exp-1');
-    photo('dash', null, 'odometer_entry', 'odo-1');
+    await photo('receipt', null, 'expense', 'exp-1');
+    await photo('dash', null, 'odometer_entry', 'odo-1');
     const reads = [
       '/api/v1/photos/expense/exp-1',
       '/api/v1/photos/expense/exp-1/receipt/thumbnail',
@@ -97,17 +97,17 @@ describe('photos resolve through can() for every role', () => {
 
   test('a photo id from another car is not found under this car', async () => {
     await seedCar(ctx, 'other-car');
-    photo('other-cars-photo', null, 'vehicle', 'other-car');
+    await photo('other-cars-photo', null, 'vehicle', 'other-car');
     expect(await remove(m.editor.request, 'other-cars-photo')).toBe(404);
     expect(await remove(m.coOwner.request, 'other-cars-photo')).toBe(404);
   });
 
   test('policy documents stay with the policy owner', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO insurance_policies (id, user_id, company) VALUES ('pol-1', ?, 'Mutual')",
       [ctx.user.id]
     );
-    photo('policy-photo', null, 'insurance_policy', 'pol-1');
+    await photo('policy-photo', null, 'insurance_policy', 'pol-1');
     const path = '/api/v1/photos/insurance_policy/pol-1';
     expect((await ctx.authed('GET', path)).status).toBe(200);
     expect((await m.coOwner.request('GET', path)).status).toBe(404);

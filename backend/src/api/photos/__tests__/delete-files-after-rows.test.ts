@@ -16,7 +16,7 @@ let restoreProvider: () => void;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
      VALUES ('prov-1', ?, 'storage', 'fake', 'Fake storage', 'unused', 'active')`,
     [ctx.user.id]
@@ -36,21 +36,21 @@ afterEach(() => {
   ctx.close();
 });
 
-function attachPhoto(entityType: string, entityId: string, id: string): void {
-  ctx.sqlite.run(
+async function attachPhoto(entityType: string, entityId: string, id: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
      VALUES (?, ?, ?, ?, 'p.jpg', 'image/jpeg', 1024)`,
     [id, ctx.user.id, entityType, entityId]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
      VALUES (?, ?, 'prov-1', ?, 'active')`,
     [`${id}-ref`, id, `photos/${id}.jpg`]
   );
 }
 
-const photoRows = () =>
-  (ctx.sqlite.query('SELECT COUNT(*) AS n FROM photos').get() as { n: number }).n;
+const photoRows = async () =>
+  ((await ctx.sql.get('SELECT COUNT(*) AS n FROM photos')) as { n: number }).n;
 
 async function createExpense(vehicleId: string): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/expenses', {
@@ -91,7 +91,7 @@ const paths: DeletePath[] = [
     name: 'an expense',
     setup: async () => {
       const id = await createExpense(await seedVehicle(ctx, { nickname: 'Car' }));
-      attachPhoto('expense', id, 'e');
+      await attachPhoto('expense', id, 'e');
       return { url: `/api/v1/expenses/${id}`, photos: 1 };
     },
     failRows: () =>
@@ -113,7 +113,7 @@ const paths: DeletePath[] = [
       const body = await json<DataEnvelope<{ groupId: string; siblings: { id: string }[] }>>(res);
       expect(res.status).toBe(201);
       for (const [i, leg] of body.data.siblings.entries())
-        attachPhoto('expense', leg.id, `leg${i}`);
+        await attachPhoto('expense', leg.id, `leg${i}`);
       return { url: `/api/v1/expenses/split/${body.data.groupId}`, photos: 2 };
     },
     failRows: () =>
@@ -125,8 +125,8 @@ const paths: DeletePath[] = [
     name: 'a vehicle, with its expenses',
     setup: async () => {
       const vehicleId = await seedVehicle(ctx, { nickname: 'Gone' });
-      attachPhoto('vehicle', vehicleId, 'v');
-      attachPhoto('expense', await createExpense(vehicleId), 've');
+      await attachPhoto('vehicle', vehicleId, 'v');
+      await attachPhoto('expense', await createExpense(vehicleId), 've');
       return { url: `/api/v1/vehicles/${vehicleId}`, photos: 2 };
     },
     failRows: () =>
@@ -136,7 +136,7 @@ const paths: DeletePath[] = [
     name: 'an insurance policy',
     setup: async () => {
       const policyId = await createPolicy();
-      attachPhoto('insurance_policy', policyId, 'pol');
+      await attachPhoto('insurance_policy', policyId, 'pol');
       return { url: `/api/v1/insurance/${policyId}`, photos: 1 };
     },
     failRows: () =>
@@ -155,7 +155,7 @@ describe('deleting something with photos', () => {
       } finally {
         spy.mockRestore();
       }
-      expect(photoRows()).toBe(photos);
+      expect(await photoRows()).toBe(photos);
       expect(deletedFiles, 'no stored file is deleted while its row stays').toEqual([]);
     });
 
@@ -163,7 +163,7 @@ describe('deleting something with photos', () => {
       const { url, photos } = await path.setup();
       const res = await ctx.authed('DELETE', url);
       expect(res.status, await res.text()).toBe(200);
-      expect(photoRows()).toBe(0);
+      expect(await photoRows()).toBe(0);
       expect(deletedFiles).toHaveLength(photos);
     });
   }
@@ -172,9 +172,9 @@ describe('deleting something with photos', () => {
 describe('deleting one photo', () => {
   async function expenseWithTwoPhotos(): Promise<string> {
     const id = await createExpense(await seedVehicle(ctx, { nickname: 'Car' }));
-    attachPhoto('expense', id, 'a');
-    attachPhoto('expense', id, 'b');
-    ctx.sqlite.run(`UPDATE photos SET is_cover = 1 WHERE id = 'a'`);
+    await attachPhoto('expense', id, 'a');
+    await attachPhoto('expense', id, 'b');
+    await ctx.sql.run(`UPDATE photos SET is_cover = TRUE WHERE id = 'a'`);
     return id;
   }
 
@@ -192,7 +192,7 @@ describe('deleting one photo', () => {
       } finally {
         spy.mockRestore();
       }
-      expect(photoRows()).toBe(2);
+      expect(await photoRows()).toBe(2);
       expect(deletedFiles, 'no stored file is deleted while its row stays').toEqual([]);
     });
   }
@@ -201,9 +201,9 @@ describe('deleting one photo', () => {
     const id = await expenseWithTwoPhotos();
     const res = await ctx.authed('DELETE', `/api/v1/photos/expense/${id}/a`);
     expect(res.status).toBe(204);
-    expect(photoRows()).toBe(1);
+    expect(await photoRows()).toBe(1);
     expect(deletedFiles).toEqual(['photos/a.jpg']);
-    const cover = ctx.sqlite.query(`SELECT is_cover AS c FROM photos WHERE id = 'b'`).get();
+    const cover = await ctx.sql.get(`SELECT is_cover AS c FROM photos WHERE id = 'b'`);
     expect(cover).toEqual({ c: 1 });
   });
 });
@@ -217,7 +217,7 @@ describe('deleting a claim', () => {
     });
     expect(res.status).toBe(201);
     const claimId = (await json<DataEnvelope<{ id: string }>>(res)).data.id;
-    attachPhoto('insurance_claim', claimId, 'c');
+    await attachPhoto('insurance_claim', claimId, 'c');
 
     const photoDeletes = spyOn(repos().photos, 'deleteByEntities');
     try {
@@ -227,7 +227,7 @@ describe('deleting a claim', () => {
     } finally {
       photoDeletes.mockRestore();
     }
-    expect(photoRows()).toBe(1);
+    expect(await photoRows()).toBe(1);
     expect(deletedFiles).toEqual([]);
   });
 });

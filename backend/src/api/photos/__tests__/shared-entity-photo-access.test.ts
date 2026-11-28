@@ -56,7 +56,7 @@ async function expenseByB(vehicleId: string): Promise<string> {
   });
   const body = await json<DataEnvelope<{ id: string }>>(res);
   expect(res.status, JSON.stringify(body)).toBe(201);
-  const row = ctx.sqlite.query('SELECT user_id FROM expenses WHERE id = ?').get(body.data.id) as {
+  const row = (await ctx.sql.get('SELECT user_id FROM expenses WHERE id = ?', [body.data.id])) as {
     user_id: string;
   };
   expect(row.user_id).toBe(ctx.user.id);

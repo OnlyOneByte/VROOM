@@ -7,11 +7,11 @@ let markSpy: ReturnType<typeof spyOn<typeof activityTracker, 'markDataChanged'>>
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-1', ?, 'Toyota', 'Camry', 2022)`,
     [ctx.user.id]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
      VALUES ('photo-1', ?, 'vehicle', 'veh-1', 'shot.jpg', 'image/jpeg', 1024)`,
     [ctx.user.id]

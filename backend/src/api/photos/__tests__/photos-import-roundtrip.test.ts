@@ -54,10 +54,10 @@ async function seedVlmProvider(): Promise<void> {
 }
 
 let photosProviderSeq = 0;
-function seedPhotosProvider(): void {
+async function seedPhotosProvider(): Promise<void> {
   photosProviderSeq += 1;
   const id = `photos-prov-${photosProviderSeq}`;
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-photos', 'My Photos', ?, ?, 'active')`,
     [
@@ -94,13 +94,13 @@ async function confirm(
   });
 }
 
-function expenseCount(): number {
-  return (ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number }).n;
+async function expenseCount(): Promise<number> {
+  return ((await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number }).n;
 }
 
 describe('Photos import round-trip: stage, confirm, re-run', () => {
   test('sweep → confirm N drafts → N expenses persist with the photos:<id> clientId', async () => {
-    seedPhotosProvider();
+    await seedPhotosProvider();
     await seedVlmProvider();
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
     const ids = store.seedSearchablePhotos([{ filename: 'a.jpg' }, { filename: 'b.jpg' }]);
@@ -109,23 +109,23 @@ describe('Photos import round-trip: stage, confirm, re-run', () => {
     const drafts = await sweep();
     expect(drafts.map((d) => d.photoId).sort()).toEqual([...ids].sort());
 
-    const before = expenseCount();
+    const before = await expenseCount();
     for (const d of drafts) {
       const res = await confirm(d.photoId, vehicleId, d.draft.amount ?? 30);
       expect(res.status, await res.clone().text()).toBe(201);
     }
-    expect(expenseCount()).toBe(before + 2);
+    expect(await expenseCount()).toBe(before + 2);
 
     for (const id of ids) {
-      const row = ctx.sqlite
-        .query('SELECT client_id FROM expenses WHERE client_id = ?')
-        .get(`photos:${id}`) as { client_id: string } | null;
+      const row = (await ctx.sql.get('SELECT client_id FROM expenses WHERE client_id = ?', [
+        `photos:${id}`,
+      ])) as { client_id: string } | null;
       expect(row?.client_id).toBe(`photos:${id}`);
     }
   });
 
   test('a re-sweep after confirm filters out the now-imported photos', async () => {
-    seedPhotosProvider();
+    await seedPhotosProvider();
     await seedVlmProvider();
     const vehicleId = await seedVehicle(ctx, { make: 'Ford', model: 'F150', year: 2022 });
     const ids = store.seedSearchablePhotos([{ filename: 'a.jpg' }, { filename: 'b.jpg' }]);
@@ -141,7 +141,7 @@ describe('Photos import round-trip: stage, confirm, re-run', () => {
   });
 
   test('a re-confirm of the same clientId creates no duplicate', async () => {
-    seedPhotosProvider();
+    await seedPhotosProvider();
     await seedVlmProvider();
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX5', year: 2023 });
     const ids = store.seedSearchablePhotos([{ filename: 'a.jpg' }]);
@@ -151,10 +151,10 @@ describe('Photos import round-trip: stage, confirm, re-run', () => {
     const photoId = ids[0] as string;
     const r1 = await confirm(photoId, vehicleId, 18.5, 'misc');
     expect(r1.status).toBe(201);
-    const afterFirst = expenseCount();
+    const afterFirst = await expenseCount();
 
     const r2 = await confirm(photoId, vehicleId, 18.5, 'misc');
     expect(r2.status).toBe(201);
-    expect(expenseCount()).toBe(afterFirst);
+    expect(await expenseCount()).toBe(afterFirst);
   });
 });

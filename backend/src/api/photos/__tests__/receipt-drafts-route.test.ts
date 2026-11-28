@@ -67,10 +67,10 @@ function photosSecret(plain: unknown): string {
   });
 }
 
-function seedPhotosProvider(
+async function seedPhotosProvider(
   credentials = photosSecret({ refreshToken: 'refresh-token-abc' })
-): void {
-  ctx.sqlite.run(
+): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-photos', 'My Photos', ?, ?, 'active')`,
     ['photos-prov-1', ctx.user.id, credentials, JSON.stringify({ albumId: 'album-vroom' })]
@@ -93,7 +93,7 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
   });
 
   test('a google-photos provider but no vlm provider → drafts come from the built-in text reader', async () => {
-    seedPhotosProvider();
+    await seedPhotosProvider();
     store.seedSearchablePhotos([
       {
         filename: 'fuel.png',
@@ -115,8 +115,8 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     setPhotosServiceBuilderForTest(null);
     await seedVlmProvider();
     for (const credentials of [photosSecret({}), 'not-encrypted']) {
-      ctx.sqlite.run(`DELETE FROM user_providers WHERE id = 'photos-prov-1'`);
-      seedPhotosProvider(credentials);
+      await ctx.sql.run(`DELETE FROM user_providers WHERE id = 'photos-prov-1'`);
+      await seedPhotosProvider(credentials);
       const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');
       expect(res.status).toBe(400);
       expect(await res.text()).toMatch(/re-connect|decrypt provider credentials/i);
@@ -124,7 +124,7 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
   });
 
   test('both providers present → a clean sweep returns one draft per app-created photo, persists nothing', async () => {
-    seedPhotosProvider();
+    await seedPhotosProvider();
     await seedVlmProvider();
     store.seedSearchablePhotos([{ filename: 'r1.jpg' }, { filename: 'r2.jpg' }]);
     stubVlm('{"amount": 23.45, "category": "fuel", "vendor": "Shell"}');
@@ -134,7 +134,7 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
     expect(drafts).toHaveLength(2);
     expect(drafts[0]?.draft.amount).toBe(23.45);
     expect(drafts[0]?.thumbnailUrl).toContain(drafts[0]?.photoId);
-    const count = (ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number }).n;
+    const count = ((await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number }).n;
     expect(count).toBe(0);
   });
 
@@ -143,13 +143,13 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
       ['drive-prov-1', 'google-drive'],
       ['s3-prov-1', 's3'],
     ]) {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
          VALUES (?, ?, 'storage', ?, ?, 'x', '{}', 'active')`,
         [id, ctx.user.id, type, type]
       );
     }
-    seedPhotosProvider();
+    await seedPhotosProvider();
     await seedVlmProvider();
     store.seedSearchablePhotos([{ filename: 'r1.jpg' }]);
     stubVlm('{"amount": 10, "category": "fuel"}');
@@ -160,14 +160,14 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
   });
 
   test('an already-imported photo is filtered out', async () => {
-    seedPhotosProvider();
+    await seedPhotosProvider();
     await seedVlmProvider();
     const ids = store.seedSearchablePhotos([{ filename: 'a.jpg' }, { filename: 'b.jpg' }]);
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2020 });
     stubVlm('{"amount": 10}');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO expenses (id, user_id, vehicle_id, category, expense_amount, date, client_id)
-       VALUES ('exp-imported', ?, ?, 'misc', 1000, '2026-05-01', ?)`,
+       VALUES ('exp-imported', ?, ?, 'misc', 1000, 1777593600, ?)`,
       [ctx.user.id, vehicleId, `photos:${ids[0]}`]
     );
 
@@ -177,14 +177,14 @@ describe('GET /api/v1/photos/receipt-drafts', () => {
   });
 
   test('a Photos transport failure → 502 (honest, never a faked empty result)', async () => {
-    seedPhotosProvider();
+    await seedPhotosProvider();
     await seedVlmProvider();
     store.seedSearchablePhotos([{ filename: 'x.jpg' }]);
     store.injectFault('searchMediaItems', photosApiError(503, 'Google Photos API 503'));
     const res = await ctx.authed('GET', '/api/v1/photos/receipt-drafts');
     expect(res.status).toBe(502);
     expect(await res.text()).toMatch(/Could not read|try again/i);
-    const count = (ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number }).n;
+    const count = ((await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number }).n;
     expect(count).toBe(0);
   });
 

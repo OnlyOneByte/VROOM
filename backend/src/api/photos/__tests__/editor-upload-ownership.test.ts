@@ -23,11 +23,11 @@ const receipt = (): File =>
 beforeEach(async () => {
   ctx = await createTestApp();
   storage = null;
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('veh-shared', ?, 'Volvo', 'XC40', 2021)`,
     [ctx.user.id]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
      VALUES ('exp-shared', 'veh-shared', ?, 'fuel', 1700000000, 2500)`,
     [ctx.user.id]
@@ -43,18 +43,18 @@ afterEach(() => {
 
 describe("an editor's photo on a shared vehicle belongs to the vehicle owner", () => {
   test("the upload is owned by the owner and stored in the owner's provider", async () => {
-    storage = installFakePhotoStorage(ctx);
+    storage = await installFakePhotoStorage(ctx);
     const photo = await uploadPhotoForEntity('expense', 'exp-shared', editor.id, receipt());
 
     expect(photo.userId).toBe(ctx.user.id);
-    const ref = ctx.sqlite
-      .query('SELECT provider_id, status FROM photo_refs WHERE photo_id = ?')
-      .get(photo.id);
+    const ref = await ctx.sql.get('SELECT provider_id, status FROM photo_refs WHERE photo_id = ?', [
+      photo.id,
+    ]);
     expect(ref).toEqual({ provider_id: FAKE_PROVIDER_ID, status: 'active' });
   });
 
   test('both the owner and the editor can list and open it', async () => {
-    storage = installFakePhotoStorage(ctx);
+    storage = await installFakePhotoStorage(ctx);
     const photo = await uploadPhotoForEntity('expense', 'exp-shared', editor.id, receipt());
 
     for (const viewer of [ctx.user.id, editor.id]) {
@@ -69,28 +69,29 @@ describe("an editor's photo on a shared vehicle belongs to the vehicle owner", (
   });
 
   test("the editor deleting it removes the file from the owner's storage", async () => {
-    storage = installFakePhotoStorage(ctx);
+    storage = await installFakePhotoStorage(ctx);
     const photo = await uploadPhotoForEntity('expense', 'exp-shared', editor.id, receipt());
-    const { storage_ref } = ctx.sqlite
-      .query('SELECT storage_ref FROM photo_refs WHERE photo_id = ?')
-      .get(photo.id) as { storage_ref: string };
+    const { storage_ref } = (await ctx.sql.get(
+      'SELECT storage_ref FROM photo_refs WHERE photo_id = ?',
+      [photo.id]
+    )) as { storage_ref: string };
 
     await deletePhotoForEntity('expense', 'exp-shared', photo.id, editor.id);
 
-    expect(ctx.sqlite.query('SELECT id FROM photos').all()).toEqual([]);
+    expect(await ctx.sql.all('SELECT id FROM photos')).toEqual([]);
     await expect(
       storage.provider.download({ providerType: 'fake', externalId: storage_ref })
     ).rejects.toThrow();
   });
 
   test("an older editor-owned photo stays private to that editor's storage", async () => {
-    storage = installFakePhotoStorage(ctx);
-    ctx.sqlite.run(
+    storage = await installFakePhotoStorage(ctx);
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES ('prov-editor', ?, 'storage', 'fake', 'Editor storage', 'unused', 'active')`,
       [editor.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-legacy', ?, 'expense', 'exp-shared', 'old.png', 'image/png', 4)`,
       [editor.id]
@@ -103,7 +104,7 @@ describe("an editor's photo on a shared vehicle belongs to the vehicle owner", (
       entityId: 'exp-shared',
       pathHint: '',
     });
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
        VALUES ('ref-legacy', 'photo-legacy', 'prov-editor', ?, 'active')`,
       [stored.externalId]
@@ -119,7 +120,7 @@ describe("an editor's photo on a shared vehicle belongs to the vehicle owner", (
         deletePhotoForEntity('expense', 'exp-shared', 'photo-legacy', other)
       ).rejects.toThrow('Photo');
     }
-    expect(ctx.sqlite.query('SELECT id FROM photo_refs').all()).toEqual([{ id: 'ref-legacy' }]);
+    expect(await ctx.sql.all('SELECT id FROM photo_refs')).toEqual([{ id: 'ref-legacy' }]);
 
     const ownView = await getPhotoThumbnailForEntity(
       'expense',
@@ -134,6 +135,6 @@ describe("an editor's photo on a shared vehicle belongs to the vehicle owner", (
     await expect(
       uploadPhotoForEntity('expense', 'exp-shared', editor.id, receipt())
     ).rejects.toThrow("This vehicle's owner doesn't have an active photo storage provider");
-    expect(ctx.sqlite.query('SELECT id FROM photos').all()).toEqual([]);
+    expect(await ctx.sql.all('SELECT id FROM photos')).toEqual([]);
   });
 });
