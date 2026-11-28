@@ -386,6 +386,21 @@ describe('TripForm edit mode', () => {
 		expect(onSaved).toHaveBeenCalledTimes(1);
 	});
 
+	test('emptied optional fields are cleared on save', async () => {
+		mount({ trip: trip() });
+		await settle();
+
+		await fireEvent.input(field('trip-start-loc'), { target: { value: '' } });
+		await fireEvent.input(field('trip-end-loc'), { target: { value: '  ' } });
+		await fireEvent.input(field('trip-note'), { target: { value: '' } });
+		await submit();
+
+		expect(update).toHaveBeenCalledWith(
+			't1',
+			expect.objectContaining({ startLocation: null, endLocation: null, note: null })
+		);
+	});
+
 	test('a failed update reports the update failure', async () => {
 		update.mockRejectedValue(new ApiError('Odometer must increase', 400));
 		mount({ trip: trip() });

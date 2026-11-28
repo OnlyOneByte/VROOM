@@ -118,19 +118,25 @@
 				startOdometer: startValue,
 				endOdometer: endValue,
 				purpose,
-				tripDate: dateOnlyToISO(tripDate),
-				startLocation: startLocation.trim() || undefined,
-				endLocation: endLocation.trim() || undefined,
-				note: note.trim() || undefined
+				tripDate: dateOnlyToISO(tripDate)
 			};
 			if (trip) {
 				const changedDriver = driverId !== (trip.driverId ?? null);
-				await tripApi.update(trip.id, { ...payload, ...(changedDriver && { driverId }) });
+				await tripApi.update(trip.id, {
+					...payload,
+					startLocation: startLocation.trim() || null,
+					endLocation: endLocation.trim() || null,
+					note: note.trim() || null,
+					...(changedDriver && { driverId })
+				});
 				appStore.addNotification({ type: 'success', message: 'Trip updated' });
 			} else {
 				await tripApi.create({
 					vehicleId,
 					...payload,
+					startLocation: startLocation.trim() || undefined,
+					endLocation: endLocation.trim() || undefined,
+					note: note.trim() || undefined,
 					...(driverId !== undefined && { driverId })
 				});
 				appStore.addNotification({ type: 'success', message: 'Trip logged' });

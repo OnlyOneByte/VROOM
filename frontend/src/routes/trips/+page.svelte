@@ -198,7 +198,7 @@
 				<span class="max-w-40 truncate">{vehicleNames.get(trip.vehicleId) ?? 'Vehicle'}</span>
 			</p>
 			{#if trip.note}
-				<p class="text-sm text-muted-foreground">{trip.note}</p>
+				<p class="line-clamp-2 text-sm break-words text-muted-foreground">{trip.note}</p>
 			{/if}
 		</div>
 		<div class="shrink-0 text-right">

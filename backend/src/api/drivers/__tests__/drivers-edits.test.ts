@@ -78,10 +78,18 @@ describe('changing the driver on an existing entry', () => {
       await status(m.editor.request, 'PUT', `/api/v1/trips/${id}`, { driverId: editorDriver })
     ).toBe(200);
     expect(await column('trips', 'driver_id', id)).toBe(editorDriver);
+    const readingDriver = async () =>
+      (
+        (await ctx.sql.get('SELECT driver_id AS v FROM odometer_entries WHERE source_trip_id = ?', [
+          id,
+        ])) as { v: string | null }
+      ).v;
+    expect(await readingDriver()).toBe(editorDriver);
     expect(await status(m.editor.request, 'PUT', `/api/v1/trips/${id}`, { driverId: null })).toBe(
       200
     );
     expect(await column('trips', 'driver_id', id)).toBeNull();
+    expect(await readingDriver()).toBeNull();
   });
 
   test("without driver.record, someone else's reading can't be re-credited", async () => {
@@ -100,6 +108,48 @@ describe('changing the driver on an existing entry', () => {
       200
     );
     expect(await column('odometer_entries', 'driver_id', id)).toBe(coOwnerDriver);
+  });
+
+  test('a trip edit leaves a reading that now belongs to another trip alone', async () => {
+    const guest = await addGuest();
+    const first = await created(m.editor.request, '/api/v1/trips', trip({ driverId: guest }));
+    const second = await created(m.editor.request, '/api/v1/trips', trip({ driverId: guest }));
+    const editorDriver = await driverOf(m.editor.id);
+
+    expect(
+      await status(m.editor.request, 'PUT', `/api/v1/trips/${first}`, {
+        driverId: editorDriver,
+        endOdometer: 160,
+      })
+    ).toBe(200);
+
+    const drivers = (await ctx.sql.all(
+      'SELECT odometer AS o, driver_id AS d FROM odometer_entries WHERE vehicle_id = ? ORDER BY odometer',
+      [CAR]
+    )) as { o: number; d: string | null }[];
+    expect(drivers).toEqual([
+      { o: 150, d: guest },
+      { o: 160, d: editorDriver },
+    ]);
+    expect(await column('trips', 'driver_id', second)).toBe(guest);
+  });
+
+  test("a trip's driver change keeps a reading someone else re-credited", async () => {
+    const editorDriver = await driverOf(m.editor.id);
+    const id = await created(m.editor.request, '/api/v1/trips', trip({ driverId: editorDriver }));
+    const guest = await addGuest();
+    const reading = (await ctx.sql.get('SELECT id FROM odometer_entries WHERE source_trip_id = ?', [
+      id,
+    ])) as { id: string };
+    expect(
+      await status(ctx.authed, 'PUT', `/api/v1/odometer/${reading.id}`, { driverId: guest })
+    ).toBe(200);
+
+    expect(await status(m.editor.request, 'PUT', `/api/v1/trips/${id}`, { driverId: null })).toBe(
+      200
+    );
+
+    expect(await column('odometer_entries', 'driver_id', reading.id)).toBe(guest);
   });
 
   test.each([
