@@ -144,6 +144,20 @@ describe('guessManualColumns', () => {
 		});
 	});
 
+	test('totals of volume or distance go to their own fields, and entry or service types are categories', () => {
+		expect(
+			guessManualColumns(['Date', 'Total gallons', 'Total distance', 'Price', 'Service type'])
+		).toEqual({
+			date: 'Date',
+			volume: 'Total gallons',
+			amount: 'Price',
+			category: 'Service type'
+		});
+		expect(guessManualColumns(['Date', 'Entry type', 'Payment type', 'Amount']).category).toBe(
+			'Entry type'
+		);
+	});
+
 	test('an un-guessable header set leaves fields unmapped (no invented columns)', () => {
 		expect(guessManualColumns(['col1', 'col2', 'xyz'])).toEqual({});
 	});

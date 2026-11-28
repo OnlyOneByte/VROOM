@@ -43,17 +43,13 @@ const UNIT_PRICE = /\bper\b|\/\s*(gal|l|litre|liter)\b|unit price/;
 const GUESSES: Array<[NativeImportField, Array<RegExp>, RegExp?]> = [
 	['date', [/date/]],
 	['mileage', [/odometer/, /mileage/, /\bodo\b/]],
-	[
-		'volume',
-		[/volume/, /gallon/, /litre|liter/, /fuel amount/, /\bfill/],
-		/price|cost|total|paid|spent/
-	],
+	['volume', [/volume/, /gallon/, /litre|liter/, /fuel amount/, /\bfill/], /price|cost|paid|spent/],
 	[
 		'amount',
 		[/total/, /amount/, /cost/, /spent/, /paid/, /price/],
-		/volume|gallon|litre|liter|fill/
+		/volume|gallon|litre|liter|fill|distance|mileage|odometer|\bkm\b|\bmiles?\b/
 	],
-	['category', [/categor/, /^(expense )?type$/, /\bkind\b/]],
+	['category', [/categor/, /\btype\b/, /\bkind\b/], /fuel|payment/],
 	['vehicle', [/vehicle/, /\bcar\b/]],
 	['description', [/note/, /description/, /comment/]],
 	['tags', [/\btags?\b/]]
