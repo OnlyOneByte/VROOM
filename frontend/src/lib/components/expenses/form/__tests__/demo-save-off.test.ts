@@ -143,7 +143,7 @@ describe('expense form in the demo garage', () => {
 	);
 
 	test.each([true, false])(
-		'with demo=%s, Force Delete reaches its handler only for a real user',
+		'with demo=%s, Force delete reaches its handler only for a real user',
 		async demo => {
 			authStore.setUser({ ...user, demo });
 			const onForceDelete = vi.fn();
@@ -160,7 +160,7 @@ describe('expense form in the demo garage', () => {
 					onForceDelete
 				}
 			});
-			await fireEvent.click(screen.getByRole('button', { name: 'Force Delete' }));
+			await fireEvent.click(screen.getByRole('button', { name: 'Force delete' }));
 			expect(onForceDelete).toHaveBeenCalledTimes(demo ? 0 : 1);
 		}
 	);

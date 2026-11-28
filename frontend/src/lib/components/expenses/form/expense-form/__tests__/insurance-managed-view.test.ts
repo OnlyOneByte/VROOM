@@ -52,7 +52,7 @@ describe('InsuranceManagedView', () => {
 	test('shows the managed-by-insurance notice with category, amount and date', () => {
 		render(InsuranceManagedView, { props: props() });
 
-		expect(screen.getByRole('heading', { name: 'Insurance Expense' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Insurance expense' })).toBeInTheDocument();
 		expect(screen.getByText('This expense is managed by an insurance policy')).toBeInTheDocument();
 		expect(screen.getByText('Financial')).toBeInTheDocument();
 		expect(screen.getByText('$612.50')).toBeInTheDocument();
@@ -104,21 +104,21 @@ describe('InsuranceManagedView', () => {
 		expect(onBack).toHaveBeenCalledTimes(2);
 	});
 
-	test('Force Delete calls onForceDelete and is disabled while deleting', async () => {
+	test('Force delete calls onForceDelete and is disabled while deleting', async () => {
 		const onForceDelete = vi.fn();
 		const { unmount } = render(InsuranceManagedView, { props: props({ onForceDelete }) });
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Force Delete' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Force delete' }));
 		expect(onForceDelete).toHaveBeenCalledTimes(1);
 		unmount();
 
 		render(InsuranceManagedView, { props: props({ isDeleting: true }) });
-		expect(screen.getByRole('button', { name: 'Force Delete' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Force delete' })).toBeDisabled();
 	});
 
-	test('Back to Expenses and Force Delete are 40px tall at every width', () => {
+	test('Back to Expenses and Force delete are 40px tall at every width', () => {
 		render(InsuranceManagedView, { props: props() });
-		for (const name of ['Back to Expenses', 'Force Delete']) {
+		for (const name of ['Back to Expenses', 'Force delete']) {
 			const button = screen.getByRole('button', { name });
 			expect(button).toHaveClass('h-10');
 			expect(button.className).not.toMatch(/\bsm:h-/);

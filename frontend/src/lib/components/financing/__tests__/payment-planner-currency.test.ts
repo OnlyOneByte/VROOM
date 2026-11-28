@@ -32,7 +32,7 @@ describe('PaymentPlannerDialog currency', () => {
 			props: { financing: LOAN, open: true, onPaymentAmountSaved: vi.fn() }
 		});
 
-		expect(await screen.findByLabelText('Monthly Payment (€)')).toBeTruthy();
+		expect(await screen.findByLabelText('Monthly payment (€)')).toBeTruthy();
 		const dialog = screen.getByRole('dialog');
 		expect([...dialog.querySelectorAll('span')].some(s => s.textContent?.trim() === '$')).toBe(
 			false

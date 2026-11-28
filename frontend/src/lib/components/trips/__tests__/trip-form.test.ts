@@ -128,14 +128,14 @@ afterEach(() => {
 });
 
 describe('TripForm create mode', () => {
-	test('opens titled Log a Trip with business purpose and no vehicle chosen', async () => {
+	test('opens titled Log a trip with business purpose and no vehicle chosen', async () => {
 		mount();
 		await settle();
 
-		expect(screen.getByRole('heading', { name: 'Log a Trip' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Log a trip' })).toBeInTheDocument();
 		expect(field('trip-vehicle')).toHaveTextContent('Select a vehicle');
 		expect(field('trip-purpose')).toHaveTextContent('Business');
-		expect(screen.getByRole('button', { name: 'Log Trip' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: 'Log trip' })).toBeEnabled();
 	});
 
 	test('a single vehicle is preselected', async () => {
@@ -150,7 +150,7 @@ describe('TripForm create mode', () => {
 		await settle();
 
 		expect(screen.getByText('Add a vehicle first to log a trip.')).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Log Trip' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Log trip' })).toBeDisabled();
 	});
 
 	test('the odometer unit follows the chosen vehicle', async () => {
@@ -285,7 +285,7 @@ describe('TripForm create submit', () => {
 		);
 		expect(onSaved).not.toHaveBeenCalled();
 		expect(screen.getByRole('dialog')).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Log Trip' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: 'Log trip' })).toBeEnabled();
 	});
 
 	test('the submit button reads Logging… and both buttons disable while saving', async () => {
@@ -336,7 +336,7 @@ describe('TripForm edit mode', () => {
 		mount({ trip: trip() });
 		await settle();
 
-		expect(screen.getByRole('heading', { name: 'Edit Trip' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Edit trip' })).toBeInTheDocument();
 		expect(field('trip-vehicle')).toBeDisabled();
 		expect(field('trip-vehicle').value).toBe('2019 Honda Civic');
 		expect(field('trip-start').value).toBe('1000');
@@ -361,7 +361,7 @@ describe('TripForm edit mode', () => {
 		mount({ trip: trip({ vehicleId: 'gone' }) });
 		await settle();
 
-		expect(field('trip-vehicle').value).toBe('Unknown Vehicle');
+		expect(field('trip-vehicle').value).toBe('Unknown vehicle');
 	});
 
 	test('saving sends the update without a vehicle id', async () => {
@@ -369,7 +369,7 @@ describe('TripForm edit mode', () => {
 		await settle();
 
 		await fireEvent.input(field('trip-end'), { target: { value: '1100' } });
-		await fireEvent.click(screen.getByRole('button', { name: 'Save Trip' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Save trip' }));
 		await settle();
 
 		expect(update).toHaveBeenCalledWith('t1', {
@@ -459,7 +459,7 @@ describe('TripForm driver chip', () => {
 		await settle();
 		expect(screen.getByRole('combobox', { name: 'Driver: Sam' })).toBeTruthy();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Save Trip' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Save trip' }));
 		await settle();
 		expect(update.mock.calls[0]?.[1]).not.toHaveProperty('driverId');
 	});

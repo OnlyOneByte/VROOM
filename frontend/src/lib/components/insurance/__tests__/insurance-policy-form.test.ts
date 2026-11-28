@@ -130,12 +130,12 @@ describe('InsurancePolicyForm create mode', () => {
 		expect(save.className).not.toMatch(/shadow-lg|shadow-2xl|hover:scale/);
 	});
 
-	test('with no vehicles, shows the Add Vehicle empty state instead of the form', async () => {
+	test('with no vehicles, shows the Add vehicle empty state instead of the form', async () => {
 		getVehicles.mockResolvedValue([]);
 		await mount();
 		expect(screen.getByRole('heading', { name: 'Add a vehicle first' })).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /Create Policy/ })).toBeNull();
+		expect(screen.getByRole('link', { name: 'Add vehicle' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /create policy/i })).toBeNull();
 		expect(screen.queryByLabelText(/Company/)).toBeNull();
 	});
 

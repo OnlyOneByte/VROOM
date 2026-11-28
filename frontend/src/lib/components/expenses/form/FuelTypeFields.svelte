@@ -59,7 +59,7 @@
 
 {#if energyMode === 'fuel'}
 	<div class="space-y-2">
-		<Label for="fuelType">Fuel Type / Octane</Label>
+		<Label for="fuelType">Fuel type / octane</Label>
 		<Select.Root
 			type="single"
 			value={showCustomFuelType ? 'other' : fuelType || ''}
@@ -92,11 +92,11 @@
 
 	{#if showCustomFuelType}
 		<div class="space-y-2">
-			<Label for="customFuelType">Custom Fuel Type</Label>
+			<Label for="customFuelType">Custom fuel type</Label>
 			<Input
 				id="customFuelType"
 				type="text"
-				placeholder="e.g., E85, E100 Race Fuel"
+				placeholder="e.g., E85, E100 race fuel"
 				bind:value={fuelType}
 				onblur={() => onBlur('fuelType')}
 			/>
@@ -104,7 +104,7 @@
 	{/if}
 {:else}
 	<div class="space-y-2">
-		<Label for="fuelType">Charging Type</Label>
+		<Label for="fuelType">Charging type</Label>
 		<Select.Root
 			type="single"
 			value={fuelType || ''}
@@ -126,7 +126,7 @@
 	</div>
 
 	<div class="space-y-2">
-		<Label for="chargerType">Where you charged (Optional)</Label>
+		<Label for="chargerType">Where you charged (optional)</Label>
 		<Select.Root
 			type="single"
 			value={chargerType || NO_CHARGER}

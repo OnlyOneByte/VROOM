@@ -277,11 +277,11 @@
 	);
 	const plainTitle = $derived(
 		form.isGroupEditMode
-			? 'Edit Split Expense'
+			? 'Edit split expense'
 			: form.isEditMode
-				? 'Edit Expense'
+				? 'Edit expense'
 				: form.queuedExpense
-					? 'Edit Queued Expense'
+					? 'Edit queued expense'
 					: 'New expense'
 	);
 	const formTitle = $derived(form.isEditMode ? editTitle : plainTitle);
@@ -426,7 +426,7 @@
 	{:else if form.queuedPhotosUnreadable && form.queuedExpense?.clientId}
 		{@const clientId = form.queuedExpense.clientId}
 		<div class="space-y-2" data-testid="queued-photos-unreadable">
-			<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
+			<h2 class="text-sm font-medium text-foreground">Photos & receipts</h2>
 			<p id="queued-photos-message" class="text-sm text-muted-foreground">
 				Couldn't load this entry's photos, so they can't be changed here. They stay saved with it
 				and will sync as they are.
@@ -633,7 +633,7 @@
 		</div>
 	{:else if form.expenseError}
 		<div class="space-y-6">
-			<ExpenseFormHeader title="Edit Expense" onBack={handleBack} />
+			<ExpenseFormHeader title="Edit expense" onBack={handleBack} />
 			<LoadErrorCard
 				data-testid="expense-load-error"
 				title="Couldn't load this {form.groupId ? 'split expense' : 'expense'}"

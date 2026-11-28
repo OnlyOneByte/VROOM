@@ -33,7 +33,7 @@
 </script>
 
 <div class="space-y-6">
-	<ExpenseFormHeader title="Insurance Expense" {onBack}>
+	<ExpenseFormHeader title="Insurance expense" {onBack}>
 		{#snippet subtitle()}This expense is managed by an insurance policy{/snippet}
 	</ExpenseFormHeader>
 
@@ -57,7 +57,7 @@
 				</p>
 			</div>
 			<div>
-				<p class="text-muted-foreground">Total Amount</p>
+				<p class="text-muted-foreground">Total amount</p>
 				<p class="font-medium text-foreground">
 					{formatCurrency(parseFloat(amount) || 0)}
 				</p>
@@ -105,7 +105,7 @@
 			disabled={isDeleting || authStore.user?.demo === true}
 		>
 			<Trash2 class="mr-2 h-4 w-4 text-destructive" />
-			Force Delete
+			Force delete
 		</Button>
 	</div>
 </div>

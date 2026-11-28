@@ -29,11 +29,11 @@ test.describe('A new expense shows on the list before the list has loaded', () =
 		await page.getByRole('radio', { name: 'Misc' }).click();
 		await page.getByLabel('Amount *').fill('12.34');
 		await page.getByRole('button', { name: /More details/ }).click();
-		await page.getByLabel('Description (Optional)').fill('Car wash on Elm');
+		await page.getByLabel('Description (optional)').fill('Car wash on Elm');
 
 		await page.evaluate(() => {
 			const save = [...document.querySelectorAll('button')].find(
-				b => b.textContent?.trim() === 'Save Expense'
+				b => b.textContent?.trim() === 'Save expense'
 			);
 			save?.addEventListener('click', () => {
 				const clickedAt = performance.now();
@@ -54,7 +54,7 @@ test.describe('A new expense shows on the list before the list has loaded', () =
 				observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 			});
 		});
-		await page.getByRole('button', { name: 'Save Expense' }).click();
+		await page.getByRole('button', { name: 'Save expense' }).click();
 
 		await expect(
 			page.getByTestId('pending-rows-while-loading').getByText('Car wash on Elm')
@@ -95,13 +95,13 @@ test.describe('A new expense shows on the list before the list has loaded', () =
 		await page.getByRole('radio', { name: 'Misc' }).click();
 		await page.getByLabel('Amount *').fill('12.34');
 		await page.getByRole('button', { name: /More details/ }).click();
-		await page.getByLabel('Description (Optional)').fill('Car wash on Elm');
+		await page.getByLabel('Description (optional)').fill('Car wash on Elm');
 		const reply = page.waitForResponse(
 			response =>
 				new URL(response.url()).pathname === '/api/v1/expenses' &&
 				response.request().method() === 'POST'
 		);
-		await page.getByRole('button', { name: 'Save Expense' }).click();
+		await page.getByRole('button', { name: 'Save expense' }).click();
 
 		expect((await reply).ok()).toBe(true);
 		expect(saved).toBe(true);

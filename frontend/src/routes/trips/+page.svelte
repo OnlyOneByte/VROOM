@@ -134,7 +134,7 @@
 {#snippet summarySection(s: TripSummary)}
 	<Card.Root variant="section" data-testid="trip-summary-card">
 		<Card.Header>
-			<Card.Title level={2} class="sr-only">Mileage Summary</Card.Title>
+			<Card.Title level={2} class="sr-only">Mileage summary</Card.Title>
 		</Card.Header>
 		<Card.Content class="space-y-5">
 			{#if s.rate > 0}
@@ -240,7 +240,7 @@
 			{#if !isLoading && !loadError && trips.length > 0 && loggable.length > 0}
 				<Button size="lg" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
-					Log Trip
+					Log trip
 				</Button>
 			{:else if isLoading}
 				<Skeleton class="h-10 w-full sm:w-36" />
@@ -277,7 +277,7 @@
 				{#if loggable.length > 0}
 					<Button size="lg" onclick={openCreate}>
 						<Plus class="mr-2 h-4 w-4" />
-						Log Trip
+						Log trip
 					</Button>
 				{/if}
 			{/snippet}
@@ -317,7 +317,7 @@
 		bind:open={deleteOpen}
 		title="Delete this trip?"
 		description="This removes the trip from your mileage log. This cannot be undone."
-		confirmLabel="Delete Trip"
+		confirmLabel="Delete trip"
 		onConfirm={confirmDelete}
 	>
 		<label class="flex items-start gap-3 rounded-md border border-border-strong p-3 text-sm">

@@ -34,7 +34,7 @@ describe('ReminderForm save registration', () => {
 		});
 		expect(hasPendingSave()).toBe(false);
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Save Changes' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Save changes' }));
 
 		expect(update).toHaveBeenCalled();
 		expect(hasPendingSave()).toBe(true);

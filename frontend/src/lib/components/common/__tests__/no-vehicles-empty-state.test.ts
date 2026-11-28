@@ -3,14 +3,14 @@ import { render, screen } from '@testing-library/svelte';
 import NoVehiclesEmptyState, { addVehicleFirstTo } from '../NoVehiclesEmptyState.svelte';
 
 describe('NoVehiclesEmptyState', () => {
-	test('names the missing vehicle, explains why with the page text, and links to Add Vehicle', () => {
+	test('names the missing vehicle, explains why with the page text, and links to Add vehicle', () => {
 		render(NoVehiclesEmptyState, { description: 'Every trip belongs to a vehicle.' });
 
 		expect(
 			screen.getByRole('heading', { level: 2, name: 'Add a vehicle first' })
 		).toBeInTheDocument();
 		expect(screen.getByText('Every trip belongs to a vehicle.')).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'Add vehicle' })).toHaveAttribute(
 			'href',
 			'/vehicles/new'
 		);

@@ -251,7 +251,7 @@
 
 		{#if chartError || chartData.length >= MIN_CHART_POINTS}
 			<AppLineChart
-				title="Mileage Over Time"
+				title="Mileage over time"
 				description={chartIsCapped
 					? `Your latest ${CHART_READING_LIMIT} readings`
 					: 'Odometer readings plotted by date'}

@@ -79,7 +79,7 @@ describe('ExpenseSearchFilters: search and clearing', () => {
 	test('the clear button is hidden when no filter is active', () => {
 		renderFilters();
 
-		expect(screen.queryByRole('button', { name: 'Clear Filters' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 	});
 
 	test.each<[string, RenderOptions]>([
@@ -90,7 +90,7 @@ describe('ExpenseSearchFilters: search and clearing', () => {
 	])('the clear button appears for %s and calls onClearFilters', async (_label, options) => {
 		const { onClearFilters } = renderFilters(options);
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Clear Filters' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
 
 		expect(onClearFilters).toHaveBeenCalledTimes(1);
 	});
@@ -123,7 +123,7 @@ describe('ExpenseSearchFilters: tag picking', () => {
 		expect(screen.getByRole('button', { name: 'Remove tag tolls' })).toBeInTheDocument();
 		expect(suggestionButtons()).not.toContain('tolls');
 		expect(tagInput().placeholder).toBe('Add more tags...');
-		expect(screen.getByRole('button', { name: 'Clear Filters' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Clear filters' })).toBeInTheDocument();
 	});
 
 	test('Enter selects an exact case-insensitive match over the first suggestion', async () => {
@@ -154,7 +154,7 @@ describe('ExpenseSearchFilters: tag picking', () => {
 		await fireEvent.keyDown(tagInput(), { key: 'Enter' });
 
 		expect(screen.queryByRole('button', { name: /^Remove tag/ })).toBeNull();
-		expect(screen.queryByRole('button', { name: 'Clear Filters' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 	});
 
 	test('Backspace in an empty box removes the most recently selected tag', async () => {
@@ -198,7 +198,7 @@ describe('ExpenseSearchFilters: tag picking', () => {
 		await fireEvent.click(screen.getByRole('option', { name: 'tolls' }));
 		await fireEvent.click(screen.getByRole('button', { name: 'Remove tag tolls' }));
 
-		expect(screen.queryByRole('button', { name: 'Clear Filters' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 		expect(tagInput().placeholder).toBe('Search and add tags...');
 	});
 

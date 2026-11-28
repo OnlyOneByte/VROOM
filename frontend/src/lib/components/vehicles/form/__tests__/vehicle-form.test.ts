@@ -773,7 +773,7 @@ describe('VehicleForm financing on create', () => {
 		expect(dialog.textContent).not.toContain("You're changing");
 		expect(notificationMessages()).toEqual([]);
 
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change Units' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change units' }));
 
 		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles'));
 		expect(createVehicle).toHaveBeenCalledTimes(2);
@@ -904,7 +904,7 @@ describe('VehicleForm financing on edit', () => {
 		await submitUpdate();
 
 		const dialog = await screen.findByRole('alertdialog');
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'End Lease' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'End lease' }));
 
 		await vi.waitFor(() =>
 			expect(notificationMessages()).toContain(
@@ -924,7 +924,7 @@ describe('VehicleForm edit mode unit confirmation', () => {
 		const dialog = await screen.findByRole('alertdialog');
 		expect(dialog.textContent).not.toContain("You're changing");
 
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change Units' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change units' }));
 
 		await vi.waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(2));
 		expect(updatedPayload()).toMatchObject({ confirmUnitChange: true });
@@ -947,7 +947,7 @@ describe('VehicleForm edit mode unit confirmation', () => {
 		await submitUpdate();
 		const dialog = await screen.findByRole('alertdialog');
 
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change Units' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Change units' }));
 
 		await vi.waitFor(() =>
 			expect(notificationMessages()).toContain("Couldn't update the vehicle. Units changed.")
@@ -1000,7 +1000,7 @@ describe('VehicleForm edit mode delete dialog', () => {
 		await submitUpdate();
 		const dialog = await screen.findByRole('alertdialog');
 
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'End Lease' }));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'End lease' }));
 
 		await vi.waitFor(() => expect(hasPendingSave()).toBe(true));
 		expect(updateVehicle).not.toHaveBeenCalled();

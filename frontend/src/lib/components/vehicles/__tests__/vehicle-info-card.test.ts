@@ -65,11 +65,11 @@ describe('VehicleInfoCard', () => {
 	test('omits optional fields the vehicle does not have', () => {
 		render(VehicleInfoCard, { props: { vehicle: vehicle() } });
 		for (const label of [
-			'License Plate',
+			'License plate',
 			'VIN',
-			'Initial Mileage',
-			'Purchase Date',
-			'Purchase Price'
+			'Initial mileage',
+			'Purchase date',
+			'Purchase price'
 		]) {
 			expect(screen.queryByText(label)).toBeNull();
 		}
@@ -88,19 +88,19 @@ describe('VehicleInfoCard', () => {
 			}
 		});
 
-		expect(valueFor('License Plate')).toBe('ABC-123');
+		expect(valueFor('License plate')).toBe('ABC-123');
 		expect(valueFor('VIN')).toBe('1HGCM82633A004352');
-		expect(valueFor('Initial Mileage')).toBe('45,210 mi');
-		expect(valueFor('Purchase Date')).toBe('Jun 15, 2021');
-		expect(valueFor('Purchase Price')).toBe('$27,999.50');
+		expect(valueFor('Initial mileage')).toBe('45,210 mi');
+		expect(valueFor('Purchase date')).toBe('Jun 15, 2021');
+		expect(valueFor('Purchase price')).toBe('$27,999.50');
 	});
 
 	test('a zero initial mileage or price is treated as not set', () => {
 		render(VehicleInfoCard, {
 			props: { vehicle: vehicle({ initialMileage: 0, purchasePrice: 0 }) }
 		});
-		expect(screen.queryByText('Initial Mileage')).toBeNull();
-		expect(screen.queryByText('Purchase Price')).toBeNull();
+		expect(screen.queryByText('Initial mileage')).toBeNull();
+		expect(screen.queryByText('Purchase price')).toBeNull();
 	});
 
 	test('owners get an edit link to the vehicle edit page', () => {
@@ -115,6 +115,6 @@ describe('VehicleInfoCard', () => {
 	test('non-owners get no edit link', () => {
 		render(VehicleInfoCard, { props: { vehicle: vehicle(), isOwner: false } });
 		expect(screen.queryByRole('link', { name: 'Edit vehicle' })).toBeNull();
-		expect(screen.getByText('Vehicle Information')).toBeInTheDocument();
+		expect(screen.getByText('Vehicle information')).toBeInTheDocument();
 	});
 });

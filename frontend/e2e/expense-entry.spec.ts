@@ -44,7 +44,7 @@ test.describe('Expense form', () => {
 		);
 
 		await page.goto('/expenses/new');
-		await page.getByRole('button', { name: 'Save Expense' }).click();
+		await page.getByRole('button', { name: 'Save expense' }).click();
 
 		await expect(page.getByText('Please select a category')).toBeVisible();
 		await expect(page.getByText('Amount must be greater than 0')).toBeVisible();
@@ -103,7 +103,7 @@ test.describe('Expense form', () => {
 			request =>
 				new URL(request.url()).pathname === '/api/v1/expenses' && request.method() === 'POST'
 		);
-		await page.getByRole('button', { name: 'Save Expense' }).click();
+		await page.getByRole('button', { name: 'Save expense' }).click();
 
 		expect((await postRequest).postDataJSON()).toMatchObject({
 			vehicleId: VEHICLE_CAMRY.id,
@@ -143,7 +143,7 @@ test.describe('Expense form', () => {
 			});
 		}).toPass({ timeout: 20_000 });
 
-		await page.getByRole('button', { name: 'Save Expense' }).click();
+		await page.getByRole('button', { name: 'Save expense' }).click();
 
 		await expect(page.getByText('Expense saved offline. Will sync when online.')).toBeVisible();
 
@@ -195,7 +195,7 @@ test.describe('Expense form', () => {
 		await page.getByLabel('Gallons (US) *').fill('10');
 		await page.getByLabel('Odometer *').fill('44000');
 
-		await page.getByRole('button', { name: 'Save Expense' }).click();
+		await page.getByRole('button', { name: 'Save expense' }).click();
 
 		await expect(page.getByText(/Mileage must be greater than 45,000/)).toBeVisible();
 	});
@@ -365,7 +365,7 @@ test.describe('Mobile expense entry', () => {
 	test('the primary action is a full-size touch target', async ({ page }) => {
 		await page.goto('/expenses/new');
 
-		const save = page.getByRole('button', { name: 'Save Expense' });
+		const save = page.getByRole('button', { name: 'Save expense' });
 		const box = await save.boundingBox();
 		expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
 	});

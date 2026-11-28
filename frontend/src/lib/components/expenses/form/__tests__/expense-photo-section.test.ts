@@ -129,7 +129,7 @@ describe('ExpensePhotoSection: uploading', () => {
 		await screen.findByText('No photos or receipts yet.');
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
-		expect(await screen.findByText('Upload Photos & Receipts')).toBeInTheDocument();
+		expect(await screen.findByText('Upload photos & receipts')).toBeInTheDocument();
 		expect(await screen.findByText(/JPEG, PNG, WebP, PDF/)).toBeInTheDocument();
 
 		const input = document.querySelector('input[type="file"]') as HTMLInputElement;

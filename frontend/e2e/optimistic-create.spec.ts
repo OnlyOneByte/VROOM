@@ -6,8 +6,8 @@ async function addCarWash(page: Page): Promise<void> {
 	await page.getByRole('radio', { name: 'Misc' }).click();
 	await page.getByLabel('Amount *').fill('12.34');
 	await page.getByRole('button', { name: /More details/ }).click();
-	await page.getByLabel('Description (Optional)').fill('Car wash on Elm');
-	await page.getByRole('button', { name: 'Save Expense' }).click();
+	await page.getByLabel('Description (optional)').fill('Car wash on Elm');
+	await page.getByRole('button', { name: 'Save expense' }).click();
 }
 
 test.describe('Adding an expense does not wait for the server', () => {
@@ -65,7 +65,7 @@ test.describe('Adding an expense does not wait for the server', () => {
 
 		await row.getByRole('link', { name: /^Edit / }).click();
 		await expect(page.getByLabel('Amount *')).toHaveValue('12.34');
-		const description = page.getByLabel('Description (Optional)');
+		const description = page.getByLabel('Description (optional)');
 		if (!(await description.isVisible()))
 			await page.getByRole('button', { name: /More details/ }).click();
 		await expect(description).toHaveValue('Car wash on Elm');

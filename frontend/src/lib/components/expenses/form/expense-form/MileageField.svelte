@@ -34,7 +34,7 @@
 
 <div class="min-w-0 space-y-2">
 	<Label for="mileage">
-		Odometer {required ? '*' : '(Optional)'}
+		Odometer {required ? '*' : '(optional)'}
 	</Label>
 	<div class="relative">
 		<Input

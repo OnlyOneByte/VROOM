@@ -64,21 +64,21 @@ afterEach(() => {
 describe('PaymentMetricsGrid for a loan with APR', () => {
 	test('shows principal paid with the interest paid alongside it', () => {
 		mount();
-		expect(screen.getByText('Principal vs Interest')).toBeTruthy();
+		expect(screen.getByText('Principal vs interest')).toBeTruthy();
 		expect(screen.getByText('$4,749.50')).toBeTruthy();
 		expect(screen.getByText('+ $250.50 interest')).toBeTruthy();
 	});
 
 	test('shows payments made against the scheduled term', () => {
 		mount();
-		expect(screen.getByText('Payments Made')).toBeTruthy();
+		expect(screen.getByText('Payments made')).toBeTruthy();
 		expect(screen.getByText('12')).toBeTruthy();
 		expect(screen.getByText('of 60 scheduled')).toBeTruthy();
 	});
 
 	test('shows the estimated payoff date and the months left in the term', () => {
 		mount();
-		expect(screen.getByText('Estimated Payoff')).toBeTruthy();
+		expect(screen.getByText('Estimated payoff')).toBeTruthy();
 		expect(screen.getByText('Jan 10, 2029')).toBeTruthy();
 		expect(screen.getByText('48 months remaining')).toBeTruthy();
 	});
@@ -99,7 +99,7 @@ describe('PaymentMetricsGrid for a loan with APR', () => {
 				scheduleEntry(3, 500)
 			]
 		});
-		expect(screen.getByText('Total Cost of Loan')).toBeTruthy();
+		expect(screen.getByText('Total cost of loan')).toBeTruthy();
 		expect(screen.getByText('$23,000.00')).toBeTruthy();
 		expect(screen.getByText('15% over principal')).toBeTruthy();
 	});
@@ -124,32 +124,32 @@ describe('PaymentMetricsGrid for a loan with APR', () => {
 describe('PaymentMetricsGrid for a zero-APR loan', () => {
 	test('omits the interest and total-cost cards', () => {
 		mount({ financing: makeLoan({ apr: 0 }), amortizationSchedule: [scheduleEntry(1, 100)] });
-		expect(screen.queryByText('Principal vs Interest')).toBeNull();
-		expect(screen.queryByText('Total Cost of Loan')).toBeNull();
-		expect(screen.getByText('Payments Made')).toBeTruthy();
-		expect(screen.getByText('Estimated Payoff')).toBeTruthy();
+		expect(screen.queryByText('Principal vs interest')).toBeNull();
+		expect(screen.queryByText('Total cost of loan')).toBeNull();
+		expect(screen.getByText('Payments made')).toBeTruthy();
+		expect(screen.getByText('Estimated payoff')).toBeTruthy();
 	});
 });
 
 describe('PaymentMetricsGrid for a lease', () => {
 	test('labels the end date as the lease end and shows the buyout value', () => {
 		mount({ financing: makeLease({ residualValue: 18_500 }), paymentsCount: 12 });
-		expect(screen.getByText('Lease End Date')).toBeTruthy();
-		expect(screen.queryByText('Estimated Payoff')).toBeNull();
+		expect(screen.getByText('Lease end date')).toBeTruthy();
+		expect(screen.queryByText('Estimated payoff')).toBeNull();
 		expect(screen.getByText('24 months remaining')).toBeTruthy();
-		expect(screen.getByText('Residual Value (Buyout)')).toBeTruthy();
+		expect(screen.getByText('Residual value (buyout)')).toBeTruthy();
 		expect(screen.getByText('$18,500.00')).toBeTruthy();
-		expect(screen.queryByText('Total Cost of Loan')).toBeNull();
+		expect(screen.queryByText('Total cost of loan')).toBeNull();
 	});
 
 	test('omits the buyout card when no residual value is recorded', () => {
 		mount({ financing: makeLease({ residualValue: undefined }) });
-		expect(screen.queryByText('Residual Value (Buyout)')).toBeNull();
+		expect(screen.queryByText('Residual value (buyout)')).toBeNull();
 	});
 
 	test('prices miles over the term allowance at the excess fee', () => {
 		mount({ financing: makeLease(), mileageUsed: 40_000 });
-		expect(screen.getByText('Mileage Overage')).toBeTruthy();
+		expect(screen.getByText('Mileage overage')).toBeTruthy();
 		expect(screen.getByText('$1,000.00')).toBeTruthy();
 		expect(screen.getByText('4,000 mi over · $0.25/mi')).toBeTruthy();
 	});
@@ -172,6 +172,6 @@ describe('PaymentMetricsGrid for a lease', () => {
 		['no excess fee', { excessMileageFee: undefined }]
 	])('omits the overage card with %s', (_label, overrides) => {
 		mount({ financing: makeLease(overrides), mileageUsed: 99_000 });
-		expect(screen.queryByText('Mileage Overage')).toBeNull();
+		expect(screen.queryByText('Mileage overage')).toBeNull();
 	});
 });
