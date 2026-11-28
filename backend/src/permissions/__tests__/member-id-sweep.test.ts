@@ -168,11 +168,18 @@ describe('responses to members of a shared car', () => {
     const ids = otherAccounts(ctx, members, role);
     const unexpected = new Set<string>();
     const gapsSeen = new Set<string>();
+    const invites = [`${VEHICLE_ID}-accept`, `${VEHICLE_ID}-decline`];
+    ctx.sqlite.run('UPDATE vehicle_shares SET shared_with_id = ? WHERE id IN (?, ?)', [
+      members[role].id,
+      ...invites,
+    ]);
+    const invitesAnswered = new Set<string>();
     let answered = 0;
     for (const [key, method, path, call] of sweepRequests(members.editor.id)) {
       const { cookie } = await requestAs(ctx, members[role].id);
       const res = await sendSweepCall(ctx.app, cookie, method, path, call ?? {});
       if (res.ok) answered++;
+      if (res.ok && key.startsWith('POST /api/v1/shares/:id/')) invitesAnswered.add(key);
       const found = new Set<string>();
       fieldsHolding(parsed(await res.text()), ids, '$', found);
       sortFields(found, key, role, unexpected, gapsSeen);
@@ -184,13 +191,19 @@ describe('responses to members of a shared car', () => {
       gapsSeen: [...gapsSeen].sort(),
       gapsExpected,
       answered,
+      invitesAnswered: [...invitesAnswered].sort(),
     };
   }
 
   for (const role of ROLES) {
     test(`a ${role} sees no other account's id outside the reviewed allowlist`, async () => {
-      const { unexpected, gapsSeen, gapsExpected, answered } = await sweepAs(role);
+      const { unexpected, gapsSeen, gapsExpected, answered, invitesAnswered } =
+        await sweepAs(role);
       expect(answered, 'the sweep reached the routes').toBeGreaterThan(60);
+      expect(invitesAnswered).toEqual([
+        'POST /api/v1/shares/:id/accept',
+        'POST /api/v1/shares/:id/decline',
+      ]);
       expect(unexpected).toEqual([]);
       expect(gapsSeen, 'a known gap that no longer shows is fixed: remove its entry').toEqual(
         gapsExpected.sort()
