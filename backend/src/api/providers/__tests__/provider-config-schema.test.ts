@@ -97,7 +97,7 @@ describe('a stored key the schema no longer knows', () => {
   test('is kept when a form echoes it back, but a new unknown key is still refused', async () => {
     const created = await ctx.authed('POST', '/api/v1/providers', S3);
     const { data } = (await created.json()) as { data: { id: string } };
-    ctx.sqlite.run('UPDATE user_providers SET config = ? WHERE id = ?', [
+    await ctx.sql.run('UPDATE user_providers SET config = ? WHERE id = ?', [
       JSON.stringify({ ...S3.config, legacyFolderId: 'f-1' }),
       data.id,
     ]);

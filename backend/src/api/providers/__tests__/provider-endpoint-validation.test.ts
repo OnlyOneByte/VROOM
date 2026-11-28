@@ -86,9 +86,9 @@ async function sendS3(request: Record<string, unknown>) {
   });
 }
 
-function insertStoredS3Provider(endpoint: string): string {
+async function insertStoredS3Provider(endpoint: string): Promise<string> {
   const id = `stored-s3-${Math.random().toString(36).slice(2)}`;
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 's3', 'Stored', ?, ?, 'active')`,
     [
@@ -114,7 +114,7 @@ describe('provider endpoints when the admin allows private endpoints', () => {
   ])('storage endpoint %s is rejected', async (endpoint) => {
     const res = await ctx.authed('POST', '/api/v1/providers', s3Body(endpoint));
     expect(res.status).toBe(400);
-    expect(ctx.sqlite.query('SELECT COUNT(*) AS n FROM user_providers').get()).toEqual({ n: 0 });
+    expect((await ctx.sql.get('SELECT COUNT(*) AS n FROM user_providers'))).toEqual({ n: 0 });
   });
 
   test('a model base URL on a link-local address is rejected', async () => {
@@ -187,13 +187,13 @@ describe('provider endpoints with private endpoints blocked', () => {
   });
 
   test('a stored row saved while LAN hosts were allowed is refused when tested', async () => {
-    const id = insertStoredS3Provider('http://192.168.1.20:9000');
+    const id = await insertStoredS3Provider('http://192.168.1.20:9000');
     const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
     expect(res.status).toBe(400);
   });
 
   test('the refusal is recorded as an endpoint problem, so Settings can say why', async () => {
-    const id = insertStoredS3Provider('http://192.168.1.20:9000');
+    const id = await insertStoredS3Provider('http://192.168.1.20:9000');
     await ctx.authed('POST', `/api/v1/providers/${id}/test`);
     const listed = (await (await ctx.authed('GET', '/api/v1/providers?domain=storage')).json()) as {
       data: { id: string; lastErrorCode: string | null }[];
@@ -214,7 +214,7 @@ describe('provider endpoints with private endpoints blocked', () => {
     '%s is refused when tested and recorded as an endpoint problem',
     async (_case, endpoint, addresses) => {
       outboundResolver.lookup = async () => addresses;
-      const id = insertStoredS3Provider(endpoint);
+      const id = await insertStoredS3Provider(endpoint);
       const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
       expect(res.status).toBe(400);
       const listed = (await (
@@ -259,7 +259,7 @@ describe('provider endpoints with an admin allowlist', () => {
 
 describe('stored provider rows are checked when used', () => {
   test('a stored row with a link-local endpoint is refused by the health check', async () => {
-    const id = insertStoredS3Provider('http://169.254.169.254');
+    const id = await insertStoredS3Provider('http://169.254.169.254');
     const res = await ctx.authed('POST', `/api/v1/providers/${id}/test`);
     expect(res.status).toBe(400);
   });
@@ -491,8 +491,8 @@ describe('outbound requests connect to the validated address', () => {
 describe('provider endpoints by default: local providers until a second account exists', () => {
   defaultPrivateProviderEndpoints();
 
-  function addAccount(id: string): void {
-    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+  async function addAccount(id: string): Promise<void> {
+    await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
       id,
       `${id}@example.com`,
       'Another person',
@@ -514,7 +514,7 @@ describe('provider endpoints by default: local providers until a second account 
   });
 
   test('the demo account does not count as a second account', async () => {
-    addAccount('demo-garage');
+    await addAccount('demo-garage');
     const res = await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.20:9000'));
     expect(res.status).toBe(201);
   });
@@ -528,7 +528,7 @@ describe('provider endpoints by default: local providers until a second account 
     expect(created.status).toBe(201);
     const { id } = (await json<DataEnvelope<{ id: string }>>(created)).data;
 
-    addAccount('second-person');
+    await addAccount('second-person');
 
     const again = await ctx.authed('POST', '/api/v1/providers', s3Body('http://192.168.1.21:9000'));
     expect(again.status).toBe(400);
@@ -552,7 +552,7 @@ describe('an explicit PRIVATE_PROVIDER_ENDPOINTS wins over the account count', (
   });
 
   test('with two accounts, the listed target is still allowed', async () => {
-    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+    await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
       'listed-second',
       'listed-second@example.com',
       'Another person',
@@ -574,7 +574,7 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
     previousAdmins = admin.adminEmails;
     admin.adminEmails = [ctx.user.email.toLowerCase()];
     memberId = `member-${crypto.randomUUID()}`;
-    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+    await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
       memberId,
       `${memberId}@example.com`,
       'Member',
@@ -592,7 +592,7 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
   });
 
   test('a user who holds the built-in admin role, but is not listed in ADMIN_EMAILS, is an admin too', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, NULL, ?)',
       [`ra-${memberId}`, memberId, builtInRoleId('admin'), ctx.user.id]
     );
@@ -632,7 +632,7 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
 
   test("a member's stored LAN provider is refused when tested", async () => {
     const id = `member-s3-${crypto.randomUUID()}`;
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
        VALUES (?, ?, 'storage', 's3', 'Stored', ?, ?, 'active')`,
       [

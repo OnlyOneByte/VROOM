@@ -21,10 +21,8 @@ function drivePayload(accountEmail: string) {
   };
 }
 
-function providerRowCount(): number {
-  const row = ctx.sqlite
-    .query(`SELECT COUNT(*) AS n FROM user_providers WHERE user_id = ? AND domain = 'storage'`)
-    .get(ctx.user.id) as { n: number };
+async function providerRowCount(): Promise<number> {
+  const row = (await ctx.sql.get(`SELECT COUNT(*) AS n FROM user_providers WHERE user_id = ? AND domain = 'storage'`, [ctx.user.id])) as { n: number };
   return row.n;
 }
 
@@ -37,7 +35,7 @@ describe('POST /providers duplicate check is atomic with the insert', () => {
 
     const statuses = [first.status, second.status].sort();
     expect(statuses).toEqual([201, 409]);
-    expect(providerRowCount()).toBe(1);
+    expect(await providerRowCount()).toBe(1);
   });
 
   test('concurrent creates for DIFFERENT accounts both persist', async () => {
@@ -47,7 +45,7 @@ describe('POST /providers duplicate check is atomic with the insert', () => {
     ]);
 
     expect([first.status, second.status]).toEqual([201, 201]);
-    expect(providerRowCount()).toBe(2);
+    expect(await providerRowCount()).toBe(2);
   });
 
   test('a sequential duplicate is still a 409 (the check itself is unchanged)', async () => {
@@ -56,6 +54,6 @@ describe('POST /providers duplicate check is atomic with the insert', () => {
 
     const second = await ctx.authed('POST', '/api/v1/providers', drivePayload('alice@example.com'));
     expect(second.status).toBe(409);
-    expect(providerRowCount()).toBe(1);
+    expect(await providerRowCount()).toBe(1);
   });
 });

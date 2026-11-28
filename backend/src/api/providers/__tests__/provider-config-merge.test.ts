@@ -19,8 +19,8 @@ interface ProviderResponse {
   config: Record<string, unknown>;
 }
 
-function seedConnectedDrive(id: string, config: Record<string, unknown>): void {
-  ctx.sqlite.run(
+async function seedConnectedDrive(id: string, config: Record<string, unknown>): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-drive', 'My Drive', '', ?, 'active')`,
     [id, ctx.user.id, JSON.stringify(config)]
@@ -38,7 +38,7 @@ async function storedConfig(id: string): Promise<Record<string, unknown>> {
 
 describe('PUT /providers/:id merges `config` instead of replacing it', () => {
   test('a rename + root-path edit keeps the connected accountEmail', async () => {
-    seedConnectedDrive('drive-1', {
+    await seedConnectedDrive('drive-1', {
       providerRootPath: 'VROOM',
       photoRootPath: 'Receipts',
       accountEmail: 'owner@example.com',
@@ -63,7 +63,7 @@ describe('PUT /providers/:id merges `config` instead of replacing it', () => {
   });
 
   test('a single-key edit keeps every other key, including the resolved albumId', async () => {
-    seedConnectedDrive('drive-2', {
+    await seedConnectedDrive('drive-2', {
       providerRootPath: 'VROOM',
       photoRootPath: 'Photos',
       accountEmail: 'owner@example.com',
@@ -84,7 +84,7 @@ describe('PUT /providers/:id merges `config` instead of replacing it', () => {
   });
 
   test('a key the caller DOES send still wins — merging is not ignoring the payload', async () => {
-    seedConnectedDrive('drive-3', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
+    await seedConnectedDrive('drive-3', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
 
     await ctx.authed('PUT', '/api/v1/providers/drive-3', { config: { photoRootPath: 'Scans' } });
 
@@ -95,7 +95,7 @@ describe('PUT /providers/:id merges `config` instead of replacing it', () => {
   });
 
   test('a server-only key in the payload leaves the stored value unchanged', async () => {
-    seedConnectedDrive('drive-5', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
+    await seedConnectedDrive('drive-5', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
 
     const res = await ctx.authed('PUT', '/api/v1/providers/drive-5', {
       config: { photoRootPath: 'Photos', accountEmail: 'second@example.com' },
@@ -109,7 +109,7 @@ describe('PUT /providers/:id merges `config` instead of replacing it', () => {
   });
 
   test("another user's provider is still 404 and untouched (the merge reads the OWNED row)", async () => {
-    seedConnectedDrive('drive-4', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
+    await seedConnectedDrive('drive-4', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
     const other = await createTestApp();
 
     const res = await other.authed('PUT', '/api/v1/providers/drive-4', {
