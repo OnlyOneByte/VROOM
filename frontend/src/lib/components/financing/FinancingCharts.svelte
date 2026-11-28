@@ -103,6 +103,7 @@
 		data={amortizationChartData}
 		x="paymentNumber"
 		y={['principal', 'interest']}
+		seriesLayout="stack"
 		series={amortizationSeries}
 		config={amortizationChartConfig}
 		xAxisProps={{
