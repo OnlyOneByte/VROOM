@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { countStatements } from '../../../db/statement-count';
 import {
   createTestApp,
   type DataEnvelope,
@@ -333,10 +334,10 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
       );
     }
 
-    const prepare = spyOn(ctx.sqlite, 'prepare');
-    const res = await ctx.authed('GET', `/api/v1/providers/${created.id}/sync-status`);
-    const statements = prepare.mock.calls.length;
-    prepare.mockRestore();
+    const { result: res, statements } = await countStatements(() =>
+      ctx.authed('GET', `/api/v1/providers/${created.id}/sync-status`)
+    );
+    expect(statements).toBeGreaterThan(0);
     expect(res.status).toBe(200);
     expect(statements).toBeLessThanOrEqual(SYNC_STATUS_MAX_STATEMENTS);
     const data = (await json<DataEnvelope<Record<string, Record<string, number>>>>(res)).data;

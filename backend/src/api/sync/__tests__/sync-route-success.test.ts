@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { countStatements } from '../../../db/statement-count';
 import {
   createTestApp,
   json,
@@ -274,12 +275,12 @@ describe('backupService.listAllBackups', () => {
       if (providerId === 'p-broken') throw new Error('listing failed');
       return [];
     });
-    const prepare = spyOn(ctx.sqlite, 'prepare');
     try {
-      const results = await backupService.listAllBackups(ctx.user.id);
-      return { results, statements: prepare.mock.calls.length };
+      const { result: results, statements } = await countStatements(() =>
+        backupService.listAllBackups(ctx.user.id)
+      );
+      return { results, statements };
     } finally {
-      prepare.mockRestore();
       list.mockRestore();
       config.mockRestore();
     }
@@ -291,6 +292,7 @@ describe('backupService.listAllBackups', () => {
     await seedProvider('p-3', 'Three');
     const one = await listWith(['p-1']);
     const three = await listWith(['p-1', 'p-2', 'p-3']);
+    expect(one.statements).toBeGreaterThan(0);
     expect(three.statements).toBe(one.statements);
     expect(three.results.map((r) => r.providerName)).toEqual(['One', 'Two', 'Three']);
   });

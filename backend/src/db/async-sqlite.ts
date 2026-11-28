@@ -4,6 +4,7 @@ import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { drizzle, type SqliteRemoteResult } from 'drizzle-orm/sqlite-proxy';
 import { UPKEEP_QUERIES } from './dialect';
 import * as schema from './sqlite/schema';
+import { noteStatement } from './statement-count';
 
 const STATEMENT_CACHE_SIZE = 500;
 export const TRANSACTION_CONTROL = /^(commit|end|rollback|release)\b/i;
@@ -16,6 +17,10 @@ const LEADING_WHITESPACE_SEMICOLONS_AND_COMMENTS =
 export function statementHead(query: string): string {
   return query.replace(LEADING_WHITESPACE_SEMICOLONS_AND_COMMENTS, '');
 }
+function countUnlessControl(head: string): void {
+  if (!OPENING.test(head) && !TRANSACTION_CONTROL.test(head)) noteStatement();
+}
+
 const GUARDED_METHODS = ['prepare', 'query', 'run', 'exec', 'transaction'] as const;
 const RAW_QUERY_METHODS = ['run', 'all', 'get', 'values'] as const;
 
@@ -243,6 +248,7 @@ function createAsyncDatabase(sqlite: Database) {
       scope.root.ended = true;
       throw new TransactionRolledBackError();
     }
+    countUnlessControl(head);
     return execute(query, params, method);
   }
 
