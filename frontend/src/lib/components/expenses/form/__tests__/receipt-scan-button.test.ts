@@ -173,7 +173,9 @@ describe('ReceiptScanButton: errors', () => {
 			'a rejected key (502)',
 			new ApiError(
 				"The AI provider didn't accept its key. Check it in Settings, then try again.",
-				502
+				502,
+				undefined,
+				'AppError'
 			),
 			"The AI provider didn't accept its key. Check it in Settings, then try again. Or fill it in manually."
 		],
@@ -181,22 +183,41 @@ describe('ReceiptScanButton: errors', () => {
 			'an image too large for the provider (413)',
 			new ApiError(
 				'This receipt image is too large for the AI provider. Use a smaller photo.',
-				413
+				413,
+				undefined,
+				'PAYLOAD_TOO_LARGE'
 			),
 			'This receipt image is too large for the AI provider. Use a smaller photo. Or fill it in manually.'
 		],
 		[
 			'built-in reader found no text (422)',
-			new ApiError('No readable text found. Try a sharper, well-lit photo.', 422),
+			new ApiError(
+				'No readable text found. Try a sharper, well-lit photo.',
+				422,
+				undefined,
+				'AppError'
+			),
 			'No readable text found. Try a sharper, well-lit photo. Or fill it in manually.'
 		],
 		[
 			'built-in reader unavailable (503)',
 			new ApiError(
 				"The built-in text reader isn't available right now. Try again in a moment.",
-				503
+				503,
+				undefined,
+				'AppError'
 			),
 			"The built-in text reader isn't available right now. Try again in a moment. Or fill it in manually."
+		],
+		[
+			'a proxy rejecting a large upload (413, no JSON body)',
+			new ApiError('Request failed with status 413', 413),
+			"Couldn't read the receipt. Something went wrong. Try again, and reload the page if it keeps happening. Or fill it in manually."
+		],
+		[
+			'a proxy gateway error (502, no JSON body)',
+			new ApiError('Request failed with status 502', 502),
+			"Couldn't reach the AI provider. Check the key and model, or fill it in manually."
 		],
 		[
 			'non-Error',

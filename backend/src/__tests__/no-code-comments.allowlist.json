@@ -95,7 +95,6 @@
   "backend/src/api/providers/sync-worker.ts: Every skipped ref must record a failure: findPendingOrFailed is ordered by created_at, so untouched rows starve newer ones.",
   "backend/src/api/providers/sync-worker.ts: Must match the retry bound in photoRefRepository.findPendingOrFailed.",
   "backend/src/api/providers/sync-worker.ts: bun mock.module leaks across test files, so tests inject fakes through deps instead.",
-  "backend/src/api/providers/vlm-routes.ts: Adapters log upstream errors; the client gets a generic 502 with no key or raw error.",
   "backend/src/api/providers/vlm-routes.ts: Draft amounts are dollars; cents conversion happens at POST /expenses.",
   "backend/src/api/providers/vlm-routes.ts: bodyLimit only checks Content-Length; a chunked upload can omit it.",
   "backend/src/api/push/push-endpoint.ts: SSRF guard: the server POSTs to a user-supplied URL, so it is pinned to browser-vendor push hosts.",

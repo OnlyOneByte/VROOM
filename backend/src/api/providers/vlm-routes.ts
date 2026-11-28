@@ -72,7 +72,6 @@ routes.post('/parse', receiptScanLimiter, scansAtOnce, authorize(ownAccount), as
       provider.extractReceipt({ data: bytes, mimeType: file.type })
     );
   } catch (err) {
-    // Adapters log upstream errors; the client gets a generic 502 with no key or raw error.
     const message = err instanceof Error ? err.message : 'VLM provider error';
     logger.warn('Receipt parse failed', { providerType: providerRow.providerType, error: message });
     if (err instanceof OcrUnavailableError) {

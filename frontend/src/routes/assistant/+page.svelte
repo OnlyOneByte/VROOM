@@ -152,8 +152,15 @@
 			hasProvider = false;
 			return null;
 		}
-		if (err instanceof ApiError && [502, 503].includes(err.statusCode)) {
+		if (
+			err instanceof ApiError &&
+			err.code !== 'API_ERROR' &&
+			[502, 503].includes(err.statusCode ?? 0)
+		) {
 			return err.message;
+		}
+		if (err instanceof ApiError && err.statusCode === 502) {
+			return "The AI provider couldn't be reached. Check the key and model in Settings, then try again.";
 		}
 		return userFacingErrorMessage(err);
 	}

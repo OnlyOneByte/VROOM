@@ -93,7 +93,12 @@ describe('assistant page errors', () => {
 	test('a failed send is announced, and Retry sends the same question again', async () => {
 		sendMessage
 			.mockRejectedValueOnce(
-				new ApiError('The assistant provider could not be reached. Try again.', 502)
+				new ApiError(
+					'The assistant provider could not be reached. Try again.',
+					502,
+					undefined,
+					'AppError'
+				)
 			)
 			.mockResolvedValueOnce({ reply: 'You spent $120.', toolsUsed: [] });
 		await ask('How much did I spend?');
@@ -112,11 +117,28 @@ describe('assistant page errors', () => {
 		[502, "The AI provider didn't accept its key. Check it in Settings, then try again."],
 		[503, 'The AI provider is limiting requests right now. Try again in a few minutes.']
 	])('a provider failure (%i) shows what the server says went wrong', async (status, message) => {
-		sendMessage.mockRejectedValue(new ApiError(message, status));
+		sendMessage.mockRejectedValue(new ApiError(message, status, undefined, 'AppError'));
 		await ask('How much did I spend?');
 
 		expect(await screen.findByText(message)).toBeInTheDocument();
 	});
+
+	test.each([
+		[
+			502,
+			"The AI provider couldn't be reached. Check the key and model in Settings, then try again."
+		],
+		[503, SERVER_FAILURE_MESSAGE]
+	])(
+		'a proxy error page (%i) shows a readable sentence, not the status',
+		async (status, message) => {
+			sendMessage.mockRejectedValue(new ApiError(`Request failed with status ${status}`, status));
+			await ask('How much did I spend?');
+
+			expect(await screen.findByText(message)).toBeInTheDocument();
+			expect(screen.queryByText(/Request failed with status/)).toBeNull();
+		}
+	);
 
 	test("a missing provider shows the server's reason", async () => {
 		sendMessage.mockRejectedValue(
