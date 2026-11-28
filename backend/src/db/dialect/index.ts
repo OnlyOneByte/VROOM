@@ -203,7 +203,14 @@ export interface RawQueryable {
   all<T>(query: SQL): T[] | Promise<T[]>;
 }
 
+interface PgExecutable {
+  execute(query: SQL): Promise<unknown[]>;
+}
+
 export async function rawAll<T>(db: RawQueryable, query: SQL): Promise<T[]> {
+  if (ACTIVE_DIALECT === 'pg') {
+    return (await (db as unknown as PgExecutable).execute(query)) as T[];
+  }
   return db.all<T>(query);
 }
 
