@@ -77,8 +77,13 @@ function makeCellGetter(record: Record<string, string>): CellGetter {
   return (k: string) => denormalizeCsvCell((record[k] ?? '').trim());
 }
 
-function parseAmount(raw: string): { value: number } | { error: string } {
-  const amount = Number(raw);
+// A semicolon file comes from a decimal-comma locale, so "40,50" there means 40.50.
+function toNumber(raw: string, decimalComma: boolean): number {
+  return Number(decimalComma && /^\d+,\d+$/.test(raw) ? raw.replace(',', '.') : raw);
+}
+
+function parseAmount(raw: string, decimalComma = false): { value: number } | { error: string } {
+  const amount = toNumber(raw, decimalComma);
   if (!raw || !Number.isFinite(amount) || amount <= 0) {
     return { error: `Invalid amount "${raw}"` };
   }
@@ -93,10 +98,11 @@ function parseAmount(raw: string): { value: number } | { error: string } {
 
 function parseMileage(
   raw: string,
-  category: (typeof EXPENSE_CATEGORIES)[number]
+  category: (typeof EXPENSE_CATEGORIES)[number],
+  decimalComma = false
 ): { value: number | null } | { error: string } {
   if (!raw) return { value: null };
-  const m = Number(raw);
+  const m = toNumber(raw, decimalComma);
   if (!Number.isInteger(m) || m < 0) return { error: `Invalid mileage "${raw}"` };
   if (m === 0)
     return category === 'fuel' ? { error: MILEAGE_NOT_POSITIVE_MESSAGE } : { value: null };
@@ -104,9 +110,12 @@ function parseMileage(
   return { value: m };
 }
 
-function parseVolume(raw: string): { value: number | null } | { error: string } {
+function parseVolume(
+  raw: string,
+  decimalComma = false
+): { value: number | null } | { error: string } {
   if (!raw) return { value: null };
-  const v = Number(raw);
+  const v = toNumber(raw, decimalComma);
   if (!Number.isFinite(v) || v <= 0) return { error: `Invalid volume "${raw}"` };
   if (v > EXP.maxVolume) return { error: VOLUME_TOO_HIGH_MESSAGE };
   return { value: v };
@@ -123,7 +132,7 @@ function parseCategory(
 }
 
 const ISO_DATE_TIME =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(Z|[+-]\d{2}:?\d{2})?)?$/i;
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/i;
 
 function clockTime(
   hh: string,
@@ -142,10 +151,10 @@ function parseDate(raw: string, timeZone?: string): { value: Date } | { error: s
   const [year, month, day] = [Number(y), Number(mo), Number(d)];
   if (!isDateInputYear(year)) return { error: DATE_OUT_OF_RANGE_MESSAGE };
   if (!buildCalendarDate(year, month, day)) return invalid;
+  const time = hh === undefined ? undefined : clockTime(hh, mm, ss);
+  if (time === null) return invalid;
   // new Date() reads a date or a date-time without an offset as UTC, which would shift it.
   if (!offset) {
-    const time = hh === undefined ? undefined : clockTime(hh, mm, ss);
-    if (time === null) return invalid;
     const date = buildImportDate(year, month, day, timeZone, time);
     return date ? { value: date } : invalid;
   }
@@ -223,7 +232,8 @@ function parseFuelCells(
 function parseRow(
   record: Record<string, string>,
   vehicleByName: Map<string, string | null>,
-  timeZone?: string
+  timeZone?: string,
+  decimalComma = false
 ): { expense: ImportableExpense } | { error: string } {
   const get = makeCellGetter(record);
 
@@ -233,13 +243,13 @@ function parseRow(
 
   const categoryResult = parseCategory(get('category'));
   if ('error' in categoryResult) return categoryResult;
-  const amountResult = parseAmount(get('amount'));
+  const amountResult = parseAmount(get('amount'), decimalComma);
   if ('error' in amountResult) return amountResult;
   const dateResult = parseDate(get('date'), timeZone);
   if ('error' in dateResult) return dateResult;
-  const mileageResult = parseMileage(get('mileage'), categoryResult.value);
+  const mileageResult = parseMileage(get('mileage'), categoryResult.value, decimalComma);
   if ('error' in mileageResult) return mileageResult;
-  const volumeResult = parseVolume(get('volume'));
+  const volumeResult = parseVolume(get('volume'), decimalComma);
   if ('error' in volumeResult) return volumeResult;
   const fuelCells = parseFuelCells(get);
   if ('error' in fuelCells) return fuelCells;
@@ -324,16 +334,6 @@ function fitsCurrency(
   }
 }
 
-// A semicolon file comes from a decimal-comma locale, so "40,50" there means 40.50.
-function readDecimalCommas(records: Record<string, string>[]): void {
-  for (const record of records) {
-    for (const key of ['amount', 'mileage', 'volume']) {
-      const value = record[key];
-      if (value && /^\d+,\d+$/.test(value)) record[key] = value.replace(',', '.');
-    }
-  }
-}
-
 export function buildImportPlan(
   csv: string,
   vehicles: ImportVehicle[],
@@ -367,7 +367,7 @@ export function buildImportPlan(
     );
   }
 
-  if (delimiter === ';') readDecimalCommas(records);
+  const decimalComma = delimiter === ';';
 
   const vehicleByName = new Map<string, string | null>();
   const register = (name: string, id: string) => {
@@ -390,7 +390,9 @@ export function buildImportPlan(
       date: denormalizeCsvCell((record.date ?? '').trim()),
     };
     const preError = rowErrors.get(i);
-    const parsed = preError ? { error: preError } : parseRow(record, vehicleByName, timeZone);
+    const parsed = preError
+      ? { error: preError }
+      : parseRow(record, vehicleByName, timeZone, decimalComma);
     const result = 'error' in parsed ? parsed : fitsCurrency(parsed, scale);
     const rowNum = i + 2;
     if ('error' in result) {

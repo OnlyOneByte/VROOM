@@ -212,6 +212,7 @@ describe('guessManualColumns', () => {
 		expect(guessManualColumns(['Date', 'Amount', 'Subtotal']).amount).toBe('Amount');
 		expect(guessManualColumns(['Date', 'Subtotal', 'Total']).amount).toBe('Total');
 		expect(guessManualColumns(['Date', 'Total cost']).amount).toBe('Total cost');
+		expect(guessManualColumns(['Date', 'Tax amount', 'Total cost']).amount).toBe('Total cost');
 	});
 
 	test('an un-guessable header set leaves fields unmapped (no invented columns)', () => {

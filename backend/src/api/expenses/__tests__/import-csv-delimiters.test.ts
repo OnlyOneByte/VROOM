@@ -39,6 +39,11 @@ describe('semicolon and tab files', () => {
     });
   });
 
+  test('an error in a semicolon file quotes the value as written', () => {
+    const csv = 'date;vehicle;category;amount;mileage\n2024-03-15;Camry;misc;10;12,345';
+    expect(buildImportPlan(csv, VEHICLES).rows[0]?.message).toBe('Invalid mileage "12,345"');
+  });
+
   test('a native file with tabs imports', () => {
     const csv = 'date\tvehicle\tcategory\tamount\n2024-03-15\tCamry\tmisc\t12.5';
     expect(buildImportPlan(csv, VEHICLES).rows[0]?.expense?.expenseAmount).toBe(1250);
@@ -106,12 +111,16 @@ describe('date-times in a native import', () => {
     expect(plan('2024-03-15T02:00:00+02:00')?.expense?.date.toISOString()).toBe(
       '2024-03-15T00:00:00.000Z'
     );
+    expect(plan('2024-03-15T02:00:00.123456Z')?.expense?.date.toISOString()).toBe(
+      '2024-03-15T02:00:00.123Z'
+    );
   });
 
   test.each([
     '2024-02-31T10:00:00',
     '2024-02-31 10:00',
     '2024-02-31T10:00:00Z',
+    '2024-03-15T24:00:00Z',
     '2024-02-30',
     '2024-03-15T25:00',
     '2024-03-15T10:61',
@@ -120,13 +129,16 @@ describe('date-times in a native import', () => {
     expect(plan(date, LOS_ANGELES)).toMatchObject({ status: 'error' });
   });
 
-  test('a mapped date-time on an impossible day is rejected', () => {
-    const { csv } = applyMapping('When,Cost\n2024-02-31 10:00,10', {
-      columns: { date: 'When', amount: 'Cost' },
-      targetVehicle: 'Camry',
-      dateFormat: 'iso',
-      defaultCategory: 'misc',
-    });
-    expect(buildImportPlan(csv, VEHICLES).rows[0]).toMatchObject({ status: 'error' });
-  });
+  test.each(['2024-02-31 10:00', '2024-03-15 10:75'])(
+    'a mapped date-time %s on an impossible day or time is rejected',
+    (date) => {
+      const { csv } = applyMapping(`When,Cost\n${date},10`, {
+        columns: { date: 'When', amount: 'Cost' },
+        targetVehicle: 'Camry',
+        dateFormat: 'iso',
+        defaultCategory: 'misc',
+      });
+      expect(buildImportPlan(csv, VEHICLES).rows[0]).toMatchObject({ status: 'error' });
+    }
+  );
 });
