@@ -96,9 +96,9 @@ These have defaults, but the defaults only suit localhost.
 | `FRONTEND_PORT` | `3000` | Host port in the example stacks |
 | `ORIGIN` | unset (derived from the request) | Frontend container only. The public origin the server reports, e.g. `https://yourdomain.com`, instead of deriving it from the request headers. Read at startup, so a change needs a container restart, not a rebuild. Leave it unset unless header-derived origins are wrong behind your proxy; an empty value stops the frontend from starting |
 | `HOST` | `127.0.0.1` | Address the backend binds. The default is loopback only, so a direct install is not exposed until you say so; containers need `0.0.0.0` (both Dockerfiles and example stacks set it). The backend exits naming `HOST` if this machine has no such address |
-| `DATABASE_URL` | `./data/vroom.db` | SQLite file path (or `sqlite:<path>`). Both Dockerfiles and example stacks set `/app/data/vroom.db`. Opt-in Postgres (#1635, in progress): `postgres://user:password@host:5432/database` runs the Postgres migrations at startup and stops with a clear message if the server can't be reached. Any other scheme refuses to start |
+| `DATABASE_URL` | `./data/vroom.db` | SQLite file path (or `sqlite:<path>`; surrounding spaces are ignored). Both Dockerfiles and example stacks set `/app/data/vroom.db`. Opt-in Postgres (#1635, in progress): `postgres://user:password@host:5432/database` runs the Postgres migrations at startup and stops with a clear message if the server can't be reached. Any other scheme refuses to start |
 | `DATA_PATH` | `./data` | Host directory bind-mounted at `/app/data` by `docker-compose.yml`. Must exist |
-| `WAL_CHECKPOINTS` | `on` | `off` stops the backend's own WAL checkpoints (every 15 minutes, at start and at shutdown), so a replication tool such as Litestream can own them. Leave it `on` without one |
+| `WAL_CHECKPOINTS` | `on` | `off` stops the backend's own WAL checkpoints (every 15 minutes, at start and at shutdown), so a replication tool such as Litestream can own them. Leave it `on` without one. SQLite only; ignored on Postgres |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
 | `TRUSTED_PROXY_IPS` | empty | Comma-separated proxy IPs or CIDR ranges whose `X-Forwarded-For` is honored. It is read from the right: the nearest address that is not a trusted proxy is the client, so an entry a client added itself is ignored. Left unset behind a reverse proxy, every anonymous request shares one rate-limit bucket keyed on the proxy's IP. An invalid entry stops the backend at startup |
 | `TRUSTED_CLIENT_IP_HEADER` | empty | A header a trusted proxy sets to the client IP, such as `CF-Connecting-IP`. Read only when the request comes from a `TRUSTED_PROXY_IPS` address, and before `X-Forwarded-For` |
@@ -387,6 +387,11 @@ per-request limit of Cloudflare's free plan.
 One SQLite file at `DATABASE_URL`, in WAL mode — so the data directory holds `vroom.db`
 plus `vroom.db-wal` and `vroom.db-shm`. The migrations in `backend/drizzle/` are applied
 automatically at startup; there is no manual migration step.
+
+With opt-in Postgres (#1635, in progress) there is no database file: the migrations in
+`backend/drizzle-pg/` run at startup instead. The file backup, Litestream and WAL checkpoint notes
+below apply to SQLite only, and `bun src/db/checkpoint.ts` says so and does nothing. On Postgres,
+back up with the in-app backup ZIP or your Postgres host's own backups.
 
 **Databases created before `0000_baseline` cannot be upgraded in place.** Their migration history
 no longer matches the journal. To move one forward:

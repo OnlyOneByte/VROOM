@@ -22,8 +22,10 @@ const POSTGRES_CONNECT_TIMEOUT_SECONDS = 10;
 export type DatabaseTarget = { kind: 'sqlite'; path: string } | { kind: 'pg'; url: string };
 
 const SCHEME = /^([a-z][a-z0-9+.-]+):/i;
+const MAX_CAUSE_DEPTH = 10;
 
-export function databaseTarget(url: string): DatabaseTarget {
+export function databaseTarget(raw: string): DatabaseTarget {
+  const url = raw.trim();
   const scheme = SCHEME.exec(url)?.[1]?.toLowerCase();
   if (scheme === undefined) return { kind: 'sqlite', path: url };
   if (POSTGRES_URL.test(url)) return { kind: 'pg', url };
@@ -142,7 +144,10 @@ async function finishSetup(asyncDb: AsyncAppDatabase): Promise<void> {
 
 export function driverReason(error: unknown): string {
   let root = error;
-  while (root instanceof Error && root.cause instanceof Error) root = root.cause;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
+    if (!(root instanceof Error && root.cause instanceof Error)) break;
+    root = root.cause;
+  }
   const code = (root as { code?: unknown }).code;
   const message = extractErrorMessage(root);
   return typeof code === 'string' && !message.includes(code) ? `${message} (${code})` : message;
@@ -192,7 +197,7 @@ function upkeep(kind: keyof typeof UPKEEP_QUERIES): unknown {
 }
 
 function checkpointPossible(): boolean {
-  return !getDb().$client.inTransaction;
+  return ACTIVE_DIALECT === 'sqlite' && !getDb().$client.inTransaction;
 }
 
 export async function checkDatabaseHealth(): Promise<boolean> {
