@@ -30,7 +30,7 @@ describe('restore merge: the settings already here win', () => {
 
     const delRes = await ctx.authed('DELETE', `/api/v1/vehicles/${myVehicleId}`);
     expect(delRes.status).toBeLessThan(300);
-    ctx.sqlite.run("UPDATE user_preferences SET theme_preference = 'midnight' WHERE user_id = ?", [
+    await ctx.sql.run("UPDATE user_preferences SET theme_preference = 'midnight' WHERE user_id = ?", [
       ctx.user.id,
     ]);
 
@@ -40,11 +40,9 @@ describe('restore merge: the settings already here win', () => {
     expect(result.imported?.vehicles).toBe(1);
     expect(result.imported?.userPreferences).toBe(0);
     expect(result.kept?.userPreferences).toBe(1);
-    const back = ctx.sqlite.query('SELECT id FROM vehicles WHERE id = ?').all(myVehicleId);
+    const back = (await ctx.sql.all('SELECT id FROM vehicles WHERE id = ?', [myVehicleId]));
     expect(back).toHaveLength(1);
-    const prefs = ctx.sqlite
-      .query('SELECT theme_preference FROM user_preferences WHERE user_id = ?')
-      .get(ctx.user.id) as { theme_preference: string };
+    const prefs = (await ctx.sql.get('SELECT theme_preference FROM user_preferences WHERE user_id = ?', [ctx.user.id])) as { theme_preference: string };
     expect(prefs.theme_preference).toBe('midnight');
   });
 });

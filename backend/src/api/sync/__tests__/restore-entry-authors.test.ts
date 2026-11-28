@@ -7,9 +7,9 @@ import { seedCar, shareCar } from '../../../test-helpers/members';
 let ctx: TestApp;
 const CAR = 'authors-car';
 
-function authorOf(table: string, id: string): string | null {
+async function authorOf(table: string, id: string): Promise<string | null> {
   return (
-    ctx.sqlite.query(`SELECT created_by FROM ${table} WHERE id = ?`).get(id) as {
+    (await ctx.sql.get(`SELECT created_by FROM ${table} WHERE id = ?`, [id])) as {
       created_by: string | null;
     }
   ).created_by;
@@ -48,7 +48,7 @@ afterEach(() => ctx.close());
 describe('restore keeps an entry author only while they are a member of the car', () => {
   test('a crafted backup naming a non-member as author gives them no delete right', async () => {
     const outsider = await createInvitee(ctx, 'authors-outsider');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       'INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at) VALUES (?, ?, ?, 1000, 1717200000)',
       ['owners-reading', CAR, ctx.user.id]
     );
@@ -57,7 +57,7 @@ describe('restore keeps an entry author only while they are a member of the car'
 
     await restore(zip.toBuffer());
 
-    expect(authorOf('odometer_entries', 'owners-reading')).toBeNull();
+    expect(await authorOf('odometer_entries', 'owners-reading')).toBeNull();
     await shareCar(ctx, CAR, outsider, 'editor');
     expect((await outsider.request('DELETE', '/api/v1/odometer/owners-reading')).status).toBe(403);
   });
@@ -74,7 +74,7 @@ describe('restore keeps an entry author only while they are a member of the car'
 
     await restore((await exportZip()).toBuffer());
 
-    expect(authorOf('odometer_entries', id)).toBe(editor.id);
+    expect(await authorOf('odometer_entries', id)).toBe(editor.id);
     expect((await editor.request('DELETE', `/api/v1/odometer/${id}`)).status).toBe(200);
   });
 
@@ -82,18 +82,18 @@ describe('restore keeps an entry author only while they are a member of the car'
     const editor = await createInvitee(ctx, 'authors-trip-editor');
     const outsider = await createInvitee(ctx, 'authors-photo-outsider');
     await shareCar(ctx, CAR, editor, 'editor');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, created_by) VALUES ('editors-trip', ?, ?, 10, 20, 'business', 1717200000, ?)",
       [CAR, ctx.user.id, editor.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size, created_by) VALUES ('forged-photo', ?, 'vehicle', ?, 'a.jpg', 'image/jpeg', 10, ?)",
       [ctx.user.id, CAR, outsider.id]
     );
 
     await restore((await exportZip()).toBuffer());
 
-    expect(authorOf('trips', 'editors-trip')).toBe(editor.id);
-    expect(authorOf('photos', 'forged-photo')).toBeNull();
+    expect(await authorOf('trips', 'editors-trip')).toBe(editor.id);
+    expect(await authorOf('photos', 'forged-photo')).toBeNull();
   });
 });

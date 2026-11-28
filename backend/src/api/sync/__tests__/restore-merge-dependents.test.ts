@@ -30,8 +30,8 @@ const createCar = (licensePlate: string) =>
     licensePlate,
   });
 
-const count = (sql: string, ...params: string[]): number =>
-  (ctx.sqlite.query(sql).get(...params) as { n: number }).n;
+const count = async (sql: string, ...params: string[]): Promise<number> =>
+  ((await ctx.sql.get(sql, [...params])) as { n: number }).n;
 
 async function exportZip(): Promise<Buffer> {
   const { backupService } = await import('../backup');
@@ -54,27 +54,27 @@ async function merge(zip: Buffer) {
   return restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
 }
 
-function insertExpense(
+async function insertExpense(
   id: string,
   vehicleId: string,
   userId: string,
   driverId: string | null,
   groupId: string | null = null
 ) {
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, missed_fillup, paid_by_driver_id, group_id)
-     VALUES (?, ?, ?, 'fuel', 1600000000, 2500, 0, ?, ?)`,
+     VALUES (?, ?, ?, 'fuel', 1600000000, 2500, FALSE, ?, ?)`,
     [id, vehicleId, userId, driverId, groupId]
   );
 }
 
-function seedOtherAccountGroup() {
-  ctx.sqlite.run("INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')");
-  ctx.sqlite.run(
+async function seedOtherAccountGroup() {
+  await ctx.sql.run("INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')");
+  await ctx.sql.run(
     "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('their-car', 'them', 'Kia', 'Rio', 2020)"
   );
-  insertExpense('their-1', 'their-car', 'them', null, 'their-group');
-  insertExpense('their-2', 'their-car', 'them', null, 'their-group');
+  await insertExpense('their-1', 'their-car', 'them', null, 'their-group');
+  await insertExpense('their-2', 'their-car', 'them', null, 'their-group');
 }
 
 describe('restore merge with records that depend on other records', () => {
@@ -90,7 +90,7 @@ describe('restore merge with records that depend on other records', () => {
     });
     const reminderId = reminder.reminder.id;
     const zip = await exportZip();
-    ctx.sqlite.run('DELETE FROM reminder_vehicles WHERE reminder_id = ? AND vehicle_id = ?', [
+    await ctx.sql.run('DELETE FROM reminder_vehicles WHERE reminder_id = ? AND vehicle_id = ?', [
       reminderId,
       removed.id,
     ]);
@@ -98,43 +98,41 @@ describe('restore merge with records that depend on other records', () => {
     const result = await merge(zip);
 
     expect(result.imported?.reminderVehicles).toBe(0);
-    const links = ctx.sqlite
-      .query('SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?')
-      .all(reminderId);
+    const links = (await ctx.sql.all('SELECT vehicle_id FROM reminder_vehicles WHERE reminder_id = ?', [reminderId]));
     expect(links).toEqual([{ vehicle_id: kept.id }]);
   });
 
   test("an expense naming another account's driver is not added", async () => {
     const car = await createCar('DRV-1');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO vehicle_drivers (id, vehicle_id, name) VALUES ('my-driver', ?, 'Me')",
       [car.id]
     );
-    insertExpense('my-expense', car.id, ctx.user.id, 'my-driver');
+    await insertExpense('my-expense', car.id, ctx.user.id, 'my-driver');
     const zip = await retag(await exportZip(), 'my-driver', 'their-driver');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')"
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('their-car', 'them', 'Kia', 'Rio', 2020)"
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO vehicle_drivers (id, vehicle_id, name) VALUES ('their-driver', 'their-car', 'T')"
     );
-    ctx.sqlite.run("DELETE FROM expenses WHERE id = 'my-expense'");
+    await ctx.sql.run("DELETE FROM expenses WHERE id = 'my-expense'");
 
     const result = await merge(zip);
 
     expect(result.success).toBe(true);
     expect(result.imported?.expenses).toBe(0);
     expect(
-      count("SELECT COUNT(*) AS n FROM expenses WHERE paid_by_driver_id = 'their-driver'")
+      await count("SELECT COUNT(*) AS n FROM expenses WHERE paid_by_driver_id = 'their-driver'")
     ).toBe(0);
   });
 
   test('records in the backup for a car shared with you are not added to it', async () => {
     const mine = await createCar('SHW-1');
-    insertExpense('my-expense', mine.id, ctx.user.id, null);
+    await insertExpense('my-expense', mine.id, ctx.user.id, null);
     const owner = await createInvitee(ctx, 'car-owner', 'Owner');
     const created = await owner.request('POST', '/api/v1/vehicles', {
       make: 'Mazda',
@@ -150,15 +148,15 @@ describe('restore merge with records that depend on other records', () => {
     const shareId = (await json<DataEnvelope<{ id: string }>>(invite)).data.id;
     expect((await ctx.authed('POST', `/api/v1/shares/${shareId}/accept`)).status).toBe(200);
     const zip = await retag(await exportZip(), mine.id, theirCar);
-    ctx.sqlite.run("DELETE FROM expenses WHERE id = 'my-expense'");
+    await ctx.sql.run("DELETE FROM expenses WHERE id = 'my-expense'");
 
     const result = await merge(zip);
 
     expect(result.imported?.vehicles).toBe(0);
     expect(result.imported?.expenses).toBe(0);
-    expect(count('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', theirCar)).toBe(0);
+    expect(await count('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', theirCar)).toBe(0);
     expect(
-      count('SELECT COUNT(*) AS n FROM vehicles WHERE id = ? AND user_id = ?', theirCar, owner.id)
+      await count('SELECT COUNT(*) AS n FROM vehicles WHERE id = ? AND user_id = ?', theirCar, owner.id)
     ).toBe(1);
   });
 
@@ -166,17 +164,17 @@ describe('restore merge with records that depend on other records', () => {
     "%s never adds an expense to another account's split group",
     async (mode) => {
       const car = await createCar('GRP-1');
-      insertExpense('my-split', car.id, ctx.user.id, null, 'my-group');
+      await insertExpense('my-split', car.id, ctx.user.id, null, 'my-group');
       const zip = await retag(await exportZip(), 'my-group', 'their-group');
-      seedOtherAccountGroup();
-      ctx.sqlite.run("DELETE FROM expenses WHERE id = 'my-split'");
+      await seedOtherAccountGroup();
+      await ctx.sql.run("DELETE FROM expenses WHERE id = 'my-split'");
 
       const { restoreService } = await import('../restore');
       const result = await restoreService.restoreFromBackup(ctx.user.id, zip, mode);
 
       expect(result.success).toBe(true);
-      expect(count("SELECT COUNT(*) AS n FROM expenses WHERE group_id = 'their-group'")).toBe(2);
-      expect(count("SELECT COUNT(*) AS n FROM expenses WHERE id = 'my-split'")).toBe(0);
+      expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE group_id = 'their-group'")).toBe(2);
+      expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE id = 'my-split'")).toBe(0);
     }
   );
 });

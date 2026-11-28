@@ -20,13 +20,13 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 async function seedMember(id: string, level: string, status: string): Promise<void> {
-  ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+  await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
     id,
     `${id}@test.com`,
     id,
   ]);
   await assignServerRole(appContext().asyncDb, id, 'member');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, 0, 0)`,
     [`share-${id}`, vehicleId, ctx.user.id, id, level, status]
@@ -41,11 +41,9 @@ async function seedMember(id: string, level: string, status: string): Promise<vo
   }
 }
 
-function vehicleRoles(userId: string): string[] {
+async function vehicleRoles(userId: string): Promise<string[]> {
   return (
-    ctx.sqlite
-      .query('SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id IS NOT NULL')
-      .all(userId) as { role_id: string }[]
+    (await ctx.sql.all('SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id IS NOT NULL', [userId])) as { role_id: string }[]
   ).map((row) => row.role_id);
 }
 
@@ -76,8 +74,8 @@ describe('restore re-creates role assignments from restored accepted shares only
 
     await restore(zip);
 
-    expect(vehicleRoles('editor-1')).toEqual([builtInRoleId('editor')]);
-    expect(vehicleRoles('viewer-1')).toEqual([builtInRoleId('viewer')]);
+    expect(await vehicleRoles('editor-1')).toEqual([builtInRoleId('editor')]);
+    expect(await vehicleRoles('viewer-1')).toEqual([builtInRoleId('viewer')]);
   });
 
   test('pending and declined shares grant no role', async () => {
@@ -86,8 +84,8 @@ describe('restore re-creates role assignments from restored accepted shares only
 
     await restore(await exportZip());
 
-    expect(vehicleRoles('pending-1')).toEqual([]);
-    expect(vehicleRoles('declined-1')).toEqual([]);
+    expect(await vehicleRoles('pending-1')).toEqual([]);
+    expect(await vehicleRoles('declined-1')).toEqual([]);
   });
 
   test('a crafted backup claiming an accepted share for someone who never accepted grants no role', async () => {
@@ -113,11 +111,9 @@ describe('restore re-creates role assignments from restored accepted shares only
 
     await restore(zip.toBuffer());
 
-    const status = ctx.sqlite
-      .query("SELECT status FROM vehicle_shares WHERE id = 'forged-share'")
-      .get();
+    const status = (await ctx.sql.get("SELECT status FROM vehicle_shares WHERE id = 'forged-share'"));
     expect(status).toEqual({ status: 'pending' });
-    expect(vehicleRoles('never-accepted-1')).toEqual([]);
+    expect(await vehicleRoles('never-accepted-1')).toEqual([]);
   });
 
   test('role, assignment and override rows in a crafted backup are ignored', async () => {
@@ -159,12 +155,12 @@ describe('restore re-creates role assignments from restored accepted shares only
 
     await restore(zip.toBuffer());
 
-    expect(ctx.sqlite.query('SELECT id FROM roles WHERE built_in = 0').all()).toEqual([]);
+    expect((await ctx.sql.all('SELECT id FROM roles WHERE built_in = FALSE'))).toEqual([]);
     expect(
-      ctx.sqlite.query("SELECT id FROM role_assignments WHERE id LIKE 'forged-%'").all()
+      (await ctx.sql.all("SELECT id FROM role_assignments WHERE id LIKE 'forged-%'"))
     ).toEqual([]);
-    expect(ctx.sqlite.query('SELECT id FROM permission_overrides').all()).toEqual([]);
-    expect(vehicleRoles('stranger-1')).toEqual([]);
+    expect((await ctx.sql.all('SELECT id FROM permission_overrides'))).toEqual([]);
+    expect(await vehicleRoles('stranger-1')).toEqual([]);
     expect(
       (await resolverFor(ctx.user.id, [{ kind: 'server' }])).can('server.roles.manage', {
         kind: 'server',

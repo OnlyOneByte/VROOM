@@ -56,7 +56,7 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
     ).toLowerCase();
     expect(errText, 'rejection cites the junction/vehicle ref').toContain('vehicle');
 
-    const rows = ctx.sqlite.query('SELECT id FROM vehicles').all() as { id: string }[];
+    const rows = (await ctx.sql.all('SELECT id FROM vehicles')) as { id: string }[];
     expect(rows, 'rejected restore left the original data intact, no wipe').toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows.some((r) => r.id === 'not-in-backup-vehicle')).toBe(false);
@@ -104,7 +104,7 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
     ).toLowerCase();
     expect(errText, 'rejection cites the financing/vehicle ref').toContain('vehicle');
 
-    const rows = ctx.sqlite.query('SELECT id FROM vehicles').all() as { id: string }[];
+    const rows = (await ctx.sql.all('SELECT id FROM vehicles')) as { id: string }[];
     expect(rows, 'rejected restore left the original data intact').toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
   });
@@ -122,7 +122,7 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
     expect(created.status, JSON.stringify(remBody)).toBe(201);
     const reminderId = remBody.data.reminder.id;
 
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, source_type, source_id)
        VALUES ('exp-src-1', ?, ?, 'maintenance', 1717200000, 50.0, 'reminder', ?)`,
       [vehicleId, ctx.user.id, reminderId]
@@ -158,7 +158,7 @@ describe('restore rejects junction rows that reference out-of-backup ids', () =>
     ).toLowerCase();
     expect(errText, 'rejection cites the reminder source ref').toContain('reminder');
 
-    const rows = ctx.sqlite.query('SELECT id FROM vehicles').all() as { id: string }[];
+    const rows = (await ctx.sql.all('SELECT id FROM vehicles')) as { id: string }[];
     expect(rows, 'rejected restore left the original data intact').toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
   });

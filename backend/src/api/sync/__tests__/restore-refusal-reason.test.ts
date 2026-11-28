@@ -12,12 +12,12 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 async function seedSheetsProvider(): Promise<void> {
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
      VALUES ('prov-sheets', ?, 'storage', 'google-drive', 'Drive', 'x', 'active')`,
     [ctx.user.id]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?)
      ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config`,
     [
@@ -27,10 +27,8 @@ async function seedSheetsProvider(): Promise<void> {
   );
 }
 
-function pausedAt(): unknown {
-  const row = ctx.sqlite
-    .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-    .get(ctx.user.id) as { backup_config: string };
+async function pausedAt(): Promise<unknown> {
+  const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [ctx.user.id])) as { backup_config: string };
   return JSON.parse(row.backup_config).providers['prov-sheets'].sheetsAutoPausedAt;
 }
 
@@ -48,7 +46,7 @@ describe('a Sheets restore that fails before validation', () => {
       await expect(
         restoreService.restoreFromSheets(ctx.user.id, 'prov-sheets', 'preview')
       ).rejects.toThrow('missing the Vehicles tab');
-      expect(typeof pausedAt()).toBe('string');
+      expect(typeof await pausedAt()).toBe('string');
     } finally {
       spy.mockRestore();
     }
@@ -57,12 +55,12 @@ describe('a Sheets restore that fails before validation', () => {
 
 describe('a refused Sheets restore', () => {
   test('leads with the plain reason, which says to copy the spreadsheet first', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES ('prov-sheets', ?, 'storage', 'google-drive', 'Drive', 'x', 'active')`,
       [ctx.user.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?)
        ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config`,
       [
@@ -91,9 +89,7 @@ describe('a refused Sheets restore', () => {
       const details = (refused as ValidationError).details as string[];
       expect(details[0]).toBe(BACKUP_CHECK_REASONS.sheets.metadata);
       expect(details[0]).toContain('use File\u00a0>\u00a0Make a copy');
-      const row = ctx.sqlite
-        .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-        .get(ctx.user.id) as { backup_config: string };
+      const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [ctx.user.id])) as { backup_config: string };
       const settings = JSON.parse(row.backup_config).providers['prov-sheets'];
       expect(typeof settings.sheetsAutoPausedAt).toBe('string');
       expect(settings.sheetsSpreadsheetId).toBe('sheet-1');
