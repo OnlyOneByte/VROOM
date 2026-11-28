@@ -44,10 +44,34 @@ describe('the reminder start date says when it is first due', () => {
 		expect(hint()).toBe('It’s first due on this date, then every 3 months.');
 	});
 
-	test('a recurring expense starting today says the first one is added right away', () => {
+	test('a custom repeat of one reads as every week, not every 1 week', () => {
+		renderNew({
+			startDate: '2999-07-01',
+			frequency: 'custom',
+			intervalValue: '1',
+			intervalUnit: 'week'
+		});
+		expect(hint()).toBe('It’s first due on this date, then every week.');
+	});
+
+	test('a recurring expense starting today says the first one is due today, not that it is added on save', () => {
 		renderNew({ kind: 'expense', frequency: 'yearly' });
 		expect(hint()).toBe(
-			'The first expense is added today, then every year, so it’s added right away. Pick a later date if the first one isn’t due yet.'
+			'The first expense is due today, then every year. Pick a later date if it isn’t due yet.'
+		);
+	});
+
+	test('a past start date is due as soon as it is saved, not "on this date"', () => {
+		renderNew({ startDate: '2001-01-15' });
+		expect(hint()).toBe(
+			'This date has passed, so it’s due as soon as you save. Pick a later date if it isn’t due yet.'
+		);
+	});
+
+	test('a recurring expense with a past start date warns that missed periods are added', () => {
+		renderNew({ kind: 'expense', startDate: '2001-01-15' });
+		expect(hint()).toBe(
+			'This date has passed, so expenses are added for the periods since then. Pick today or a later date if you only want new ones.'
 		);
 	});
 

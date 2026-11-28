@@ -23,23 +23,34 @@
 		monthly: 'every month',
 		yearly: 'every year'
 	};
-	let every = $derived(
-		EVERY[form.values.frequency] ??
-			(parseInt(form.values.intervalValue, 10) > 0
-				? `every ${parseInt(form.values.intervalValue, 10)} ${form.values.intervalUnit}${pluralSuffix}`
-				: null)
-	);
-	// A new reminder's start date is its first due date, so today means due the moment it's saved.
+	let every = $derived.by(() => {
+		if (EVERY[form.values.frequency]) return EVERY[form.values.frequency];
+		const count = parseInt(form.values.intervalValue, 10);
+		if (!(count > 0)) return null;
+		return count === 1
+			? `every ${form.values.intervalUnit}`
+			: `every ${count} ${form.values.intervalUnit}s`;
+	});
+	// A new reminder's start date is its first due date (the backend sets nextDueDate to it), so a
+	// date of today or earlier is due as soon as it's saved. A recurring expense isn't added on save:
+	// due reminders run on the next app open or "Run due reminders", one expense per missed period.
 	let startHint = $derived.by(() => {
 		if (!form.isNew || !form.values.startDate) return null;
 		const isExpense = form.values.kind === 'expense';
-		const first = isExpense ? 'The first expense is added' : 'It’s first due';
 		const then = every ? `, then ${every}` : '';
-		if (form.values.startDate !== toDateInputValue(new Date()))
-			return `${first} on this date${then}.`;
+		const today = toDateInputValue(new Date());
+		const start = form.values.startDate;
+		if (start > today) {
+			return `${isExpense ? 'The first expense is due' : 'It’s first due'} on this date${then}.`;
+		}
+		if (start === today) {
+			return isExpense
+				? `The first expense is due today${then}. Pick a later date if it isn’t due yet.`
+				: `It’s first due today${then}, so it’s due as soon as you save. Pick a later date if it isn’t due yet.`;
+		}
 		return isExpense
-			? `${first} today${then}, so it’s added right away. Pick a later date if the first one isn’t due yet.`
-			: `${first} today${then}, so it’s due as soon as you save. Pick a later date if it isn’t due yet.`;
+			? 'This date has passed, so expenses are added for the periods since then. Pick today or a later date if you only want new ones.'
+			: 'This date has passed, so it’s due as soon as you save. Pick a later date if it isn’t due yet.';
 	});
 </script>
 
@@ -100,7 +111,7 @@
 		aria-describedby={startHint ? 'reminder-start-hint' : undefined}
 	/>
 	{#if startHint}
-		<p id="reminder-start-hint" class="text-sm text-muted-foreground">{startHint}</p>
+		<p id="reminder-start-hint" class="text-xs text-muted-foreground">{startHint}</p>
 	{/if}
 </div>
 
