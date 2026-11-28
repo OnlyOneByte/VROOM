@@ -19,6 +19,7 @@ import {
 	formatRelativeTime,
 	getCurrencySymbol,
 	plainDecimal,
+	padAmountInput,
 	toAmountInput,
 	toDateInputValue
 } from '#lib/utils/formatters.ts';
@@ -360,6 +361,16 @@ describe('toAmountInput', () => {
 	test("writes an amount for a number input with the currency's decimals and a dot", () => {
 		expect(toAmountInput(450, 'USD')).toBe('450.00');
 		expect(toAmountInput(45000.4, 'JPY')).toBe('45000');
+	});
+});
+
+describe('padAmountInput', () => {
+	test("pads to the currency's decimals but never rounds a stored amount", () => {
+		expect(padAmountInput(60, 'USD')).toBe('60.00');
+		expect(padAmountInput(37.5, 'USD')).toBe('37.50');
+		expect(padAmountInput(1200, 'JPY')).toBe('1200');
+		expect(padAmountInput(37.5, 'JPY')).toBe('37.5');
+		expect(padAmountInput(12.345, 'USD')).toBe('12.345');
 	});
 });
 

@@ -82,7 +82,7 @@ test.describe('Offline expense entry', () => {
 		await row.getByRole('link', { name: /^Edit .*1,000,001/ }).click();
 
 		await expect(page.getByRole('heading', { name: 'Edit queued expense' })).toBeVisible();
-		await expect(page.getByLabel('Amount *')).toHaveValue('1000001');
+		await expect(page.getByLabel('Amount *')).toHaveValue('1000001.00');
 		await page.getByRole('button', { name: 'Save expense' }).click();
 		await expect(page.locator('#amount-error')).toHaveText('Amount must be 1,000,000 or less');
 

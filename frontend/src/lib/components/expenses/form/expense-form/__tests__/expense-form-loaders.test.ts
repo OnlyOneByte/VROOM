@@ -235,7 +235,7 @@ describe('loadExpense — split groups', () => {
 		expect(state.isSplit).toBe(true);
 		expect(state.formData).toMatchObject({
 			category: 'maintenance',
-			amount: '100',
+			amount: '100.00',
 			tags: ['tires'],
 			description: 'Tires'
 		});
@@ -280,7 +280,7 @@ describe('loadExpense — split groups', () => {
 		expect(state.isSplit).toBe(false);
 		expect(state.formData).toMatchObject({
 			category: 'financial',
-			amount: '240',
+			amount: '240.00',
 			tags: ['insurance'],
 			description: ''
 		});

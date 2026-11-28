@@ -83,7 +83,7 @@ describe('loadQueuedExpense', () => {
 		expect(state.formData).toMatchObject({
 			vehicleId: 'v1',
 			category: 'fuel',
-			amount: '1000001',
+			amount: '1000001.00',
 			date: '2025-03-10',
 			mileage: '31000',
 			volume: '12.5',
