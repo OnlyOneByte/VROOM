@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { repos } from '../../app-context';
 import { CONFIG } from '../../config';
 import type { NewReminder, Reminder } from '../../db/schema';
+import type { SplitConfig } from '../../db/types';
 import { NotFoundError, ValidationError } from '../../errors';
 import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
 import {
@@ -33,6 +34,7 @@ import {
   requireVehiclesAccess,
 } from '../../utils/vehicle-access';
 import { hideDriverFields } from '../drivers/attribution';
+import { expenseSplitService } from '../expenses/split-service';
 import { recurringCostSummary } from './reminder-cost';
 import type { ReminderWithVehicles } from './repository';
 import {
@@ -155,6 +157,27 @@ async function mayTouchFinancialReminder(
 
 async function assertMayWriteReminder(c: Context, existing: ReminderScope): Promise<void> {
   if (!(await mayTouchFinancialReminder(c, existing, 'write'))) throw new NotFoundError('Reminder');
+}
+
+function visibleShare<R extends { expenseAmount: number | null; expenseSplitConfig: unknown }>(
+  reminder: R,
+  vehicleIds: readonly string[],
+  visible: readonly string[]
+): R {
+  if (visible.length === vehicleIds.length) return reminder;
+  const split = reminder.expenseSplitConfig as SplitConfig | null;
+  const shown = new Set(visible);
+  if (!split || reminder.expenseAmount == null) {
+    return { ...reminder, expenseAmount: null, expenseSplitConfig: null };
+  }
+  const allocations = expenseSplitService
+    .computeAllocations(split, reminder.expenseAmount)
+    .filter((allocation) => shown.has(allocation.vehicleId));
+  return {
+    ...reminder,
+    expenseAmount: allocations.reduce((sum, allocation) => sum + allocation.amount, 0),
+    expenseSplitConfig: { method: 'absolute', allocations },
+  };
 }
 
 async function visibleVehicleIds(c: Context, vehicleIds: readonly string[]): Promise<string[]> {
@@ -423,11 +446,14 @@ routes.get('/', authorize(fromQueryVehicle), async (c) => {
     listUserId === user.id
       ? reminders
       : await Promise.all(
-          reminders.map(async (row) => ({
-            ...row,
-            vehicleIds: await visibleVehicleIds(c, row.vehicleIds),
-            seen: await mayTouchFinancialReminder(c, row, 'read'),
-          }))
+          reminders.map(async (row) => {
+            const visibleIds = await visibleVehicleIds(c, row.vehicleIds);
+            return {
+              reminder: visibleShare(row.reminder, row.vehicleIds, visibleIds),
+              vehicleIds: visibleIds,
+              seen: await mayTouchFinancialReminder(c, row, 'read'),
+            };
+          })
         ).then((rows) => rows.filter((row) => row.seen).map(({ seen: _seen, ...row }) => row));
   const scale = await repos().preferences.moneyScale(listUserId);
   return c.json({ success: true, data: visible.map((r) => reminderWithVehiclesToApi(r, scale)) });
@@ -456,11 +482,13 @@ routes.get(
       return financialAccessOf(resolver, expense.vehicleId).read || !isFinancialExpense(expense);
     });
     const scale = await repos().preferences.moneyScale(existing.reminder.userId);
+    const isOwner = c.get('user').id === existing.reminder.userId;
     return c.json({
       success: true,
-      data: readable.map((expense) =>
-        hideDriverFields(c, expense.vehicleId, expenseToApi(expense, scale))
-      ),
+      data: readable.map((expense) => {
+        const row = hideDriverFields(c, expense.vehicleId, expenseToApi(expense, scale));
+        return isOwner ? row : { ...row, groupTotal: null, splitMethod: null };
+      }),
     });
   }
 );

@@ -14,8 +14,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function count(sql: string): number {
-  return (ctx.sqlite.query(sql).get() as { n: number }).n;
+async function count(sql: string): Promise<number> {
+  return ((await ctx.sql.get(sql)) as { n: number }).n;
 }
 
 async function seedFullDataset(): Promise<void> {
@@ -49,7 +49,7 @@ async function seedFullDataset(): Promise<void> {
   });
   expect(expRes.status, await expRes.clone().text()).toBe(201);
 
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at)
      VALUES ('odo-full-1', ?, ?, 45000, 1709251200)`,
     [vehicleId, uid]
@@ -85,20 +85,22 @@ async function seedFullDataset(): Promise<void> {
   });
   const rem = await json<DataEnvelope<{ reminder: { id: string } }>>(remRes);
   expect(remRes.status, JSON.stringify(rem)).toBe(201);
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read)
-     VALUES ('notif-full-1', ?, ?, 1709251200, NULL, 0)`,
+     VALUES ('notif-full-1', ?, ?, 1709251200, NULL, FALSE)`,
     [rem.data.reminder.id, uid]
   );
 
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
      VALUES ('photo-full-1', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 4096)`,
     [uid, vehicleId]
   );
 
-  ctx.sqlite.run(`INSERT OR IGNORE INTO user_preferences (user_id) VALUES (?)`, [uid]);
-  ctx.sqlite.run(`INSERT OR IGNORE INTO sync_state (user_id) VALUES (?)`, [uid]);
+  await ctx.sql.run(`INSERT INTO user_preferences (user_id) VALUES (?) ON CONFLICT DO NOTHING`, [
+    uid,
+  ]);
+  await ctx.sql.run(`INSERT INTO sync_state (user_id) VALUES (?) ON CONFLICT DO NOTHING`, [uid]);
 }
 
 describe('replace-mode restore with a complete FK-linked dataset', () => {
@@ -120,7 +122,7 @@ describe('replace-mode restore with a complete FK-linked dataset', () => {
       'photos',
     ] as const;
     const before: Record<string, number> = {};
-    for (const t of TABLES) before[t] = count(`SELECT COUNT(*) n FROM ${t}`);
+    for (const t of TABLES) before[t] = await count(`SELECT COUNT(*) n FROM ${t}`);
     expect(before.vehicles, 'a vehicle was seeded').toBe(1);
     expect(before.vehicle_financing, 'financing seeded').toBe(1);
     expect(before.odometer_entries, 'odometer seeded').toBe(1);
@@ -138,7 +140,7 @@ describe('replace-mode restore with a complete FK-linked dataset', () => {
 
     for (const t of TABLES) {
       expect(
-        count(`SELECT COUNT(*) n FROM ${t}`),
+        await count(`SELECT COUNT(*) n FROM ${t}`),
         `${t} round-tripped to its pre-restore count`
       ).toBe(before[t]);
     }
@@ -157,9 +159,9 @@ describe('replace-mode restore with a complete FK-linked dataset', () => {
     const second = await restoreService.restoreFromBackup(ctx.user.id, zip2, 'replace');
     expect(second.success, JSON.stringify(second)).toBe(true);
 
-    expect(count('SELECT COUNT(*) n FROM vehicles')).toBe(1);
-    expect(count('SELECT COUNT(*) n FROM vehicle_financing')).toBe(1);
-    expect(count('SELECT COUNT(*) n FROM insurance_claims')).toBe(1);
-    expect(count('SELECT COUNT(*) n FROM photos')).toBe(1);
+    expect(await count('SELECT COUNT(*) n FROM vehicles')).toBe(1);
+    expect(await count('SELECT COUNT(*) n FROM vehicle_financing')).toBe(1);
+    expect(await count('SELECT COUNT(*) n FROM insurance_claims')).toBe(1);
+    expect(await count('SELECT COUNT(*) n FROM photos')).toBe(1);
   });
 });
