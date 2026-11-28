@@ -14,7 +14,7 @@ describe('the underlined quick-add fields', () => {
 	});
 
 	test('an empty figure shows its placeholder in a faint tone, so 0.000 does not read as a value', () => {
-		expect(classes).toContain('placeholder:text-muted-foreground/40');
+		expect(classes).toContain('placeholder:text-border-strong');
 	});
 
 	test('show the error colour while an invalid field has focus', () => {
