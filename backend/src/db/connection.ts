@@ -14,7 +14,7 @@ import { logger } from '../utils/logger';
 import { bunSqlConnection, openAsyncPostgres, type PgConnection } from './async-postgres';
 import { type AsyncAppDatabase, openAsyncDatabase } from './async-sqlite';
 import { rawAll, UPKEEP_QUERIES } from './dialect';
-import { ACTIVE_DIALECT } from './dialect/active';
+import { ACTIVE_DIALECT, POSTGRES_URL } from './dialect/active';
 import * as schema from './sqlite/schema';
 
 const POSTGRES_CONNECT_TIMEOUT_SECONDS = 10;
@@ -26,10 +26,14 @@ const SCHEME = /^([a-z][a-z0-9+.-]+):/i;
 export function databaseTarget(url: string): DatabaseTarget {
   const scheme = SCHEME.exec(url)?.[1]?.toLowerCase();
   if (scheme === undefined) return { kind: 'sqlite', path: url };
-  if (scheme === 'postgres' || scheme === 'postgresql') return { kind: 'pg', url };
+  if (POSTGRES_URL.test(url)) return { kind: 'pg', url };
   if (scheme === 'sqlite') return { kind: 'sqlite', path: url.replace(/^sqlite:(\/\/)?/i, '') };
+  const unsupported =
+    scheme === 'postgres' || scheme === 'postgresql'
+      ? `DATABASE_URL starts with "${scheme}:" but not "${scheme}://".`
+      : `DATABASE_URL uses the unsupported scheme "${scheme}:".`;
   throw new Error(
-    `DATABASE_URL uses the unsupported scheme "${scheme}:". Use a SQLite file path (or sqlite:<path>), or postgres://user:password@host:5432/database.`
+    `${unsupported} Use a SQLite file path (or sqlite:<path>), or postgres://user:password@host:5432/database.`
   );
 }
 
@@ -136,6 +140,14 @@ async function finishSetup(asyncDb: AsyncAppDatabase): Promise<void> {
   if (admin) logger.info('Made the oldest eligible account the server admin', { userId: admin });
 }
 
+export function driverReason(error: unknown): string {
+  let root = error;
+  while (root instanceof Error && root.cause instanceof Error) root = root.cause;
+  const code = (root as { code?: unknown }).code;
+  const message = extractErrorMessage(root);
+  return typeof code === 'string' && !message.includes(code) ? `${message} (${code})` : message;
+}
+
 export async function startPostgres(start: PostgresStart, where: string): Promise<void> {
   let connection: PgConnection;
   try {
@@ -143,7 +155,7 @@ export async function startPostgres(start: PostgresStart, where: string): Promis
     connection = await start.connect();
   } catch (error) {
     throw new Error(
-      `Could not connect to ${where}: ${extractErrorMessage(error)}. Check DATABASE_URL and that the database server is running and reachable.`
+      `Could not connect to ${where}: ${driverReason(error)}. Check DATABASE_URL and that the database server is running and reachable.`
     );
   }
   const { createPostgresAppContext, useAppContext } = await import('../app-context');

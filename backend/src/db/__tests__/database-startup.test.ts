@@ -10,10 +10,11 @@ import {
   checkDatabaseHealth,
   databaseTarget,
   describeDatabase,
+  driverReason,
   runMigrations,
   startPostgres,
 } from '../connection';
-import { ACTIVE_DIALECT } from '../dialect/active';
+import { ACTIVE_DIALECT, dialectFromUrl } from '../dialect/active';
 
 const PASSWORD = 's3cretPW';
 
@@ -45,6 +46,43 @@ describe('DATABASE_URL', () => {
     }
   );
 
+  test.each(['postgres:vroom', 'postgres:/db/vroom', 'postgresql:db'])(
+    '%s, without the slashes, is refused',
+    (url) => {
+      expect(() => databaseTarget(url)).toThrow(/but not "postgres(ql)?:\/\/"/);
+    }
+  );
+
+  test.each([
+    './data/vroom.db',
+    ':memory:',
+    'sqlite:./x.db',
+    'postgres://db/vroom',
+    'PostgreSQL://db/vroom',
+    'postgres:vroom',
+    'postgres:/db',
+    'mysql://db',
+  ])('%s gets the same dialect from the startup check and the active dialect', (url) => {
+    let kind: string;
+    try {
+      kind = databaseTarget(url).kind;
+    } catch {
+      kind = 'refused';
+    }
+    expect(kind === 'refused' || kind === dialectFromUrl(url)).toBe(true);
+  });
+
+  test('the reason shown is the driver error under any wrapping, with its code', () => {
+    const driver = Object.assign(new Error('Connection closed'), {
+      code: 'ERR_POSTGRES_CONNECTION_CLOSED',
+    });
+    const wrapped = new Error('Failed query: CREATE SCHEMA', {
+      cause: new Error('x', { cause: driver }),
+    });
+    expect(driverReason(wrapped)).toBe('Connection closed (ERR_POSTGRES_CONNECTION_CLOSED)');
+    expect(driverReason(new Error('plain'))).toBe('plain');
+  });
+
   test('a Postgres target is described without its user or password', () => {
     const where = describeDatabase(databaseTarget(`postgres://vroom:${PASSWORD}@db.internal/cars`));
     expect(where).toBe('Postgres at db.internal:5432/cars');
@@ -60,6 +98,8 @@ describe('a Postgres server that cannot be reached', () => {
       .catch((error: unknown) => error as Error);
     expect(Date.now() - started).toBeLessThan(15_000);
     expect(failure?.message).toStartWith('Could not connect to Postgres at 127.0.0.1:1/cars: ');
+    expect(failure?.message).toContain('(ERR_POSTGRES_');
+    expect(failure?.message).not.toContain('Failed query');
     expect(JSON.stringify(failure, Object.getOwnPropertyNames(failure))).not.toContain(PASSWORD);
   }, 20_000);
 });
