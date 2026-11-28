@@ -31,8 +31,8 @@ async function tripWithOdometerPhoto(): Promise<{ tripId: string; entryId: strin
   });
   const trip = await json<DataEnvelope<{ id: string }>>(tripRes);
   expect(tripRes.status, JSON.stringify(trip)).toBe(201);
-  const entry = ctx.sqlite.query('SELECT id FROM odometer_entries').get() as { id: string };
-  ctx.sqlite.run(
+  const entry = (await ctx.sql.get('SELECT id FROM odometer_entries')) as { id: string };
+  await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
      VALUES ('photo-dash', ?, 'odometer_entry', ?, 'dash.jpg', 'image/jpeg', 1)`,
     [ctx.user.id, entry.id]
@@ -41,9 +41,9 @@ async function tripWithOdometerPhoto(): Promise<{ tripId: string; entryId: strin
 }
 
 async function addManualReading(tripId: string, odometer: number): Promise<void> {
-  const { vehicle_id } = ctx.sqlite
-    .query('SELECT vehicle_id FROM trips WHERE id = ?')
-    .get(tripId) as { vehicle_id: string };
+  const { vehicle_id } = (await ctx.sql.get('SELECT vehicle_id FROM trips WHERE id = ?', [
+    tripId,
+  ])) as { vehicle_id: string };
   const res = await ctx.authed('POST', `/api/v1/odometer/${vehicle_id}`, {
     odometer,
     recordedAt: '2026-05-01T00:01:00.000Z',
@@ -51,8 +51,8 @@ async function addManualReading(tripId: string, odometer: number): Promise<void>
   expect(res.status).toBe(201);
 }
 
-function photoCount(): number {
-  return (ctx.sqlite.query('SELECT COUNT(*) AS n FROM photos').get() as { n: number }).n;
+async function photoCount(): Promise<number> {
+  return ((await ctx.sql.get('SELECT COUNT(*) AS n FROM photos')) as { n: number }).n;
 }
 
 describe("a trip's linked odometer entry takes its photos with it", () => {
@@ -60,8 +60,8 @@ describe("a trip's linked odometer entry takes its photos with it", () => {
     const { tripId } = await tripWithOdometerPhoto();
     const res = await ctx.authed('DELETE', `/api/v1/trips/${tripId}?keepOdometer=false`);
     expect(res.status).toBeLessThan(300);
-    expect(ctx.sqlite.query('SELECT COUNT(*) AS n FROM odometer_entries').get()).toEqual({ n: 0 });
-    expect(photoCount()).toBe(0);
+    expect(await ctx.sql.get('SELECT COUNT(*) AS n FROM odometer_entries')).toEqual({ n: 0 });
+    expect(await photoCount()).toBe(0);
   });
 
   test.each([
@@ -79,9 +79,9 @@ describe("a trip's linked odometer entry takes its photos with it", () => {
       const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, body);
 
       expect(res.status).toBeLessThan(300);
-      const entries = ctx.sqlite
-        .query('SELECT id, odometer, recorded_at, note, source_trip_id FROM odometer_entries')
-        .all() as {
+      const entries = (await ctx.sql.all(
+        'SELECT id, odometer, recorded_at, note, source_trip_id FROM odometer_entries'
+      )) as {
         id: string;
         odometer: number;
         recorded_at: number;
@@ -97,7 +97,7 @@ describe("a trip's linked odometer entry takes its photos with it", () => {
           source_trip_id: tripId,
         },
       ]);
-      expect(photoCount()).toBe(1);
+      expect(await photoCount()).toBe(1);
     }
   );
 
@@ -108,20 +108,20 @@ describe("a trip's linked odometer entry takes its photos with it", () => {
     const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { endOdometer: 650 });
 
     expect(res.status).toBeLessThan(300);
-    const entries = ctx.sqlite.query('SELECT id, odometer FROM odometer_entries').all() as {
+    const entries = (await ctx.sql.all('SELECT id, odometer FROM odometer_entries')) as {
       id: string;
       odometer: number;
     }[];
     expect(entries.map((e) => e.odometer)).toEqual([650]);
     expect(entries.map((e) => e.id)).not.toContain(entryId);
-    expect(photoCount()).toBe(0);
+    expect(await photoCount()).toBe(0);
   });
 
   test('keeping the odometer entry keeps its photo', async () => {
     const { tripId } = await tripWithOdometerPhoto();
     const res = await ctx.authed('DELETE', `/api/v1/trips/${tripId}`);
     expect(res.status).toBeLessThan(300);
-    expect(photoCount()).toBe(1);
+    expect(await photoCount()).toBe(1);
   });
 });
 
@@ -139,7 +139,7 @@ describe('a failed photo cleanup does not block the trip edit', () => {
     } finally {
       spy.mockRestore();
     }
-    const entries = ctx.sqlite.query('SELECT id, odometer FROM odometer_entries').all() as {
+    const entries = (await ctx.sql.all('SELECT id, odometer FROM odometer_entries')) as {
       id: string;
       odometer: number;
     }[];

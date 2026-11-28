@@ -149,7 +149,7 @@ async function inputOutcome(
 }
 
 async function seedSweepCar(ctx: TestApp): Promise<Members> {
-  seedCar(ctx, VEHICLE_ID);
+  await seedCar(ctx, VEHICLE_ID);
   ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 1 WHERE id = ?', [VEHICLE_ID]);
   const members = await seedMembers(ctx, VEHICLE_ID, 'sweep');
   seedSweepRecords(ctx, VEHICLE_ID, members.stranger.id);

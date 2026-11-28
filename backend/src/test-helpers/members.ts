@@ -10,37 +10,41 @@ export interface Members {
   disabled: Invitee;
 }
 
-export function seedCar(ctx: TestApp, vehicleId: string, ownerId = ctx.user.id): void {
-  ctx.sqlite.run(
+export async function seedCar(
+  ctx: TestApp,
+  vehicleId: string,
+  ownerId = ctx.user.id
+): Promise<void> {
+  await ctx.sql.run(
     "INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Toyota', 'Camry', 2022)",
     [vehicleId, ownerId]
   );
 }
 
-export function shareCar(
+export async function shareCar(
   ctx: TestApp,
   vehicleId: string,
   member: Invitee,
   level: 'viewer' | 'editor'
-): void {
-  ctx.sqlite.run(
+): Promise<void> {
+  await ctx.sql.run(
     "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, ?, 'accepted', ?)",
     [`share-${vehicleId}-${member.id}`, vehicleId, ctx.user.id, member.id, level, member.email]
   );
-  ctx.sqlite.run(
-    'INSERT OR IGNORE INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
+  await ctx.sql.run(
+    'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
     [`ra-${vehicleId}-${member.id}`, member.id, shareRoleId(level), vehicleId, ctx.user.id]
   );
 }
 
-export function overrideOn(
+export async function overrideOn(
   ctx: TestApp,
   vehicleId: string,
   member: Invitee,
   permission: string,
   effect: 'allow' | 'deny'
-): void {
-  ctx.sqlite.run(
+): Promise<void> {
+  await ctx.sql.run(
     "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect) VALUES (?, ?, 'vehicle', ?, ?, ?)",
     [`po-${member.id}-${permission}`, member.id, vehicleId, permission, effect]
   );
@@ -58,11 +62,11 @@ export async function seedMembers(
     stranger: await createInvitee(ctx, `${prefix}-stranger`),
     disabled: await createInvitee(ctx, `${prefix}-disabled`),
   };
-  shareCar(ctx, vehicleId, members.coOwner, 'viewer');
-  shareCar(ctx, vehicleId, members.editor, 'editor');
-  shareCar(ctx, vehicleId, members.viewer, 'viewer');
-  shareCar(ctx, vehicleId, members.disabled, 'editor');
-  ctx.sqlite.run(
+  await shareCar(ctx, vehicleId, members.coOwner, 'viewer');
+  await shareCar(ctx, vehicleId, members.editor, 'editor');
+  await shareCar(ctx, vehicleId, members.viewer, 'viewer');
+  await shareCar(ctx, vehicleId, members.disabled, 'editor');
+  await ctx.sql.run(
     'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
     [
       `ra-${members.coOwner.id}`,
@@ -72,6 +76,6 @@ export async function seedMembers(
       ctx.user.id,
     ]
   );
-  ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [members.disabled.id]);
+  await ctx.sql.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [members.disabled.id]);
   return members;
 }

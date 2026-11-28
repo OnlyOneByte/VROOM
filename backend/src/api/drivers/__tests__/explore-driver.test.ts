@@ -17,7 +17,7 @@ interface Period {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'ex');
   await ctx.authed('PUT', `/api/v1/vehicles/${CAR}/car-share`, { enabled: true });
   const spend = (request: typeof ctx.authed, amount: number, date: string) =>

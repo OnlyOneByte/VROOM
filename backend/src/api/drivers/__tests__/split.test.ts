@@ -50,7 +50,7 @@ async function balances(as: { request: TestApp['authed'] } | null = null): Promi
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'sp');
   await ctx.authed('PUT', `/api/v1/vehicles/${CAR}/car-share`, { enabled: true });
   const list = (
@@ -86,7 +86,7 @@ describe('split rules and balances', () => {
     expect((await balances()).transfers).toEqual([
       expect.objectContaining({ fromDriverId: editor, toDriverId: owner, amount: 80 }),
     ]);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
     expect((await balances(m.coOwner)).transfers).toEqual([
       expect.objectContaining({ fromDriverId: editor, toDriverId: owner, amount: 20 }),
     ]);
@@ -145,7 +145,7 @@ describe('split rules and balances', () => {
   });
 
   test('balances need permission to see costs', async () => {
-    overrideOn(ctx, CAR, m.editor, 'vehicle.expense.read', 'deny');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.expense.read', 'deny');
     expect((await m.editor.request('GET', `${base}/balances${PERIOD}`)).status).toBe(403);
   });
 });

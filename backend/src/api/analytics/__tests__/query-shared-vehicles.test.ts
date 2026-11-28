@@ -52,8 +52,8 @@ function expense(
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, SHARED);
-  seedCar(ctx, PRIVATE);
+  await seedCar(ctx, SHARED);
+  await seedCar(ctx, PRIVATE);
   expense(SHARED, 'maintenance', 8000);
   expense(SHARED, 'financial', 40000, 'financing');
   expense(SHARED, 'financial', 120000, 'insurance_term');
@@ -61,7 +61,7 @@ beforeEach(async () => {
   expense(PRIVATE, 'maintenance', 70000);
   viewer = await createInvitee(ctx, 'qs-viewer');
   stranger = await createInvitee(ctx, 'qs-stranger');
-  shareCar(ctx, SHARED, viewer, 'viewer');
+  await shareCar(ctx, SHARED, viewer, 'viewer');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -100,7 +100,7 @@ describe('analytics query for a car shared with the viewer', () => {
   });
 
   test('access to only one kind of financial record still hides them all', async () => {
-    overrideOn(ctx, SHARED, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.financing.read', 'allow');
 
     const result = await query(viewer.request, ALL_BY_CATEGORY);
     expect(result.totals.value).toBe(80);
@@ -108,8 +108,8 @@ describe('analytics query for a car shared with the viewer', () => {
   });
 
   test('a viewer the owner lets see financials gets the financial rows too', async () => {
-    overrideOn(ctx, SHARED, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, SHARED, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.insurance.read', 'allow');
 
     const result = await query(viewer.request, ALL_BY_CATEGORY);
     expect(result.totals.value).toBe(80 + 400 + 1200 + 50);
@@ -189,7 +189,7 @@ describe('analytics query for a car shared with the viewer', () => {
 
 describe('analytics query follows the per-car permissions of a share', () => {
   test('a viewer denied expense reads on the shared car gets nothing for it', async () => {
-    overrideOn(ctx, SHARED, viewer, 'vehicle.expense.read', 'deny');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.expense.read', 'deny');
     for (const scope of ['', `vehicleIds=${SHARED}`]) {
       expect((await query(viewer.request, `interval=none&${scope}`)).totals.value, scope).toBe(0);
       expect((await items(viewer.request, scope)).count, scope).toBe(0);
@@ -210,7 +210,7 @@ describe('analytics query follows the per-car permissions of a share', () => {
     };
     expect(await trips()).toEqual([1]);
 
-    overrideOn(ctx, SHARED, viewer, 'vehicle.trip.read', 'deny');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.trip.read', 'deny');
     expect(await trips()).toEqual([0]);
     expect((await query(viewer.request, 'interval=none')).totals.value).toBe(80);
   });
@@ -238,7 +238,7 @@ describe('analytics query follows the per-car permissions of a share', () => {
 
   test('an editor share reads the shared car the same way', async () => {
     const editor = await createInvitee(ctx, 'qs-editor');
-    shareCar(ctx, SHARED, editor, 'editor');
+    await shareCar(ctx, SHARED, editor, 'editor');
     expect((await query(editor.request, `${ALL_BY_CATEGORY}`)).totals.value).toBe(80);
   });
 
@@ -291,8 +291,8 @@ describe('the query and its items report the cars they covered', () => {
     );
   }
 
-  beforeEach(() => {
-    seedCar(ctx, OWN, viewer.id);
+  beforeEach(async () => {
+    await seedCar(ctx, OWN, viewer.id);
   });
 
   test('an owned car and a shared car are both listed, with nothing left out', async () => {
@@ -317,7 +317,7 @@ describe('the query and its items report the cars they covered', () => {
   });
 
   test('a shared car without expense access is never named, whatever the currency', async () => {
-    overrideOn(ctx, SHARED, viewer, 'vehicle.expense.read', 'deny');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.expense.read', 'deny');
     for (const currency of ['USD', 'EUR']) {
       ownerCurrency(currency);
       for (const body of await coverage(viewer.request, '', [PRIVATE, SHARED])) {

@@ -21,8 +21,8 @@ interface PolicyView {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
-  seedCar(ctx, PRIVATE);
+  await seedCar(ctx, CAR);
+  await seedCar(ctx, PRIVATE);
   m = await seedMembers(ctx, CAR, 'ins');
   ctx.sqlite.run(
     "INSERT INTO vehicle_financing (id, vehicle_id, provider, original_amount, term_months, start_date, payment_amount) VALUES ('loan-1', ?, 'Bank', 1000000, 60, 1704067200, 20000)",
@@ -68,16 +68,16 @@ describe('financing resolves through can() for every role', () => {
     expect(await status(m.viewer.request, 'GET', loan)).toBe(403);
     expect(await status(m.stranger.request, 'GET', loan)).toBe(404);
     expect(await status(m.disabled.request, 'GET', loan)).toBe(403);
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.financing.read', 'allow');
     expect(await status(m.viewer.request, 'GET', loan)).toBe(200);
   });
 
   test('writes: a co-owner changes the loan; an editor needs an allow override; a deny wins', async () => {
     expect(await status(m.coOwner.request, 'PATCH', amount, { paymentAmount: 210 })).toBe(200);
     expect(await status(m.editor.request, 'PATCH', amount, { paymentAmount: 220 })).toBe(403);
-    overrideOn(ctx, CAR, m.editor, 'vehicle.financing.write', 'allow');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.financing.write', 'allow');
     expect(await status(m.editor.request, 'PATCH', amount, { paymentAmount: 220 })).toBe(200);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.financing.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.financing.read', 'deny');
     expect(await status(m.coOwner.request, 'PUT', '/api/v1/financing/loan-1/payoff')).toBe(403);
     expect(await status(m.stranger.request, 'DELETE', '/api/v1/financing/loan-1')).toBe(404);
   });
@@ -106,7 +106,7 @@ describe('insurance resolves through can() for every role', () => {
     const viewers = (await policies(m.viewer.request))[0];
     expect(viewers?.vehicleIds).toEqual([CAR]);
     expect(viewers?.terms[0]?.totalCost).toBeUndefined();
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
     expect((await policies(m.viewer.request))[0]?.terms[0]?.totalCost).toBeTruthy();
     expect(
       await status(m.stranger.request, 'GET', `/api/v1/insurance/vehicles/${CAR}/policies`)
@@ -138,11 +138,11 @@ describe('insurance resolves through can() for every role', () => {
     expect(await status(m.viewer.request, 'GET', shared)).toBe(403);
     expect(await status(m.disabled.request, 'GET', shared)).toBe(403);
     expect(await status(m.stranger.request, 'GET', shared)).toBe(404);
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
     expect(await status(m.viewer.request, 'GET', shared)).toBe(200);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
     expect(await status(m.coOwner.request, 'GET', shared)).toBe(403);
-    overrideOn(ctx, CAR, m.editor, 'vehicle.insurance.write', 'allow');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.insurance.write', 'allow');
     expect(await status(m.editor.request, 'DELETE', `${shared}/pol2-doc`)).toBe(404);
     expect(await status(m.coOwner.request, 'DELETE', `${multiCar}/pol-doc`)).toBe(404);
     expect(await status(ctx.authed, 'DELETE', `${shared}/pol2-doc`)).toBe(204);
@@ -177,10 +177,10 @@ describe('insurance resolves through can() for every role', () => {
     expect(await status(m.viewer.request, 'GET', docs('claim-shared'))).toBe(403);
     expect(await status(ctx.authed, 'GET', docs('claim-private'))).toBe(200);
 
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
     expect(await claimIds(m.viewer.request)).toEqual(['claim-shared']);
     expect(await status(m.viewer.request, 'GET', docs('claim-shared'))).toBe(200);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
     expect(await claimIds(m.coOwner.request)).toEqual([]);
     expect(await status(m.coOwner.request, 'GET', docs('claim-shared'))).toBe(403);
   });

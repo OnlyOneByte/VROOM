@@ -16,9 +16,9 @@ const car = `/api/v1/vehicles/${CAR}`;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 've');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO vehicle_financing (id, vehicle_id, provider, original_amount, term_months, start_date, payment_amount) VALUES ('ve-loan', ?, 'Bank', 1000000, 60, 1704067200, 20000)",
     [CAR]
   );
@@ -46,14 +46,14 @@ describe('vehicles resolve through can() for every role', () => {
     expect(await status(m.viewer.request, 'PUT', car, { nickname: 'Mine' })).toBe(403);
     expect(await status(m.disabled.request, 'PUT', car, { nickname: 'Mine' })).toBe(403);
     expect(await status(m.stranger.request, 'PUT', car, { nickname: 'Mine' })).toBe(404);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.write', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.write', 'deny');
     expect(await status(m.coOwner.request, 'PUT', car, { nickname: 'Ours' })).toBe(403);
     expect(await status(m.coOwner.request, 'DELETE', car)).toBe(403);
     expect(await status(ctx.authed, 'DELETE', car)).toBe(200);
   });
 
   test("a co-owner's plate change is checked against the owner's other cars", async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO vehicles (id, user_id, make, model, year, license_plate) VALUES ('ve-second', ?, 'Honda', 'Fit', 2020, 'ABC123')",
       [ctx.user.id]
     );
@@ -62,7 +62,7 @@ describe('vehicles resolve through can() for every role', () => {
 
   test('car stats follow expense read', async () => {
     expect(await status(m.viewer.request, 'GET', `${car}/stats`)).toBe(200);
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.expense.read', 'deny');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.expense.read', 'deny');
     expect(await status(m.viewer.request, 'GET', `${car}/stats`)).toBe(403);
     expect(await status(m.viewer.request, 'GET', car)).toBe(200);
   });
@@ -70,16 +70,16 @@ describe('vehicles resolve through can() for every role', () => {
   test('the shared list follows vehicle read and shows loans only to financial readers', async () => {
     expect((await sharedList(m.coOwner.request)).find((v) => v.id === CAR)?.financing).toBeTruthy();
     expect((await sharedList(m.viewer.request)).find((v) => v.id === CAR)?.financing).toBeFalsy();
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.read', 'deny');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.read', 'deny');
     expect((await sharedList(m.viewer.request)).map((v) => v.id)).not.toContain(CAR);
     expect(await status(m.viewer.request, 'GET', car)).toBe(403);
   });
 
   test('an edit never returns or changes what the editor cannot see', async () => {
-    ctx.sqlite.run("UPDATE vehicles SET vin = 'VIN123', purchase_price = 2000000 WHERE id = ?", [
+    await ctx.sql.run("UPDATE vehicles SET vin = 'VIN123', purchase_price = 2000000 WHERE id = ?", [
       CAR,
     ]);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.financing.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.financing.read', 'deny');
     const res = await m.coOwner.request('PUT', car, { nickname: 'Ours' });
     expect(res.status).toBe(200);
     const body = (await json<DataEnvelope<Record<string, unknown>>>(res)).data;
@@ -89,15 +89,15 @@ describe('vehicles resolve through can() for every role', () => {
     expect(await status(m.coOwner.request, 'PUT', car, { purchasePrice: 1 })).toBe(403);
     expect(await status(m.coOwner.request, 'PUT', car, { vin: '1HGCM82633A004352' })).toBe(403);
 
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.write', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.write', 'allow');
     const edited = await m.viewer.request('PUT', car, {});
     expect(edited.status).toBe(200);
     expect((await json<DataEnvelope<Record<string, unknown>>>(edited)).data.vin).toBeNull();
   });
 
   test('allow overrides on both financial reads show the loan in the shared list', async () => {
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.insurance.read', 'allow');
     expect((await sharedList(m.viewer.request)).find((v) => v.id === CAR)?.financing).toBeTruthy();
   });
 
