@@ -9,7 +9,7 @@ import { ValidationError } from '../../errors';
 import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
 import { logger } from '../../utils/logger';
 import { formatNumberForMessage } from '../../utils/money';
-import { zonedParts, zoneOffsetMs } from '../../utils/time-zone';
+import { zonedDayWindow, zonedParts, zoneOffsetMs } from '../../utils/time-zone';
 import { DISTANCE_UNIT_SHORT_LABELS } from '../../utils/unit-conversions';
 import { expenseSplitService } from '../expenses/split-service';
 import { notifyUser, type PushPayload } from '../push/push-service';
@@ -333,8 +333,15 @@ export function nextDueAfterService(
   return alreadyAdvanced ? due : advanceReminderDueDate(reminder, due, timeZone);
 }
 
-export function isTimeDue(nextDue: Date, now: Date): boolean {
-  return nextDue <= now;
+function endOfDayIn(now: Date, timeZone: string | undefined): Date {
+  const nextDay = timeZone
+    ? zonedDayWindow(now, timeZone).nextDay
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return new Date(nextDay.getTime() - 1);
+}
+
+export function isTimeDue(nextDue: Date, now: Date, timeZone?: string): boolean {
+  return nextDue <= endOfDayIn(now, timeZone);
 }
 
 function hasReminderEndedBy(reminder: Reminder, nextDue: Date): boolean {
@@ -418,7 +425,7 @@ async function fastForwardPastNow(
 ): Promise<void> {
   const previousDue = currentDue;
   let nextDue = currentDue;
-  while (isTimeDue(nextDue, now)) {
+  while (isTimeDue(nextDue, now, timeZone)) {
     if (hasReminderEndedBy(reminder, nextDue)) {
       await repos().reminders.deactivate(reminder.id, reminder.userId);
       return;
@@ -475,7 +482,7 @@ class ReminderTriggerService {
     const now = new Date();
     const result: TriggerResult = { createdExpenses: [], notifications: [], skipped: [] };
 
-    const overdueReminders = await repos().reminders.findOverdue(userId, now);
+    const overdueReminders = await repos().reminders.findOverdue(userId, endOfDayIn(now, timeZone));
     for (const { reminder, vehicleIds } of overdueReminders) {
       try {
         await this.processReminder(reminder, vehicleIds, now, result, timeZone);
@@ -595,7 +602,7 @@ class ReminderTriggerService {
     let nextDue: Date = reminder.nextDueDate;
     let catchUpCount = 0;
 
-    while (isTimeDue(nextDue, now) && catchUpCount < maxCatchUp) {
+    while (isTimeDue(nextDue, now, timeZone) && catchUpCount < maxCatchUp) {
       if (hasReminderEndedBy(reminder, nextDue)) {
         break;
       }
@@ -615,7 +622,7 @@ class ReminderTriggerService {
       return;
     }
 
-    if (catchUpCount >= maxCatchUp && isTimeDue(nextDue, now)) {
+    if (catchUpCount >= maxCatchUp && isTimeDue(nextDue, now, timeZone)) {
       await fastForwardPastNow(reminder, nextDue, now, timeZone);
       result.skipped.push({ reminderId: reminder.id, reason: 'catch_up_limit_reached' });
     }
