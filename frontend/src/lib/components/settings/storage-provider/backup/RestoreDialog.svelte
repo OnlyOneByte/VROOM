@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { formatBytes, formatDateWith } from '#lib/utils/formatters.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -22,13 +23,31 @@
 		CollapsibleTrigger
 	} from '#lib/components/ui/collapsible/index.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
+	import { vehicleApi } from '#lib/services/vehicle-api.ts';
+	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
 	import ProviderPicker from './RestoreProviderPicker.svelte';
-	import type { RestoreResult, RestoreProviderInfo, BackupFileInfo } from '#lib/types/index.ts';
+	import type {
+		RestoreResult,
+		RestoreProviderInfo,
+		BackupFileInfo,
+		RestoreDroppedReason
+	} from '#lib/types/index.ts';
 
 	type FlowType = 'file' | 'provider';
 
 	type ProviderSubStep = 'pick-provider' | 'pick-file' | 'loading-sheets';
+
+	type DroppedGrant = NonNullable<RestoreResult['grants']>['dropped'][number];
+
+	const DROPPED_REASONS: Record<RestoreDroppedReason, string> = {
+		vehicle_not_restored: "the car isn't in this backup",
+		no_accepted_share: 'the person no longer has this car shared with them',
+		member_not_active: "the member isn't active on this car",
+		granted_by_non_member: 'whoever set it no longer has this car shared with them',
+		role_not_assignable: "that role isn't available any more",
+		permission_not_grantable: "that permission can't be given on a car"
+	};
 
 	interface Props {
 		open: boolean;
@@ -68,8 +87,15 @@
 	let restoreMode = $state<'replace' | 'merge'>('merge');
 	let isProcessing = $state(false);
 	let error = $state<string | null>(null);
+	let droppedGrants = $state<DroppedGrant[]>([]);
+	let carNames = $state<Record<string, string>>({});
+	let carNamesRequest = 0;
+	let doneButton = $state<HTMLButtonElement | null>(null);
 
 	function resetState() {
+		droppedGrants = [];
+		carNames = {};
+		carNamesRequest++;
 		step = 1;
 		flowType = null;
 		providerSubStep = 'pick-provider';
@@ -232,7 +258,16 @@
 				throw new Error('Invalid restore configuration');
 			}
 			onRestore(result);
-			open = false;
+			const dropped = result.grants?.dropped ?? [];
+			if (dropped.length === 0) {
+				close();
+				return;
+			}
+			droppedGrants = dropped;
+			step = 4;
+			void loadCarNames();
+			await tick();
+			doneButton?.focus();
 		} catch (err) {
 			error = `Couldn't restore. ${userFacingErrorMessage(err)}`;
 			mergeInstead = restoreMode === 'replace' && err instanceof ApiError && err.statusCode === 409;
@@ -241,6 +276,40 @@
 			isProcessing = false;
 		}
 	}
+
+	function close() {
+		open = false;
+		resetState();
+		onClose();
+	}
+
+	async function loadCarNames() {
+		const request = ++carNamesRequest;
+		let names: Record<string, string>;
+		try {
+			const cars = await vehicleApi.getVehicles();
+			names = Object.fromEntries(cars.map(car => [car.id, getVehicleDisplayName(car)]));
+		} catch {
+			names = {};
+		}
+		if (request === carNamesRequest) carNames = names;
+	}
+
+	let droppedCars = $derived.by(() => {
+		const cars: Record<string, { car: string; reasons: Record<string, number> }> = {};
+		for (const grant of droppedGrants) {
+			const entry = (cars[grant.vehicleId] ??= {
+				car:
+					grant.reason === 'vehicle_not_restored'
+						? 'A car not in this backup'
+						: (carNames[grant.vehicleId] ?? 'One of your cars'),
+				reasons: {}
+			});
+			const reason = DROPPED_REASONS[grant.reason] ?? 'it no longer applies';
+			entry.reasons[reason] = (entry.reasons[reason] ?? 0) + 1;
+		}
+		return Object.entries(cars);
+	});
 
 	function mergeInsteadOfReplace() {
 		restoreMode = 'merge';
@@ -296,6 +365,7 @@
 			if (providerSubStep === 'pick-file') return 'Select Backup';
 			return 'Loading...';
 		}
+		if (step === 4) return 'Restore finished';
 		return 'Preview Import';
 	});
 
@@ -307,6 +377,7 @@
 			if (providerSubStep === 'pick-file') return 'Choose a backup to restore';
 			return 'Loading data from provider...';
 		}
+		if (step === 4) return 'Your data is back. A few sharing settings were not brought back.';
 		return 'Review and confirm the restore';
 	});
 
@@ -573,16 +644,43 @@
 					</RadioGroup.Root>
 				</div>
 			{/if}
+
+			{#if step === 4}
+				<div class="space-y-3" data-testid="restore-dropped-grants">
+					<p class="text-sm text-foreground">
+						Access someone had on a car comes back only while it still fits that car. These didn't:
+					</p>
+					<ul class="space-y-2">
+						{#each droppedCars as [vehicleId, entry] (vehicleId)}
+							<li class="rounded-(--r-md) border bg-surface p-3 text-sm">
+								<div class="font-medium text-foreground">{entry.car}</div>
+								{#each Object.entries(entry.reasons) as [reason, count] (reason)}
+									<div class="text-muted-foreground">
+										{count === 1 ? '1 sharing setting' : `${count} sharing settings`}: {reason}.
+									</div>
+								{/each}
+							</li>
+						{/each}
+					</ul>
+					<p class="text-sm text-muted-foreground">
+						To give someone access again, use the sharing settings on that car.
+					</p>
+				</div>
+			{/if}
 		</div>
 
 		<Dialog.Footer class="flex gap-2">
-			{#if step > 1}
+			{#if step > 1 && step < 4}
 				<Button variant="ghost" onclick={handleBack} disabled={isProcessing}>
 					<ArrowLeft aria-hidden="true" />Back
 				</Button>
 			{/if}
 			<div class="flex-1"></div>
-			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
+			{#if step === 4}
+				<Button bind:ref={doneButton} onclick={close}>Done</Button>
+			{:else}
+				<Button variant="outline" onclick={close}>Cancel</Button>
+			{/if}
 			{#if step === 3 && restorePreview}
 				<Button disabled={isProcessing} onclick={handleRestore}>
 					{#if isProcessing}

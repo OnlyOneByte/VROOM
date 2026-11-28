@@ -169,9 +169,14 @@ export async function createTermExpenses(params: TermExpenseParams, scale?: numb
   }
 }
 
-export async function deleteTermExpenses(termId: string, userId: string): Promise<number> {
+export async function deleteTermExpenses(
+  termId: string,
+  userId: string,
+  first?: () => Promise<unknown>
+): Promise<number> {
   let photoObjects: Awaited<ReturnType<typeof storedPhotoObjects>> = [];
   const removed = await appContext().asyncDb.transaction(async () => {
+    await first?.();
     const linked = await repos().expenses.findBySource('insurance_term', termId, userId);
     photoObjects = await storedPhotoObjects(
       'expense',

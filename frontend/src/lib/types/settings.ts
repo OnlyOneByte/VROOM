@@ -97,10 +97,18 @@ export interface RestoreResult {
 			kind: 'role' | 'override';
 			vehicleId: string;
 			userId: string;
-			reason: string;
+			reason: RestoreDroppedReason;
 		}>;
 	};
 }
+
+export type RestoreDroppedReason =
+	| 'vehicle_not_restored'
+	| 'no_accepted_share'
+	| 'member_not_active'
+	| 'granted_by_non_member'
+	| 'role_not_assignable'
+	| 'permission_not_grantable';
 
 export interface UserSettings {
 	id: string;
