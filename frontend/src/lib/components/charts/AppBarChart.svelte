@@ -262,10 +262,10 @@
 					onTooltipClick={onSelect ? (_event, detail) => onSelect(detail.data, null) : undefined}
 					{data}
 					{x}
-					{y}
+					y={stacked && Array.isArray(y) ? undefined : y}
 					series={plottedSeries}
 					{orientation}
-					{seriesLayout}
+					seriesLayout={seriesLayout ?? (series.length > 1 ? 'group' : undefined)}
 					{yDomain}
 					padding={resolvedPadding}
 					props={{
