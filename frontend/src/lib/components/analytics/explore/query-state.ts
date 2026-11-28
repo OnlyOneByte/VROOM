@@ -222,6 +222,18 @@ export function chartForm(query: ExploreQuery): ChartForm {
 	return query.split === 'none' ? 'bars' : 'stacked';
 }
 
+export function isAdditive(query: ExploreQuery): boolean {
+	const { metric } = metricInfo(query.metric);
+	return metric === 'cost' || metric === 'count' || metric === 'volume' || metric === 'distance';
+}
+
+export function chartKind(query: ExploreQuery): 'bar' | 'line' {
+	const form = chartForm(query);
+	if (form === 'compare' || form === 'line') return 'line';
+	if (form === 'panels') return isAdditive(query) ? 'bar' : 'line';
+	return 'bar';
+}
+
 export function describeQuery(query: ExploreQuery, distance = 'mile'): string {
 	const metric = metricLabel(query.metric, distance);
 	const per = EXPLORE_INTERVALS.find(i => i.value === query.per)?.label.toLowerCase();

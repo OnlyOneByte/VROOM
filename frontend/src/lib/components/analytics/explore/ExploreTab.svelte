@@ -24,6 +24,7 @@
 		EXPLORE_COMPARES,
 		EXPLORE_INTERVALS,
 		chartForm,
+		chartKind,
 		exploreRequest,
 		queryCache,
 		takePrefetched,
@@ -38,7 +39,6 @@
 		bucketTotals,
 		emptyBuckets,
 		carPanels,
-		chartKind,
 		exploreAnnotations,
 		hasData,
 		heroSentence,
@@ -141,15 +141,21 @@
 
 	let barChart = $state<(typeof import('./explore-bar-chart.ts'))['AppBarChart']>();
 	let lineChart = $state<(typeof import('./explore-line-chart.ts'))['AppLineChart']>();
-	let chartsError = $state<string | null>(null);
+	let chartsError = $state<{ kind: 'bar' | 'line'; message: string } | null>(null);
 
-	function loadChart(kind: 'bar' | 'line') {
-		chartsError = null;
-		const loading =
-			kind === 'bar'
-				? import('./explore-bar-chart.ts').then(module => (barChart = module.AppBarChart))
-				: import('./explore-line-chart.ts').then(module => (lineChart = module.AppLineChart));
-		loading.catch(e => (chartsError = userFacingErrorMessage(e)));
+	function importChart(kind: 'bar' | 'line'): Promise<unknown> {
+		return kind === 'bar'
+			? import('./explore-bar-chart.ts').then(module => (barChart = module.AppBarChart))
+			: import('./explore-line-chart.ts').then(module => (lineChart = module.AppLineChart));
+	}
+
+	async function loadChart(kind: 'bar' | 'line'): Promise<void> {
+		try {
+			await importChart(kind);
+			if (chartsError?.kind === kind) chartsError = null;
+		} catch (e) {
+			chartsError = { kind, message: userFacingErrorMessage(e) };
+		}
 	}
 
 	let chartReady = $state(false);
@@ -184,15 +190,17 @@
 	let kind = $derived(chartKind(shown));
 	let chartLoaded = $derived(kind === 'line' ? !!lineChart : !!barChart);
 
+	let chartError = $derived(chartsError?.kind === kind ? chartsError.message : null);
+
 	$effect(() => {
-		if (!chartLoaded) untrack(() => loadChart(kind));
+		if (!chartLoaded && !chartError) untrack(() => loadChart(kind));
 	});
 
 	$effect(() => {
 		if (!chartLoaded) return;
 		const timer = setTimeout(() => {
-			import('./explore-bar-chart.ts').catch(() => {});
-			import('./explore-line-chart.ts').catch(() => {});
+			importChart('bar').catch(() => {});
+			importChart('line').catch(() => {});
 		}, 2000);
 		return () => clearTimeout(timer);
 	});
@@ -619,10 +627,10 @@
 			message={error}
 			onRetry={() => load(request, requestKey, query)}
 		/>
-	{:else if chartsError && response && hasData(response)}
+	{:else if chartError && response && hasData(response)}
 		<LoadErrorCard
 			title="Couldn't load this chart"
-			message={chartsError}
+			message={chartError}
 			onRetry={() => loadChart(kind)}
 		/>
 	{:else if !response || (hasData(response) && (!chartReady || !chartLoaded))}

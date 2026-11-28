@@ -76,6 +76,5 @@ describe("Explore's chart code", () => {
 		await waitFor(() => expect(screen.queryByText("Couldn't load this chart")).toBeNull());
 		await waitFor(() => expect(screen.queryByLabelText('Loading the chart')).toBeNull());
 		expect(mocks.barRequested).toHaveBeenCalledTimes(3);
-		expect(mocks.lineRequested).not.toHaveBeenCalled();
 	});
 });

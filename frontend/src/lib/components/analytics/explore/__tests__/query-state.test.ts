@@ -8,6 +8,7 @@ import {
 	apiQuery,
 	applyPreset,
 	chartForm,
+	chartKind,
 	describeQuery,
 	metricLabel,
 	normalizeExplore,
@@ -20,7 +21,6 @@ import {
 	bucketDate,
 	bucketLabel,
 	carPanels,
-	chartKind,
 	emptyBuckets,
 	exploreAnnotations,
 	expensesNote,
@@ -591,10 +591,13 @@ describe('chartKind', () => {
 	test.each([
 		[{}, 'bar'],
 		[{ per: 'none' }, 'bar'],
+		[{ per: 'none', metric: 'mpg' }, 'bar'],
 		[{ split: 'tag' }, 'bar'],
 		[{ split: 'none' }, 'bar'],
 		[{ split: 'vehicle' }, 'bar'],
-		[{ split: 'vehicle', metric: 'mpg' }, 'line'],
+		[{ compare: 'cars' }, 'bar'],
+		[{ compare: 'cars', metric: 'mpg' }, 'line'],
+		[{ compare: 'cars', metric: 'costPerDistance' }, 'line'],
 		[{ metric: 'mpg' }, 'line'],
 		[{ compare: 'prevYear' }, 'line']
 	] as const)('%o draws a %s chart', (change, kind) => {
