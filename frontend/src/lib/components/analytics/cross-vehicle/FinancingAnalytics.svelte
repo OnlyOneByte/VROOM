@@ -1,189 +1,82 @@
 <script lang="ts">
-	import { CreditCard } from '@lucide/svelte';
-	import * as Card from '#lib/components/ui/card/index.ts';
-	import type * as Chart from '#lib/components/ui/chart/index.ts';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { AppBarChart, AppPieChart } from '#lib/components/charts/index.ts';
-	import StatCardGrid from '#lib/components/charts/StatCardGrid.svelte';
+	import { resolve } from '$app/paths';
+	import { paramRoutes } from '#lib/routes.ts';
 	import type { FinancingResponse } from '#lib/types/index.ts';
-	import { capitalize, formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
-	import { parseMonthToDate } from '#lib/utils/chart-formatters.ts';
+	import { formatCurrency, formatNumber } from '#lib/utils/formatters.ts';
 
 	let { financing }: { financing: FinancingResponse } = $props();
 
-	let loanBreakdownData = $derived(
-		(financing.loanBreakdown ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
-	);
-	let hasLoanBreakdown = $derived(loanBreakdownData.length > 0);
+	let financed = $derived(financing.vehicleDetails.filter(v => v.financingType !== 'own'));
+	let owned = $derived(financing.vehicleDetails.length - financed.length);
+	let whole = (v: number) => formatCurrency(v, undefined, 0);
 
-	const loanChartConfig: Chart.ChartConfig = {
-		principal: { label: 'Principal', color: 'var(--chart-2)' },
-		interest: { label: 'Interest', color: 'var(--chart-3)' }
-	};
-
-	const loanSeries = [
-		{ key: 'principal', label: 'Principal', color: 'var(--chart-2)' },
-		{ key: 'interest', label: 'Interest', color: 'var(--chart-3)' }
-	];
-
-	let typeDistData = $derived(
-		(financing.typeDistribution ?? []).map(d => ({
-			key: d.type,
-			label: capitalize(d.type),
-			value: d.count,
-			color:
-				d.type === 'loan'
-					? 'var(--chart-1)'
-					: d.type === 'lease'
-						? 'var(--chart-3)'
-						: 'var(--chart-2)'
-		}))
-	);
-
-	function vehicleCountTooltip(count: number): string {
-		return `${count} vehicle${count !== 1 ? 's' : ''}`;
-	}
-
-	function vehicleCountLabel(type: string): string {
-		return vehicleCountTooltip(financing.typeDistribution?.find(d => d.type === type)?.count ?? 0);
-	}
-
-	function getFinancingBadgeVariant(
-		type: string
-	): 'default' | 'secondary' | 'outline' | 'destructive' {
-		if (type === 'loan') return 'default';
-		if (type === 'lease') return 'secondary';
-		return 'outline';
-	}
-
-	let financingSummaryItems = $derived.by(() => {
-		const s = financing.summary;
-		return [
-			{
-				label: 'Total Monthly Payments',
-				value: formatCurrency(s.totalMonthlyPayments),
-				subtitle: '/month'
-			},
-			{
-				label: 'Remaining Balance',
-				value: formatCurrency(s.remainingBalance),
-				subtitle: 'across all vehicles'
-			},
-			{
-				label: 'Est. Monthly Interest',
-				value: formatCurrency(s.monthlyInterestEstimate),
-				subtitle: 'on current loan balances'
-			},
-			{
-				label: 'Active Financing',
-				value: String(s.activeCount),
-				subtitle: `${s.loanCount} loan${s.loanCount !== 1 ? 's' : ''}, ${s.leaseCount} lease${s.leaseCount !== 1 ? 's' : ''}`
-			}
-		];
+	let kind = $derived.by(() => {
+		const { loanCount, leaseCount } = financing.summary;
+		if (leaseCount === 0) return loanCount === 1 ? 'one loan' : `${loanCount} loans`;
+		if (loanCount === 0) return leaseCount === 1 ? 'one lease' : `${leaseCount} leases`;
+		return `${loanCount + leaseCount} loans and leases`;
 	});
+
+	let ownedText = $derived(
+		owned === 0
+			? ''
+			: financed.length === 0
+				? owned === 1
+					? 'Your car is owned outright.'
+					: `All ${owned} cars are owned outright.`
+				: `The other ${owned === 1 ? 'car is' : `${owned} cars are`} owned outright.`
+	);
+
+	function meta(v: FinancingResponse['vehicleDetails'][number]): string {
+		const left = `${v.monthsRemaining} ${v.monthsRemaining === 1 ? 'payment' : 'payments'} to go`;
+		return [
+			v.financingType === 'lease' ? 'Lease' : 'Loan',
+			v.financingType === 'loan' && v.apr != null ? `${formatNumber(v.apr, 1)}% APR` : null,
+			left
+		]
+			.filter(Boolean)
+			.join(' · ');
+	}
 </script>
 
-<div class="flex items-center gap-2">
-	<CreditCard class="h-5 w-5 text-muted-foreground" />
-	<h2 class="text-xl font-bold">Financing Overview</h2>
-</div>
-
-<StatCardGrid items={financingSummaryItems} columns={4} />
-
 {#if financing.vehicleDetails.length > 0}
-	<Card.Root class="p-4 sm:p-6">
-		<div class="space-y-4">
-			<h3 class="font-semibold text-sm sm:text-base">Vehicle Financing Details</h3>
-			<div class="space-y-3">
-				{#each financing.vehicleDetails as vehicle (vehicle.vehicleId)}
-					<div class="p-3 sm:p-4 rounded-lg border border-border">
-						<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-							<div class="space-y-2">
-								<div class="flex items-center gap-2">
-									<h4 class="font-semibold text-sm sm:text-base">
-										{vehicle.vehicleName}
-									</h4>
-									<Badge variant={getFinancingBadgeVariant(vehicle.financingType)}>
-										{vehicle.financingType === 'own' ? 'Owned' : capitalize(vehicle.financingType)}
-									</Badge>
-								</div>
-
-								{#if vehicle.financingType !== 'own'}
-									<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs sm:text-sm">
-										<div>
-											<p class="text-muted-foreground">Monthly</p>
-											<p class="font-semibold">
-												{formatCurrency(vehicle.monthlyPayment)}
-											</p>
-										</div>
-										<div>
-											<p class="text-muted-foreground">Remaining</p>
-											<p class="font-semibold">
-												{formatCurrency(vehicle.remainingBalance)}
-											</p>
-										</div>
-										{#if vehicle.financingType === 'loan'}
-											<div>
-												<p class="text-muted-foreground">APR</p>
-												<p class="font-semibold">
-													{vehicle.apr != null ? `${formatNumber(vehicle.apr, 1)}%` : '—'}
-												</p>
-											</div>
-											<div>
-												<p class="text-muted-foreground">Est. Monthly Interest</p>
-												<p class="font-semibold text-destructive">
-													{formatCurrency(vehicle.monthlyInterestEstimate)}
-												</p>
-											</div>
-										{/if}
-									</div>
-								{:else}
-									<p class="text-xs sm:text-sm text-muted-foreground">
-										Owned outright - No financing
-									</p>
-								{/if}
-							</div>
-
-							{#if vehicle.financingType !== 'own'}
-								<div class="text-left sm:text-right">
-									<p class="text-xs text-muted-foreground">Months Remaining</p>
-									<p class="text-xl sm:text-2xl font-bold">
-										{vehicle.monthsRemaining}
-									</p>
-								</div>
+	<section aria-labelledby="cross-loans-title" class="space-y-3">
+		<h2 class="text-base font-semibold" id="cross-loans-title">Loans</h2>
+		<p class="max-w-xl text-muted-foreground">
+			{#if financed.length > 0}
+				You pay <strong class="text-foreground">
+					{formatCurrency(financing.summary.totalMonthlyPayments)} a month
+				</strong>
+				on {kind}, with <strong class="text-foreground">
+					{whole(financing.summary.remainingBalance)}
+				</strong> left.
+			{/if}
+			{ownedText}
+		</p>
+		{#if financed.length > 0}
+			<ul class="divide-y divide-border" aria-labelledby="cross-loans-title">
+				{#each financed as v (v.vehicleId)}
+					<li class="flex items-center justify-between gap-4 py-3">
+						<div class="min-w-0">
+							<a
+								href={resolve(paramRoutes.vehicle, { id: v.vehicleId })}
+								class="block rounded-sm font-semibold break-words text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+							>
+								{v.vehicleName}
+							</a>
+							<p class="text-sm text-muted-foreground">{meta(v)}</p>
+						</div>
+						<div class="shrink-0 text-right">
+							<p class="font-semibold tabular-nums">{formatCurrency(v.monthlyPayment)}/mo</p>
+							{#if v.remainingBalance > 0}
+								<p class="text-xs font-semibold text-muted-foreground tabular-nums">
+									{whole(v.remainingBalance)} left
+								</p>
 							{/if}
 						</div>
-					</div>
+					</li>
 				{/each}
-			</div>
-		</div>
-	</Card.Root>
+			</ul>
+		{/if}
+	</section>
 {/if}
-
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-	{#if hasLoanBreakdown}
-		<AppBarChart
-			level={3}
-			title="Loan Payment Breakdown"
-			description="Interest vs Principal over time"
-			data={loanBreakdownData}
-			x="date"
-			y={['principal', 'interest']}
-			seriesLayout="stack"
-			series={loanSeries}
-			config={loanChartConfig}
-		/>
-	{/if}
-
-	{#if typeDistData.length > 0}
-		<AppPieChart
-			level={3}
-			title="Financing Type Distribution"
-			description="Vehicles by financing type"
-			data={typeDistData}
-			legendLabel="Financing types"
-			formatLegendValue={item => vehicleCountLabel(item.key)}
-			tooltipFormat={vehicleCountTooltip}
-		/>
-	{/if}
-</div>
