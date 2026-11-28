@@ -1123,6 +1123,37 @@ describe('vehicle detail page Next up and Recent expenses', () => {
 		expect(screen.queryByRole('link', { name: /^Log it: Car loan/ })).toBeNull();
 	});
 
+	test('mileage reminders show in Next up once reached, and as soon when the car is close, in its unit', async () => {
+		const mileage = (id: string, nextDueOdometer: number, mileageDue: boolean) => ({
+			reminder: {
+				id,
+				name: id,
+				type: 'notification',
+				isActive: true,
+				triggerMode: 'mileage',
+				nextDueDate: null,
+				nextDueOdometer
+			},
+			vehicleIds: ['v1'],
+			mileageDue,
+			currentOdometer: 40360
+		});
+		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
+		listReminders.mockResolvedValue([
+			mileage('Tyre rotation', 40000, true),
+			mileage('Brake check', 41000, false),
+			mileage('Oil change', 43000, false)
+		]);
+		await mount();
+
+		const card = (await screen.findByRole('heading', { name: 'Next up' })).closest(
+			'[data-slot="card"]'
+		) as HTMLElement;
+		expect(card.textContent).toContain('Reached 40,000 on the odometer');
+		expect(card.textContent).toContain('Due in 640 km');
+		expect(card.textContent).not.toContain('Oil change');
+	});
+
 	test('a viewer sees Next up without Log it', async () => {
 		getVehicle.mockResolvedValue(VIEWER_VEHICLE);
 		getExpenseSummary.mockResolvedValue(DATA_SUMMARY);
