@@ -71,7 +71,7 @@ describe('Button aria-disabled focus ring', () => {
 
 		for (const mode of ['', 'dark:']) {
 			const fill = classes.findLast(cls => new RegExp(`^${mode}bg-[a-z-]+(/\\d+)?$`).test(cls));
-			if (!fill) continue;
+			if (!fill || fill.endsWith('bg-transparent')) continue;
 			const [, color, alpha = '100'] = fill.match(/bg-([a-z-]+)(?:\/(\d+))?$/)!;
 			expect(classes).toContain(`${mode}aria-disabled:bg-${color}/${Number(alpha) / 2}`);
 		}
@@ -115,6 +115,13 @@ describe('Button aria-disabled focus ring', () => {
 				.filter(cls => /^text-(?!\[|sm|xs|base|lg)/.test(cls))
 		).toEqual([]);
 		expect(buttonVariants({ variant: 'link' }).split(/\s+/)).toContain('text-accent-ink');
+	});
+
+	test('outline has no fill of its own, so it reads the same on the page, a card or a dialog', () => {
+		const classes = buttonVariants({ variant: 'outline' }).split(/\s+/);
+
+		expect(classes).toContain('bg-transparent');
+		expect(classes.filter(cls => /^(aria-disabled:)?bg-(?!transparent)/.test(cls))).toEqual([]);
 	});
 
 	test('the enabled focus ring stays the half-strength ring token', () => {
