@@ -209,17 +209,19 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
     expect(await dryRun.json()).toMatchObject({ data: { readyCount: 1, errorCount: 0 } });
   });
 
-  test('a day column gives the calendar day in the requested time zone next to the UTC instant', async () => {
+  test('a last day column gives the calendar day in the requested time zone, leaving earlier columns in place', async () => {
     const vehicleId = await seedCivic('Kiwi');
     await createExpense(vehicleId, 'misc', 12, 'Noon in Auckland', '2024-06-15T23:00:00.000Z');
 
     const zoned = await ctx.authed('GET', '/api/v1/expenses/export?timeZone=Pacific/Auckland');
-    const zonedCsv = await zoned.text();
-    expect(zonedCsv.split('\n')[0]).toStartWith('"date","day","vehicle"');
-    expect(zonedCsv).toContain('"2024-06-15T23:00:00.000Z","2024-06-16"');
+    const [header, row] = (await zoned.text()).trim().split('\n');
+    expect(header).toStartWith('"date","vehicle","category","amount"');
+    expect(header).toEndWith('"createdAt","day"');
+    expect(row).toStartWith('"2024-06-15T23:00:00.000Z","Kiwi"');
+    expect(row).toEndWith(',"2024-06-16"');
 
     const utc = await (await ctx.authed('GET', '/api/v1/expenses/export')).text();
-    expect(utc).toContain('"2024-06-15T23:00:00.000Z","2024-06-15"');
+    expect(utc.trim()).toEndWith(',"2024-06-15"');
   });
 
   test('does not quote a numeric amount end-to-end', async () => {

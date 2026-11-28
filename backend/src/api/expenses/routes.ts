@@ -647,7 +647,6 @@ function exportFuelCells(e: {
 
 export const EXPORT_COLUMNS = [
   'date',
-  'day',
   'vehicle',
   'category',
   'amount',
@@ -661,6 +660,7 @@ export const EXPORT_COLUMNS = [
   'tags',
   'missedFillup',
   'createdAt',
+  'day',
 ] as const;
 
 routes.get(
