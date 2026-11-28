@@ -81,7 +81,7 @@ describe('FinancingCharts', () => {
 		});
 		const schedule = calculateAmortizationSchedule(financing, 2);
 		mount(financing, schedule);
-		expect(screen.getByText('Amortization Schedule')).toBeTruthy();
+		expect(screen.getByText('Payment schedule')).toBeTruthy();
 		expect(screen.getByText(/with 5 payments/)).toBeTruthy();
 		expect(captured.props?.x).toBe('paymentNumber');
 		expect(captured.props?.seriesLayout).toBe('stack');
@@ -119,7 +119,7 @@ describe('FinancingCharts', () => {
 	test('keeps the card but defers the chart until it scrolls into view', () => {
 		gate.visible = false;
 		mount(makeLoan(), longSchedule(12));
-		expect(screen.getByText('Amortization Schedule')).toBeTruthy();
+		expect(screen.getByText('Payment schedule')).toBeTruthy();
 		expect(captured.props).toBeNull();
 	});
 
@@ -130,7 +130,7 @@ describe('FinancingCharts', () => {
 		['no schedule', makeLoan(), undefined]
 	])('renders nothing for %s', (_label, financing, schedule) => {
 		mount(financing, schedule);
-		expect(screen.queryByText('Amortization Schedule')).toBeNull();
+		expect(screen.queryByText('Payment schedule')).toBeNull();
 		expect(captured.props).toBeNull();
 	});
 });

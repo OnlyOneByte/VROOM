@@ -19,7 +19,7 @@
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
 		MOBILE_ROW_SUMMARY_CLASS
 	} from './compact-row-classes';
-	import { rowTitle, tagsBesideCategory, type GroupRow } from './expense-table-rows';
+	import { rowDate, rowTitle, tagsBesideCategory, type GroupRow } from './expense-table-rows';
 	import PendingSyncNote from './PendingSyncNote.svelte';
 	import type { PendingRowState } from '#lib/utils/sync/pending-rows.ts';
 
@@ -34,6 +34,7 @@
 		isSelected: boolean;
 		onSelect: (_groupId: string) => void;
 		onDelete: (_row: GroupRow) => void;
+		underMonth?: boolean;
 	}
 
 	let {
@@ -46,7 +47,8 @@
 		isSelected,
 		onSelect,
 		onDelete,
-		pending
+		pending,
+		underMonth = false
 	}: Props = $props();
 	let shownTags = $derived(tagsBesideCategory(row.tags, row.category));
 
@@ -54,9 +56,9 @@
 	let heading = $derived(rowTitle(row.description, row.category));
 	let meta = $derived(
 		[
-			heading.categoryInMeta ? EXPENSE_CATEGORY_INFO[row.category].shortLabel : null,
+			heading.categoryInMeta ? EXPENSE_CATEGORY_INFO[row.category].label : null,
 			showVehicleColumn && row.vehicleNames.length > 0 ? row.vehicleNames.join(', ') : null,
-			formatDate(new Date(row.date))
+			rowDate(row.date, underMonth)
 		].filter(part => part !== null)
 	);
 	let insuranceLinked = $derived(isInsuranceLinked(row.tags));
@@ -78,8 +80,10 @@
 				</p>
 				<SplitExpenseBadge />
 			</div>
-			<p class="mt-0.5 text-sm text-muted-foreground">
-				{meta.join(' · ')}
+			<p class="mt-0.5 flex flex-wrap gap-x-1 text-sm text-muted-foreground">
+				{#each meta as part, i (i)}
+					<span class="whitespace-nowrap">{i > 0 ? `· ${part}` : part}</span>
+				{/each}
 			</p>
 			{#if shownTags.length > 0}
 				<div class="flex flex-wrap gap-1 mt-1.5">

@@ -55,9 +55,8 @@
 		ledger = false
 	}: Props = $props();
 
-	let sections = $derived(
-		sortBy === 'date' && monthTotals ? monthSections(rows) : [{ month: '', rows }]
-	);
+	let byMonth = $derived(sortBy === 'date' && !!monthTotals);
+	let sections = $derived(byMonth ? monthSections(rows) : [{ month: '', rows }]);
 </script>
 
 {#snippet row(row: DisplayRow)}
@@ -73,6 +72,7 @@
 			{onSelect}
 			onDelete={onDeleteExpense}
 			pending={pendingStates?.get(row.expense.id)}
+			underMonth={byMonth}
 		/>
 	{:else}
 		<CompactGroupRow
@@ -86,6 +86,7 @@
 			{onSelect}
 			onDelete={onDeleteGroup}
 			pending={pendingStates?.get(row.children[0]?.id ?? '')}
+			underMonth={byMonth}
 		/>
 	{/if}
 {/snippet}
