@@ -125,10 +125,11 @@ export function splitGroup(
     );
     return { owed, unassigned: 0 };
   }
-  const shares = allocate(input.total, weightsFor(rule, input));
+  const withPayer = input.total - (input.paidBy.get(null) ?? 0);
+  const shares = allocate(withPayer, weightsFor(rule, input));
   const allocated = [...shares.values()].reduce((a, b) => a + b, 0);
   const owed = new Map([...shares].filter(([id]) => id !== UNASSIGNED));
-  const unassigned = (shares.get(UNASSIGNED) ?? 0) + (input.total - allocated);
+  const unassigned = (shares.get(UNASSIGNED) ?? 0) + (withPayer - allocated);
   return { owed, unassigned };
 }
 
@@ -184,13 +185,6 @@ function spending(db: AsyncAppDatabase, vehicleId: string, options: BalanceOptio
     );
 }
 
-function tally(rows: { cents: number; payer: string | null }[]) {
-  const paidBy = new Map<string | null, number>();
-  for (const r of rows) paidBy.set(r.payer, (paidBy.get(r.payer) ?? 0) + r.cents);
-  const groupTotal = rows.reduce((sum, r) => sum + r.cents, 0);
-  return { paidBy, groupTotal, withPayer: groupTotal - (paidBy.get(null) ?? 0) };
-}
-
 export async function computeBalances(
   db: AsyncAppDatabase,
   vehicleId: string,
@@ -215,11 +209,12 @@ export async function computeBalances(
   let total = 0;
   for (const group of Object.keys(GROUP_CATEGORIES) as Group[]) {
     const categories: readonly string[] = GROUP_CATEGORIES[group];
-    const { paidBy, groupTotal, withPayer } = tally(
-      rows.filter((r) => categories.includes(r.category))
-    );
+    const inGroup = rows.filter((r) => categories.includes(r.category));
+    const paidBy = new Map<string | null, number>();
+    for (const r of inGroup) paidBy.set(r.payer, (paidBy.get(r.payer) ?? 0) + r.cents);
+    const groupTotal = inGroup.reduce((sum, r) => sum + r.cents, 0);
     const result = splitGroup(rules[group], {
-      total: withPayer,
+      total: groupTotal,
       paidBy,
       distance,
       unattributed: stats.distance?.unattributed ?? 0,

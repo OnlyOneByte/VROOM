@@ -99,6 +99,16 @@ describe('split rules and balances', () => {
     expect(data.total).toBe(240);
   });
 
+  test('when no cost has a payer yet, nobody owes anything and the whole amount is reported as unpaid', async () => {
+    await ctx.sql.run('DELETE FROM expenses WHERE vehicle_id = ?', [CAR]);
+    await expense('sp-old-fuel', 'fuel', 5000, null);
+    const data = await balances();
+
+    expect(data.unpaid).toBe(50);
+    expect(data.drivers.every((d) => d.balance === 0)).toBe(true);
+    expect(data.transfers).toEqual([]);
+  });
+
   test('fixed ownership shares move the premium, and someone who cannot see it does not', async () => {
     const rules = {
       running: { kind: 'distance' },
