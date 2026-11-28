@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
   seedVehicleFinancing,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
 import {
   expenseArb,
@@ -37,7 +37,9 @@ async function resetDb(): Promise<void> {
   repo = new AnalyticsRepository(testDb.asyncDb);
 }
 
-async function setupUserAndVehicles(vehicleCount: number): Promise<{ userId: string; vehicles: TestVehicle[] }> {
+async function setupUserAndVehicles(
+  vehicleCount: number
+): Promise<{ userId: string; vehicles: TestVehicle[] }> {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
   await seedUser(testDb.sql, user);
 

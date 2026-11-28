@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
 import {
   expenseArb,
@@ -35,7 +35,11 @@ async function resetDb(): Promise<void> {
   repo = new AnalyticsRepository(testDb.asyncDb);
 }
 
-async function seedUserAndVehicle(userId: string, email: string, name: string): Promise<TestVehicle> {
+async function seedUserAndVehicle(
+  userId: string,
+  email: string,
+  name: string
+): Promise<TestVehicle> {
   await seedUser(testDb.sql, { id: userId, email, displayName: name });
   const v: TestVehicle = {
     id: `vehicle-${userId}-0`,
@@ -66,7 +70,10 @@ async function seedSampledExpenses(
   return seeded;
 }
 
-async function seedVehiclesWithRandomExpenses(userId: string, vehicleCount: number): Promise<TestVehicle[]> {
+async function seedVehiclesWithRandomExpenses(
+  userId: string,
+  vehicleCount: number
+): Promise<TestVehicle[]> {
   const result: TestVehicle[] = [];
   for (let i = 0; i < vehicleCount; i++) {
     const v = fc.sample(vehicleArb(userId, i), 1)[0];
@@ -84,7 +91,10 @@ async function seedVehiclesWithRandomExpenses(userId: string, vehicleCount: numb
   return result;
 }
 
-async function seedVehiclesWithDistinctiveExpenses(userId: string, vehicleCount: number): Promise<TestVehicle[]> {
+async function seedVehiclesWithDistinctiveExpenses(
+  userId: string,
+  vehicleCount: number
+): Promise<TestVehicle[]> {
   const result: TestVehicle[] = [];
   for (let i = 0; i < vehicleCount; i++) {
     const v = fc.sample(vehicleArb(userId, i), 1)[0];
@@ -174,7 +184,12 @@ describe('Year scoping filters correctly', () => {
 
           const vehicle = await seedUserAndVehicle('user-1', 'test@test.com', 'Test');
 
-          const targetExpenses = await seedSampledExpenses(vehicle.id, targetCount, targetYear, 'target');
+          const targetExpenses = await seedSampledExpenses(
+            vehicle.id,
+            targetCount,
+            targetYear,
+            'target'
+          );
 
           const otherYear = targetYear === 2024 ? 2022 : targetYear + 1;
           await seedSampledExpenses(vehicle.id, otherCount, otherYear, 'other');
@@ -224,7 +239,10 @@ describe('User data isolation', () => {
           await seedUser(testDb.sql, { id: 'user-2', email: 'u2@test.com', displayName: 'User 2' });
 
           const user1Vehicles = await seedVehiclesWithRandomExpenses('user-1', user1VehicleCount);
-          const user2Vehicles = await seedVehiclesWithDistinctiveExpenses('user-2', user2VehicleCount);
+          const user2Vehicles = await seedVehiclesWithDistinctiveExpenses(
+            'user-2',
+            user2VehicleCount
+          );
 
           const stats1 = await repo.getQuickStats('user-1', yearToRange(2024));
           expect(stats1.vehicleCount).toBe(user1VehicleCount);

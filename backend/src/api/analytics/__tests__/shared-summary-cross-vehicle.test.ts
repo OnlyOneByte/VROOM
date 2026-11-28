@@ -28,7 +28,12 @@ interface Summary {
   quickStats: { vehicleCount: number; ytdSpending: number };
 }
 
-async function expense(vehicleId: string, category: string, cents: number, source: string | null = null) {
+async function expense(
+  vehicleId: string,
+  category: string,
+  cents: number,
+  source: string | null = null
+) {
   await ctx.sql.run(
     'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [`ssc-${vehicleId}-${category}-${cents}`, vehicleId, ctx.user.id, category, cents, JUNE, source]

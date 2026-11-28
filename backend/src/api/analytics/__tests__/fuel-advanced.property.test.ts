@@ -3,17 +3,13 @@ import fc from 'fast-check';
 import { EXPENSE_CATEGORIES } from '../../../db/types';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
-import {
-  type TestExpense,
-  type TestVehicle,
-  yearToRange,
-} from './analytics-test-generators';
+import { type TestExpense, type TestVehicle, yearToRange } from './analytics-test-generators';
 
 let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;

@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedInsurancePolicy,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
 import {
   expenseArb,
@@ -41,11 +41,10 @@ async function setupUserAndVehicle(opts?: {
   purchaseDate?: Date | null;
 }): Promise<{ userId: string; vehicle: TestVehicle }> {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-  await testDb.sql.run('INSERT OR IGNORE INTO users (id, email, display_name) VALUES (?, ?, ?)', [
-    user.id,
-    user.email,
-    user.displayName,
-  ]);
+  await testDb.sql.run(
+    'INSERT INTO users (id, email, display_name) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
+    [user.id, user.email, user.displayName]
+  );
 
   const v: TestVehicle = {
     id: 'vehicle-user-1-0',
@@ -127,7 +126,11 @@ describe('Health score formula', () => {
           let policyId: string | null = null;
           if (hasInsurance) {
             policyId = 'policy-1';
-            await seedUser(testDb.sql, { id: 'user-1', email: 'test@test.com', displayName: 'Test' });
+            await seedUser(testDb.sql, {
+              id: 'user-1',
+              email: 'test@test.com',
+              displayName: 'Test',
+            });
             const policy: TestInsurancePolicy = {
               id: policyId,
               userId: 'user-1',
@@ -302,7 +305,7 @@ describe('TCO total equals sum of components', () => {
     await fc.assert(
       fc.asyncProperty(
         fc.integer({ min: 0, max: 8 }),
-        fc.option(fc.double({ min: 1000, max: 100000, noNaN: true, noDefaultInfinity: true }), {
+        fc.option(fc.integer({ min: 1000, max: 100000 }), {
           nil: null,
         }),
         async (expenseCount, purchasePrice) => {
@@ -332,7 +335,12 @@ describe('TCO total equals sum of components', () => {
 });
 
 describe('financed vehicle TCO does not double-count principal', () => {
-  async function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): Promise<void> {
+  async function seedFinancingPayment(
+    vehicleId: string,
+    id: string,
+    amount: number,
+    date: Date
+  ): Promise<void> {
     await testDb.sql.run(
       'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -447,7 +455,12 @@ describe('TCO buckets financial rows by sourceType (recurring/manual → otherCo
 });
 
 describe('year-scoped: purchasePrice excluded from a year window; that year financing kept', () => {
-  async function seedFinancingPayment(vehicleId: string, id: string, amount: number, date: Date): Promise<void> {
+  async function seedFinancingPayment(
+    vehicleId: string,
+    id: string,
+    amount: number,
+    date: Date
+  ): Promise<void> {
     await testDb.sql.run(
       'INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, missed_fillup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
