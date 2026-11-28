@@ -14,11 +14,11 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function kinds(): string[] {
+async function kinds(): Promise<string[]> {
   return (
-    ctx.sqlite
-      .query('SELECT vehicle_kind FROM vehicles WHERE user_id = ? ORDER BY make')
-      .all(ctx.user.id) as { vehicle_kind: string }[]
+    (await ctx.sql.all('SELECT vehicle_kind FROM vehicles WHERE user_id = ? ORDER BY make', [
+      ctx.user.id,
+    ])) as { vehicle_kind: string }[]
   ).map((row) => row.vehicle_kind);
 }
 
@@ -46,19 +46,19 @@ describe('backup → restore round-trip of vehicles.vehicle_kind', () => {
     await createVehicle({ make: 'E Winnebago', model: 'Travato', vehicleKind: 'rv' });
     await createVehicle({ make: 'F Polaris', model: 'Ranger', vehicleKind: 'other' });
     const expected = ['car', 'motorcycle', 'van', 'truck', 'rv', 'other'];
-    expect(kinds()).toEqual(expected);
+    expect(await kinds()).toEqual(expected);
 
     await roundTrip();
 
-    expect(kinds()).toEqual(expected);
+    expect(await kinds()).toEqual(expected);
   });
 
   test('a kind the app does not know restores as car', async () => {
     const id = await createVehicle({ make: 'Honda', model: 'Civic' });
-    ctx.sqlite.query('UPDATE vehicles SET vehicle_kind = ? WHERE id = ?').run('hovercraft', id);
+    await ctx.sql.run('UPDATE vehicles SET vehicle_kind = ? WHERE id = ?', ['hovercraft', id]);
 
     await roundTrip();
 
-    expect(kinds()).toEqual(['car']);
+    expect(await kinds()).toEqual(['car']);
   });
 });

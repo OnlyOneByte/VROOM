@@ -14,12 +14,11 @@ interface ConsentRow {
   community_region: string | null;
 }
 
-function consentRow(): ConsentRow {
-  return ctx.sqlite
-    .query(
-      'SELECT community_stats_opt_in, community_stats_consented_at, community_region FROM user_preferences WHERE user_id = ?'
-    )
-    .get(ctx.user.id) as ConsentRow;
+async function consentRow(): Promise<ConsentRow> {
+  return (await ctx.sql.get(
+    'SELECT community_stats_opt_in, community_stats_consented_at, community_region FROM user_preferences WHERE user_id = ?',
+    [ctx.user.id]
+  )) as ConsentRow;
 }
 
 async function roundTrip(): Promise<void> {
@@ -37,12 +36,12 @@ describe('backup → restore never carries community stats consent', () => {
       communityRegion: 'CA-ON',
     });
     expect(res.status, await res.text()).toBe(200);
-    expect(consentRow().community_stats_opt_in).toBe(1);
-    expect(consentRow().community_stats_consented_at).not.toBeNull();
+    expect((await consentRow()).community_stats_opt_in).toBe(1);
+    expect((await consentRow()).community_stats_consented_at).not.toBeNull();
 
     await roundTrip();
 
-    expect(consentRow()).toEqual({
+    expect(await consentRow()).toEqual({
       community_stats_opt_in: 0,
       community_stats_consented_at: null,
       community_region: 'CA-ON',
@@ -51,12 +50,13 @@ describe('backup → restore never carries community stats consent', () => {
 
   test('an unknown region in a backup is dropped on restore', async () => {
     await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'USD' });
-    ctx.sqlite
-      .query('UPDATE user_preferences SET community_region = ? WHERE user_id = ?')
-      .run('XX-NOPE', ctx.user.id);
+    await ctx.sql.run('UPDATE user_preferences SET community_region = ? WHERE user_id = ?', [
+      'XX-NOPE',
+      ctx.user.id,
+    ]);
 
     await roundTrip();
 
-    expect(consentRow().community_region).toBeNull();
+    expect((await consentRow()).community_region).toBeNull();
   });
 });

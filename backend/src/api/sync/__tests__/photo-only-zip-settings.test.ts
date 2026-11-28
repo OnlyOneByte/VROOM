@@ -19,17 +19,17 @@ const zipOn = {
   lastBackupAt: '2026-01-01T00:00:00.000Z',
 };
 
-function seedProvider(id: string, providerType: string): void {
-  ctx.sqlite.run(
+async function seedProvider(id: string, providerType: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', ?, 'My Provider', 'unused', '{}', 'active')`,
     [id, ctx.user.id, providerType]
   );
 }
 
-function setBackupConfig(providers: Record<string, unknown>): void {
-  ctx.sqlite.run(
-    'INSERT OR REPLACE INTO user_preferences (user_id, backup_config, sync_on_inactivity) VALUES (?, ?, 1)',
+async function setBackupConfig(providers: Record<string, unknown>): Promise<void> {
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config, sync_on_inactivity) VALUES (?, ?, TRUE) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config, sync_on_inactivity = excluded.sync_on_inactivity',
     [ctx.user.id, JSON.stringify({ providers })]
   );
 }
@@ -42,8 +42,8 @@ async function getData<T>(path: string): Promise<T> {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedProvider('p-photos', 'google-photos');
-  setBackupConfig({ 'p-photos': zipOn });
+  await seedProvider('p-photos', 'google-photos');
+  await setBackupConfig({ 'p-photos': zipOn });
 }, SETUP_TIMEOUT_MS);
 
 afterEach(() => ctx.close());
@@ -55,8 +55,8 @@ describe('a stale ZIP setting left on a Google Photos provider', () => {
   });
 
   test('/sync/status still reports backups as on for a real ZIP provider', async () => {
-    seedProvider('p-s3', 's3');
-    setBackupConfig({ 'p-photos': zipOn, 'p-s3': zipOn });
+    await seedProvider('p-s3', 's3');
+    await setBackupConfig({ 'p-photos': zipOn, 'p-s3': zipOn });
     const status = await getData<{ backupEnabled: boolean }>('/api/v1/sync/status');
     expect(status.backupEnabled).toBe(true);
   });
@@ -95,8 +95,8 @@ describe('a stale ZIP setting left on a Google Photos provider', () => {
     });
 
     test('is armed when a real ZIP provider is enabled', async () => {
-      seedProvider('p-s3', 's3');
-      setBackupConfig({ 'p-photos': zipOn, 'p-s3': zipOn });
+      await seedProvider('p-s3', 's3');
+      await setBackupConfig({ 'p-photos': zipOn, 'p-s3': zipOn });
       await createVehicle();
       expect(record).toHaveBeenCalled();
     });

@@ -14,8 +14,8 @@ interface ReminderRow {
   expense_split_config: string | null;
 }
 
-function reminderRows(): ReminderRow[] {
-  return ctx.sqlite.query('SELECT id, expense_split_config FROM reminders').all() as ReminderRow[];
+async function reminderRows(): Promise<ReminderRow[]> {
+  return (await ctx.sql.all('SELECT id, expense_split_config FROM reminders')) as ReminderRow[];
 }
 
 describe('backup → restore round-trip preserves a reminder expenseSplitConfig (nested JSON)', () => {
@@ -50,7 +50,7 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
     });
     expect(created.status, await created.text()).toBe(201);
 
-    const before = reminderRows();
+    const before = await reminderRows();
     expect(before).toHaveLength(1);
     const reminderId = before[0].id;
     expect(JSON.parse(before[0].expense_split_config ?? 'null')).toEqual(storedConfig);
@@ -64,7 +64,7 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.imported?.reminders, 'restore summary counts the reminder').toBe(1);
 
-    const after = reminderRows();
+    const after = await reminderRows();
     expect(after, 'exactly one reminder after restore (no dup, no loss)').toHaveLength(1);
     expect(after[0].id).toBe(reminderId);
     const restored = JSON.parse(after[0].expense_split_config ?? 'null');
@@ -97,7 +97,7 @@ describe('backup → restore round-trip preserves a reminder expenseSplitConfig 
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
 
     expect(result.success, JSON.stringify(result)).toBe(true);
-    const rows = reminderRows();
+    const rows = await reminderRows();
     expect(rows).toHaveLength(1);
     expect(JSON.parse(rows[0].expense_split_config ?? 'null')).toEqual(splitConfig);
   });

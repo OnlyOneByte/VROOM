@@ -6,7 +6,7 @@ let ctx: TestApp;
 beforeEach(async () => {
   ctx = await createTestApp();
   const { encrypt } = await import('../../../utils/encryption');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES ('p-zipfail', ?, 'storage', 'fake-zip-fails', 'Drive', ?, '{}', 'active')`,
     [
@@ -18,14 +18,22 @@ beforeEach(async () => {
       }),
     ]
   );
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify({
-      providers: {
-        'p-zipfail': { enabled: true, folderPath: 'B', retentionCount: 5, sheetsSyncEnabled: true },
-      },
-    }),
-  ]);
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [
+      ctx.user.id,
+      JSON.stringify({
+        providers: {
+          'p-zipfail': {
+            enabled: true,
+            folderPath: 'B',
+            retentionCount: 5,
+            sheetsSyncEnabled: true,
+          },
+        },
+      }),
+    ]
+  );
   const { backupStrategyRegistry } = await import('../backup-strategy-registry');
   backupStrategyRegistry.register('fake-zip-fails', {
     execute: () =>
@@ -47,9 +55,10 @@ describe('a working Sheets backup is findable even when the ZIP upload fails', (
     const result = await backupOrchestrator.execute(ctx.user.id, 'Test User', true);
     expect(result.outcome).toBe('failed');
 
-    const stored = ctx.sqlite
-      .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-      .get(ctx.user.id) as { backup_config: string };
+    const stored = (await ctx.sql.get(
+      'SELECT backup_config FROM user_preferences WHERE user_id = ?',
+      [ctx.user.id]
+    )) as { backup_config: string };
     const entry = JSON.parse(stored.backup_config).providers['p-zipfail'];
     expect(entry.sheetsSpreadsheetId).toBe('sheet-works');
     expect(entry.lastBackupAt).toBeUndefined();

@@ -105,24 +105,29 @@ describe('BackupOrchestrator.execute() real skip paths', () => {
 });
 
 describe('BackupOrchestrator.execute() outcome', () => {
-  function seedEnabledProvider(ctxApp: TestApp, id: string, providerType: string): void {
-    ctxApp.sqlite.run(
+  async function seedEnabledProvider(
+    ctxApp: TestApp,
+    id: string,
+    providerType: string
+  ): Promise<void> {
+    await ctxApp.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
        VALUES (?, ?, 'storage', ?, 'Fake', ?, ?, 'active')`,
       [id, ctxApp.user.id, providerType, encryptedCreds(id, ctxApp.user.id), JSON.stringify({})]
     );
-    const existing = ctxApp.sqlite
-      .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-      .get(ctxApp.user.id) as { backup_config: string | null } | null;
+    const existing = (await ctxApp.sql.get(
+      'SELECT backup_config FROM user_preferences WHERE user_id = ?',
+      [ctxApp.user.id]
+    )) as { backup_config: string | null } | null;
     const config = existing?.backup_config
       ? (JSON.parse(existing.backup_config) as { providers: Record<string, unknown> })
       : { providers: {} };
     config.providers[id] = { enabled: true, folderPath: 'B', retentionCount: 5 };
-    ctxApp.sqlite.run(
-      'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
+    await ctxApp.sql.run(
+      'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
       [ctxApp.user.id, JSON.stringify(config)]
     );
-    ctxApp.sqlite.run(
+    await ctxApp.sql.run(
       'INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)',
       [`v-${id}`, ctxApp.user.id, 'T', 'C', 2022]
     );
@@ -173,7 +178,7 @@ describe('BackupOrchestrator.execute() outcome', () => {
   test('every provider fails → outcome failed AND the sync anchor is NOT advanced (retry)', async () => {
     registerFake('fake-fail', false);
     try {
-      seedEnabledProvider(ctx, 'pf', 'fake-fail');
+      await seedEnabledProvider(ctx, 'pf', 'fake-fail');
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = (await backupOrchestrator.execute(
         ctx.user.id,
@@ -185,9 +190,9 @@ describe('BackupOrchestrator.execute() outcome', () => {
       expect(result.failedProviders).toContain('pf');
       expect(result.results.pf?.success).toBe(false);
 
-      const sync = ctx.sqlite
-        .query('SELECT last_sync_date FROM sync_state WHERE user_id = ?')
-        .get(ctx.user.id) as { last_sync_date: string | null } | null;
+      const sync = (await ctx.sql.get('SELECT last_sync_date FROM sync_state WHERE user_id = ?', [
+        ctx.user.id,
+      ])) as { last_sync_date: string | null } | null;
       expect(sync?.last_sync_date ?? null).toBeNull();
     } finally {
       unregister('fake-fail');
@@ -197,7 +202,7 @@ describe('BackupOrchestrator.execute() outcome', () => {
   test('a single provider that did not fully back up → outcome failed', async () => {
     registerFake('fake-cap-partial', 'partial');
     try {
-      seedEnabledProvider(ctx, 'pcp', 'fake-cap-partial');
+      await seedEnabledProvider(ctx, 'pcp', 'fake-cap-partial');
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = (await backupOrchestrator.execute(
         ctx.user.id,
@@ -216,8 +221,8 @@ describe('BackupOrchestrator.execute() outcome', () => {
     registerFake('fake-ok-2', true);
     registerFake('fake-fail-2', false);
     try {
-      seedEnabledProvider(ctx, 'pok', 'fake-ok-2');
-      seedEnabledProvider(ctx, 'pbad', 'fake-fail-2');
+      await seedEnabledProvider(ctx, 'pok', 'fake-ok-2');
+      await seedEnabledProvider(ctx, 'pbad', 'fake-fail-2');
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = (await backupOrchestrator.execute(
         ctx.user.id,
@@ -229,9 +234,9 @@ describe('BackupOrchestrator.execute() outcome', () => {
       expect(result.failedProviders).toEqual(['pbad']);
       expect(result.results.pok?.success).toBe(true);
 
-      const sync = ctx.sqlite
-        .query('SELECT last_sync_date FROM sync_state WHERE user_id = ?')
-        .get(ctx.user.id) as { last_sync_date: string | null } | null;
+      const sync = (await ctx.sql.get('SELECT last_sync_date FROM sync_state WHERE user_id = ?', [
+        ctx.user.id,
+      ])) as { last_sync_date: string | null } | null;
       expect(sync?.last_sync_date ?? null).toBeNull();
     } finally {
       unregister('fake-ok-2');
@@ -242,7 +247,7 @@ describe('BackupOrchestrator.execute() outcome', () => {
   test('provider succeeds → outcome success', async () => {
     registerFake('fake-ok', true);
     try {
-      seedEnabledProvider(ctx, 'po', 'fake-ok');
+      await seedEnabledProvider(ctx, 'po', 'fake-ok');
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = (await backupOrchestrator.execute(
         ctx.user.id,
@@ -264,7 +269,7 @@ describe('BackupOrchestrator.execute() outcome', () => {
       throw new Error('lookup exploded');
     });
     try {
-      seedEnabledProvider(ctx, 'prej', 'fake-reject');
+      await seedEnabledProvider(ctx, 'prej', 'fake-reject');
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = (await backupOrchestrator.execute(
         ctx.user.id,
@@ -285,9 +290,9 @@ describe('BackupOrchestrator.execute() outcome', () => {
   test('a backup-config entry with no provider row is skipped while the live provider still runs', async () => {
     registerFake('fake-live', true);
     try {
-      seedEnabledProvider(ctx, 'plive', 'fake-live');
-      seedEnabledProvider(ctx, 'pghost', 'fake-live');
-      ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['pghost']);
+      await seedEnabledProvider(ctx, 'plive', 'fake-live');
+      await seedEnabledProvider(ctx, 'pghost', 'fake-live');
+      await ctx.sql.run('DELETE FROM user_providers WHERE id = ?', ['pghost']);
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = (await backupOrchestrator.execute(
         ctx.user.id,
@@ -306,9 +311,11 @@ describe('BackupOrchestrator.execute() outcome', () => {
   test('a provider whose stored credentials cannot be read is reported unusable, not skipped', async () => {
     registerFake('fake-readable', true);
     try {
-      seedEnabledProvider(ctx, 'pread', 'fake-readable');
-      seedEnabledProvider(ctx, 'pbroken', 'fake-readable');
-      ctx.sqlite.run("UPDATE user_providers SET credentials = 'garbage' WHERE id = ?", ['pbroken']);
+      await seedEnabledProvider(ctx, 'pread', 'fake-readable');
+      await seedEnabledProvider(ctx, 'pbroken', 'fake-readable');
+      await ctx.sql.run("UPDATE user_providers SET credentials = 'garbage' WHERE id = ?", [
+        'pbroken',
+      ]);
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = (await backupOrchestrator.execute(
         ctx.user.id,
@@ -325,24 +332,28 @@ describe('BackupOrchestrator.execute() outcome', () => {
       });
       expect(result.results.pread?.unusable).toBeUndefined();
 
-      const health = (id: string) =>
-        ctx.sqlite
-          .query('SELECT status, last_error_code, last_sync_at FROM user_providers WHERE id = ?')
-          .get(id) as {
+      const health = async (id: string) =>
+        (await ctx.sql.get(
+          'SELECT status, last_error_code, last_sync_at FROM user_providers WHERE id = ?',
+          [id]
+        )) as {
           status: string;
           last_error_code: string | null;
           last_sync_at: number | null;
         };
-      expect(health('pbroken')).toMatchObject({ status: 'needs_reauth', last_error_code: 'auth' });
-      expect(health('pread')).toMatchObject({ status: 'active', last_error_code: null });
-      expect(health('pread').last_sync_at).not.toBeNull();
+      expect(await health('pbroken')).toMatchObject({
+        status: 'needs_reauth',
+        last_error_code: 'auth',
+      });
+      expect(await health('pread')).toMatchObject({ status: 'active', last_error_code: null });
+      expect((await health('pread')).last_sync_at).not.toBeNull();
     } finally {
       unregister('fake-readable');
     }
   });
 
   test('a provider whose type has no registered strategy fails instead of being skipped', async () => {
-    seedEnabledProvider(ctx, 'punreg', 'no-such-provider-type');
+    await seedEnabledProvider(ctx, 'punreg', 'no-such-provider-type');
     const { backupOrchestrator } = await import('../backup-orchestrator');
     const result = (await backupOrchestrator.execute(ctx.user.id, 'U', true)) as OrchestratorResult;
 
@@ -364,9 +375,9 @@ describe('BackupOrchestrator.execute() outcome', () => {
     const { backupService } = await import('../backup');
     const zipSpy = spyOn(backupService, 'exportAsZip');
     try {
-      seedEnabledProvider(ctx, 'psheets', 'fake-sheets-only');
-      ctx.sqlite.run(
-        'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
+      await seedEnabledProvider(ctx, 'psheets', 'fake-sheets-only');
+      await ctx.sql.run(
+        'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
         [
           ctx.user.id,
           JSON.stringify({
@@ -413,7 +424,7 @@ describe('BackupOrchestrator.execute() outcome', () => {
     const { backupService } = await import('../backup');
     const zipSpy = spyOn(backupService, 'exportAsZip').mockRejectedValue(new Error('zip exploded'));
     try {
-      seedEnabledProvider(ctx, 'pzip', 'fake-zip-probe');
+      await seedEnabledProvider(ctx, 'pzip', 'fake-zip-probe');
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = (await backupOrchestrator.execute(
         ctx.user.id,

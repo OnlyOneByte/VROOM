@@ -9,7 +9,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   seen.length = 0;
   const { encrypt } = await import('../../../utils/encryption');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES ('psheets', ?, 'storage', 'fake-sheets-pause', 'Drive', ?, '{}', 'active')`,
     [
@@ -36,18 +36,18 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function setBackupConfig(settings: Record<string, unknown>): void {
-  ctx.sqlite.run(
+async function setBackupConfig(settings: Record<string, unknown>): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?)
      ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config`,
     [ctx.user.id, JSON.stringify({ providers: { psheets: settings } })]
   );
 }
 
-function storedSettings(): Record<string, unknown> {
-  const row = ctx.sqlite
-    .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-    .get(ctx.user.id) as { backup_config: string };
+async function storedSettings(): Promise<Record<string, unknown>> {
+  const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [
+    ctx.user.id,
+  ])) as { backup_config: string };
   return JSON.parse(row.backup_config).providers.psheets;
 }
 
@@ -71,7 +71,7 @@ const PAUSED = {
 
 describe('automatic Sheets backups pause after a refused restore', () => {
   test('an automatic run skips the paused spreadsheet', async () => {
-    setBackupConfig(PAUSED);
+    await setBackupConfig(PAUSED);
     await makeAChange();
     const { backupOrchestrator } = await import('../backup-orchestrator');
 
@@ -79,11 +79,11 @@ describe('automatic Sheets backups pause after a refused restore', () => {
 
     expect(seen).toEqual([]);
     expect(result.results).toEqual({});
-    expect(storedSettings().sheetsAutoPausedAt).toBe(PAUSED.sheetsAutoPausedAt);
+    expect((await storedSettings()).sheetsAutoPausedAt).toBe(PAUSED.sheetsAutoPausedAt);
   });
 
   test('an automatic run still makes the ZIP backup, without the paused Sheets sync', async () => {
-    setBackupConfig({ ...PAUSED, enabled: true });
+    await setBackupConfig({ ...PAUSED, enabled: true });
     await makeAChange();
     const { backupOrchestrator } = await import('../backup-orchestrator');
 
@@ -92,22 +92,22 @@ describe('automatic Sheets backups pause after a refused restore', () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]?.enabled).toBe(true);
     expect(seen[0]?.sheetsSyncEnabled).toBe(false);
-    expect(storedSettings().sheetsAutoPausedAt).toBe(PAUSED.sheetsAutoPausedAt);
+    expect((await storedSettings()).sheetsAutoPausedAt).toBe(PAUSED.sheetsAutoPausedAt);
   });
 
   test('a backup the user starts writes the spreadsheet and ends the pause', async () => {
-    setBackupConfig(PAUSED);
+    await setBackupConfig(PAUSED);
     const { backupOrchestrator } = await import('../backup-orchestrator');
 
     await backupOrchestrator.execute(ctx.user.id, 'U', true);
 
     expect(seen).toHaveLength(1);
     expect(seen[0]?.sheetsSyncEnabled).toBe(true);
-    expect(storedSettings()).not.toHaveProperty('sheetsAutoPausedAt');
+    expect(await storedSettings()).not.toHaveProperty('sheetsAutoPausedAt');
   });
 
   test('a backup the user starts keeps the pause when the Sheets write fails', async () => {
-    setBackupConfig(PAUSED);
+    await setBackupConfig(PAUSED);
     const { backupStrategyRegistry } = await import('../backup-strategy-registry');
     backupStrategyRegistry.register('fake-sheets-pause', {
       async execute(): Promise<BackupStrategyResult> {
@@ -118,45 +118,45 @@ describe('automatic Sheets backups pause after a refused restore', () => {
 
     await backupOrchestrator.execute(ctx.user.id, 'U', true);
 
-    expect(storedSettings().sheetsAutoPausedAt).toBe(PAUSED.sheetsAutoPausedAt);
+    expect((await storedSettings()).sheetsAutoPausedAt).toBe(PAUSED.sheetsAutoPausedAt);
   });
 
   test('a settings save from the app cannot set the pause either', async () => {
     const { sheetsAutoPausedAt: _paused, ...unpaused } = PAUSED;
-    setBackupConfig(unpaused);
+    await setBackupConfig(unpaused);
 
     const res = await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: { providers: { psheets: PAUSED } },
     });
 
     expect(res.status).toBe(200);
-    expect(storedSettings()).not.toHaveProperty('sheetsAutoPausedAt');
+    expect(await storedSettings()).not.toHaveProperty('sheetsAutoPausedAt');
   });
 
   test('resuming from the notice ends the pause', async () => {
-    setBackupConfig(PAUSED);
+    await setBackupConfig(PAUSED);
 
     const res = await ctx.authed('POST', '/api/v1/sync/sheets/psheets/resume', {});
 
     expect(res.status).toBe(200);
-    expect(storedSettings()).not.toHaveProperty('sheetsAutoPausedAt');
-    expect(storedSettings().sheetsSyncEnabled).toBe(true);
+    expect(await storedSettings()).not.toHaveProperty('sheetsAutoPausedAt');
+    expect((await storedSettings()).sheetsSyncEnabled).toBe(true);
   });
 
   test('resuming a provider that was never paused changes nothing', async () => {
     const res = await ctx.authed('POST', '/api/v1/sync/sheets/unknown/resume', {});
 
     expect(res.status).toBe(200);
-    const row = ctx.sqlite
-      .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-      .get(ctx.user.id) as { backup_config: string | null } | null;
+    const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [
+      ctx.user.id,
+    ])) as { backup_config: string | null } | null;
     expect(row?.backup_config ? JSON.parse(row.backup_config).providers?.unknown : undefined).toBe(
       undefined
     );
   });
 
   test('a settings save from the app neither clears nor sets the pause', async () => {
-    setBackupConfig(PAUSED);
+    await setBackupConfig(PAUSED);
     const { sheetsAutoPausedAt: _paused, ...clientCopy } = PAUSED;
 
     const res = await ctx.authed('PUT', '/api/v1/settings', {
@@ -164,7 +164,7 @@ describe('automatic Sheets backups pause after a refused restore', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(storedSettings().retentionCount).toBe(7);
-    expect(storedSettings().sheetsAutoPausedAt).toBe(PAUSED.sheetsAutoPausedAt);
+    expect((await storedSettings()).retentionCount).toBe(7);
+    expect((await storedSettings()).sheetsAutoPausedAt).toBe(PAUSED.sheetsAutoPausedAt);
   });
 });

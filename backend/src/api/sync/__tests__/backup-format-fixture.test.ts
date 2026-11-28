@@ -43,8 +43,8 @@ function fixtureZip(version?: string): Buffer {
   return zip.toBuffer();
 }
 
-function count(table: string): number {
-  return (ctx.sqlite.query(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+async function count(table: string): Promise<number> {
+  return ((await ctx.sql.get(`SELECT COUNT(*) AS n FROM ${table}`)) as { n: number }).n;
 }
 
 async function restoreError(zip: Buffer): Promise<string[]> {
@@ -70,17 +70,17 @@ describe('the frozen 2.0.0 backup fixture', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, fixtureZip(), 'replace');
 
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(count('vehicles')).toBe(2);
-    expect(count('expenses')).toBe(95);
-    expect(count('vehicle_financing')).toBe(1);
-    expect(count('insurance_policies')).toBe(2);
-    expect(count('insurance_claims')).toBe(1);
-    expect(count('odometer_entries')).toBe(1);
-    expect(count('trips')).toBe(1);
-    expect(count('reminders')).toBe(1);
-    const loan = ctx.sqlite
-      .query('SELECT expense_amount FROM expenses WHERE id = ?')
-      .get('xdfo83wsg1gk954b2slxyb2s') as { expense_amount: number };
+    expect(await count('vehicles')).toBe(2);
+    expect(await count('expenses')).toBe(95);
+    expect(await count('vehicle_financing')).toBe(1);
+    expect(await count('insurance_policies')).toBe(2);
+    expect(await count('insurance_claims')).toBe(1);
+    expect(await count('odometer_entries')).toBe(1);
+    expect(await count('trips')).toBe(1);
+    expect(await count('reminders')).toBe(1);
+    const loan = (await ctx.sql.get('SELECT expense_amount FROM expenses WHERE id = ?', [
+      'xdfo83wsg1gk954b2slxyb2s',
+    ])) as { expense_amount: number };
     expect(loan.expense_amount).toBe(37286);
   });
 
@@ -90,14 +90,14 @@ describe('the frozen 2.0.0 backup fixture', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, fixtureZip(), 'replace');
 
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(count('expenses')).toBe(95);
+    expect(await count('expenses')).toBe(95);
   });
 
   test('a backup from a newer minor version is refused with a clear message', async () => {
     const details = await restoreError(fixtureZip('3.2.0'));
 
     expect(details.join('\n')).toMatch(/newer version of VROOM.*Update VROOM/);
-    expect(count('vehicles')).toBe(0);
+    expect(await count('vehicles')).toBe(0);
   });
 
   test('a backup from a newer major version is refused with a clear message', async () => {
@@ -106,6 +106,6 @@ describe('the frozen 2.0.0 backup fixture', () => {
     const details = await restoreError(fixtureZip('4.0.0'));
 
     expect(details.join('\n')).toMatch(/newer version of VROOM.*Update VROOM/);
-    expect(count('vehicles')).toBe(0);
+    expect(await count('vehicles')).toBe(0);
   });
 });

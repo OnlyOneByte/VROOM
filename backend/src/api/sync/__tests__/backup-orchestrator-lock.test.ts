@@ -10,7 +10,7 @@ beforeEach(async () => {
   ctx = await createTestApp();
   finishWork = [];
   const { encrypt } = await import('../../../utils/encryption');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES ('p-hang', ?, 'storage', 'fake-hang', 'Hang', ?, '{}', 'active')`,
     [
@@ -22,12 +22,15 @@ beforeEach(async () => {
       }),
     ]
   );
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify({
-      providers: { 'p-hang': { enabled: true, folderPath: 'B', retentionCount: 5 } },
-    }),
-  ]);
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [
+      ctx.user.id,
+      JSON.stringify({
+        providers: { 'p-hang': { enabled: true, folderPath: 'B', retentionCount: 5 } },
+      }),
+    ]
+  );
   const { backupStrategyRegistry } = await import('../backup-strategy-registry');
   backupStrategyRegistry.register('fake-hang', {
     execute: () =>

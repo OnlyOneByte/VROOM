@@ -13,10 +13,11 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function rateRow(): { business_mileage_rate: number } {
-  return ctx.sqlite
-    .query('SELECT business_mileage_rate FROM user_preferences WHERE user_id = ?')
-    .get(ctx.user.id) as { business_mileage_rate: number };
+async function rateRow(): Promise<{ business_mileage_rate: number }> {
+  return (await ctx.sql.get(
+    'SELECT business_mileage_rate FROM user_preferences WHERE user_id = ?',
+    [ctx.user.id]
+  )) as { business_mileage_rate: number };
 }
 
 async function roundTrip(): Promise<void> {
@@ -31,20 +32,20 @@ describe('backup → restore round-trip preserves businessMileageRate', () => {
   test('a non-zero fractional rate survives a full export→restore (not reset to 0)', async () => {
     const put = await ctx.authed('PUT', '/api/v1/settings', { businessMileageRate: 0.67 });
     expect(put.status, await put.text()).toBe(200);
-    expect(rateRow().business_mileage_rate).toBe(0.67);
+    expect((await rateRow()).business_mileage_rate).toBe(0.67);
 
     await roundTrip();
 
-    expect(rateRow().business_mileage_rate).toBe(0.67);
+    expect((await rateRow()).business_mileage_rate).toBe(0.67);
   });
 
   test('the default rate round-trips as 0 (control — no spurious change)', async () => {
     await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'USD' });
-    expect(rateRow().business_mileage_rate).toBe(0);
+    expect((await rateRow()).business_mileage_rate).toBe(0);
 
     await roundTrip();
 
-    expect(rateRow().business_mileage_rate).toBe(0);
+    expect((await rateRow()).business_mileage_rate).toBe(0);
   });
 
   test('a paired sibling pref (currencyUnit) survives alongside the rate (no field dropped)', async () => {

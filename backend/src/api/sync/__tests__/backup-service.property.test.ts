@@ -17,7 +17,7 @@ let storageSpy: ReturnType<typeof spyOn> | undefined;
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-drive', 'Drive', 'enc', '{}', 'active')`,
     [PROVIDER_ID, ctx.user.id]
@@ -29,13 +29,16 @@ afterEach(() => {
   ctx.close();
 });
 
-function seedRetention(retentionCount: number): void {
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify({
-      providers: { [PROVIDER_ID]: { enabled: true, folderPath: 'B', retentionCount } },
-    }),
-  ]);
+async function seedRetention(retentionCount: number): Promise<void> {
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [
+      ctx.user.id,
+      JSON.stringify({
+        providers: { [PROVIDER_ID]: { enabled: true, folderPath: 'B', retentionCount } },
+      }),
+    ]
+  );
 }
 
 async function stubStorage(files: StorageFileInfo[]): Promise<string[]> {
@@ -105,7 +108,7 @@ describe('listBackups: the backup listing', () => {
           const files = uniqueFiles([...backups, ...nonBackups]);
           const backupKeys = new Set(files.slice(0, backups.length).map((f) => f.key));
           const lastModifiedByKey = new Map(files.map((f) => [f.key, f.lastModified]));
-          seedRetention(10);
+          await seedRetention(10);
           await stubStorage(files);
 
           const result = await backupService.listBackups(ctx.user.id, PROVIDER_ID);
@@ -144,7 +147,7 @@ describe('enforceRetention: the retention sweep', () => {
           const newestFirst = files
             .filter((f) => backupKeys.has(f.key))
             .sort((a, b) => b.lastModified.localeCompare(a.lastModified));
-          seedRetention(retentionCount);
+          await seedRetention(retentionCount);
           const deleted = await stubStorage(files);
 
           const count = await backupService.enforceRetention(ctx.user.id, PROVIDER_ID);

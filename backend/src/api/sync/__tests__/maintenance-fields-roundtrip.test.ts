@@ -30,18 +30,18 @@ interface NotifRowDb {
   due_odometer: number | null;
 }
 
-function reminderRow(id: string): ReminderRowDb {
-  return ctx.sqlite
-    .query(
-      'SELECT id, trigger_mode, interval_mileage, last_service_odometer, next_due_odometer, next_due_date FROM reminders WHERE id = ?'
-    )
-    .get(id) as ReminderRowDb;
+async function reminderRow(id: string): Promise<ReminderRowDb> {
+  return (await ctx.sql.get(
+    'SELECT id, trigger_mode, interval_mileage, last_service_odometer, next_due_odometer, next_due_date FROM reminders WHERE id = ?',
+    [id]
+  )) as ReminderRowDb;
 }
 
-function notifRow(id: string): NotifRowDb {
-  return ctx.sqlite
-    .query('SELECT id, due_date, due_odometer FROM reminder_notifications WHERE id = ?')
-    .get(id) as NotifRowDb;
+async function notifRow(id: string): Promise<NotifRowDb> {
+  return (await ctx.sql.get(
+    'SELECT id, due_date, due_odometer FROM reminder_notifications WHERE id = ?',
+    [id]
+  )) as NotifRowDb;
 }
 
 async function roundTrip(): Promise<void> {
@@ -56,27 +56,27 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
   test('a mileage-only reminder + its mileage notification survive with every field intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Forester', year: 2021 });
 
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO reminders
          (id, user_id, name, type, action_mode, frequency, trigger_mode,
           interval_mileage, last_service_odometer, next_due_odometer,
           start_date, next_due_date, is_active)
        VALUES ('mr1', ?, 'Oil change', 'notification', 'automatic', 'custom', 'mileage',
-          5000, 30000, 35000, 0, NULL, 1)`,
+          5000, 30000, 35000, 0, NULL, TRUE)`,
       [ctx.user.id]
     );
-    ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('mr1', ?)`, [
+    await ctx.sql.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('mr1', ?)`, [
       vehicleId,
     ]);
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date, due_odometer, is_read)
-       VALUES ('mn1', 'mr1', ?, NULL, 35000, 0)`,
+       VALUES ('mn1', 'mr1', ?, NULL, 35000, FALSE)`,
       [ctx.user.id]
     );
 
     await roundTrip();
 
-    const r = reminderRow('mr1');
+    const r = await reminderRow('mr1');
     expect(r, 'reminder survived the round-trip').toBeTruthy();
     expect(r.trigger_mode).toBe('mileage');
     expect(r.interval_mileage).toBe(5000);
@@ -87,7 +87,7 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
       'a mileage-only reminder keeps a NULL date (not coerced to 0)'
     ).toBeNull();
 
-    const n = notifRow('mn1');
+    const n = await notifRow('mn1');
     expect(n, 'notification survived the round-trip').toBeTruthy();
     expect(n.due_date, 'a mileage notification keeps a NULL due_date').toBeNull();
     expect(n.due_odometer).toBe(35000);
@@ -96,22 +96,22 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
   test('a time+mileage (both) reminder preserves both axes through the round-trip', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Forester', year: 2021 });
 
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO reminders
          (id, user_id, name, type, action_mode, frequency, trigger_mode,
           interval_mileage, last_service_odometer, next_due_odometer,
           start_date, next_due_date, is_active)
        VALUES ('mr2', ?, 'Major service', 'notification', 'automatic', 'monthly', 'both',
-          10000, 40000, 50000, 1700000000, 1800000000, 1)`,
+          10000, 40000, 50000, 1700000000, 1800000000, TRUE)`,
       [ctx.user.id]
     );
-    ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('mr2', ?)`, [
+    await ctx.sql.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES ('mr2', ?)`, [
       vehicleId,
     ]);
 
     await roundTrip();
 
-    const r = reminderRow('mr2');
+    const r = await reminderRow('mr2');
     expect(r.trigger_mode).toBe('both');
     expect(r.interval_mileage).toBe(10000);
     expect(r.last_service_odometer).toBe(40000);
@@ -135,7 +135,7 @@ describe('backup → restore round-trip preserves maintenance-schedule fields', 
 
     await roundTrip();
 
-    const r = reminderRow(id);
+    const r = await reminderRow(id);
     expect(r.trigger_mode).toBe('time');
     expect(r.interval_mileage, 'unset mileage interval stays NULL').toBeNull();
     expect(r.last_service_odometer).toBeNull();

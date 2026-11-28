@@ -46,28 +46,29 @@ async function seedProvider(
     userId: ctx.user.id,
     domain: 'storage',
   });
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', ?, ?, ?, ?, 'active')`,
     [id, ctx.user.id, providerType, id, credentials, JSON.stringify({})]
   );
-  const existing = ctx.sqlite
-    .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-    .get(ctx.user.id) as { backup_config: string | null } | null;
+  const existing = (await ctx.sql.get(
+    'SELECT backup_config FROM user_preferences WHERE user_id = ?',
+    [ctx.user.id]
+  )) as { backup_config: string | null } | null;
   const config = existing?.backup_config
     ? (JSON.parse(existing.backup_config) as { providers: Record<string, unknown> })
     : { providers: {} };
   if (saved) config.providers[id] = saved;
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify(config),
-  ]);
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [ctx.user.id, JSON.stringify(config)]
+  );
 }
 
-function savedEnabledFlags(): Record<string, boolean> {
-  const row = ctx.sqlite
-    .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-    .get(ctx.user.id) as { backup_config: string };
+async function savedEnabledFlags(): Promise<Record<string, boolean>> {
+  const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [
+    ctx.user.id,
+  ])) as { backup_config: string };
   const config = JSON.parse(row.backup_config) as {
     providers: Record<string, { enabled: boolean }>;
   };
@@ -88,7 +89,7 @@ describe('Back up now to chosen providers', () => {
   });
 
   test('a subset backs up only to the chosen providers and leaves saved settings alone', async () => {
-    const before = savedEnabledFlags();
+    const before = await savedEnabledFlags();
     const res = await ctx.authed('POST', '/api/v1/sync', {
       syncTypes: ['backup'],
       force: true,
@@ -97,7 +98,7 @@ describe('Back up now to chosen providers', () => {
 
     expect(res.status).toBe(200);
     expect(calls.map((call) => call.providerId)).toEqual(['on-b']);
-    expect(savedEnabledFlags()).toEqual(before);
+    expect(await savedEnabledFlags()).toEqual(before);
   });
 
   test('a provider whose backups are off can be chosen for one backup, with its saved folder', async () => {
@@ -114,7 +115,7 @@ describe('Back up now to chosen providers', () => {
       folderPath: 'C',
       retentionCount: 7,
     });
-    expect(savedEnabledFlags()['off-c']).toBe(false);
+    expect((await savedEnabledFlags())['off-c']).toBe(false);
   });
 
   test('a chosen provider with no saved settings gets the app defaults, never a zero retention', async () => {
@@ -167,10 +168,10 @@ describe('Back up now refuses providers it cannot use', () => {
   test("another user's provider is refused as unknown", async () => {
     calls = [];
     await registerRecorder();
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO users (id, email, display_name) VALUES ('someone-else', 'else@test.com', 'Else')"
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
        VALUES ('theirs', 'someone-else', 'storage', ?, 'Theirs', 'x', '{}', 'active')`,
       [FAKE_TYPE]
@@ -203,17 +204,17 @@ describe('Back up now refuses providers it cannot use', () => {
   });
 });
 
-function lastSyncDate(): string | null {
-  const row = ctx.sqlite
-    .query('SELECT last_sync_date FROM sync_state WHERE user_id = ?')
-    .get(ctx.user.id) as { last_sync_date: string | null } | null;
+async function lastSyncDate(): Promise<string | null> {
+  const row = (await ctx.sql.get('SELECT last_sync_date FROM sync_state WHERE user_id = ?', [
+    ctx.user.id,
+  ])) as { last_sync_date: string | null } | null;
   return row?.last_sync_date ?? null;
 }
 
-function savedConfig(): { providers: Record<string, Record<string, unknown>> } {
-  const row = ctx.sqlite
-    .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-    .get(ctx.user.id) as { backup_config: string };
+async function savedConfig(): Promise<{ providers: Record<string, Record<string, unknown>> }> {
+  const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [
+    ctx.user.id,
+  ])) as { backup_config: string };
   return JSON.parse(row.backup_config);
 }
 
@@ -233,7 +234,7 @@ describe('A one-off backup keeps the saved settings usable and the sync anchor h
     });
     expect(res.status).toBe(200);
 
-    const config = savedConfig();
+    const config = await savedConfig();
     expect(config.providers['new-d']).toMatchObject({
       enabled: false,
       folderPath: 'Backups',
@@ -258,7 +259,7 @@ describe('A one-off backup keeps the saved settings usable and the sync anchor h
     });
 
     expect(res.status).toBe(200);
-    expect(lastSyncDate()).toBeNull();
+    expect(await lastSyncDate()).toBeNull();
   });
 
   test('a chosen set that covers every provider with backups on moves the last-sync time', async () => {
@@ -270,7 +271,7 @@ describe('A one-off backup keeps the saved settings usable and the sync anchor h
     });
 
     expect(res.status).toBe(200);
-    expect(lastSyncDate()).not.toBeNull();
+    expect(await lastSyncDate()).not.toBeNull();
   });
 
   test('a provider with only Sheets on keeps ZIP off when chosen', async () => {
@@ -304,8 +305,8 @@ describe('A one-off backup does not undo changes made while it ran', () => {
 
   test('backups turned on for the provider during its first one-off backup stay on', async () => {
     await seedProvider('new-f', FAKE_TYPE, null);
-    await registerDuring(() => {
-      ctx.sqlite.run('UPDATE user_preferences SET backup_config = ? WHERE user_id = ?', [
+    await registerDuring(async () => {
+      await ctx.sql.run('UPDATE user_preferences SET backup_config = ? WHERE user_id = ?', [
         JSON.stringify({
           providers: { 'new-f': { enabled: true, folderPath: 'Mine', retentionCount: 3 } },
         }),
@@ -320,7 +321,7 @@ describe('A one-off backup does not undo changes made while it ran', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(savedConfig().providers['new-f']).toMatchObject({
+    expect((await savedConfig()).providers['new-f']).toMatchObject({
       enabled: true,
       folderPath: 'Mine',
       retentionCount: 3,
@@ -352,7 +353,7 @@ describe('A one-off backup does not undo changes made while it ran', () => {
       preferences.mergeJsonField = write;
     }
 
-    expect(savedConfig().providers['new-h']).toMatchObject({
+    expect((await savedConfig()).providers['new-h']).toMatchObject({
       enabled: true,
       folderPath: 'Mine',
       retentionCount: 3,
@@ -362,8 +363,8 @@ describe('A one-off backup does not undo changes made while it ran', () => {
 
   test('a provider removed during its backup gets no settings entry', async () => {
     await seedProvider('new-g', FAKE_TYPE, null);
-    await registerDuring(() => {
-      ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['new-g']);
+    await registerDuring(async () => {
+      await ctx.sql.run('DELETE FROM user_providers WHERE id = ?', ['new-g']);
     });
 
     const res = await ctx.authed('POST', '/api/v1/sync', {
@@ -373,7 +374,7 @@ describe('A one-off backup does not undo changes made while it ran', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(savedConfig().providers['new-g']).toBeUndefined();
+    expect((await savedConfig()).providers['new-g']).toBeUndefined();
   });
 
   test('a backup that finishes while its provider is being removed leaves no settings entry', async () => {
@@ -417,7 +418,7 @@ describe('A one-off backup does not undo changes made while it ran', () => {
       release();
     }
 
-    expect(savedConfig().providers['gone-i']).toBeUndefined();
+    expect((await savedConfig()).providers['gone-i']).toBeUndefined();
   });
 
   test('a provider removed between the backup check and its write gets no entry', async () => {
@@ -449,6 +450,6 @@ describe('A one-off backup does not undo changes made while it ran', () => {
       preferences.mergeJsonField = write;
     }
 
-    expect(savedConfig().providers['gone-j']).toBeUndefined();
+    expect((await savedConfig()).providers['gone-j']).toBeUndefined();
   });
 });

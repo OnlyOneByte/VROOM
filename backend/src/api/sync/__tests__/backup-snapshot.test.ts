@@ -45,9 +45,7 @@ describe('a backup reads one consistent snapshot', () => {
     }
     expect((await pending)?.status).toBe(201);
     expect(
-      ctx.sqlite
-        .query("SELECT COUNT(*) AS n FROM reminders WHERE name = 'Written mid-backup'")
-        .get()
+      await ctx.sql.get("SELECT COUNT(*) AS n FROM reminders WHERE name = 'Written mid-backup'")
     ).toEqual({ n: 1 });
   }, 10_000);
 });

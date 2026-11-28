@@ -14,11 +14,11 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function catalogIds(): (string | null)[] {
+async function catalogIds(): Promise<(string | null)[]> {
   return (
-    ctx.sqlite
-      .query('SELECT catalog_model_id FROM vehicles WHERE user_id = ? ORDER BY make')
-      .all(ctx.user.id) as { catalog_model_id: string | null }[]
+    (await ctx.sql.all('SELECT catalog_model_id FROM vehicles WHERE user_id = ? ORDER BY make', [
+      ctx.user.id,
+    ])) as { catalog_model_id: string | null }[]
   ).map((row) => row.catalog_model_id);
 }
 
@@ -41,30 +41,31 @@ describe('backup → restore round-trip of vehicles.catalog_model_id', () => {
   test('a set id and a null id both survive', async () => {
     await createVehicle({ make: 'Honda', model: 'Civic', catalogModelId: 'honda-civic' });
     await createVehicle({ make: 'Zastava', model: 'Yugo' });
-    expect(catalogIds()).toEqual(['honda-civic', null]);
+    expect(await catalogIds()).toEqual(['honda-civic', null]);
 
     await roundTrip();
 
-    expect(catalogIds()).toEqual(['honda-civic', null]);
+    expect(await catalogIds()).toEqual(['honda-civic', null]);
   });
 
   test('an id the catalogue does not know restores as null', async () => {
     const id = await createVehicle({ make: 'Honda', model: 'Civic' });
-    ctx.sqlite.query('UPDATE vehicles SET catalog_model_id = ? WHERE id = ?').run('gone-model', id);
+    await ctx.sql.run('UPDATE vehicles SET catalog_model_id = ? WHERE id = ?', ['gone-model', id]);
 
     await roundTrip();
 
-    expect(catalogIds()).toEqual([null]);
+    expect(await catalogIds()).toEqual([null]);
   });
 
   test('an id that belongs to another make restores as null', async () => {
     const id = await createVehicle({ make: 'Honda', model: 'Civic' });
-    ctx.sqlite
-      .query('UPDATE vehicles SET catalog_model_id = ? WHERE id = ?')
-      .run('toyota-camry', id);
+    await ctx.sql.run('UPDATE vehicles SET catalog_model_id = ? WHERE id = ?', [
+      'toyota-camry',
+      id,
+    ]);
 
     await roundTrip();
 
-    expect(catalogIds()).toEqual([null]);
+    expect(await catalogIds()).toEqual([null]);
   });
 });
