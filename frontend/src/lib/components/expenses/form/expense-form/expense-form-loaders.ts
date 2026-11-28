@@ -18,7 +18,7 @@ import {
 	toError,
 	userFacingErrorMessage
 } from '#lib/utils/error-handling.ts';
-import { toDateInputValue } from '#lib/utils/formatters.ts';
+import { toAmountInput, toDateInputValue } from '#lib/utils/formatters.ts';
 import { parsePreselectedTags } from './expense-navigation';
 import { splitStateFromGroup } from './split-config';
 import { readQuickAddMemory } from './quick-add-memory';
@@ -72,7 +72,7 @@ export async function loadQueuedExpense(state: ExpenseFormState, id: string): Pr
 	state.formData.vehicleId = queued.vehicleId;
 	state.formData.tags = queued.tags ?? [];
 	state.formData.category = queued.category;
-	state.formData.amount = queued.amount.toString();
+	state.formData.amount = toAmountInput(queued.amount, state.amountCurrency);
 	state.formData.date = toDateInputValue(queued.date);
 	state.formData.mileage = queued.mileage?.toString() ?? '';
 	state.formData.volume = queued.volume?.toString() ?? '';
@@ -151,7 +151,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 				if (isInsurance) {
 					state.isInsuranceManaged = true;
 					state.formData.category = first.category;
-					state.formData.amount = splitGroup.groupTotal.toString();
+					state.formData.amount = toAmountInput(splitGroup.groupTotal, state.amountCurrency);
 					state.formData.tags = first.tags || [];
 					state.formData.date = toDateInputValue(first.date);
 					state.formData.description = first.description || '';
@@ -161,7 +161,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 
 				state.isGroupEditMode = true;
 				state.formData.category = first.category;
-				state.formData.amount = splitGroup.groupTotal.toString();
+				state.formData.amount = toAmountInput(splitGroup.groupTotal, state.amountCurrency);
 				state.formData.tags = first.tags || [];
 				state.formData.date = toDateInputValue(first.date);
 				state.formData.description = first.description || '';
@@ -181,7 +181,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 		state.formData.vehicleId = expense.vehicleId;
 		state.formData.tags = expense.tags || [];
 		state.formData.category = expense.category;
-		state.formData.amount = expense.amount.toString();
+		state.formData.amount = toAmountInput(expense.amount, state.amountCurrency);
 		state.formData.date = toDateInputValue(expense.date);
 		state.formData.mileage = expense.mileage?.toString() ?? '';
 		state.formData.volume = expense.volume?.toString() ?? '';

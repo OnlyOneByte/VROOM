@@ -54,7 +54,7 @@
 				min="0"
 				bind:value={amount}
 				placeholder={amountPlaceholder(currency)}
-				class="h-auto min-w-[3ch] py-0 text-center text-7xl leading-none tabular-nums caret-needle placeholder:text-muted-foreground [field-sizing:content] sm:h-auto sm:text-8xl md:text-8xl {numberClass}"
+				class="h-auto min-w-[3ch] py-0 text-center text-7xl leading-none tabular-nums caret-needle placeholder:text-muted-foreground/40 [field-sizing:content] sm:h-auto sm:text-8xl md:text-8xl {numberClass}"
 				onblur={onAmountBlur}
 				aria-invalid={!!amountError}
 				aria-describedby={amountError ? 'amount-error' : undefined}

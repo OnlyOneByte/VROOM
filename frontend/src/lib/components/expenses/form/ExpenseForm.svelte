@@ -763,6 +763,9 @@
 						<div class="flex flex-wrap items-center gap-2 {quickAdd ? 'justify-center' : ''}">
 							{#if !form.isSplit}
 								{@render vehicleField(false)}
+								{#if quickAdd && form.canSplit}
+									<span class="h-0 basis-full sm:hidden" aria-hidden="true"></span>
+								{/if}
 							{/if}
 							<Label for="date" class="sr-only">Date *</Label>
 							{@render dateField('h-10 w-auto rounded-full px-3.5')}

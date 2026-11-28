@@ -13,6 +13,10 @@ describe('the underlined quick-add fields', () => {
 		expect(classes).toContain('focus-visible:shadow-[0_1.5px_0_0_var(--color-needle)]');
 	});
 
+	test('an empty figure shows its placeholder in a faint tone, so 0.000 does not read as a value', () => {
+		expect(classes).toContain('placeholder:text-muted-foreground/40');
+	});
+
 	test('show the error colour while an invalid field has focus', () => {
 		expect(classes).toContain('aria-invalid:focus-visible:border-destructive');
 		expect(classes).toContain(
