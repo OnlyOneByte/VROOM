@@ -122,9 +122,17 @@ describe('ReminderRow status', () => {
 		expect(screen.getByText('In 1,700 km')).toHaveClass('text-muted-foreground');
 	});
 
-	test('while it is being marked serviced from the menu, the row says so', () => {
+	test('while it is being marked serviced from the menu, the row says so', async () => {
 		renderUpcoming(40360, 'mi', true);
 		expect(screen.getByRole('status')).toHaveTextContent('Marking serviced…');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'More actions for Oil change' }));
+		expect(await screen.findByRole('button', { name: 'Marking…' })).toBeDisabled();
+	});
+
+	test('the status region is already in the row before marking starts, so the change is announced', () => {
+		renderUpcoming(40360, 'mi');
+		expect(screen.getByRole('status').textContent).toBe('');
 	});
 
 	test('with no reading yet it names the target reading', () => {

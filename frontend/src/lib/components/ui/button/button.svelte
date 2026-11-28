@@ -14,7 +14,7 @@
 				destructive:
 					'bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/40 aria-disabled:focus-visible:ring-destructive/80 aria-disabled:bg-destructive/50',
 				outline:
-					'border border-border-strong bg-background hover:bg-sunk aria-invalid:border-2 aria-disabled:border-border/50 aria-disabled:bg-background/50',
+					'border border-border-strong bg-transparent hover:bg-sunk aria-invalid:border-2 aria-disabled:border-border/50',
 				secondary: 'bg-sunk text-foreground hover:bg-sunk/70 aria-disabled:bg-sunk/50',
 				ghost: 'hover:bg-sunk',
 				link: 'text-accent-ink underline-offset-4 hover:underline'
