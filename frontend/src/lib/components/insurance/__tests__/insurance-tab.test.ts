@@ -176,6 +176,11 @@ describe('InsuranceTab policies', () => {
 		expect(
 			others.map(li => li.textContent?.match(/\w{3} \d+, \d{4} – \w{3} \d+, \d{4}/)?.[0])
 		).toEqual(['Jan 24, 2027 – Jul 24, 2027', 'Jan 26, 2026 – Jul 26, 2026']);
+		expect(others.map(li => li.textContent?.match(/Upcoming|Ended|In force/)?.[0])).toEqual([
+			'Upcoming',
+			'Ended'
+		]);
+		expect(within(row).getByText('Jan 24, 2027')).toHaveClass('whitespace-nowrap');
 	});
 
 	test('a policy whose only terms start later shows the earliest with when it starts', async () => {
