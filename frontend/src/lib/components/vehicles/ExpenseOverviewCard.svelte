@@ -18,7 +18,7 @@
 
 	const statItems = $derived([
 		{
-			label: 'Total Expenses',
+			label: 'Total expenses',
 			value: formatCurrency(stats.totalExpenses),
 			unit: 'all time',
 			icon: DollarSign,
@@ -32,7 +32,7 @@
 			iconColor: 'chart-1'
 		},
 		{
-			label: 'Monthly Average',
+			label: 'Monthly average',
 			value: formatCurrency(stats.monthlyAverage),
 			unit: 'last 12 months',
 			icon: TrendingUp,

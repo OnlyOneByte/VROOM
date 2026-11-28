@@ -319,18 +319,28 @@ describe('the Litestream example', () => {
   });
 });
 
-describe('the Portainer stack', () => {
-  test("the auto-updater's Docker-controlling dashboard is published on loopback only", () => {
-    const yaml = repoFile(PORTAINER);
-    const service = yaml.slice(yaml.search(/^ {2}tugtainer:$/m));
-    const lines = service
-      .slice(service.search(/^ {4}ports:$/m))
-      .split('\n')
-      .slice(1);
-    const end = lines.findIndex((line) => /^ {0,4}\S/.test(line));
-    const published = lines.slice(0, end).filter((line) => /^ {6}- /.test(line));
+function publishedPorts(stack: string, name: string): string[] {
+  const yaml = repoFile(stack);
+  const service = yaml.slice(yaml.search(new RegExp(`^ {2}${name}:$`, 'm')));
+  const lines = service
+    .slice(service.search(/^ {4}ports:$/m))
+    .split('\n')
+    .slice(1);
+  const end = lines.findIndex((line) => /^ {0,4}\S/.test(line));
+  return lines.slice(0, end).filter((line) => /^ {6}- /.test(line));
+}
+
+describe('published ports in the example stacks', () => {
+  test.each(STACKS)('%s publishes the backend on loopback only', (stack) => {
+    const published = publishedPorts(stack, 'backend');
     expect(published.length).toBeGreaterThan(0);
     for (const line of published) expect(line).toMatch(/^ {6}- "127\.0\.0\.1:/);
-    expect(service).toContain('/var/run/docker.sock');
+  });
+
+  test("the auto-updater's Docker-controlling dashboard is published on loopback only", () => {
+    const published = publishedPorts(PORTAINER, 'tugtainer');
+    expect(published.length).toBeGreaterThan(0);
+    for (const line of published) expect(line).toMatch(/^ {6}- "127\.0\.0\.1:/);
+    expect(repoFile(PORTAINER)).toContain('/var/run/docker.sock');
   });
 });

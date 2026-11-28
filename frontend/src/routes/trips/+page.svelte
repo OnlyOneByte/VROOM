@@ -101,7 +101,27 @@
 		await load();
 	}
 
+	let loadingMore = $state(false);
+	let generation = 0;
+
+	async function loadMore() {
+		loadingMore = true;
+		const started = generation;
+		try {
+			const next = await tripApi.list({ limit: 100, offset: trips.length });
+			if (started !== generation) return;
+			const shown = new Set(trips.map(t => t.id));
+			trips = [...trips, ...next.data.filter(t => !shown.has(t.id))];
+			totalCount = next.pagination.totalCount;
+		} catch (error) {
+			appStore.showError(`Couldn't load more trips. ${userFacingErrorMessage(error)}`);
+		} finally {
+			loadingMore = false;
+		}
+	}
+
 	async function load() {
+		generation++;
 		isLoading = true;
 		loadError = null;
 		try {
@@ -134,7 +154,7 @@
 {#snippet summarySection(s: TripSummary)}
 	<Card.Root variant="section" data-testid="trip-summary-card">
 		<Card.Header>
-			<Card.Title level={2} class="sr-only">Mileage Summary</Card.Title>
+			<Card.Title level={2} class="sr-only">Mileage summary</Card.Title>
 		</Card.Header>
 		<Card.Content class="space-y-5">
 			{#if s.rate > 0}
@@ -240,7 +260,7 @@
 			{#if !isLoading && !loadError && trips.length > 0 && loggable.length > 0}
 				<Button size="lg" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
-					Log Trip
+					Log trip
 				</Button>
 			{:else if isLoading}
 				<Skeleton class="h-10 w-full sm:w-36" />
@@ -277,7 +297,7 @@
 				{#if loggable.length > 0}
 					<Button size="lg" onclick={openCreate}>
 						<Plus class="mr-2 h-4 w-4" />
-						Log Trip
+						Log trip
 					</Button>
 				{/if}
 			{/snippet}
@@ -306,6 +326,11 @@
 					>
 						Showing {formatNumber(trips.length, 0)} of {formatNumber(totalCount, 0)} trips
 					</p>
+					<div class="flex justify-center pt-2">
+						<Button variant="outline" size="lg" disabled={loadingMore} onclick={loadMore}>
+							{loadingMore ? 'Loading…' : 'Load more trips'}
+						</Button>
+					</div>
 				{/if}
 			</Card.Content>
 		</Card.Root>
@@ -317,7 +342,7 @@
 		bind:open={deleteOpen}
 		title="Delete this trip?"
 		description="This removes the trip from your mileage log. This cannot be undone."
-		confirmLabel="Delete Trip"
+		confirmLabel="Delete trip"
 		onConfirm={confirmDelete}
 	>
 		<label class="flex items-start gap-3 rounded-md border border-border-strong p-3 text-sm">

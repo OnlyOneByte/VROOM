@@ -12,6 +12,13 @@ export interface AmortizationEntry {
 	isPaid: boolean;
 }
 
+export function showsPaymentSchedule(
+	financing: Pick<VehicleFinancing, 'financingType' | 'apr'> | undefined,
+	schedule: readonly AmortizationEntry[]
+): boolean {
+	return financing?.financingType === 'loan' && (financing.apr ?? 0) > 0 && schedule.length > 0;
+}
+
 interface LeaseMetrics {
 	monthsRemaining: number;
 	daysRemaining: number;

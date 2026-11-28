@@ -69,7 +69,7 @@
 
 		if (isLoanWithApr) {
 			items.push({
-				label: 'Principal vs Interest',
+				label: 'Principal vs interest',
 				value: formatCurrency(totalPrincipalPaid),
 				subtitle: `+ ${formatCurrency(totalInterestPaid)} interest`,
 				icon: TrendingUp,
@@ -78,7 +78,7 @@
 		}
 
 		items.push({
-			label: 'Payments Made',
+			label: 'Payments made',
 			value: paymentsCount,
 			subtitle: `of ${financing.termMonths} scheduled`,
 			icon: Hash,
@@ -86,7 +86,7 @@
 		});
 
 		items.push({
-			label: financing.financingType === 'lease' ? 'Lease End Date' : 'Estimated Payoff',
+			label: financing.financingType === 'lease' ? 'Lease end date' : 'Estimated payoff',
 			value: formatDate(estimatedPayoffDate),
 			subtitle: `${remainingMonths} month${remainingMonths !== 1 ? 's' : ''} remaining`,
 			icon: Calendar,
@@ -95,7 +95,7 @@
 
 		if (isLoanWithApr) {
 			items.push({
-				label: 'Total Cost of Loan',
+				label: 'Total cost of loan',
 				value: formatCurrency(totalCostOfLoan),
 				subtitle: `${interestPercentage}% over principal`,
 				icon: Banknote,
@@ -105,7 +105,7 @@
 
 		if (financing.financingType === 'lease' && financing.residualValue) {
 			items.push({
-				label: 'Residual Value (Buyout)',
+				label: 'Residual value (buyout)',
 				value: formatCurrency(financing.residualValue),
 				subtitle: 'End-of-lease purchase option',
 				icon: DollarSign,
@@ -119,7 +119,7 @@
 			financing.excessMileageFee
 		) {
 			items.push({
-				label: 'Mileage Overage',
+				label: 'Mileage overage',
 				value: excessMiles > 0 ? formatCurrency(overageCost) : formatCurrency(0),
 				subtitle: `${excessMiles > 0 ? `${formatNumber(excessMiles, 0)} ${distLabel} over` : 'Within limit'} · ${formatCurrency(financing.excessMileageFee)}/${distLabel}`,
 				icon: TriangleAlert,

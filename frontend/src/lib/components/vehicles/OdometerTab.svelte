@@ -179,7 +179,8 @@
 	}
 
 	function rowHref(entry: OdometerHistoryEntry): string {
-		const returnTo = `?returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`;
+		const back = `${resolve(paramRoutes.vehicle, { id: vehicleId })}?tab=odometer`;
+		const returnTo = `?returnTo=${encodeURIComponent(back)}`;
 		return entry.source === 'expense'
 			? resolve(paramRoutes.expenseEdit, { id: entry.sourceId }) + returnTo
 			: resolve(paramRoutes.vehicleOdometerEntryEdit, {
@@ -251,7 +252,7 @@
 
 		{#if chartError || chartData.length >= MIN_CHART_POINTS}
 			<AppLineChart
-				title="Mileage Over Time"
+				title="Mileage over time"
 				description={chartIsCapped
 					? `Your latest ${CHART_READING_LIMIT} readings`
 					: 'Odometer readings plotted by date'}

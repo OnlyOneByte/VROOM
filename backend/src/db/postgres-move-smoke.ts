@@ -2,7 +2,9 @@ import { Database } from 'bun:sqlite';
 import { readFileSync, writeFileSync } from 'node:fs';
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
-import { builtInRoleId } from '../permissions/grants';
+import { resolveNewUser } from '../api/auth/routes';
+import { appContext } from '../app-context';
+import { runMigrations } from './connection';
 
 export const MOVE_ORIGIN = 'http://127.0.0.1:4173';
 const DAY_SECONDS = 86_400;
@@ -27,22 +29,15 @@ export function sqliteSession(path: string): string {
   return session;
 }
 
-export async function postgresSession(url: string): Promise<string> {
-  const sql = new Bun.SQL(url, { max: 1 });
-  const userId = newId();
-  const session = newId();
-  const now = Math.floor(Date.now() / 1000);
-  try {
-    await sql`INSERT INTO users (id, email, display_name, created_at, updated_at)
-      VALUES (${userId}, ${`move-${userId}@vroom.test`}, 'Moved account', ${now}, ${now})`;
-    await sql`INSERT INTO role_assignments (id, user_id, role_id, scope_id, created_at)
-      VALUES (${newId()}, ${userId}, ${builtInRoleId('member')}, NULL, ${now})`;
-    await sql`INSERT INTO sessions (id, user_id, expires_at)
-      VALUES (${session}, ${userId}, ${now + DAY_SECONDS})`;
-  } finally {
-    await sql.close();
-  }
-  return session;
+export async function signUpSession(): Promise<string> {
+  const id = newId();
+  const result = await resolveNewUser('google', {
+    providerAccountId: `move-${id}`,
+    email: `move-${id}@vroom.test`,
+    displayName: 'Moved account',
+  });
+  if (!('userId' in result)) throw new Error(`Sign-up was refused: ${result.redirect}`);
+  return (await appContext().lucia.createSession(result.userId, {})).id;
 }
 
 function headers(session: string): Record<string, string> {
@@ -99,6 +94,8 @@ export function compareBackups(before: string, after: string): string[] {
 }
 
 if (import.meta.main) {
+  console.info = console.error;
+  console.debug = console.error;
   const [command, ...args] = process.argv.slice(2);
   const need = (i: number) => {
     const value = args[i];
@@ -106,8 +103,11 @@ if (import.meta.main) {
     return value;
   };
   if (command === 'session-sqlite') console.log(sqliteSession(need(0)));
-  else if (command === 'session-postgres') console.log(await postgresSession(need(0)));
-  else if (command === 'export') await exportBackup(need(0), need(1), need(2));
+  else if (command === 'session-postgres') {
+    await runMigrations();
+    console.log(await signUpSession());
+    process.exit(0);
+  } else if (command === 'export') await exportBackup(need(0), need(1), need(2));
   else if (command === 'restore') await restoreBackup(need(0), need(1), need(2));
   else if (command === 'compare') {
     const differences = compareBackups(need(0), need(1));
@@ -118,7 +118,7 @@ if (import.meta.main) {
     console.log('Every table has the same row count on Postgres as on SQLite.');
   } else {
     console.error(
-      'Usage: postgres-move-smoke.ts session-sqlite <db> | session-postgres <url> | export <base> <session> <zip> | restore <base> <session> <zip> | compare <sqlite.zip> <postgres.zip>'
+      'Usage: postgres-move-smoke.ts session-sqlite <db> | DATABASE_URL=<postgres url> session-postgres | export <base> <session> <zip> | restore <base> <session> <zip> | compare <sqlite.zip> <postgres.zip>'
     );
     process.exit(2);
   }

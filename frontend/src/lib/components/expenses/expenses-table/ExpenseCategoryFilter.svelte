@@ -43,7 +43,7 @@
 		</div>
 	</Select.Trigger>
 	<Select.Content>
-		<Select.Item value="" label="All Categories">All Categories</Select.Item>
+		<Select.Item value="" label="All categories">All categories</Select.Item>
 		{#each Object.entries(categoryLabels) as [category, label] (category)}
 			<Select.Item value={category} {label}>{label}</Select.Item>
 		{/each}

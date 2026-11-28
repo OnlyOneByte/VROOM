@@ -417,7 +417,7 @@ describe('new odometer reading submit', () => {
 			recordedAt: new Date(2026, 10, 10, 12, 0, 0).toISOString(),
 			note: 'Oil change visit'
 		});
-		expect(goto).toHaveBeenCalledWith('/vehicles/v1');
+		expect(goto).toHaveBeenCalledWith('/vehicles/v1?tab=odometer');
 	});
 
 	test('an empty note is sent as undefined', async () => {
@@ -523,7 +523,7 @@ describe('new odometer reading navigation', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-		expect(goto).toHaveBeenCalledWith('/vehicles/v1');
+		expect(goto).toHaveBeenCalledWith('/vehicles/v1?tab=odometer');
 		expect(create).not.toHaveBeenCalled();
 	});
 

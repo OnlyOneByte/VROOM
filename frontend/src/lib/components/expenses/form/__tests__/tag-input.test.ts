@@ -9,7 +9,7 @@ function renderTagInput(
 	extra: { error?: string; touched?: boolean; suggestions?: readonly string[] } = {}
 ) {
 	render(TagInput, { tags, suggestions: SUGGESTIONS, ...extra });
-	return screen.getByLabelText('Tags (Optional)') as HTMLInputElement;
+	return screen.getByLabelText('Tags (optional)') as HTMLInputElement;
 }
 
 function selectedTags(): string[] {

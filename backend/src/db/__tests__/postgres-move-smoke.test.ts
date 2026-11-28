@@ -4,7 +4,14 @@ import AdmZip from 'adm-zip';
 import { CONFIG } from '../../config';
 import { seedGarage } from '../../db/seed';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../test-helpers/http-client';
-import { compareBackups, exportBackup, MOVE_ORIGIN, restoreBackup } from '../postgres-move-smoke';
+import {
+  compareBackups,
+  exportBackup,
+  MOVE_ORIGIN,
+  restoreBackup,
+  rowCounts,
+  signUpSession,
+} from '../postgres-move-smoke';
 
 let ctx: TestApp;
 let server: ReturnType<typeof Bun.serve>;
@@ -36,6 +43,24 @@ describe('the SQLite to Postgres move script', () => {
     expect(compareBackups(before, after)).toEqual([]);
   }, 60_000);
 
+  test('the account to move into comes from the sign-up path with a working session', async () => {
+    const dir = process.env.KIROCREW_SCRATCH ?? process.env.TMPDIR ?? '/tmp';
+    const empty = join(dir, `move-signup-${process.pid}.zip`);
+    const moved = await signUpSession();
+    const me = await fetch(`${base}/api/v1/auth/me`, {
+      headers: { Cookie: `auth_session=${moved}`, Origin: MOVE_ORIGIN },
+    });
+    expect(me.status).toBe(200);
+    const body = (await me.json()) as {
+      data: { user: { id: string; email: string }; pendingApproval: boolean };
+    };
+    expect(body.data.user.id).not.toBe(ctx.user.id);
+    expect(body.data.user.email).toMatch(/^move-\w+@vroom\.test$/);
+    expect(body.data.pendingApproval).toBe(false);
+    await exportBackup(base, moved, empty);
+    expect(rowCounts(empty)['vehicles.csv'] ?? 0).toBe(0);
+  }, 60_000);
+
   test('a backup with rows missing after the move is reported table by table', async () => {
     const dir = process.env.KIROCREW_SCRATCH ?? process.env.TMPDIR ?? '/tmp';
     const before = join(dir, `move-full-${process.pid}.zip`);
@@ -49,5 +74,19 @@ describe('the SQLite to Postgres move script', () => {
     const differences = compareBackups(before, after);
     expect(differences).toHaveLength(1);
     expect(differences[0]).toMatch(/^expenses\.csv: \d+ on SQLite, 0 on Postgres$/);
+  }, 60_000);
+});
+
+describe('the move script command line', () => {
+  test('a session command prints only the session id on stdout, even with info logging', () => {
+    const dir = process.env.KIROCREW_SCRATCH ?? process.env.TMPDIR ?? '/tmp';
+    const { TEST_DB: _testDb, ...env } = process.env;
+    const run = Bun.spawnSync(['bun', 'src/db/postgres-move-smoke.ts', 'session-postgres'], {
+      cwd: join(import.meta.dir, '..', '..', '..'),
+      env: { ...env, DATABASE_URL: join(dir, `move-cli-${process.pid}.db`), LOG_LEVEL: 'info' },
+    });
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.toString()).toMatch(/^[a-z0-9]+\n$/);
+    expect(run.stderr.toString()).toContain('Running database migrations');
   }, 60_000);
 });

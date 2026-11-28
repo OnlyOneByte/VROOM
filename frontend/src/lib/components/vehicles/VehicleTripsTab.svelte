@@ -7,7 +7,9 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import { tripApi } from '#lib/services/trip-api.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { capitalize, formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
@@ -32,6 +34,7 @@
 	let unit = $derived(getDistanceUnitLabel(distanceUnit, true));
 
 	async function load() {
+		generation++;
 		isLoading = true;
 		loadError = null;
 		try {
@@ -42,6 +45,25 @@
 			loadError = userFacingErrorMessage(error);
 		} finally {
 			isLoading = false;
+		}
+	}
+
+	let loadingMore = $state(false);
+	let generation = 0;
+
+	async function loadMore() {
+		loadingMore = true;
+		const started = generation;
+		try {
+			const next = await tripApi.list({ vehicleId, limit: TRIP_LIMIT, offset: trips.length });
+			if (started !== generation) return;
+			const shown = new Set(trips.map(t => t.id));
+			trips = [...trips, ...next.data.filter(t => !shown.has(t.id))];
+			totalCount = next.pagination.totalCount;
+		} catch (error) {
+			appStore.showError(`Couldn't load more trips. ${userFacingErrorMessage(error)}`);
+		} finally {
+			loadingMore = false;
 		}
 	}
 
@@ -115,6 +137,13 @@
 					</li>
 				{/each}
 			</ul>
+			{#if trips.length < totalCount}
+				<div class="flex justify-center pt-3">
+					<Button variant="outline" size="lg" disabled={loadingMore} onclick={loadMore}>
+						{loadingMore ? 'Loading…' : 'Load more trips'}
+					</Button>
+				</div>
+			{/if}
 		</Card.Content>
 	</Card.Root>
 {/if}

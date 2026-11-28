@@ -282,7 +282,7 @@ describe('vehicle detail page overview', () => {
 		expect(captured['compare']?.['isOwner']).toBe(true);
 	});
 
-	test('the nickname titles the page and the owner sees Share and Add Expense', async () => {
+	test('the nickname titles the page and the owner sees Share and Add expense', async () => {
 		await mount();
 
 		expect(document.title).toBe('Daily Driver - VROOM Car Tracker');
@@ -307,7 +307,7 @@ describe('vehicle detail page overview', () => {
 			if (i > 0) expect(level - (levels[i - 1] ?? 1)).toBeLessThanOrEqual(1);
 		});
 		expect(
-			screen.getByRole('heading', { level: 2, name: /Vehicle Information/ })
+			screen.getByRole('heading', { level: 2, name: /Vehicle information/ })
 		).toBeInTheDocument();
 	});
 
@@ -343,7 +343,7 @@ describe('vehicle detail page overview', () => {
 		expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
 	});
 
-	test('the first Upload Photos tap mounts the upload dialog open', async () => {
+	test('the first Upload photos tap mounts the upload dialog open', async () => {
 		await mount();
 		await openDetails();
 		expect(captured['media']).toBeUndefined();
@@ -353,7 +353,7 @@ describe('vehicle detail page overview', () => {
 		await settle();
 
 		expect(captured['media']?.['open']).toBe(true);
-		expect(captured['media']?.['title']).toBe('Upload Vehicle Photos');
+		expect(captured['media']?.['title']).toBe('Upload vehicle photos');
 	});
 
 	test('a vehicle with no expenses shows the no-expenses empty state', async () => {
@@ -444,6 +444,17 @@ describe('vehicle detail page overview', () => {
 		expect(captured['photos']?.['photos']).toHaveLength(2);
 	});
 
+	test('?tab= opens that tab, and an unknown tab falls back to Overview', async () => {
+		const view = render(Page, { props: { data: { vehicleId: 'v1', tab: 'odometer' } } as never });
+		await settle();
+		expect(screen.getByRole('tab', { name: 'Odometer' })).toHaveAttribute('aria-selected', 'true');
+		view.unmount();
+
+		render(Page, { props: { data: { vehicleId: 'v1', tab: 'nope' } } as never });
+		await settle();
+		expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+	});
+
 	test('insurance is its own tab, loaded only when opened', async () => {
 		await mount();
 		expect(captured['insurance']).toBeUndefined();
@@ -461,14 +472,14 @@ describe('vehicle detail page overview', () => {
 		const trigger = screen.getByRole('button', { name: 'Details and photos' });
 		expect(trigger).toHaveAttribute('aria-expanded', 'false');
 		expect(captured['photos']).toBeUndefined();
-		expect(screen.queryByRole('heading', { name: /Vehicle Information/ })).toBeNull();
+		expect(screen.queryByRole('heading', { name: /Vehicle information/ })).toBeNull();
 
 		await fireEvent.click(trigger);
 		await waitFor(() => expect(captured['photos']).toBeDefined());
 		expect(container.querySelector('[data-mock="insurance"]')).toBeNull();
 
 		expect(trigger).toHaveAttribute('aria-expanded', 'true');
-		expect(screen.getByRole('heading', { level: 2, name: /Vehicle Information/ })).toBeVisible();
+		expect(screen.getByRole('heading', { level: 2, name: /Vehicle information/ })).toBeVisible();
 		expect(captured['photos']).toBeDefined();
 	});
 
@@ -519,7 +530,7 @@ describe('vehicle detail page overview', () => {
 
 		await openTab('Expenses');
 		await waitFor(() => expect(captured['categories']).toBeDefined());
-		expect(captured['trend']?.['description']).toBe('All Time');
+		expect(captured['trend']?.['description']).toBe('All time');
 		expect(captured['trend']?.['data']).toHaveLength(1);
 		const bars = captured['categories'];
 		expect(bars?.['title']).toBe('Spending by category');
@@ -899,7 +910,7 @@ describe('vehicle detail page tabs', () => {
 			expect(captured['table']?.['monthTotals']).toEqual(new Map([['2026-03', 85.4]]))
 		);
 		expect(captured['table']?.['ledger']).toBe(true);
-		expect(screen.queryByText('All Expenses')).toBeNull();
+		expect(screen.queryByText('All expenses')).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
 		await vi.waitFor(() =>

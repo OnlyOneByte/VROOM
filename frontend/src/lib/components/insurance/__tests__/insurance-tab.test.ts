@@ -34,7 +34,7 @@ vi.mock('#lib/utils/error-handling.ts', async importOriginal => ({
 
 const InsuranceTab = (await import('../InsuranceTab.svelte')).default;
 
-const RETURN_TO = encodeURIComponent('/vehicles/v1');
+const RETURN_TO = encodeURIComponent('/vehicles/v1?tab=insurance');
 
 function mount(readOnly = false) {
 	return render(InsuranceTab, { props: { vehicleId: 'v1', readOnly } });
@@ -131,6 +131,86 @@ describe('InsuranceTab policies', () => {
 		vi.setSystemTime(new Date(2026, 10, 23, 12));
 	}
 
+	test('with the next term already added, the row shows the term in force today, and the others are listed', async () => {
+		onNov23();
+		const renewed = makePolicy({
+			id: 'p6',
+			company: 'State Farm',
+			terms: [
+				makeTerm({
+					id: 'now',
+					policyId: 'p6',
+					startDate: '2026-07-26',
+					endDate: '2027-01-24',
+					totalCost: 1200
+				}),
+				makeTerm({
+					id: 'next',
+					policyId: 'p6',
+					startDate: '2027-01-24',
+					endDate: '2027-07-24',
+					totalCost: 1250
+				}),
+				makeTerm({
+					id: 'old',
+					policyId: 'p6',
+					startDate: '2026-01-26',
+					endDate: '2026-07-26',
+					totalCost: 1150
+				})
+			]
+		});
+		getPoliciesForVehicle.mockResolvedValue([renewed]);
+		mount();
+		await settle();
+
+		const row = screen.getByRole('link', { name: /State Farm/ });
+		expect(row).toHaveTextContent('Jul 26, 2026 – Jan 24, 2027');
+		expect(row).toHaveTextContent('$1,200.00');
+		expect(row).toHaveTextContent('Next term from Jan 24, 2027');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Show 2 other terms' }));
+		const others = within(screen.getByRole('list', { name: 'Other terms' })).getAllByRole(
+			'listitem'
+		);
+		expect(
+			others.map(li => li.textContent?.match(/\w{3} \d+, \d{4} – \w{3} \d+, \d{4}/)?.[0])
+		).toEqual(['Jan 24, 2027 – Jul 24, 2027', 'Jan 26, 2026 – Jul 26, 2026']);
+	});
+
+	test('a policy whose only terms start later shows the earliest with when it starts', async () => {
+		onNov23();
+		getPoliciesForVehicle.mockResolvedValue([
+			makePolicy({
+				id: 'p8',
+				company: 'Future Co',
+				terms: [
+					makeTerm({ id: 'late', policyId: 'p8', startDate: '2027-07-24', endDate: '2028-01-24' }),
+					makeTerm({ id: 'soon', policyId: 'p8', startDate: '2027-01-24', endDate: '2027-07-24' })
+				]
+			})
+		]);
+		mount();
+		await settle();
+
+		const row = screen.getByRole('link', { name: /Future Co/ });
+		expect(row).toHaveTextContent('Jan 24, 2027 – Jul 24, 2027');
+		expect(row).toHaveTextContent('Starts Jan 24, 2027');
+		expect(row).not.toHaveTextContent('Next term from');
+	});
+
+	test('notes sit under the row, outside its link', async () => {
+		getPoliciesForVehicle.mockResolvedValue([
+			makePolicy({ id: 'p7', notes: 'Agent: Pat, 555-0100', terms: [makeTerm()] })
+		]);
+		mount();
+		await settle();
+
+		const link = screen.getByRole('link', { name: /Acme Mutual/ });
+		expect(link).not.toHaveTextContent('Agent: Pat');
+		expect(screen.getByText('Agent: Pat, 555-0100')).toBeInTheDocument();
+	});
+
 	test('each policy is one row: carrier, number, term, cost and when it renews', async () => {
 		onNov23();
 		getPoliciesForVehicle.mockResolvedValue([current]);
@@ -184,7 +264,7 @@ describe('InsuranceTab policies', () => {
 		expect(screen.getByText('Renews in 20 days')).toHaveClass('text-warning');
 	});
 
-	test('viewers see coverage, notes and past terms without leaving the tab', async () => {
+	test('viewers see coverage, notes and other terms without leaving the tab', async () => {
 		const withHistory = makePolicy({
 			id: 'p5',
 			company: 'State Farm',
@@ -213,13 +293,13 @@ describe('InsuranceTab policies', () => {
 
 		expect(screen.getByText('Liability 100/300/100 · $500.00 deductible')).toBeInTheDocument();
 		expect(screen.getByText('Agent: Pat, 555-0100')).toBeInTheDocument();
-		const toggle = screen.getByRole('button', { name: 'Show 1 past term' });
+		const toggle = screen.getByRole('button', { name: 'Show 1 other term' });
 		expect(toggle).toHaveAttribute('aria-expanded', 'false');
 		await fireEvent.click(toggle);
-		const past = screen.getByRole('list', { name: 'Past terms' });
+		const past = screen.getByRole('list', { name: 'Other terms' });
 		expect(past).toHaveTextContent('Jan 26, 2026 – Jul 26, 2026');
 		expect(past).toHaveTextContent('$1,150.00');
-		expect(screen.getByRole('button', { name: 'Hide past terms' })).toHaveAttribute(
+		expect(screen.getByRole('button', { name: 'Hide other terms' })).toHaveAttribute(
 			'aria-expanded',
 			'true'
 		);

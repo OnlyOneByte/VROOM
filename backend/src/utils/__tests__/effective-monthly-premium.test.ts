@@ -1,19 +1,20 @@
 import { describe, expect, test } from 'bun:test';
+import { effectiveTermCost } from '../../api/insurance/hooks';
 import { effectiveMonthlyPremium } from '../analytics-charts';
 
 describe('effectiveMonthlyPremium', () => {
-  test('explicit monthlyCost wins, even when totalCost is also set', () => {
+  test('a total cost above 0 wins over the monthly cost, like the premium expense', () => {
     expect(
       effectiveMonthlyPremium({
         startDate: new Date('2024-01-01'),
         endDate: new Date('2024-06-30'),
-        monthlyCost: 200,
-        totalCost: 9999,
+        monthlyCost: 150,
+        totalCost: 1200,
       })
     ).toBe(200);
   });
 
-  test('monthlyCost of 0 is honoured (not treated as unset)', () => {
+  test('a monthly cost of 0 falls back to the total cost', () => {
     expect(
       effectiveMonthlyPremium({
         startDate: new Date('2024-01-01'),
@@ -21,7 +22,18 @@ describe('effectiveMonthlyPremium', () => {
         monthlyCost: 0,
         totalCost: 1200,
       })
-    ).toBe(0);
+    ).toBe(200);
+  });
+
+  test('a total cost of 0 falls back to the monthly cost', () => {
+    expect(
+      effectiveMonthlyPremium({
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-06-30'),
+        monthlyCost: 150,
+        totalCost: 0,
+      })
+    ).toBe(150);
   });
 
   test('totalCost-only term amortizes across the inclusive month span', () => {
@@ -96,5 +108,27 @@ describe('effectiveMonthlyPremium', () => {
         totalCost: 1200,
       })
     ).toBe(0);
+  });
+
+  test('times the billed months, it always equals the premium expense', () => {
+    const startDate = new Date('2024-01-01');
+    const endDate = new Date('2024-12-31');
+    for (const [monthlyCost, totalCost] of [
+      [150, 1200],
+      [0, 1200],
+      [150, 0],
+      [null, 1200],
+      [150, null],
+      [0, 0],
+    ] as const) {
+      const monthly = effectiveMonthlyPremium({ startDate, endDate, monthlyCost, totalCost });
+      const expense = effectiveTermCost({
+        totalCost: totalCost ?? 0,
+        monthlyCost,
+        startDate,
+        endDate,
+      });
+      expect(monthly * 12, `${monthlyCost} / ${totalCost}`).toBeCloseTo(expense, 6);
+    }
   });
 });

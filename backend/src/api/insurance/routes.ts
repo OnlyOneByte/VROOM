@@ -235,11 +235,7 @@ routes.delete('/:id', zValidator('param', idParamSchema), authorize(fromPolicyOw
   const { id } = c.req.valid('param');
   await validateInsuranceOwnership(id, user.id);
 
-  // Premium expenses link to terms by text, not FK, so they must be deleted explicitly before the cascade.
-  const policyToDelete = await repos().insurancePolicies.findById(id);
-  for (const term of policyToDelete?.terms ?? []) {
-    await deleteTermExpenses(term.id, user.id);
-  }
+  const termIds = ((await repos().insurancePolicies.findById(id))?.terms ?? []).map((t) => t.id);
 
   // Photos have no FK, so they must be removed before the policy cascade orphans them.
   await deleteWithPhotos(
@@ -250,8 +246,25 @@ routes.delete('/:id', zValidator('param', idParamSchema), authorize(fromPolicyOw
         entityType: 'insurance_claim',
         entityIds: (await repos().insuranceClaims.findByPolicyId(id)).map((claim) => claim.id),
       },
+      {
+        entityType: 'expense',
+        entityIds: (
+          await Promise.all(
+            termIds.map((termId) =>
+              repos().expenses.findBySource('insurance_term', termId, user.id)
+            )
+          )
+        )
+          .flat()
+          .map((expense) => expense.id),
+      },
     ],
-    () => repos().insurancePolicies.delete(id, user.id)
+    async () => {
+      await repos().insurancePolicies.delete(id, user.id);
+      for (const termId of termIds) {
+        await repos().expenses.deleteBySource('insurance_term', termId, user.id);
+      }
+    }
   );
   return c.json({ success: true, message: 'Insurance policy deleted successfully' });
 });

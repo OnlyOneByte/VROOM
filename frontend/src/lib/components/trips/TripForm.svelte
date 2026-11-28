@@ -157,7 +157,7 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="sm:max-w-lg max-h-[90vh] overflow-y-auto">
 		<Dialog.Header>
-			<Dialog.Title>{isEdit ? 'Edit Trip' : 'Log a Trip'}</Dialog.Title>
+			<Dialog.Title>{isEdit ? 'Edit trip' : 'Log a trip'}</Dialog.Title>
 			<Dialog.Description>
 				Record a trip's start and end odometer, purpose, and date. The end reading also updates the
 				vehicle's odometer history.
@@ -320,7 +320,7 @@
 						<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 						{isEdit ? 'Saving…' : 'Logging…'}
 					{:else}
-						{isEdit ? 'Save Trip' : 'Log Trip'}
+						{isEdit ? 'Save trip' : 'Log trip'}
 					{/if}
 				</Button>
 			</Dialog.Footer>

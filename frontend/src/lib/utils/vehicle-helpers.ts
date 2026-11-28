@@ -6,6 +6,6 @@ interface VehicleLike {
 }
 
 export function getVehicleDisplayName(vehicle: VehicleLike | null | undefined): string {
-	if (!vehicle) return 'Unknown Vehicle';
+	if (!vehicle) return 'Unknown vehicle';
 	return vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
 }

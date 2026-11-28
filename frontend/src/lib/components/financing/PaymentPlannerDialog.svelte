@@ -110,7 +110,7 @@
 		<Dialog.Header>
 			<Dialog.Title class="flex items-center gap-2">
 				<Calculator class="h-5 w-5 text-muted-foreground" />
-				Payment Planner
+				Payment planner
 			</Dialog.Title>
 			<Dialog.Description>
 				Adjust your monthly payment and see the impact on your loan.
@@ -119,7 +119,7 @@
 
 		<div class="space-y-4 py-2">
 			<div class="space-y-2">
-				<Label for="payment-input">Monthly Payment ({currencySymbol})</Label>
+				<Label for="payment-input">Monthly payment ({currencySymbol})</Label>
 				<Input
 					id="payment-input"
 					type="number"
@@ -153,7 +153,7 @@
 						<p class="text-sm font-semibold text-foreground">
 							{formatDate(impact.newPayoffDate)}
 						</p>
-						<p class="text-xs text-muted-foreground">Payoff Date</p>
+						<p class="text-xs text-muted-foreground">Payoff date</p>
 					</div>
 
 					<div class="rounded-lg border bg-card p-3 text-center">
@@ -162,7 +162,7 @@
 							{impact.monthsSaved}
 							{impact.monthsSaved === 1 ? 'mo' : 'mos'}
 						</p>
-						<p class="text-xs text-muted-foreground">Time Saved</p>
+						<p class="text-xs text-muted-foreground">Time saved</p>
 						{#if delta}
 							{@const monthsAbs = Math.abs(delta.monthsDelta)}
 							<p
@@ -186,7 +186,7 @@
 						<p class="text-sm font-semibold text-foreground">
 							{formatCurrency(impact.interestSaved)}
 						</p>
-						<p class="text-xs text-muted-foreground">Interest Saved</p>
+						<p class="text-xs text-muted-foreground">Interest saved</p>
 						{#if delta}
 							{@const interestAbs = Math.abs(delta.interestDelta)}
 							<p

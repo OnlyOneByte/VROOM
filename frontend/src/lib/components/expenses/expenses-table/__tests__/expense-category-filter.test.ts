@@ -51,14 +51,14 @@ describe('ExpenseCategoryFilter', () => {
 		}
 	);
 
-	test('offers All Categories plus every category', async () => {
+	test('offers All categories plus every category', async () => {
 		const { trigger } = renderFilter('', 'table');
 
 		await open(trigger);
-		await screen.findByRole('option', { name: 'All Categories' });
+		await screen.findByRole('option', { name: 'All categories' });
 
 		expect(screen.getAllByRole('option').map(o => o.textContent?.trim())).toEqual([
-			'All Categories',
+			'All categories',
 			'Fuel & charging',
 			'Maintenance',
 			'Financial',
@@ -77,11 +77,11 @@ describe('ExpenseCategoryFilter', () => {
 		expect(onChange).toHaveBeenCalledWith('regulatory');
 	});
 
-	test('choosing All Categories clears the filter', async () => {
+	test('choosing All categories clears the filter', async () => {
 		const { trigger, onChange } = renderFilter('fuel', 'compact');
 
 		await open(trigger);
-		await choose('All Categories');
+		await choose('All categories');
 
 		expect(onChange).toHaveBeenCalledWith('');
 	});

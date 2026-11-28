@@ -75,10 +75,12 @@ function claimDateTrigger(): HTMLElement {
 
 async function pickClaimDate(dateValue: string): Promise<void> {
 	await fireEvent.click(claimDateTrigger());
-	await settle();
-	await fireEvent.click(
-		document.querySelector(`[data-bits-day][data-value="${dateValue}"]`) as HTMLElement
-	);
+	const day = await vi.waitFor(() => {
+		const el = document.querySelector(`[data-bits-day][data-value="${dateValue}"]`);
+		if (!(el instanceof HTMLElement)) throw new Error(`no day ${dateValue}`);
+		return el;
+	});
+	await fireEvent.click(day);
 	await settle();
 }
 

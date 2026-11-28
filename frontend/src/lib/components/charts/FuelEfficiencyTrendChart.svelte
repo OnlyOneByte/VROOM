@@ -39,7 +39,7 @@
 
 	let units = $derived(unitPreferences ?? settingsStore.unitPreferences);
 
-	let title = $derived(fuelType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency');
+	let title = $derived(fuelType === 'electric' ? 'Electric efficiency' : 'Fuel efficiency');
 	let unitLabel = $derived(
 		fuelType === 'electric'
 			? getElectricEfficiencyLabel(units.distanceUnit, units.chargeUnit)

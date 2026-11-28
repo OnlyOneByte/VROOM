@@ -49,7 +49,7 @@
 	</EmptyHeader>
 	<EmptyContent>
 		{#if hasActiveFilters && onClearFilters}
-			<Button onclick={onClearFilters} variant="outline">Clear Filters</Button>
+			<Button onclick={onClearFilters} variant="outline">Clear filters</Button>
 		{:else}
 			<Button href={emptyActionHref} class="inline-flex items-center gap-2">
 				{emptyActionLabel}

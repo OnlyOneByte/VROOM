@@ -164,7 +164,7 @@
 				href={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}&category=fuel`}
 			>
 				<Plus class="h-4 w-4 mr-2" />
-				{electric ? 'Add Charging Session' : COMMON_MESSAGES.ADD_FUEL_EXPENSE}
+				{electric ? 'Add charging session' : COMMON_MESSAGES.ADD_FUEL_EXPENSE}
 			</Button>
 		{/snippet}
 	</EmptyState>

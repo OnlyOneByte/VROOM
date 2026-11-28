@@ -72,7 +72,7 @@ describe('a queued entry keeps the full form, not quick add', () => {
 	test('it has its own heading, a back button and the outlined Cancel beside Save', async () => {
 		render(ExpenseForm, { props: { queuedExpenseId: 'offline_1' } });
 
-		expect(await screen.findByRole('heading', { name: 'Edit Queued Expense' })).toBeTruthy();
+		expect(await screen.findByRole('heading', { name: 'Edit queued expense' })).toBeTruthy();
 		expect(screen.getByRole('button', { name: 'Go back' })).toBeTruthy();
 		expect(screen.getByRole('button', { name: 'Cancel' })).not.toHaveClass('text-accent-ink');
 		expect(screen.getByLabelText('Amount *')).not.toHaveClass('text-7xl');

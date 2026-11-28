@@ -25,7 +25,9 @@
 
 	let { data }: { data: PageData } = $props();
 	let vehicleId = $derived(data.vehicleId);
-	let returnTo = $derived(page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}`);
+	let returnTo = $derived(
+		page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}?tab=odometer`
+	);
 
 	let odometer = $state<string | number | null>('');
 	let date = $state(toDateInputValue(new Date()));
@@ -116,7 +118,7 @@
 </script>
 
 <svelte:head>
-	<title>Add Odometer Reading - VROOM Car Tracker</title>
+	<title>Add odometer reading - VROOM Car Tracker</title>
 	<meta name="description" content="Add a new odometer reading" />
 </svelte:head>
 

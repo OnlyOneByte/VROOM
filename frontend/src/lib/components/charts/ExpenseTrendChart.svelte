@@ -27,7 +27,7 @@
 
 	let {
 		data,
-		title = 'Expense Trends',
+		title = 'Expense trends',
 		level,
 		description = 'Spending over time',
 		isLoading = false,

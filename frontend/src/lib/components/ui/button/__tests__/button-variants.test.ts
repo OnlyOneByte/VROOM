@@ -12,6 +12,23 @@ const VARIANTS = [
 	'link'
 ] as const;
 
+describe('Button variant merging', () => {
+	test('a size overrides the base classes it conflicts with', () => {
+		const classes = buttonVariants({ size: 'sm' }).split(/\s+/);
+
+		expect(classes).toContain('text-[13px]');
+		expect(classes).not.toContain('text-sm');
+	});
+
+	test('a caller class overrides the variant classes it conflicts with', () => {
+		const classes = buttonVariants({ size: 'sm', class: 'h-12 px-6' }).split(/\s+/);
+
+		expect(classes).toEqual(expect.arrayContaining(['h-12', 'px-6', 'has-[>svg]:px-2.5']));
+		expect(classes).not.toContain('h-8');
+		expect(classes).not.toContain('px-3');
+	});
+});
+
 describe('Button invalid border', () => {
 	test.each(VARIANTS)('%s keeps the destructive border when invalid in dark mode', variant => {
 		const classes = buttonVariants({ variant }).split(/\s+/);

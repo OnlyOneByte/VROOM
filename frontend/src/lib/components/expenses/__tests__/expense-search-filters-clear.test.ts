@@ -51,7 +51,7 @@ describe('ExpenseSearchFilters: tags follow the filters the page applies', () =>
 		expect(screen.queryByRole('button', { name: 'Remove tag tolls' })).toBeNull();
 		expect(screen.queryByRole('button', { name: 'Remove tag parking' })).toBeNull();
 		expect(screen.queryByText('Matching all selected tags')).toBeNull();
-		expect(screen.queryByRole('button', { name: 'Clear Filters' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 	});
 
 	test('tags the page sets are shown as chips', async () => {

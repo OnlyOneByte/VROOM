@@ -200,8 +200,8 @@ describe('FuelEfficiencyStatsCard units', () => {
 
 describe('FuelEfficiencyStatsCard empty state', () => {
 	test.each([
-		['electric', 'No charging data yet', 'Add Charging Session'],
-		['gas', 'No fuel data yet', 'Add Fuel Expense']
+		['electric', 'No charging data yet', 'Add charging session'],
+		['gas', 'No fuel data yet', 'Add fuel expense']
 	] as const)('a %s vehicle with no data gets matching wording', (vehicleType, title, action) => {
 		const { container } = render(FuelEfficiencyStatsCard, {
 			props: {

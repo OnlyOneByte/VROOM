@@ -102,7 +102,7 @@ async function renderFinancedEditOwnAndKilometers(): Promise<void> {
 	await fireEvent.click(screen.getByRole('switch', { name: 'This car has a loan or lease' }));
 	await fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 	const payoff = await screen.findByRole('alertdialog');
-	await fireEvent.click(within(payoff).getByRole('button', { name: 'Mark Paid Off' }));
+	await fireEvent.click(within(payoff).getByRole('button', { name: 'Mark paid off' }));
 	await waitFor(() =>
 		expect(screen.getByRole('alertdialog').textContent).toContain('Change units for this vehicle?')
 	);
@@ -112,7 +112,7 @@ describe('VehicleForm unit change together with paying off the loan', () => {
 	test('switching to Own and changing units asks for both, pays off once and saves with the flag', async () => {
 		updateVehicle.mockRejectedValueOnce(unitChangeRejection()).mockResolvedValueOnce(EXISTING);
 		await renderFinancedEditOwnAndKilometers();
-		await fireEvent.click(screen.getByRole('button', { name: 'Change Units' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Change units' }));
 
 		await waitFor(() => expect(goto).toHaveBeenCalledWith('/vehicles/veh-1'));
 		expect(payOffFinancing).toHaveBeenCalledTimes(1);
@@ -161,7 +161,7 @@ describe('VehicleForm unit change on a vehicle with saved readings', () => {
 		});
 
 		await renderEditAndSwitchToKilometers();
-		await fireEvent.click(await screen.findByRole('button', { name: 'Change Units' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Change units' }));
 
 		await waitFor(() => expect(updateVehicle).toHaveBeenCalledTimes(2));
 		const resent = updateVehicle.mock.calls[1]?.[1];

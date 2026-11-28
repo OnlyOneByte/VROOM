@@ -66,7 +66,7 @@
 		onDelete: onDeleteProp,
 		emptyTitle = 'No expenses yet',
 		emptyDescription = 'Start tracking your vehicle expenses to see insights and analytics.',
-		emptyActionLabel = 'Add First Expense',
+		emptyActionLabel = 'Add first expense',
 		emptyActionHref = '/expenses/new',
 		scrollHeight = '600px',
 		onClearFilters,

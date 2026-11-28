@@ -152,13 +152,13 @@ describe('insurance page empty state', () => {
 		expect(goto).toHaveBeenCalledWith('/insurance/new');
 	});
 
-	test('with no vehicles and no policies it points to Add Vehicle and offers no policy button', async () => {
+	test('with no vehicles and no policies it points to Add vehicle and offers no policy button', async () => {
 		getAllPolicies.mockResolvedValue([]);
 		getVehicles.mockResolvedValue([]);
 		await mount();
 
 		expect(screen.getByRole('heading', { name: 'Add a vehicle first' })).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: 'Add vehicle' })).toHaveAttribute(
 			'href',
 			'/vehicles/new'
 		);

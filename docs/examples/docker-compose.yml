@@ -7,8 +7,8 @@ services:
     image: ghcr.io/onlyonebyte/vroom/backend:latest
     container_name: vroom-backend
     ports:
-      # Behind a reverse proxy on this host, publish on loopback only: "127.0.0.1:${BACKEND_PORT:-3001}:3001"
-      - "${BACKEND_PORT:-3001}:3001"
+      # Loopback only: reach it from other machines through a reverse proxy or the tunnel (docs/deployment.md)
+      - "127.0.0.1:${BACKEND_PORT:-3001}:3001"
     volumes:
       # Persistent database storage
       - vroom-data:/app/data

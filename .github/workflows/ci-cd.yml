@@ -169,7 +169,7 @@ jobs:
           pid=$!
           curl --retry 30 --retry-delay 1 --retry-all-errors -fsS http://127.0.0.1:3001/health | tee "$RUNNER_TEMP/health.json"
           jq -e '.status == "ok"' "$RUNNER_TEMP/health.json"
-          session=$(bun src/db/postgres-move-smoke.ts session-postgres "$POSTGRES_URL")
+          session=$(DATABASE_URL="$POSTGRES_URL" bun src/db/postgres-move-smoke.ts session-postgres)
           bun src/db/postgres-move-smoke.ts restore http://127.0.0.1:3001 "$session" "$RUNNER_TEMP/sqlite.zip"
           echo "MOVE_SESSION=$session" >> "$GITHUB_ENV"
           kill "$pid"

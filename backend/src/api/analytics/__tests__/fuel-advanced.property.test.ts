@@ -1,42 +1,39 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { EXPENSE_CATEGORIES } from '../../../db/types';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
-  type TestExpense,
-  type TestVehicle,
-  yearToRange,
-} from './analytics-test-generators';
+} from './analytics-test-db';
+import { type TestExpense, type TestVehicle, yearToRange } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 const CATEGORIES = EXPENSE_CATEGORIES;
 
-function resetDb(): void {
-  testDb.sqlite.close();
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+async function resetDb(): Promise<void> {
+  testDb.close();
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 }
 
-function seedDefaultUserAndVehicle(): TestVehicle {
+async function seedDefaultUserAndVehicle(): Promise<TestVehicle> {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-  seedUser(testDb.sqlite, user);
+  await seedUser(testDb.sql, user);
   const vehicle: TestVehicle = {
     id: 'vehicle-user-1-0',
     userId: 'user-1',
@@ -44,13 +41,13 @@ function seedDefaultUserAndVehicle(): TestVehicle {
     model: 'Camry',
     year: 2022,
   };
-  seedVehicle(testDb.sqlite, vehicle);
+  await seedVehicle(testDb.sql, vehicle);
   return vehicle;
 }
 
-function seedMultipleVehicles(count: number): TestVehicle[] {
+async function seedMultipleVehicles(count: number): Promise<TestVehicle[]> {
   const user = { id: 'user-1', email: 'test@test.com', displayName: 'Test' };
-  seedUser(testDb.sqlite, user);
+  await seedUser(testDb.sql, user);
   const result: TestVehicle[] = [];
   for (let v = 0; v < count; v++) {
     const vehicle: TestVehicle = {
@@ -60,13 +57,13 @@ function seedMultipleVehicles(count: number): TestVehicle[] {
       model: `Model${v}`,
       year: 2022,
     };
-    seedVehicle(testDb.sqlite, vehicle);
+    await seedVehicle(testDb.sql, vehicle);
     result.push(vehicle);
   }
   return result;
 }
 
-function seedMixedExpenses(vehicleList: TestVehicle[], perVehicle: number): void {
+async function seedMixedExpenses(vehicleList: TestVehicle[], perVehicle: number): Promise<void> {
   let idx = 0;
   for (const vehicle of vehicleList) {
     for (let i = 0; i < perVehicle; i++) {
@@ -82,7 +79,7 @@ function seedMixedExpenses(vehicleList: TestVehicle[], perVehicle: number): void
         fuelType: cat === 'fuel' ? 'Regular' : null,
         missedFillup: false,
       };
-      seedExpense(testDb.sqlite, expense);
+      await seedExpense(testDb.sql, expense);
     }
   }
 }
@@ -99,8 +96,8 @@ describe('Maintenance timeline status assignment', () => {
         fc.integer({ min: 1, max: 5 }),
         fc.integer({ min: 30, max: 365 }),
         async (serviceCount, daysBetween) => {
-          resetDb();
-          const vehicle = seedDefaultUserAndVehicle();
+          await resetDb();
+          const vehicle = await seedDefaultUserAndVehicle();
 
           const now = new Date();
           for (let i = 0; i < serviceCount; i++) {
@@ -118,7 +115,7 @@ describe('Maintenance timeline status assignment', () => {
               fuelType: null,
               missedFillup: false,
             };
-            seedExpense(testDb.sqlite, expense);
+            await seedExpense(testDb.sql, expense);
           }
 
           const result = await repo.getFuelAdvanced('user-1', yearToRange(now.getFullYear()));
@@ -146,9 +143,9 @@ describe('All computed scores bounded [10, 100]', () => {
         fc.integer({ min: 1, max: 4 }),
         fc.integer({ min: 1, max: 8 }),
         async (vehicleCount, expensesPerVehicle) => {
-          resetDb();
-          const vehicleList = seedMultipleVehicles(vehicleCount);
-          seedMixedExpenses(vehicleList, expensesPerVehicle);
+          await resetDb();
+          const vehicleList = await seedMultipleVehicles(vehicleCount);
+          await seedMixedExpenses(vehicleList, expensesPerVehicle);
 
           const result = await repo.getFuelAdvanced('user-1', yearToRange(2024));
 
@@ -170,8 +167,8 @@ describe('Fillup interval bucketing completeness', () => {
   test('sum of bucket counts equals number of consecutive date gaps', async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 2, max: 15 }), async (expenseCount) => {
-        resetDb();
-        const vehicle = seedDefaultUserAndVehicle();
+        await resetDb();
+        const vehicle = await seedDefaultUserAndVehicle();
 
         for (let i = 0; i < expenseCount; i++) {
           const expense: TestExpense = {
@@ -185,7 +182,7 @@ describe('Fillup interval bucketing completeness', () => {
             fuelType: 'Regular',
             missedFillup: false,
           };
-          seedExpense(testDb.sqlite, expense);
+          await seedExpense(testDb.sql, expense);
         }
 
         const result = await repo.getFuelAdvanced('user-1', yearToRange(2024));
@@ -201,7 +198,7 @@ describe('Fillup interval bucketing completeness', () => {
   });
 });
 
-function seedCategorizedExpenses(vehicleId: string, count: number): void {
+async function seedCategorizedExpenses(vehicleId: string, count: number): Promise<void> {
   for (let i = 0; i < count; i++) {
     const cat = CATEGORIES[i % CATEGORIES.length];
     const expense: TestExpense = {
@@ -215,7 +212,7 @@ function seedCategorizedExpenses(vehicleId: string, count: number): void {
       fuelType: cat === 'fuel' ? 'Regular' : null,
       missedFillup: false,
     };
-    seedExpense(testDb.sqlite, expense);
+    await seedExpense(testDb.sql, expense);
   }
 }
 
@@ -225,9 +222,9 @@ describe('Heatmap uses valid expense categories', () => {
 
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 10 }), async (expenseCount) => {
-        resetDb();
-        const vehicle = seedDefaultUserAndVehicle();
-        seedCategorizedExpenses(vehicle.id, expenseCount);
+        await resetDb();
+        const vehicle = await seedDefaultUserAndVehicle();
+        await seedCategorizedExpenses(vehicle.id, expenseCount);
 
         const result = await repo.getFuelAdvanced('user-1', yearToRange(2024));
 

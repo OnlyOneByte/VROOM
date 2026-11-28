@@ -85,7 +85,11 @@ export function writeRouteCalls(vehicleId: string, memberId: string): Record<str
       },
     },
     'POST /api/v1/insurance/:id/terms': {
-      body: { startDate: DATE, endDate: '2025-06-01T00:00:00.000Z', vehicleCoverage: coverage },
+      body: {
+        startDate: '2025-06-01T00:00:00.000Z',
+        endDate: '2026-06-01T00:00:00.000Z',
+        vehicleCoverage: coverage,
+      },
     },
     'POST /api/v1/insurance/:id/claims': {
       body: { claimDate: DATE, claimType: 'collision', payoutAmount: 100 },

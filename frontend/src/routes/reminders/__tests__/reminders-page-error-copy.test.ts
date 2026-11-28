@@ -86,11 +86,11 @@ describe('/reminders error copy', () => {
 		expect(screen.queryByText(/boom/)).toBeNull();
 	});
 
-	test('a failed Run Due Reminders says what failed and why', async () => {
+	test('a failed Run due reminders says what failed and why', async () => {
 		api.trigger.mockImplementation(failure);
 		render(Page);
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Run Due Reminders' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Run due reminders' }));
 		await expectToast("Couldn't run the due reminders.");
 	});
 
@@ -103,12 +103,12 @@ describe('/reminders error copy', () => {
 		await expectToast("Couldn't mark the notification as read.");
 	});
 
-	test('a failed Mark All Read says what failed and why', async () => {
+	test('a failed Mark all read says what failed and why', async () => {
 		api.getNotifications.mockResolvedValue([notification('n1'), notification('n2')]);
 		api.markNotificationRead.mockImplementation(failure);
 		render(Page);
 
-		await fireEvent.click(await screen.findByRole('button', { name: 'Mark All Read' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Mark all read' }));
 		await expectToast("Couldn't mark the notifications as read.");
 	});
 

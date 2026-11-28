@@ -25,7 +25,7 @@
 		<LoaderCircle class="h-5 w-5 animate-spin" />
 		Saving...
 	{:else}
-		{edit ? 'Save changes' : 'Save Expense'}
+		{edit ? 'Save changes' : 'Save expense'}
 	{/if}
 {/snippet}
 

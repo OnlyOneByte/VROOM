@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-	<title>Add Vehicle - VROOM Car Tracker</title>
+	<title>Add vehicle - VROOM Car Tracker</title>
 	<meta name="description" content="Add a new vehicle to your fleet" />
 </svelte:head>
 

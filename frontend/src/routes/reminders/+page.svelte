@@ -214,13 +214,13 @@
 			{#if dueReminders.length > 0 && vehicles.length > 0}
 				<Button variant="outline" size="lg" onclick={runDueReminders} disabled={isTriggering}>
 					<RefreshCw class="mr-2 h-4 w-4 {isTriggering ? 'animate-spin' : ''}" />
-					Run Due Reminders
+					Run due reminders
 				</Button>
 			{/if}
 			{#if !isLoading && !loadError && reminders.length > 0 && vehicles.length > 0}
 				<Button size="lg" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
-					New Reminder
+					New reminder
 				</Button>
 			{:else if isLoading}
 				<Skeleton class="h-10 w-full sm:w-36" />
@@ -259,7 +259,7 @@
 			{#snippet action()}
 				<Button size="lg" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
-					New Reminder
+					New reminder
 				</Button>
 			{/snippet}
 		</EmptyState>
@@ -305,7 +305,7 @@
 					</p>
 					<Button size="lg" class="mt-2" href={resolve(routes.vehicleNew)}>
 						<Plus class="mr-2 h-4 w-4" />
-						Add Vehicle
+						Add vehicle
 					</Button>
 				</AlertDescription>
 			</Alert>
@@ -343,7 +343,7 @@
 				{#if unreadNotifications.length > 0}
 					<Button variant="ghost" size="sm" class="ml-auto h-10" onclick={markAllNotificationsRead}>
 						<Check class="mr-2 h-4 w-4" />
-						Mark All Read
+						Mark all read
 					</Button>
 				{/if}
 			</Card.Header>

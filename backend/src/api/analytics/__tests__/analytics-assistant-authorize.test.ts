@@ -67,7 +67,7 @@ describe('the assistant resolves through can()', () => {
   });
 
   test('an account without a server role cannot use the assistant', async () => {
-    ctx.sqlite.run('DELETE FROM role_assignments WHERE user_id = ? AND scope_id IS NULL', [
+    await ctx.sql.run('DELETE FROM role_assignments WHERE user_id = ? AND scope_id IS NULL', [
       m.stranger.id,
     ]);
     const chat = await m.stranger.request('POST', '/api/v1/assistant/chat', { message: 'hi' });

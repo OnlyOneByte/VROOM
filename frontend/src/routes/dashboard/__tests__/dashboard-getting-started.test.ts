@@ -118,9 +118,9 @@ describe('dashboard getting started', () => {
 			'href',
 			'/analytics'
 		);
-		expect(controls('Add Expense')).toHaveLength(0);
+		expect(controls('Add expense')).toHaveLength(0);
 		expect(controls('Log fill-up').length).toBeGreaterThan(0);
-		expect(screen.queryByText('Total Expenses')).toBeNull();
+		expect(screen.queryByText('Total expenses')).toBeNull();
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
 	});
 

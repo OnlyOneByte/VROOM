@@ -373,8 +373,8 @@ function mountSection(caps: EnergyCapabilities, loaded: Partial<BoundForm> = {})
 }
 
 const HEADING_FOR_MODE: Record<EnergyMode, string> = {
-	fuel: 'Fuel Details',
-	charging: 'Charging Details'
+	fuel: 'Fuel details',
+	charging: 'Charging details'
 };
 
 function expectRequiredFieldVisible(section: MountedSection) {

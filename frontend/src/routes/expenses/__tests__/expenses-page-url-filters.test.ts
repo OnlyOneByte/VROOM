@@ -143,7 +143,7 @@ describe('/expenses filters in the URL', () => {
 		expect(summary).toHaveTextContent(
 			'Filtered by Daily Driver · Maintenance · Jan 1, 2026 – Jan 31, 2026'
 		);
-		expect(screen.getByRole('button', { name: /Clear Filters/ })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Clear filters/ })).toBeInTheDocument();
 		expect(nav.replaceState).not.toHaveBeenCalled();
 	});
 
@@ -191,7 +191,7 @@ describe('/expenses filters in the URL', () => {
 			expect(nav.replaceState).toHaveBeenLastCalledWith('/expenses?tags=work&q=oil', {})
 		);
 
-		await fireEvent.click(screen.getByRole('button', { name: /Clear Filters/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
 		await waitFor(() => expect(nav.replaceState).toHaveBeenLastCalledWith('/expenses', {}));
 	});
 
@@ -201,7 +201,7 @@ describe('/expenses filters in the URL', () => {
 
 		await fireEvent.input(input, { target: { value: 'oil' } });
 		await waitFor(() => expect(location.search).toBe('?q=oil'));
-		await fireEvent.click(screen.getByRole('button', { name: /Clear Filters/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
 
 		await waitFor(() => expect(nav.replaceState).toHaveBeenLastCalledWith('/expenses', {}));
 		expect(location.search).toBe('');

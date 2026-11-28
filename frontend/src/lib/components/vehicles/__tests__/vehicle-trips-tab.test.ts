@@ -5,10 +5,10 @@ import { ApiError } from '#lib/utils/error-handling.ts';
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
-const list =
-	vi.fn<(filters: { vehicleId?: string; limit?: number }) => Promise<PaginatedResponse<Trip>>>();
+type Filters = { vehicleId?: string; limit?: number; offset?: number };
+const list = vi.fn<(filters: Filters) => Promise<PaginatedResponse<Trip>>>();
 vi.mock('#lib/services/trip-api.ts', () => ({
-	tripApi: { list: (filters: { vehicleId?: string; limit?: number }) => list(filters) }
+	tripApi: { list: (filters: Filters) => list(filters) }
 }));
 
 import VehicleTripsTab from '../VehicleTripsTab.svelte';
@@ -28,10 +28,10 @@ function trip(overrides: Partial<Trip> & { id: string }): Trip {
 	};
 }
 
-function page(data: Trip[]): PaginatedResponse<Trip> {
+function page(data: Trip[], totalCount = data.length): PaginatedResponse<Trip> {
 	return {
 		data,
-		pagination: { totalCount: data.length, limit: 100, offset: 0 }
+		pagination: { totalCount, limit: 100, offset: 0 }
 	} as PaginatedResponse<Trip>;
 }
 
@@ -109,5 +109,24 @@ describe('VehicleTripsTab', () => {
 
 		await fireEvent.click(await screen.findByRole('button', { name: /Retry/ }));
 		expect(await screen.findByTestId('vehicle-trips')).toBeInTheDocument();
+	});
+
+	test('Load more fetches the next trips for this car and adds them', async () => {
+		list.mockImplementation(filters =>
+			Promise.resolve(
+				filters.offset
+					? page([trip({ id: 't2', endLocation: 'Older place' })], 2)
+					: page([trip({ id: 't1' })], 2)
+			)
+		);
+		render(VehicleTripsTab, { props: { vehicleId: 'v1', distanceUnit: 'kilometers' } });
+		const section = await screen.findByTestId('vehicle-trips');
+
+		await fireEvent.click(within(section).getByRole('button', { name: 'Load more trips' }));
+
+		expect(await within(section).findByText(/Older place/)).toBeInTheDocument();
+		expect(list).toHaveBeenLastCalledWith({ vehicleId: 'v1', limit: 100, offset: 1 });
+		expect(within(section).getAllByRole('listitem')).toHaveLength(2);
+		expect(within(section).queryByRole('button', { name: 'Load more trips' })).toBeNull();
 	});
 });

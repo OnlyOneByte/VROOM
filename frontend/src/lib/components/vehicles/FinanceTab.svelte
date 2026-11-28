@@ -22,7 +22,8 @@
 		calculateAmortizationSchedule,
 		calculatePayoffDate,
 		derivePaymentEntries,
-		resolveCurrentOdometer
+		resolveCurrentOdometer,
+		showsPaymentSchedule
 	} from '#lib/utils/financing-calculations.ts';
 	import type { Expense, Vehicle, VehicleStats, DerivedPaymentEntry } from '#lib/types/index.ts';
 
@@ -94,6 +95,9 @@
 		}
 	});
 
+	let hasNextPayment = $derived((vehicle?.financing?.paymentAmount ?? 0) > 0);
+	let hasSchedule = $derived(showsPaymentSchedule(vehicle?.financing, amortizationSchedule));
+
 	onMount(() => {
 		if (vehicle?.financing?.isActive && !hasAttemptedPaymentLoad) {
 			loadPaymentHistory();
@@ -152,23 +156,25 @@
 			/>
 		{/if}
 
-		<div
-			class="grid gap-6 empty:hidden lg:grid-cols-2 lg:items-start lg:[&>:only-child]:col-span-2"
-			data-testid="finance-next-payment-grid"
-		>
-			{#if vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
-				<NextPaymentCard
-					financing={vehicle.financing}
-					lastPayment={payments.at(-1)}
-					{paymentsLoaded}
-					{isOwner}
-					recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&financingId=${vehicle.financing.id}&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-					showProgress={vehicle.financing.financingType !== 'loan'}
-					onChangePayment={() => (showPaymentPlanner = true)}
-				/>
-			{/if}
-			<FinancingCharts financing={vehicle.financing} {amortizationSchedule} />
-		</div>
+		{#if hasNextPayment || hasSchedule}
+			<div
+				class="grid gap-6 lg:grid-cols-2 lg:items-start lg:[&>:only-child]:col-span-2"
+				data-testid="finance-next-payment-grid"
+			>
+				{#if hasNextPayment}
+					<NextPaymentCard
+						financing={vehicle.financing}
+						lastPayment={payments.at(-1)}
+						{paymentsLoaded}
+						{isOwner}
+						recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&financingId=${vehicle.financing.id}&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
+						showProgress={vehicle.financing.financingType !== 'loan'}
+						onChangePayment={() => (showPaymentPlanner = true)}
+					/>
+				{/if}
+				<FinancingCharts financing={vehicle.financing} {amortizationSchedule} />
+			</div>
+		{/if}
 
 		{#if vehicle.financing.financingType !== 'loan' && vehicle.financing.paymentAmount && vehicle.financing.paymentAmount > 0}
 			<PaymentMetricsGrid
@@ -192,7 +198,7 @@
 	{:else}
 		<Alert variant="destructive">
 			<CircleAlert class="h-4 w-4" />
-			<AlertTitle>Invalid Financing Data</AlertTitle>
+			<AlertTitle>Invalid financing data</AlertTitle>
 			<AlertDescription>
 				The financing information for this vehicle is incomplete or invalid. Please update the
 				financing details.
@@ -216,9 +222,9 @@
 	{#if vehicle.financing.financingType === 'loan' && (!vehicle.financing.apr || vehicle.financing.apr <= 0)}
 		<Alert>
 			<CircleAlert class="h-4 w-4" />
-			<AlertTitle>APR Not Set</AlertTitle>
+			<AlertTitle>APR not set</AlertTitle>
 			<AlertDescription>
-				The APR (Annual Percentage Rate) is not set for this loan. Some features like the
+				The APR (annual percentage rate) is not set for this loan. Some features like the
 				amortization schedule and interest calculations will not be available.
 			</AlertDescription>
 		</Alert>

@@ -34,7 +34,7 @@
 	{#snippet action()}
 		<Button size="lg" href={resolve(routes.vehicleNew)}>
 			<Plus class="mr-2 h-4 w-4" />
-			Add Vehicle
+			Add vehicle
 		</Button>
 	{/snippet}
 </EmptyState>

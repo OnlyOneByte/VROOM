@@ -9,7 +9,7 @@ test.describe('Offline expense entry', () => {
 		await mockApi(page);
 	});
 
-	test('an expense saved offline shows on the list, and Add Expense opens again with the cached vehicles', async ({
+	test('an expense saved offline shows on the list, and Add expense opens again with the cached vehicles', async ({
 		page
 	}) => {
 		await page.goto('/expenses');
@@ -31,12 +31,12 @@ test.describe('Offline expense entry', () => {
 
 		await page.getByRole('radio', { name: 'Misc' }).click();
 		await page.getByLabel('Amount *').fill('12.34');
-		await page.getByRole('button', { name: 'Save Expense' }).click();
+		await page.getByRole('button', { name: 'Save expense' }).click();
 		await expect(page.getByText('Expense saved offline. Will sync when online.')).toBeVisible();
 
 		await expect(page).toHaveURL(/\/expenses$/);
 		await expect(page.getByText("You're offline")).toBeVisible();
-		await expect(page.getByText(/Pending Sync \(1\)/)).toBeVisible();
+		await expect(page.getByText(/Pending sync \(1\)/)).toBeVisible();
 		await expect(page.getByText('$12.34')).toBeVisible();
 		await expect(page.getByText("Couldn't load expenses")).toHaveCount(0);
 
@@ -81,13 +81,13 @@ test.describe('Offline expense entry', () => {
 		await expect(row.getByText('Not saved: Amount must be 1,000,000 or less')).toBeVisible();
 		await row.getByRole('link', { name: /^Edit .*1,000,001/ }).click();
 
-		await expect(page.getByRole('heading', { name: 'Edit Queued Expense' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Edit queued expense' })).toBeVisible();
 		await expect(page.getByLabel('Amount *')).toHaveValue('1000001');
-		await page.getByRole('button', { name: 'Save Expense' }).click();
+		await page.getByRole('button', { name: 'Save expense' }).click();
 		await expect(page.locator('#amount-error')).toHaveText('Amount must be 1,000,000 or less');
 
 		await page.getByLabel('Amount *').fill('6.50');
-		await page.getByRole('button', { name: 'Save Expense' }).click();
+		await page.getByRole('button', { name: 'Save expense' }).click();
 		await expect(page.getByText('Entry updated. Syncing it now.')).toBeVisible();
 		await expect(page).toHaveURL(/\/expenses$/);
 		await expect(page.getByText(/Needs attention \(/)).toHaveCount(0);
@@ -142,7 +142,7 @@ test.describe('Opening the app offline', () => {
 		await expect(coldStart.getByRole('heading', { name: "You're offline" })).toHaveCount(0);
 	});
 
-	test('Add Expense lists the vehicles offline even if it was never opened online', async ({
+	test('Add expense lists the vehicles offline even if it was never opened online', async ({
 		page,
 		context
 	}) => {

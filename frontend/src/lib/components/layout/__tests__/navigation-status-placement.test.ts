@@ -102,7 +102,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 			render(Navigation);
 
 			const panel = await openSyncPanel();
-			const retry = within(panel).getByRole('button', { name: 'Retry connection' });
+			const retry = await within(panel).findByRole('button', { name: 'Retry connection' });
 
 			mockFetch.mockReset();
 			mockFetch.mockResolvedValue(me());
@@ -131,7 +131,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 
 			expect(screen.getByLabelText('1 pending items')).toHaveTextContent('1');
 			const panel = await openSyncPanel();
-			await fireEvent.click(within(panel).getByRole('button', { name: 'Sync now' }));
+			await fireEvent.click(await within(panel).findByRole('button', { name: 'Sync now' }));
 			const { syncManager } = await import('#lib/utils/sync/sync-manager.ts');
 			expect(syncManager.syncAll).toHaveBeenCalled();
 		});
@@ -165,7 +165,7 @@ describe('the sync status indicator lives in the navigation, never floating over
 			await fireEvent.click(trigger);
 			const panel = await screen.findByRole('dialog', { name: 'Sync status' });
 			expect(
-				within(panel).getByRole('link', { name: 'Fix it in Settings → Backups and storage' })
+				await within(panel).findByRole('link', { name: 'Fix it in Settings → Backups and storage' })
 			).toHaveAttribute('href', '/settings/storage');
 		});
 

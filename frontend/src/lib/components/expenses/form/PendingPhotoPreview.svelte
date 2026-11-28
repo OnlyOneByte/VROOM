@@ -49,7 +49,7 @@
 
 <div class="space-y-3">
 	<div class="flex items-center justify-between">
-		<h2 class="text-sm font-medium text-foreground">Photos & Receipts</h2>
+		<h2 class="text-sm font-medium text-foreground">Photos & receipts</h2>
 		<Button variant="outline" size="sm" class="h-10 text-xs" onclick={openUploadDialog}>
 			<Upload class="mr-1 h-3 w-3" />
 			Add
@@ -98,7 +98,7 @@
 	{#await mediaDialog then { default: MediaCaptureDialog }}
 		<MediaCaptureDialog
 			bind:open={showUploadDialog}
-			title="Add Photos & Receipts"
+			title="Add photos & receipts"
 			description="Select photos or receipts to attach to this {entityNoun}"
 			acceptedTypes={['image/jpeg', 'image/png', 'image/webp', 'application/pdf']}
 			onUpload={async file => {

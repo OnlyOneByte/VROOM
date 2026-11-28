@@ -223,7 +223,7 @@
 				Uploading...
 			{:else}
 				<Upload class="mr-2 h-4 w-4" />
-				Use Photo
+				Use photo
 			{/if}
 		</Button>
 	</div>

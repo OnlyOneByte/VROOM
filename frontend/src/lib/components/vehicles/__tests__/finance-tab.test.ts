@@ -301,7 +301,7 @@ describe('FinanceTab loan summary', () => {
 		await screen.findByText(/2 payments recorded/);
 		await fireEvent.click(screen.getByRole('button', { name: /Payment planner/ }));
 		const dialog = await screen.findByRole('dialog');
-		await fireEvent.input(within(dialog).getByLabelText(/Monthly Payment/), {
+		await fireEvent.input(within(dialog).getByLabelText(/Monthly payment/), {
 			target: { value: '450' }
 		});
 		await fireEvent.click(within(dialog).getByRole('button', { name: /Save/ }));
@@ -312,16 +312,16 @@ describe('FinanceTab loan summary', () => {
 	test('a zero-APR loan warns that interest features are unavailable', async () => {
 		mount(makeVehicle(makeLoan({ apr: 0 })));
 		await screen.findByText(/2 payments recorded/);
-		expect(screen.getByText('APR Not Set')).toBeTruthy();
-		expect(screen.queryByText('Principal vs Interest')).toBeNull();
-		expect(screen.queryByText('Total Cost of Loan')).toBeNull();
+		expect(screen.getByText('APR not set')).toBeTruthy();
+		expect(screen.queryByText('Principal vs interest')).toBeNull();
+		expect(screen.queryByText('Total cost of loan')).toBeNull();
 		expect(screen.queryByText('Payment schedule')).toBeNull();
 	});
 
 	test('an interest-bearing loan shows no APR warning', async () => {
 		mount(makeVehicle(makeLoan()));
 		await screen.findByText(/2 payments recorded/);
-		expect(screen.queryByText('APR Not Set')).toBeNull();
+		expect(screen.queryByText('APR not set')).toBeNull();
 	});
 
 	test('the next payment and the payment schedule share one two-column row on wide screens', async () => {
@@ -335,9 +335,9 @@ describe('FinanceTab loan summary', () => {
 
 	test('invalid financing amounts show an error instead of the summary', async () => {
 		mount(makeVehicle(makeLoan({ originalAmount: 0 })));
-		expect(screen.getByText('Invalid Financing Data')).toBeTruthy();
+		expect(screen.getByText('Invalid financing data')).toBeTruthy();
 		expect(screen.queryByRole('region', { name: 'Next payment' })).toBeNull();
-		expect(screen.queryByText('Payments Made')).toBeNull();
+		expect(screen.queryByText('Payments made')).toBeNull();
 		await screen.findByText(/2 payments recorded/);
 	});
 
@@ -345,7 +345,13 @@ describe('FinanceTab loan summary', () => {
 		mount(makeVehicle(makeLoan({ paymentAmount: 0 })));
 		await screen.findByText(/2 payments recorded/);
 		expect(screen.queryByRole('region', { name: 'Next payment' })).toBeNull();
-		expect(screen.queryByText('Payments Made')).toBeNull();
+		expect(screen.queryByText('Payments made')).toBeNull();
+	});
+
+	test('with neither a next payment nor a schedule to draw, the two-column row is not there at all', async () => {
+		mount(makeVehicle(makeLease({ paymentAmount: 0 })));
+		await screen.findByText(/payments? recorded|No payments/);
+		expect(screen.queryByTestId('finance-next-payment-grid')).toBeNull();
 	});
 });
 
@@ -359,8 +365,8 @@ describe('FinanceTab lease', () => {
 		const mileage = screen.getByRole('region', { name: 'Mileage' });
 		expect(within(mileage).getByText(/15,000/)).toBeTruthy();
 		expect(within(mileage).getByText(/21,000 left/)).toBeTruthy();
-		expect(screen.getByText('Lease End Date')).toBeTruthy();
-		expect(screen.queryByText('APR Not Set')).toBeNull();
+		expect(screen.getByText('Lease end date')).toBeTruthy();
+		expect(screen.queryByText('APR not set')).toBeNull();
 		expect(screen.queryByRole('button', { name: /Payment planner/ })).toBeNull();
 	});
 
@@ -368,7 +374,7 @@ describe('FinanceTab lease', () => {
 		getExpensesByVehicle.mockResolvedValue(page([]));
 		mount(makeVehicle(makeLease()), { vehicleStatsData: stats({ currentOdometer: 50_000 }) });
 		await screen.findByText('No payments recorded yet. Record a payment to track your progress.');
-		expect(screen.getByText('Mileage Overage')).toBeTruthy();
+		expect(screen.getByText('Mileage overage')).toBeTruthy();
 		expect(screen.getByText('$1,000.00')).toBeTruthy();
 		expect(screen.getByText(/4,000 mi over/)).toBeTruthy();
 	});

@@ -48,7 +48,6 @@
   "backend/src/api/insurance/claims-validation.ts: Use nullish, not optional: JSON drops undefined, so null is the only way to clear a column.",
   "backend/src/api/insurance/repository.ts: Owner-scoped lookups keep writes safe even if a caller skips the route ownership check.",
   "backend/src/api/insurance/routes.ts: Photos have no FK, so they must be removed before the policy cascade orphans them.",
-  "backend/src/api/insurance/routes.ts: Premium expenses link to terms by text, not FK, so they must be deleted explicitly before the cascade.",
   "backend/src/api/insurance/routes.ts: Premium expenses link to terms by text, not FK, so they must be deleted explicitly.",
   "backend/src/api/odometer/repository.ts: Every raw-SQL leg must keep the user_id predicate or rows leak across users.",
   "backend/src/api/odometer/repository.ts: Shared with trips: changing this window breaks trip/odometer dedup.",

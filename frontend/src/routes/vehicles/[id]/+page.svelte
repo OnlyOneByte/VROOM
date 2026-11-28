@@ -104,7 +104,10 @@
 	let isLoadingStats = $derived(isLoadingSummary || isLoadingVehicleStats);
 	let vehicle = $state<Vehicle | null>(null);
 	let showingCachedVehicle = $state(false);
-	let activeTab = $state('overview');
+	const TABS = ['overview', 'expenses', 'loan', 'odometer', 'insurance', 'trips'];
+	let activeTab = $state(
+		untrack(() => (data.tab && TABS.includes(data.tab) ? data.tab : 'overview'))
+	);
 	let visitedTabs = $state<Record<string, boolean>>({ overview: true });
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	const selectedStatsPeriod: TimePeriod = 'all';
@@ -282,9 +285,9 @@
 		vehicle ? vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}` : ''
 	);
 
-	const trendDescription = 'All Time';
+	const trendDescription = 'All time';
 	let fuelChartTitle = $derived(
-		vehicle?.vehicleType === 'electric' ? 'Electric Efficiency' : 'Fuel Efficiency'
+		vehicle?.vehicleType === 'electric' ? 'Electric efficiency' : 'Fuel efficiency'
 	);
 	let fuelChartDescription = $derived.by(() => {
 		const units = vehicle?.unitPreferences ?? settingsStore.unitPreferences;
@@ -846,7 +849,7 @@
 {#snippet spendChartPlaceholders(error: string | null)}
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 		<ChartCard
-			title="Expense Trends"
+			title="Expense trends"
 			description={trendDescription}
 			height={300}
 			isLoading={!error}
@@ -1423,7 +1426,7 @@
 			{#await loadUploadDialog() then { default: MediaCaptureDialog }}
 				<MediaCaptureDialog
 					bind:open={showUploadDialog}
-					title="Upload Vehicle Photos"
+					title="Upload vehicle photos"
 					description="Upload or capture photos of your vehicle (JPEG, PNG, WebP up to 10MB)"
 					onUpload={file => vehicleApi.uploadPhoto(vehicleId, file)}
 					onUploadComplete={result => handlePhotoUploadComplete(result as Photo)}
