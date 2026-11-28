@@ -183,7 +183,7 @@ describe('CommunityCompareCard', () => {
 		compare.mockResolvedValue(all('awaiting_refresh'));
 		await mount();
 		expect(screen.getByTestId('community-compare-awaiting')).toHaveTextContent(
-			"You're in. Comparisons appear after the next daily refresh includes your vehicles."
+			"You're in. Group figures are updated about once a month, and comparisons appear once an update includes your vehicles."
 		);
 		expect(screen.queryByRole('link', { name: 'Turn on community stats' })).toBeNull();
 		expect(screen.queryByTestId('community-compare-efficiency')).toBeNull();
