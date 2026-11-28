@@ -46,8 +46,9 @@
 				bind:value={form.values.intervalValue}
 				placeholder="3"
 				aria-invalid={!!form.errors['intervalValue']}
+				aria-describedby={form.errors['intervalValue'] ? 'reminder-intervalValue-error' : undefined}
 			/>
-			{#if form.errors['intervalValue']}<FormFieldError>
+			{#if form.errors['intervalValue']}<FormFieldError id="reminder-intervalValue-error">
 					{form.errors['intervalValue']}
 				</FormFieldError>{/if}
 		</div>

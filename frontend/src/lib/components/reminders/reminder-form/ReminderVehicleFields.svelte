@@ -51,15 +51,26 @@
 
 {#if form.showSplitEditor}
 	<div class="space-y-2">
-		<Label>Split across vehicles</Label>
-		<SplitConfigEditor
-			vehicles={splitVehicles}
-			{totalAmount}
-			splitMethod={form.values.splitMethod}
-			allocations={form.values.splitAllocations}
-			onMethodChange={method => form.setSplitMethod(method)}
-			onAllocationsChange={allocations => form.setSplitAllocations(allocations)}
-		/>
-		{#if form.errors['split']}<FormFieldError>{form.errors['split']}</FormFieldError>{/if}
+		<Label id="reminder-split-label">Split across vehicles</Label>
+		<div
+			role="group"
+			tabindex="-1"
+			class="rounded-md"
+			aria-labelledby="reminder-split-label"
+			aria-describedby={form.errors['split'] ? 'reminder-split-error' : undefined}
+			data-invalid={form.errors['split'] ? 'true' : undefined}
+		>
+			<SplitConfigEditor
+				vehicles={splitVehicles}
+				{totalAmount}
+				splitMethod={form.values.splitMethod}
+				allocations={form.values.splitAllocations}
+				onMethodChange={method => form.setSplitMethod(method)}
+				onAllocationsChange={allocations => form.setSplitAllocations(allocations)}
+			/>
+		</div>
+		{#if form.errors['split']}<FormFieldError id="reminder-split-error">
+				{form.errors['split']}
+			</FormFieldError>{/if}
 	</div>
 {/if}
