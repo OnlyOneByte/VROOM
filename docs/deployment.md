@@ -335,8 +335,8 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Backups, backup downloads and restores can run for up to 10 minutes before answering.
-    location ~ ^/api/(v1/)?sync(/backups/download|/restore/from-provider)?$ {
+    # Backups, restores, the assistant and receipt scans can take minutes before answering.
+    location ~ ^/api/(v1/)?(sync(/backups/download|/restore/from-provider)?|assistant/chat|receipts/parse|photos/receipt-drafts)$ {
         proxy_read_timeout 11m;
         proxy_pass http://127.0.0.1:3001;
         proxy_set_header Host $host;
@@ -370,8 +370,9 @@ without the restore block, so does every backup larger than 10MB — the one pat
 be blocked by a limit tuned for JSON payloads.
 
 A backup, backup download or restore sends nothing until it finishes, which can take up to 10
-minutes. nginx closes an upstream that is silent for 60 seconds (`proxy_read_timeout`), so the
-two sync blocks raise it to 11 minutes for those paths only. Caddy has no such limit by default.
+minutes. An assistant reply or a receipt scan waits on the AI provider, and an import from
+Google Photos scans up to 25 receipts in a row. nginx closes an upstream that is silent for 60
+seconds (`proxy_read_timeout`), so the two blocks above raise it to 11 minutes for those paths only. Caddy has no such limit by default.
 Any other proxy in front (a load balancer, Cloudflare's 100-second cap) needs the same allowance.
 
 nginx's own `gzip` covers only `text/html` unless `gzip_types` names more. The backend already

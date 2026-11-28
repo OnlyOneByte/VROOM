@@ -9,6 +9,7 @@ import { AppError, ValidationError } from '../../errors';
 import { concurrencyLimiter, rateLimiter, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
+import { withoutIdleTimeout } from '../../utils/timeout';
 import { decryptRefreshToken } from '../providers/domains/storage/registry';
 import { parseExtraction } from '../providers/domains/vlm/prompt';
 import { getVlmProvider } from '../providers/domains/vlm/registry';
@@ -93,7 +94,7 @@ routes.get(
     };
 
     try {
-      const drafts = await stageReceiptDrafts(deps);
+      const drafts = await withoutIdleTimeout(c, () => stageReceiptDrafts(deps));
       return c.json({ success: true, data: { drafts } });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Google Photos error';

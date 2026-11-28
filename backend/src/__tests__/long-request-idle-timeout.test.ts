@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { connect } from 'node:net';
 import type { Server } from 'bun';
-import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
-import { SERVER_IDLE_TIMEOUT_SECONDS } from '../../../utils/timeout';
-import { backupService } from '../backup';
-import { backupOrchestrator } from '../backup-orchestrator';
-import { type RestoreResponse, restoreService } from '../restore';
+import * as llmOrchestrator from '../api/providers/domains/llm/orchestrator';
+import * as llmRegistry from '../api/providers/domains/llm/registry';
+import * as vlmRegistry from '../api/providers/domains/vlm/registry';
+import * as providerResolve from '../api/providers/resolve';
+import { backupService } from '../api/sync/backup';
+import { backupOrchestrator } from '../api/sync/backup-orchestrator';
+import { type RestoreResponse, restoreService } from '../api/sync/restore';
+import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../test-helpers/http-client';
+import { SERVER_IDLE_TIMEOUT_SECONDS } from '../utils/timeout';
 
 const TEST_ORIGIN = 'http://localhost:3000';
 const TEST_IDLE_SECONDS = 1;
@@ -24,7 +28,7 @@ function withinMs<T>(ms: number, promise: Promise<T>): Promise<T | 'timed out'> 
   return Promise.race([promise, Bun.sleep(ms).then(() => 'timed out' as const)]);
 }
 
-describe('long backup and restore requests outlive the idle timeout', () => {
+describe('long requests outlive the idle timeout', () => {
   let ctx: TestApp;
   let server: Server<unknown>;
   let timeoutCalls: number[];
@@ -51,7 +55,7 @@ describe('long backup and restore requests outlive the idle timeout', () => {
     ctx.close();
   });
 
-  const url = (path: string) => `http://127.0.0.1:${server.port}/api/v1/sync${path}`;
+  const url = (path: string) => `http://127.0.0.1:${server.port}/api/v1${path}`;
 
   test(
     'a restore that takes longer than the idle timeout still answers',
@@ -61,7 +65,7 @@ describe('long backup and restore requests outlive the idle timeout', () => {
         return { success: true } as unknown as RestoreResponse;
       });
       try {
-        const res = await fetch(url('/restore/from-backup'), {
+        const res = await fetch(url('/sync/restore/from-backup'), {
           method: 'POST',
           headers: { cookie: ctx.cookie, origin: TEST_ORIGIN, 'idempotency-key': 'slow-restore' },
           body: upload(),
@@ -84,7 +88,7 @@ describe('long backup and restore requests outlive the idle timeout', () => {
         return { status: 'completed', outcome: 'success' } as never;
       });
       try {
-        const res = await fetch(url(''), {
+        const res = await fetch(url('/sync'), {
           method: 'POST',
           headers: { cookie: ctx.cookie, origin: TEST_ORIGIN, 'content-type': 'application/json' },
           body: JSON.stringify({ syncTypes: ['backup'] }),
@@ -106,7 +110,7 @@ describe('long backup and restore requests outlive the idle timeout', () => {
         return Buffer.from('zip');
       });
       try {
-        const res = await fetch(url('/backups/download'), { headers: { cookie: ctx.cookie } });
+        const res = await fetch(url('/sync/backups/download'), { headers: { cookie: ctx.cookie } });
         expect(res.status).toBe(200);
         expect(await res.text()).toBe('zip');
         expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
@@ -158,7 +162,7 @@ describe('long backup and restore requests outlive the idle timeout', () => {
       try {
         const outcome = await withinMs(
           CLOSE_WAIT_MS,
-          fetch(url('/restore/from-backup'), {
+          fetch(url('/sync/restore/from-backup'), {
             method: 'POST',
             headers: {
               cookie: ctx.cookie,
@@ -182,10 +186,71 @@ describe('long backup and restore requests outlive the idle timeout', () => {
     SLOW_TEST_TIMEOUT_MS
   );
 
+  test(
+    'an assistant reply that takes longer than the idle timeout still answers',
+    async () => {
+      const spies = [
+        spyOn(providerResolve, 'resolveProvider').mockResolvedValue({
+          id: 'llm-1',
+          providerType: 'openai-compatible',
+        } as never),
+        spyOn(llmRegistry, 'getLlmProvider').mockResolvedValue({} as never),
+        spyOn(llmOrchestrator, 'runAssistant').mockImplementation(async () => {
+          await Bun.sleep(SLOW_MS);
+          return { reply: 'done', toolsUsed: [] };
+        }),
+      ];
+      try {
+        const res = await fetch(url('/assistant/chat'), {
+          method: 'POST',
+          headers: { cookie: ctx.cookie, origin: TEST_ORIGIN, 'content-type': 'application/json' },
+          body: JSON.stringify({ message: 'hi' }),
+        });
+        expect(res.status).toBe(200);
+        expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS
+  );
+
+  test(
+    'a receipt scan that takes longer than the idle timeout still answers',
+    async () => {
+      const spies = [
+        spyOn(providerResolve, 'resolveProvider').mockResolvedValue({
+          id: 'vlm-1',
+          providerType: 'openai-compatible',
+        } as never),
+        spyOn(vlmRegistry, 'getVlmProvider').mockResolvedValue({
+          extractReceipt: async () => {
+            await Bun.sleep(SLOW_MS);
+            return '{}';
+          },
+        } as never),
+      ];
+      try {
+        const form = new FormData();
+        form.append('image', new Blob([new Uint8Array(16)], { type: 'image/jpeg' }), 'r.jpg');
+        const res = await fetch(url('/receipts/parse'), {
+          method: 'POST',
+          headers: { cookie: ctx.cookie, origin: TEST_ORIGIN },
+          body: form,
+        });
+        expect(res.status).toBe(200);
+        expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS
+  );
+
   test('an unauthenticated request is refused before the idle timeout is lifted', async () => {
     const spy = spyOn(restoreService, 'restoreFromBackup');
     try {
-      const res = await fetch(url('/restore/from-backup'), {
+      const res = await fetch(url('/sync/restore/from-backup'), {
         method: 'POST',
         headers: { origin: TEST_ORIGIN, 'idempotency-key': 'anon-restore' },
         body: upload(),
