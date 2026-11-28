@@ -98,15 +98,20 @@
 		financing.originalAmount > 0 ? Math.min(100, (amountPaid / financing.originalAmount) * 100) : 0
 	);
 	let canPlan = $derived(isOwner && !!onChangePayment && isLoan);
-	const link =
-		'-my-1 -mr-2 inline-flex min-h-7 items-center rounded-sm px-2 text-sm font-semibold text-accent-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
 </script>
 
 <section aria-labelledby="next-payment-heading" class="space-y-1">
 	<div class="flex items-baseline justify-between gap-3">
 		<h3 class="text-base font-semibold" id="next-payment-heading">Next payment</h3>
 		{#if isOwner && recordPaymentHref}
-			<a href={recordPaymentHref} class={link}>Record payment</a>
+			<Button
+				href={recordPaymentHref}
+				variant="ghost"
+				size="sm"
+				class="-my-1 -mr-2 font-semibold text-accent-ink"
+			>
+				Record payment
+			</Button>
 		{/if}
 	</div>
 	<ul class="divide-y divide-border">
