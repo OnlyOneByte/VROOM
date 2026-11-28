@@ -332,4 +332,9 @@ describe('GET /auth/callback/:authProvider — provider errors', () => {
     expect(logged).toContain('unauthorized_client');
     expect(logged).not.toContain('Client secret');
   });
+
+  test('an outage on the provider side reads as unavailable', async () => {
+    const { location } = await returnWith('error=temporarily_unavailable');
+    expect(location).toBe(`${frontendUrl()}/auth?auth_error=provider_unavailable`);
+  });
 });
