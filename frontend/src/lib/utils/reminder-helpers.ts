@@ -1,9 +1,32 @@
 import type { Reminder } from '#lib/types/reminder.ts';
 import { capitalize } from './formatters';
 
-export function isReminderTimeDue(reminder: Reminder, now: number = Date.now()): boolean {
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
+
+function calendarDay(ms: number, timeZone: string | undefined): string {
+	const key = timeZone ?? '';
+	let format = dayFormats.get(key);
+	if (!format) {
+		format = new Intl.DateTimeFormat('en-CA', {
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			...(timeZone ? { timeZone } : {})
+		});
+		dayFormats.set(key, format);
+	}
+	return format.format(ms);
+}
+
+export function isReminderTimeDue(
+	reminder: Reminder,
+	now: number = Date.now(),
+	timeZone?: string
+): boolean {
 	if (reminder.nextDueDate === null) return false;
-	return new Date(reminder.nextDueDate).getTime() <= now;
+	return (
+		calendarDay(new Date(reminder.nextDueDate).getTime(), timeZone) <= calendarDay(now, timeZone)
+	);
 }
 
 export function isMileageTracking(reminder: Reminder): boolean {

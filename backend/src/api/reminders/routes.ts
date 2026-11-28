@@ -39,10 +39,12 @@ import { withMileageDue } from './mileage-due';
 import { recurringCostSummary } from './reminder-cost';
 import type { ReminderWithVehicles } from './repository';
 import {
+  endOfDayIn,
   firstDueOnOrAfter,
   nextDueAfterService,
   type ReminderSchedule,
   reminderTriggerService,
+  startOfDayIn,
 } from './trigger-service';
 import {
   assertMergedReminderValid,
@@ -258,7 +260,13 @@ function rescheduledFields(
   if (merged.triggerMode === 'mileage') return {};
   const resumed = update.isActive === true && !existing.isActive;
   if (!resumed && !scheduleChanged(existing, merged)) return {};
-  const nextDueDate = firstDueOnOrAfter(merged, new Date(), timeZone);
+  const now = new Date();
+  const firedToday =
+    existing.lastTriggeredAt !== null && existing.lastTriggeredAt >= startOfDayIn(now, timeZone);
+  const floor = firedToday
+    ? new Date(endOfDayIn(now, timeZone).getTime() + 1)
+    : startOfDayIn(now, timeZone);
+  const nextDueDate = firstDueOnOrAfter(merged, floor, timeZone);
   const ended = merged.endDate != null && nextDueDate > merged.endDate;
   if (ended && resumed) {
     throw new ValidationError('This reminder has passed its end date. Extend it to resume.');

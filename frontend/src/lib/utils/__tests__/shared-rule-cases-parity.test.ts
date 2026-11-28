@@ -32,9 +32,9 @@ const UNIT_FACTORS = readCases<{
 	usGallonsPerVolumeUnit: Record<VolumeUnit, number>;
 }>('utils/__tests__/unit-factors.cases.json');
 
-const TIME_DUE_CASES = readCases<{ nextDueDate: string; now: string; due: boolean }[]>(
-	'api/reminders/__tests__/reminder-time-due.cases.json'
-);
+const TIME_DUE_CASES = readCases<
+	{ nextDueDate: string; now: string; timeZone: string; due: boolean }[]
+>('api/reminders/__tests__/reminder-time-due.cases.json');
 
 const START_MILEAGE = 1000;
 
@@ -79,8 +79,11 @@ describe('unit-factors.cases.json', () => {
 });
 
 describe('reminder-time-due.cases.json', () => {
-	test.each(TIME_DUE_CASES)('due $nextDueDate at $now is $due', ({ nextDueDate, now, due }) => {
-		const reminder = { nextDueDate } as Reminder;
-		expect(isReminderTimeDue(reminder, new Date(now).getTime())).toBe(due);
-	});
+	test.each(TIME_DUE_CASES)(
+		'due $nextDueDate at $now in $timeZone is $due',
+		({ nextDueDate, now, timeZone, due }) => {
+			const reminder = { nextDueDate } as Reminder;
+			expect(isReminderTimeDue(reminder, new Date(now).getTime(), timeZone)).toBe(due);
+		}
+	);
 });
