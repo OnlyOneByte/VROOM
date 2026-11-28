@@ -1,5 +1,10 @@
 import { logger } from '../../../utils/logger';
-import { backupFilePrefix, backupService, resolveBackupFolderPath } from '../../sync/backup';
+import {
+  backupFilePrefix,
+  backupService,
+  RetentionIncompleteError,
+  resolveBackupFolderPath,
+} from '../../sync/backup';
 import type {
   BackupCapabilityResult,
   BackupStrategy,
@@ -11,7 +16,7 @@ import { credentialCodeOf, type StorageProvider } from '../domains/storage/stora
 import { healthFailure } from '../provider-status';
 
 export const RETENTION_WARNING =
-  "Backed up, but old backups couldn't be removed. The storage key needs permission to list and delete files.";
+  "Backed up, but old backups couldn't be removed. VROOM needs permission to list and delete files in this storage.";
 
 export async function uploadZipBackup(
   context: BackupStrategyContext,
@@ -47,6 +52,7 @@ export async function uploadZipBackup(
         error: error instanceof Error ? error.message : String(error),
       });
       warning = RETENTION_WARNING;
+      if (error instanceof RetentionIncompleteError) deletedOldBackups = error.deleted;
     }
 
     return {

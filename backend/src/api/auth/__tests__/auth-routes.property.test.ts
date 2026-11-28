@@ -8,7 +8,9 @@ describe('Auth routes structural properties', () => {
     const fnStart = routesSource.indexOf('function validateLoginState');
     expect(fnStart).toBeGreaterThan(-1);
     const fnBody = routesSource.slice(fnStart, routesSource.indexOf('\n}', fnStart) + 2);
-    expect(fnBody).toContain('consumeOAuthState(oauthStateStore, stateParam, undefined)');
+    expect(fnBody).toContain(
+      'consumeOAuthState(oauthStateStore, stateParam, undefined, authProviderId)'
+    );
   });
 
   test('link callback delegates to consumeOAuthState for the auth-link flow', async () => {
@@ -17,7 +19,9 @@ describe('Auth routes structural properties', () => {
     const fnStart = routesSource.indexOf('function validateLinkState');
     expect(fnStart).toBeGreaterThan(-1);
     const fnBody = routesSource.slice(fnStart, routesSource.indexOf('\n}', fnStart) + 2);
-    expect(fnBody).toContain("consumeOAuthState(oauthStateStore, stateParam, 'auth-link')");
+    expect(fnBody).toContain(
+      "consumeOAuthState(oauthStateStore, stateParam, 'auth-link', authProviderId)"
+    );
   });
 
   test('callback/link routes are registered before generic callback routes', async () => {

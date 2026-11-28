@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { backupService } from '../../sync/backup';
+import { backupService, RetentionIncompleteError } from '../../sync/backup';
 import type { BackupStrategyContext } from '../../sync/backup-strategy';
 import {
   GoogleDriveStrategy,
@@ -97,6 +97,28 @@ describe('GoogleDriveStrategy', () => {
   test('a successful cleanup carries no warning', async () => {
     const result = await strategy.execute(createContext());
     expect(result.capabilities.zip?.warning).toBeUndefined();
+  });
+
+  test('a cleanup that could not delete every old backup warns and reports what it did delete', async () => {
+    backupService.enforceRetention = mock(() =>
+      Promise.reject(new RetentionIncompleteError(1))
+    ) as typeof backupService.enforceRetention;
+
+    const result = await strategy.execute(createContext());
+
+    expect(result.capabilities.zip?.success).toBe(true);
+    expect(result.capabilities.zip?.warning).toBe(RETENTION_WARNING);
+    expect(result.capabilities.zip?.metadata?.deletedOldBackups).toBe(1);
+  });
+
+  test('a failed upload never triggers the cleanup of old backups', async () => {
+    mockUpload = mock(() => Promise.reject(new Error('Upload network error')));
+    strategy = new GoogleDriveStrategy(makeDeps());
+
+    const result = await strategy.execute(createContext());
+
+    expect(result.capabilities.zip?.success).toBe(false);
+    expect(mockEnforceRetention).not.toHaveBeenCalled();
   });
 
   test('a revoked sign-in fails the ZIP upload as an auth failure with the reconnect message', async () => {

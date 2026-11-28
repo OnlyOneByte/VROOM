@@ -151,7 +151,7 @@ describe('AnthropicLlmProvider.chat', () => {
 
     expect(captured?.body).toEqual({
       model: 'claude-3-5-sonnet',
-      max_tokens: 16_000,
+      max_tokens: 8192,
       system: 'You are a car-data assistant.',
       messages: [
         { role: 'user', content: 'How much did I spend on fuel?' },

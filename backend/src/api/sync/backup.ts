@@ -428,6 +428,13 @@ export function resolveBackupFolderPath(
   return joinStoragePath(providerRootPath, settings.folderPath);
 }
 
+export class RetentionIncompleteError extends Error {
+  constructor(readonly deleted: number) {
+    super('Some old backups could not be deleted');
+    this.name = 'RetentionIncompleteError';
+  }
+}
+
 export function backupFilePrefix(userId: string): string {
   const account = createHash('sha256').update(userId).digest('hex').slice(0, 12);
   return `vroom-backup-${account}-`;
@@ -497,6 +504,7 @@ class BackupService {
       }
     }
 
+    if (deletedCount < toDelete.length) throw new RetentionIncompleteError(deletedCount);
     return deletedCount;
   }
 

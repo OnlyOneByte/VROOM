@@ -131,14 +131,23 @@
 		showBackupDialog = true;
 	}
 
+	const names = (ids: string[]) =>
+		new Intl.ListFormat('en', { type: 'conjunction' }).format(
+			ids.map(id => storageProviders.find(provider => provider.id === id)?.displayName ?? id)
+		);
+
+	function cleanupProblem(results: BackupOrchestratorResult['results']): string | null {
+		const warned = Object.entries(results)
+			.filter(([, result]) => Object.values(result.capabilities).some(c => c.warning))
+			.map(([id]) => id);
+		if (warned.length === 0) return null;
+		return `Old backups couldn't be removed from ${names(warned)}. VROOM needs permission to list and delete files there.`;
+	}
+
 	function backupProblem(
 		failedProviders: string[],
 		results: BackupOrchestratorResult['results']
 	): string {
-		const names = (ids: string[]) =>
-			new Intl.ListFormat('en', { type: 'conjunction' }).format(
-				ids.map(id => storageProviders.find(provider => provider.id === id)?.displayName ?? id)
-			);
 		const unusable = failedProviders.filter(id => results[id]?.unusable);
 		const failed = failedProviders.filter(id => !results[id]?.unusable);
 		const problems = [
@@ -169,14 +178,16 @@
 			const data = await settingsStore.executeSync(['backup'], true, providerIds);
 			const providers = (count: number) => `${count} place${count === 1 ? '' : 's'}`;
 
+			const cleanup = cleanupProblem(data.results);
 			if (data.outcome === 'success') {
-				toast.success(`Backed up to ${providers(Object.keys(data.results).length)}`, {
-					id: toastId
-				});
+				const done = `Backed up to ${providers(Object.keys(data.results).length)}`;
+				if (cleanup) toast.warning(`${done}. ${cleanup}`, { id: toastId });
+				else toast.success(done, { id: toastId });
 			} else if (data.outcome === 'partial') {
 				const succeeded = Object.values(data.results).filter(r => r.success).length;
+				const problems = [backupProblem(data.failedProviders, data.results), cleanup];
 				toast.warning(
-					`Backed up to ${providers(succeeded)}. ${backupProblem(data.failedProviders, data.results)}`,
+					`Backed up to ${providers(succeeded)}. ${problems.filter(Boolean).join(' ')}`,
 					{ id: toastId }
 				);
 			} else if (data.outcome === 'noop') {

@@ -173,6 +173,7 @@ export interface ProviderBackupSettings {
   folderPath: string;
   retentionCount: number;
   lastBackupAt?: string;
+  backupWarning?: string;
   sheetsSyncEnabled?: boolean;
   sheetsSpreadsheetId?: string;
   sheetsAutoPausedAt?: string;

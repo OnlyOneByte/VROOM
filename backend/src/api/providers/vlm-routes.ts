@@ -16,6 +16,7 @@ import {
 import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
 import { withoutIdleTimeout } from '../../utils/timeout';
+import { aiFailure, loadAiProvider } from './ai-failure';
 import { OcrUnavailableError } from './domains/vlm/local-ocr';
 import { parseExtraction } from './domains/vlm/prompt';
 import { getVlmProvider, LOCAL_OCR_PROVIDER_ID } from './domains/vlm/registry';
@@ -64,14 +65,13 @@ routes.post('/parse', receiptScanLimiter, scansAtOnce, authorize(ownAccount), as
     throw new PayloadTooLargeError('Receipt image exceeds the 8MB limit');
   }
 
-  const provider = await getVlmProvider(providerRow);
+  const provider = await loadAiProvider(() => getVlmProvider(providerRow));
   let raw: Awaited<ReturnType<typeof provider.extractReceipt>>;
   try {
     raw = await withoutIdleTimeout(c, () =>
       provider.extractReceipt({ data: bytes, mimeType: file.type })
     );
   } catch (err) {
-    // Adapters log upstream errors; the client gets a generic 502 with no key or raw error.
     const message = err instanceof Error ? err.message : 'VLM provider error';
     logger.warn('Receipt parse failed', { providerType: providerRow.providerType, error: message });
     if (err instanceof OcrUnavailableError) {
@@ -83,7 +83,7 @@ routes.post('/parse', receiptScanLimiter, scansAtOnce, authorize(ownAccount), as
     if (providerRow.id === LOCAL_OCR_PROVIDER_ID) {
       throw new UnprocessableEntityError('No readable text found. Try a sharper, well-lit photo.');
     }
-    throw new AppError('The receipt-parsing provider could not be reached. Try again.', 502);
+    throw aiFailure(err, 'The receipt-parsing provider could not be reached. Try again.');
   }
 
   // Draft amounts are dollars; cents conversion happens at POST /expenses.
