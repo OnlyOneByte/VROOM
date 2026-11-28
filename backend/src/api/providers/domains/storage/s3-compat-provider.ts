@@ -20,7 +20,12 @@ import type {
   StorageRef,
   UploadParams,
 } from './storage-provider';
-import { assertWithinSize, credentialFailureOf, type DownloadOptions } from './storage-provider';
+import {
+  assertWithinSize,
+  credentialFailureOf,
+  type DownloadOptions,
+  ProviderConfigError,
+} from './storage-provider';
 
 interface S3Credentials {
   accessKeyId: string;
@@ -34,6 +39,7 @@ interface S3Config {
 }
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
+const REGION_PATTERN = /^[a-z0-9-]{1,32}$/;
 
 function toFileInfo(key: string, size?: number, lastModified?: Date): StorageFileInfo {
   const timestamp = lastModified?.toISOString() ?? new Date(0).toISOString();
@@ -228,12 +234,31 @@ export class S3CompatProvider implements StorageProvider {
       if (error instanceof ValidationError) throw error;
       const credentialFailure = credentialFailureOf(error);
       if (credentialFailure) throw credentialFailure;
+      const configProblem = this.bucketProblemOf(error);
+      if (configProblem) throw new ProviderConfigError(configProblem);
       logger.warn('S3 health check failed', {
         bucket: this.bucket,
         error: error instanceof Error ? error.message : String(error),
       });
       return false;
     }
+  }
+
+  private bucketProblemOf(error: unknown): string | null {
+    const shaped = error as {
+      $metadata?: { httpStatusCode?: number };
+      $response?: { headers?: Record<string, string | undefined> };
+    };
+    const status = shaped?.$metadata?.httpStatusCode;
+    if (status === 404) {
+      return `The bucket "${this.bucket}" doesn't exist. Check the bucket name, then test again.`;
+    }
+    if (status !== 301) return null;
+    const header = shaped.$response?.headers?.['x-amz-bucket-region'];
+    const region = header && REGION_PATTERN.test(header) ? header : undefined;
+    return region
+      ? `The bucket "${this.bucket}" is in region ${region}. Set the region to ${region}, then test again.`
+      : `The bucket "${this.bucket}" is in a different region. Check the region, then test again.`;
   }
 
   async list(folderPath: string): Promise<StorageFileInfo[]> {

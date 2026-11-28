@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { Hono } from 'hono';
 import { setPushSenderForTest } from '../../api/push/push-service';
-import { CONFIG } from '../../config';
 import { ScopeNotLoadedError } from '../../errors';
 import { errorHandler } from '../../middleware';
 import {
@@ -10,9 +9,16 @@ import {
   SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../test-helpers/http-client';
-import { type Members, seedCar, seedMembers } from '../../test-helpers/members';
-import { type SweepCall, sendSweepCall, writeRouteCalls } from '../../test-helpers/route-bodies';
-import { seedSweepRecords, storeSweepPhotos } from '../../test-helpers/sweep-records';
+import type { Members } from '../../test-helpers/members';
+import { sendSweepCall, writeRouteCalls } from '../../test-helpers/route-bodies';
+import {
+  quietPush,
+  SWEPT_KEYS,
+  seedSweepCar,
+  sweepConfig,
+  sweepRequests,
+  VEHICLE_ID,
+} from '../../test-helpers/route-sweep';
 import { logger } from '../../utils/logger';
 import { loadResolver, requestResolver } from '../grants';
 import {
@@ -21,7 +27,6 @@ import {
   type Resource,
   type ScopeGrants,
 } from '../resolve';
-import { isPublicRule, ROUTE_PERMISSIONS } from '../route-map';
 
 const NO_GRANTS: ScopeGrants = { roles: [], overrides: [] };
 const CAR: Resource = { kind: 'vehicle', vehicleId: 'car-a' };
@@ -74,29 +79,6 @@ describe('a resolver that loads before it checks', () => {
   });
 });
 
-const VEHICLE_ID = 'sweep-car';
-
-const METHOD_ORDER = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
-
-const VEHICLE_DELETE = 'DELETE /api/v1/vehicles/:id';
-
-const sweepRank = (key: string): [number, number, number] => {
-  const [method = '', path = ''] = key.split(' ');
-  const methodRank = METHOD_ORDER.indexOf(method);
-  if (method !== 'DELETE') return [methodRank, 0, 0];
-  return [methodRank, key === VEHICLE_DELETE ? 1 : 0, -path.split('/').length];
-};
-
-const SWEPT_KEYS = Object.entries(ROUTE_PERMISSIONS)
-  .filter(([, rule]) => !isPublicRule(rule))
-  .map(([key]) => key)
-  .sort((a, b) => {
-    const [ra, rb] = [sweepRank(a), sweepRank(b)];
-    return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2];
-  });
-
-const isWrite = (method: string) => method !== 'GET' && method !== 'DELETE';
-
 type Preconditions = Record<string, string>;
 
 const WRITE_PRECONDITIONS: Preconditions = {
@@ -112,30 +94,6 @@ const READ_PRECONDITIONS: Preconditions = {
   'GET /api/v1/photos/receipt-drafts': 'Connect Google Photos in Settings',
 };
 
-const quietPush = { send: async () => ({ kind: 'ok' as const }) };
-
-const config = CONFIG as { disableRateLimit: boolean; allowFakeStorageProvider: boolean };
-const configWas = {
-  disableRateLimit: config.disableRateLimit,
-  allowFakeStorageProvider: config.allowFakeStorageProvider,
-};
-const sweepConfig = (on: boolean) => {
-  config.disableRateLimit = on || configWas.disableRateLimit;
-  config.allowFakeStorageProvider = on || configWas.allowFakeStorageProvider;
-};
-
-function sweepRequests(
-  memberId: string
-): [key: string, method: string, path: string, call: SweepCall | undefined][] {
-  const calls = writeRouteCalls(VEHICLE_ID, memberId);
-  return SWEPT_KEYS.map((key) => {
-    const [method = 'GET', template = '/'] = key.split(' ');
-    const call = calls[key] ?? (isWrite(method) ? { body: { vehicleId: VEHICLE_ID } } : undefined);
-    const path = call?.path ?? template.replace(/:[A-Za-z]+/g, VEHICLE_ID);
-    return [key, method, `${path}${path.includes('?') ? '&' : '?'}vehicleId=${VEHICLE_ID}`, call];
-  });
-}
-
 async function inputOutcome(
   preconditions: Preconditions,
   key: string,
@@ -146,15 +104,6 @@ async function inputOutcome(
   const text = await res.text();
   const expected = preconditions[key];
   return expected && text.includes(expected) ? 'precondition' : text.slice(0, 160);
-}
-
-async function seedSweepCar(ctx: TestApp): Promise<Members> {
-  await seedCar(ctx, VEHICLE_ID);
-  ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 1 WHERE id = ?', [VEHICLE_ID]);
-  const members = await seedMembers(ctx, VEHICLE_ID, 'sweep');
-  seedSweepRecords(ctx, VEHICLE_ID, members.stranger.id);
-  await storeSweepPhotos(ctx, VEHICLE_ID);
-  return members;
 }
 
 describe('the sweep sends each route with a body one it accepts', () => {

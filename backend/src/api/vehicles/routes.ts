@@ -54,7 +54,7 @@ import {
 } from '../../utils/vehicle-access';
 import { catalogModelMatchesMake, isCatalogModel } from '../../utils/vehicle-catalog';
 import { calculateVehicleStats } from '../../utils/vehicle-stats';
-import { carShareAccess } from '../drivers/attribution';
+import { carShareAccess, withoutOwnerIds } from '../drivers/attribution';
 import { carShareRoutes, driverRoutes } from '../drivers/routes';
 import { nextUpdatedAtFor } from '../expenses/updated-at';
 import { withComputedBalance } from '../financing/repository';
@@ -451,7 +451,7 @@ routes.get(
     > = {
       success: true,
       data: {
-        ...vehicleRowToApi(responseData, minorUnitScale(ownerCurrency)),
+        ...withoutOwnerIds(c, vehicleRowToApi(responseData, minorUnitScale(ownerCurrency))),
         ownerCurrency,
         carShare,
       },
@@ -512,9 +512,12 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        ...vehicleRowToApi(
-          seesFinancials(access) ? updatedVehicle : sharedVehicleView(updatedVehicle),
-          scale
+        ...withoutOwnerIds(
+          c,
+          vehicleRowToApi(
+            seesFinancials(access) ? updatedVehicle : sharedVehicleView(updatedVehicle),
+            scale
+          )
         ),
         ownerCurrency,
       },

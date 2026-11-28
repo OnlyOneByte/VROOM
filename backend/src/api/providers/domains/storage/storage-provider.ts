@@ -137,3 +137,28 @@ export function credentialFailureOf(error: unknown): SyncError | null {
   }
   return null;
 }
+
+export function credentialCodeOf(error: unknown): 'auth' | 'permission' | null {
+  const failure = credentialFailureOf(error);
+  if (!failure) return null;
+  return failure.code === SyncErrorCode.PERMISSION_DENIED ? 'permission' : 'auth';
+}
+
+const MISSING_OBJECT_NAMES = new Set(['NoSuchKey', 'NotFound']);
+
+export function isMissingBucket(error: unknown): boolean {
+  return (error as { name?: unknown } | null)?.name === 'NoSuchBucket';
+}
+
+export function isMissingObject(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || isMissingBucket(error)) return false;
+  const record = error as Record<string, unknown>;
+  return MISSING_OBJECT_NAMES.has(String(record.name)) || statusOf(record) === 404;
+}
+
+export class ProviderConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ProviderConfigError';
+  }
+}
