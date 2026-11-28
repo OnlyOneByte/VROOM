@@ -975,7 +975,11 @@
 								{/snippet}
 							</Popover.Trigger>
 							{#if moreMenuOpen}
-								<Popover.Content align="end" class="flex w-48 flex-col p-1">
+								<Popover.Content
+									align="end"
+									class="flex w-48 flex-col p-1"
+									aria-label="Vehicle actions"
+								>
 									<Button
 										variant="ghost"
 										class="h-10 w-full justify-start"
@@ -1260,9 +1264,9 @@
 
 							<section aria-labelledby="vehicle-expenses-heading" class="space-y-3">
 								<div class="flex items-center justify-between gap-3">
-									<h3 class="text-base font-semibold" id="vehicle-expenses-heading">
+									<h2 class="text-base font-semibold" id="vehicle-expenses-heading">
 										{tabWaiting ? 'Expenses' : tabCountLabel}
-									</h3>
+									</h2>
 									{#if totalCount > 0 && isOwner}
 										<Button
 											variant="outline"
