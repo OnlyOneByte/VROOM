@@ -197,8 +197,7 @@ describe('responses to members of a shared car', () => {
 
   for (const role of ROLES) {
     test(`a ${role} sees no other account's id outside the reviewed allowlist`, async () => {
-      const { unexpected, gapsSeen, gapsExpected, answered, invitesAnswered } =
-        await sweepAs(role);
+      const { unexpected, gapsSeen, gapsExpected, answered, invitesAnswered } = await sweepAs(role);
       expect(answered, 'the sweep reached the routes').toBeGreaterThan(60);
       expect(invitesAnswered).toEqual([
         'POST /api/v1/shares/:id/accept',
