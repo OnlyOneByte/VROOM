@@ -423,25 +423,20 @@ export async function keepingARoleManager<T>(
   });
 }
 
-export async function hasPerPersonVehicleGrants(
-  db: AsyncHandle,
-  ownerId: string
-): Promise<boolean> {
+export async function perPersonVehicleGrants(db: AsyncHandle, ownerId: string) {
   const owned = db.select({ id: vehicles.id }).from(vehicles).where(eq(vehicles.userId, ownerId));
-  const override = await db
-    .select({ id: permissionOverrides.id })
+  const overrides = await db
+    .select()
     .from(permissionOverrides)
-    .where(inArray(permissionOverrides.scopeId, owned))
-    .then(firstRow);
-  const customRole = await db
-    .select({ id: roleAssignments.id })
+    .where(inArray(permissionOverrides.scopeId, owned));
+  const assignments = await db
+    .select()
     .from(roleAssignments)
     .where(
       and(
         inArray(roleAssignments.scopeId, owned),
         notInArray(roleAssignments.roleId, [shareRoleId('editor'), shareRoleId('viewer')])
       )
-    )
-    .then(firstRow);
-  return override !== undefined || customRole !== undefined;
+    );
+  return { overrides, assignments };
 }

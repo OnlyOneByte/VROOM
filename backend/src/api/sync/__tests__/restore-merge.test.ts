@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { ConflictError } from '../../../errors';
 import {
   createTestApp,
   type DataEnvelope,
@@ -108,7 +107,7 @@ describe('restore merge', () => {
     expect(count('SELECT COUNT(*) AS n FROM expenses WHERE id = ?', gone.id)).toBe(0);
   });
 
-  test('when a replace is blocked by per-person permissions, a merge works and keeps them', async () => {
+  test('a merge keeps per-person permissions and the sharee role as they are', async () => {
     const car = await createCar('SHR-1');
     const invitee = await createInvitee(ctx, 'merge-sharee', 'Sharee');
     const share = await post<{ id: string }>('/api/v1/shares', {
@@ -128,7 +127,6 @@ describe('restore merge', () => {
       .query('SELECT id, role_id FROM role_assignments WHERE user_id = ? ORDER BY id')
       .all(invitee.id);
 
-    await expect(restore(zip, 'replace')).rejects.toBeInstanceOf(ConflictError);
     const result = await restore(zip, 'merge');
 
     expect(result.success).toBe(true);

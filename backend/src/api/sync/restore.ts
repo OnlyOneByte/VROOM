@@ -34,7 +34,7 @@ import {
   SyncError,
   ValidationError,
 } from '../../errors';
-import { changeShareRole, hasPerPersonVehicleGrants } from '../../permissions/grants';
+import { changeShareRole, perPersonVehicleGrants } from '../../permissions/grants';
 import {
   type BackupConfig,
   DEFAULT_PROVIDER_CAPABILITIES,
@@ -60,6 +60,7 @@ import {
   storageProviderIdentity,
   upgradeBackupTables,
 } from './backup';
+import { type RegrantReport, reapplyVehicleGrants } from './restore-grants';
 
 export interface ImportSummary {
   vehicles: number;
@@ -94,6 +95,7 @@ export interface RestoreResponse {
   imported?: ImportSummary;
   kept?: ImportSummary;
   skipped?: { photos: number };
+  grants?: RegrantReport;
 }
 
 type SummaryKey = keyof ImportSummary;
@@ -232,14 +234,10 @@ class RestoreService {
 
     signal?.throwIfAborted();
     let imported = summary;
+    let grants: RegrantReport | undefined;
     try {
       await this.db.transaction(async (tx) => {
         signal?.throwIfAborted();
-        if (mode === 'replace' && (await hasPerPersonVehicleGrants(tx, userId))) {
-          throw new ConflictError(
-            'Some people have their own roles or permission changes on your vehicles, and a full restore would remove them. Remove those changes first, or restore in merge mode.'
-          );
-        }
         if (
           minorUnitScale((await this.accountCurrency(userId, tx)) ?? DEFAULT_CURRENCY) !==
           minorUnitScale(parsedWithCurrency ?? DEFAULT_CURRENCY)
@@ -251,6 +249,7 @@ class RestoreService {
         // Read before the wipe: deleteUserData cascades vehicle_shares.
         const consented = await this.consentedShareKeys(tx, userId);
         const currentPrefs = await this.currentProviderPrefs(tx, userId);
+        const live = mode === 'replace' ? await perPersonVehicleGrants(tx, userId) : undefined;
         if (mode === 'replace') {
           await this.deleteUserData(tx, userId, { keepPreferences: !data.userPreferences?.length });
         }
@@ -259,6 +258,7 @@ class RestoreService {
         if (mode === 'preview') {
           throw new MergePreviewRollback(mergeCounts(summary, imported));
         }
+        if (live) grants = await reapplyVehicleGrants(tx, userId, live);
         signal?.throwIfAborted();
       });
     } catch (error) {
@@ -279,7 +279,7 @@ class RestoreService {
     if (mode === 'merge') {
       return { success: true, ...mergeCounts(summary, imported), ...skipped };
     }
-    return { success: true, imported, ...skipped };
+    return { success: true, imported, ...skipped, ...(grants && { grants }) };
   }
 
   private async accountCurrency(
