@@ -47,8 +47,9 @@ vi.mock('#lib/services/reminder-api.ts', () => ({
 vi.mock('#lib/services/insurance-api.ts', () => ({
 	insuranceApi: { getAllPolicies: () => Promise.resolve([]) }
 }));
+const analyticsQuery = vi.hoisted(() => vi.fn());
 vi.mock('#lib/services/analytics-api.ts', () => ({
-	analyticsApi: { query: () => Promise.resolve(null) }
+	analyticsApi: { query: (...args: unknown[]) => analyticsQuery(...args) }
 }));
 
 import Page from '../+page.svelte';
@@ -68,6 +69,8 @@ function steps(): string[] {
 
 beforeEach(() => {
 	getVehicles.mockReset();
+	analyticsQuery.mockReset();
+	analyticsQuery.mockResolvedValue(null);
 	summary.expenseCount = 0;
 	reminders.list = [];
 	reminders.recurring = { count: 0, monthlyTotal: 0 };
@@ -114,25 +117,21 @@ describe('dashboard getting started', () => {
 
 		await screen.findByRole('heading', { name: 'Log your first expense' });
 		expect(steps()[0]).toBe('Add a vehicle (done)');
-		expect(screen.getByRole('link', { name: 'See what it costs' })).toHaveAttribute(
-			'href',
-			'/analytics'
-		);
+		expect(screen.queryByRole('link', { name: 'See what it costs' })).toBeNull();
 		expect(controls('Add expense')).toHaveLength(0);
 		expect(controls('Log fill-up').length).toBeGreaterThan(0);
 		expect(screen.queryByText('Total expenses')).toBeNull();
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
 	});
 
-	test('steps that are not current are 40px links that look like links', async () => {
+	test('steps still to come are muted text, not links to pages that need the step before', async () => {
 		getVehicles.mockResolvedValue([]);
 		render(Page);
 
 		await screen.findByRole('heading', { name: 'Add your first vehicle' });
 		for (const name of ['Log an expense or fill-up', 'See what it costs']) {
-			const link = screen.getByRole('link', { name });
-			expect(link).toHaveClass('inline-flex', 'min-h-10', 'items-center', 'text-accent-ink');
-			expect(link).not.toHaveClass('text-muted-foreground');
+			expect(screen.queryByRole('link', { name })).toBeNull();
+			expect(screen.getByText(name)).toHaveClass('text-muted-foreground');
 		}
 	});
 
@@ -196,6 +195,41 @@ describe('dashboard getting started', () => {
 		fail(new Error('offline'));
 		await screen.findByText("Couldn't load the dashboard");
 		expect(screen.queryByRole('list', { name: 'Getting started' })).toBeNull();
+	});
+
+	test('an own car with no cost per mile gets the note under Your garage', async () => {
+		getVehicles.mockResolvedValue([OWNED]);
+		analyticsQuery.mockResolvedValue({ series: [], totals: { perDistance: null } });
+		render(Page);
+
+		expect(await screen.findByTestId('no-per-distance-note')).toHaveTextContent(
+			'not enough distance logged in the last 30 days'
+		);
+	});
+
+	test('a shared car alone with no cost per mile gets no note, since it may be left out of the query', async () => {
+		getVehicles.mockResolvedValue([
+			OWNED,
+			{ ...OWNED, id: 'v2', sharedAccess: { sharedBy: 'Sam' } }
+		]);
+		summary.expenseCount = 3;
+		analyticsQuery.mockResolvedValue({
+			series: [{ key: 'v1', label: 'Camry', values: [0.2] }],
+			totals: { perDistance: 0.2 }
+		});
+		render(Page);
+
+		await screen.findByTestId('vehicle-rows');
+		expect(screen.queryByTestId('no-per-distance-note')).toBeNull();
+	});
+
+	test('no note when the cost per mile could not load', async () => {
+		getVehicles.mockResolvedValue([OWNED]);
+		analyticsQuery.mockRejectedValue(new Error('offline'));
+		render(Page);
+
+		await screen.findByTestId('vehicle-rows');
+		expect(screen.queryByTestId('no-per-distance-note')).toBeNull();
 	});
 
 	test('once an expense exists the checklist is gone', async () => {

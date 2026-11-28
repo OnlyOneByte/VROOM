@@ -102,12 +102,18 @@
 		hasLoaded && !loadError && ownedVehicles.length > 0 && (allTimeSummary?.expenseCount ?? 0) === 0
 	);
 	let onboardingSteps = $derived([
-		{ label: 'Add a vehicle', route: routes.vehicleNew, done: ownedVehicles.length > 0 },
-		{ label: 'Log an expense or fill-up', route: routes.expenseNew, done: false },
-		{ label: 'See what it costs', route: routes.analytics, done: false }
+		{ label: 'Add a vehicle', done: ownedVehicles.length > 0 },
+		{ label: 'Log an expense or fill-up', done: false },
+		{ label: 'See what it costs', done: false }
 	]);
 	let currentStep = $derived(onboardingSteps.findIndex(step => !step.done));
 
+	// Only when the per-distance query worked, and only for own cars (a shared car can be left out).
+	let explainNoPerDistance = $derived.by(() => {
+		if (!periodData.perDistance) return false;
+		const owned = new Set(ownedVehicles.map(v => v.id));
+		return vehicleRows.some(row => owned.has(row.id) && row.runningPerDistance === null);
+	});
 	let spend = $derived(combinePeriodSpend(periodData.summaries));
 	let distanceUnit = $derived<DistanceUnit>(settingsStore.unitPreferences.distanceUnit);
 	let distanceLabel = $derived(getDistanceUnitLabel(distanceUnit, true));
@@ -369,7 +375,12 @@
 {/snippet}
 
 {#snippet vehiclesSection()}
-	<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
+	<VehicleRowsCard
+		rows={vehicleRows}
+		periodLabel={PERIOD_PHRASES[period].chip}
+		{distanceLabel}
+		{explainNoPerDistance}
+	/>
 {/snippet}
 
 {#snippet chartSection()}
@@ -461,12 +472,8 @@
 						{:else if i === currentStep}
 							<span class="text-sm font-medium text-foreground">{step.label}</span>
 						{:else}
-							<a
-								href={resolve(step.route)}
-								class="inline-flex min-h-10 items-center text-sm text-accent-ink underline-offset-4 hover:underline"
-							>
-								{step.label}
-							</a>
+							<!-- A later step stays plain text: it can't be done until the one before it is. -->
+							<span class="text-sm text-muted-foreground">{step.label}</span>
 						{/if}
 					</li>
 				{/each}
@@ -505,7 +512,12 @@
 
 		{@render invitationsCard()}
 		<NeedsAttentionCard items={attention} showAll />
-		<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
+		<VehicleRowsCard
+			rows={vehicleRows}
+			periodLabel={PERIOD_PHRASES[period].chip}
+			{distanceLabel}
+			{explainNoPerDistance}
+		/>
 		{#if recurringCost.count > 0}
 			<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
 		{/if}

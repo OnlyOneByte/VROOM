@@ -128,6 +128,32 @@ describe('the Garage', () => {
 		);
 	});
 
+	test('a car with no cost per mile gets one note under the list saying why, for 30 days', async () => {
+		render(Page);
+		expect(await screen.findByTestId('no-per-distance-note')).toHaveTextContent(
+			'No cost per mi (—): not enough distance logged in the last 30 days. It needs odometer readings on two expenses in that time, such as two fill-ups.'
+		);
+	});
+
+	test('no note when every car has a cost per mile', async () => {
+		query.mockResolvedValue({
+			series: [
+				{ key: 'v1', label: 'Daily Driver', values: [0.2] },
+				{ key: 'v2', label: 'Tesla', values: [0.05] }
+			]
+		} as unknown as AnalyticsQueryResponse);
+		render(Page);
+		await screen.findByRole('heading', { level: 1, name: '2 vehicles' });
+		expect(screen.queryByTestId('no-per-distance-note')).toBeNull();
+	});
+
+	test('no note when the cost per mile could not load, since the "—" then means something else', async () => {
+		query.mockRejectedValue(new ApiError('boom', 500));
+		render(Page);
+		await screen.findByRole('heading', { level: 1, name: '2 vehicles' });
+		expect(screen.queryByTestId('no-per-distance-note')).toBeNull();
+	});
+
 	test("labels each odometer in the car's own unit and falls back to its other readings", async () => {
 		const metric = {
 			...TESLA,

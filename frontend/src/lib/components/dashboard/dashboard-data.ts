@@ -47,6 +47,16 @@ export interface VehicleRow {
 	runningPerDistance: number | null;
 }
 
+/**
+ * Why a vehicle row shows "—" for cost per distance. The rows' distance comes from odometer
+ * readings on expenses inside the period (not the starting odometer, standalone odometer
+ * entries or a reading from before the period), so it needs two of them in that period.
+ */
+export function noPerDistanceReason(periodChip: string): string {
+	const within = periodChip === PERIOD_PHRASES.all.chip ? '' : ` in the last ${periodChip}`;
+	return `not enough distance logged${within}. It needs odometer readings on two expenses${within ? ' in that time' : ''}, such as two fill-ups.`;
+}
+
 export interface PeriodSpend {
 	total: number;
 	previousTotal: number | null;

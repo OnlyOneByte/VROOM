@@ -4,15 +4,17 @@
 	import { paramRoutes, routes } from '#lib/routes.ts';
 	import { buildVehicleColorMap } from '#lib/utils/chart-colors.ts';
 	import { formatCurrency } from '#lib/utils/formatters.ts';
-	import type { VehicleRow } from './dashboard-data';
+	import { noPerDistanceReason, type VehicleRow } from './dashboard-data';
 
 	interface Props {
 		rows: VehicleRow[];
 		periodLabel: string;
 		distanceLabel: string;
+		/** Explain the "—" under the list: an owned row has no cost per distance and the query worked. */
+		explainNoPerDistance?: boolean;
 	}
 
-	let { rows, periodLabel, distanceLabel }: Props = $props();
+	let { rows, periodLabel, distanceLabel, explainNoPerDistance = false }: Props = $props();
 
 	let colors = $derived(buildVehicleColorMap(rows.map(row => row.id)));
 </script>
@@ -64,5 +66,12 @@
 				</li>
 			{/each}
 		</ul>
+		{#if explainNoPerDistance}
+			<p class="mt-2 text-sm text-muted-foreground" data-testid="no-per-distance-note">
+				No cost per {distanceLabel} <span aria-hidden="true">(—)</span>: {noPerDistanceReason(
+					periodLabel
+				)}
+			</p>
+		{/if}
 	</Card.Content>
 </Card.Root>
