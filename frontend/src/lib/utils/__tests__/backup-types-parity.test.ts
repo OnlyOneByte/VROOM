@@ -79,7 +79,12 @@ describe('backup types parity with the backend', () => {
 			'BackupOrchestratorResult',
 			['outcome', 'results']
 		],
-		['RestoreResult', 'restore.ts', 'RestoreResponse', ['preview', 'merge', 'imported', 'kept']]
+		[
+			'RestoreResult',
+			'restore.ts',
+			'RestoreResponse',
+			['preview', 'merge', 'imported', 'kept', 'grants']
+		]
 	])(
 		'%s matches the backend %s, except where the backend names a type (%s)',
 		(frontendName, file, backendName, namedTypeFields) => {
@@ -106,6 +111,22 @@ describe('backup types parity with the backend', () => {
 		if (!entry) throw new Error(`can't read results entry: ${results}`);
 		const frontend = fields(`export interface Entry {${entry}}`, 'Entry').map(m => m.split(':')[0]);
 		expect(frontend).toEqual(backend);
+	});
+
+	it('RestoreResult.grants has the backend RegrantReport and DroppedGrant fields', () => {
+		const grantsSrc = readFileSync(`${BACKEND_SYNC}/restore-grants.ts`, 'utf8');
+		const names = (src: string, name: string) => fields(src, name).map(m => m.split(':')[0]);
+		const grants = fields(frontendSrc, 'RestoreResult').find(m => m.startsWith('grants?:'));
+		const report = grants?.match(/^grants\?: \{(.*)\}$/)?.[1];
+		if (!report) throw new Error(`can't read grants: ${grants}`);
+		const frontend = `export interface Report {${report}}`;
+		expect(names(frontend, 'Report')).toEqual(names(grantsSrc, 'RegrantReport'));
+		const dropped = fields(frontend, 'Report').find(m => m.startsWith('dropped:'));
+		const entry = dropped?.match(/Array< ?\{(.*)\} ?>$/)?.[1];
+		if (!entry) throw new Error(`can't read dropped entry: ${dropped}`);
+		expect(names(`export interface Entry {${entry}}`, 'Entry')).toEqual(
+			names(grantsSrc, 'DroppedGrant')
+		);
 	});
 
 	it('BackupOrchestratorResult.outcome lists the backend BackupOutcome values', () => {

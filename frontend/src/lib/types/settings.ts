@@ -91,6 +91,15 @@ export interface RestoreResult {
 	imported?: Record<string, number>;
 	kept?: Record<string, number>;
 	skipped?: { photos: number };
+	grants?: {
+		reapplied: number;
+		dropped: Array<{
+			kind: 'role' | 'override';
+			vehicleId: string;
+			userId: string;
+			reason: string;
+		}>;
+	};
 }
 
 export interface UserSettings {

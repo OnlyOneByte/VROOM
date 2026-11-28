@@ -464,7 +464,7 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 
 		const named = screen.getByText('Arco').closest('button') as HTMLElement;
 		expect(named.querySelector('p')).toHaveTextContent('Arco');
-		expect(named).toHaveTextContent(/Fuel · Daily Driver · Mar 21, 2024/);
+		expect(named).toHaveTextContent(/Fuel & Charging\s*· Daily Driver\s*· Mar 21, 2024/);
 
 		const unnamed = screen.getByText('Maintenance').closest('button') as HTMLElement;
 		expect(unnamed.querySelector('p')).toHaveTextContent('Maintenance');
@@ -474,7 +474,7 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 		expect(within(split).getByText('Car wash').parentElement).toHaveTextContent(
 			/^Car wash\s*Split$/
 		);
-		expect(split).toHaveTextContent(/Fuel · .* · /);
+		expect(split).toHaveTextContent(/Fuel & Charging\s*· /);
 	});
 
 	test("a fill shows the vehicle's unit, or the user's own unit when the vehicle isn't passed", () => {
@@ -491,11 +491,11 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 		};
 		try {
 			const { unmount } = mountTable({ expenses: [fill], vehicles: [] });
-			expect(screen.getByText(/· 40 L$/)).toBeTruthy();
+			expect(screen.getByText('· 40 L')).toBeTruthy();
 			unmount();
 
 			mountTable({ expenses: [fill], vehicles: [gallonCar] });
-			expect(screen.getByText(/· 40 gal$/)).toBeTruthy();
+			expect(screen.getByText('· 40 gal')).toBeTruthy();
 		} finally {
 			units.mockRestore();
 		}
@@ -546,6 +546,19 @@ describe('ExpensesTable month groups', () => {
 		expect(headings[0]?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
 			'March 2024 total $1,234.50'
 		);
+	});
+
+	test('under a month heading a row drops the year, and no detail breaks across lines', () => {
+		useLayout('wide');
+		const { container } = mountTable({ monthTotals: TOTALS, ledger: true });
+		const line = container.querySelector('[data-testid="expense-row"] p.text-sm');
+		expect(line?.textContent?.replace(/\s+/g, ' ').trim()).toMatch(/· Mar 20$/);
+		const parts = [...(line?.querySelectorAll('span.whitespace-nowrap') ?? [])].map(
+			s => s.textContent
+		);
+		expect(parts).toContain('· Mar 20');
+		expect(parts.some(p => /(Mar|Feb) \d+, \d{4}/.test(p ?? ''))).toBe(false);
+		expect(parts.filter(p => p?.includes('·')).length).toBe(parts.length - 1);
 	});
 
 	test('ledger: sorted by amount, the rows run in one list with no month headings', () => {

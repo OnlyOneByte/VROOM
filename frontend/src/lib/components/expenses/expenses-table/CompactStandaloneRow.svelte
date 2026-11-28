@@ -4,13 +4,13 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import RecurringExpenseBadge from '../RecurringExpenseBadge.svelte';
 	import type { Expense, Vehicle } from '#lib/types/index.ts';
-	import { formatCurrency, formatDate } from '#lib/utils/formatters.ts';
+	import { formatCurrency } from '#lib/utils/formatters.ts';
 	import { getCategoryIcon } from '#lib/utils/expense-helpers.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { expenseEditHref } from './expense-table-actions';
-	import { fillLabel, rowTitle, tagsBesideCategory } from './expense-table-rows';
+	import { fillLabel, rowDate, rowTitle, tagsBesideCategory } from './expense-table-rows';
 	import {
 		MOBILE_ROW_ACTION_CLASS,
 		MOBILE_ROW_ACTIONS_CONTAINER_CLASS,
@@ -30,6 +30,7 @@
 		onSelect: (_id: string) => void;
 		onDelete: (_expense: Expense) => void;
 		pending?: PendingRowState | undefined;
+		underMonth?: boolean;
 	}
 
 	let {
@@ -42,7 +43,8 @@
 		isSelected,
 		onSelect,
 		onDelete,
-		pending
+		pending,
+		underMonth = false
 	}: Props = $props();
 	let shownTags = $derived(tagsBesideCategory(expense.tags, expense.category));
 
@@ -51,9 +53,9 @@
 	let heading = $derived(rowTitle(expense.description, expense.category));
 	let meta = $derived(
 		[
-			heading.categoryInMeta ? EXPENSE_CATEGORY_INFO[expense.category].shortLabel : null,
+			heading.categoryInMeta ? EXPENSE_CATEGORY_INFO[expense.category].label : null,
 			showVehicleColumn && vehicle ? getVehicleDisplayName(vehicle) : null,
-			formatDate(new Date(expense.date)),
+			rowDate(expense.date, underMonth),
 			fillLabel(expense, vehicle?.unitPreferences ?? settingsStore.unitPreferences)
 		].filter(part => part !== null)
 	);
@@ -65,8 +67,10 @@
 		<p class="truncate font-medium text-foreground">
 			{heading.title}
 		</p>
-		<p class="mt-0.5 text-sm text-muted-foreground">
-			{meta.join(' · ')}
+		<p class="mt-0.5 flex flex-wrap gap-x-1 text-sm text-muted-foreground">
+			{#each meta as part, i (i)}
+				<span class="whitespace-nowrap">{i > 0 ? `· ${part}` : part}</span>
+			{/each}
 		</p>
 		{#if expense.sourceType === 'reminder'}
 			<div class="mt-1.5">

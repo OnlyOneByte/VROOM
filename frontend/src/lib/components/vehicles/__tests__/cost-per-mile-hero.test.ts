@@ -77,15 +77,36 @@ describe('CostPerMileHero', () => {
 	test('a cost past 80¢ widens the dial instead of pegging it', () => {
 		const { container } = render(CostPerMileHero, {
 			summary: summary({
-				costBuckets: { ownershipTotal: 9000, runningTotal: 3000, previous: null, byVehicle: [] }
+				costBuckets: { ownershipTotal: 6000, runningTotal: 3000, previous: null, byVehicle: [] }
 			}),
 			distance: 10000,
 			distanceUnit: 'miles'
 		});
 
-		screen.getByRole('img', { name: /all in: 120¢/ });
+		screen.getByRole('img', { name: /all in: 90¢/ });
 		const labels = [...container.querySelectorAll('text.dial-figure')].map(t => t.textContent);
 		expect(labels).toEqual(['0', '30', '60', '90', '120']);
+	});
+
+	test('from a dollar a mile up, the sentence, legend and dial read in dollars', () => {
+		render(CostPerMileHero, {
+			summary: summary({
+				costBuckets: { ownershipTotal: 8300, runningTotal: 21300, previous: null, byVehicle: [] }
+			}),
+			distance: 10000,
+			distanceUnit: 'miles',
+			name: 'Daily Driver'
+		});
+
+		expect(screen.getByTestId('cost-sentence')).toHaveTextContent(
+			'Daily Driver costs $2.96 a mile over 10,000 miles: $2.13 to run it and 83¢ to own it.'
+		);
+		expect(screen.getByRole('list')).toHaveTextContent(/Running \$2\.13\s*Ownership 83¢/);
+		const dial = screen.getByRole('img', {
+			name: 'True cost per mile, all in: $2.96; running $2.13, ownership 83¢'
+		});
+		expect(dial).toHaveTextContent('ALL-IN USD / MI');
+		expect(dial).not.toHaveTextContent('296');
 	});
 
 	test('with no distance yet it says what is missing, with no dial', () => {

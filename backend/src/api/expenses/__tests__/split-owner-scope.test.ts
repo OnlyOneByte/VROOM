@@ -56,6 +56,41 @@ describe('split expense views read one owner’s records', () => {
     expect(theirs.data.siblings.map((s) => s.id)).toEqual(['theirs-1']);
   });
 
+  test('an edit changes only the editor’s own legs', async () => {
+    const res = await ctx.authed('PUT', '/api/v1/expenses/split/shared-group', {
+      splitConfig: { method: 'even', vehicleIds: ['mine-a', 'mine-b'] },
+      totalAmount: 80,
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    const theirs = ctx.sqlite
+      .query("SELECT expense_amount, group_id FROM expenses WHERE id = 'theirs-1'")
+      .get() as { expense_amount: number; group_id: string };
+    expect(theirs).toEqual({ expense_amount: 5000, group_id: 'shared-group' });
+    const mine = ctx.sqlite
+      .query("SELECT expense_amount FROM expenses WHERE id IN ('mine-1', 'mine-2')")
+      .all();
+    expect(mine).toEqual([{ expense_amount: 4000 }, { expense_amount: 4000 }]);
+  });
+
+  test('a delete removes only the deleter’s own legs', async () => {
+    const res = await other.request('DELETE', '/api/v1/expenses/split/shared-group');
+    expect(res.status, await res.clone().text()).toBe(200);
+    const left = ctx.sqlite
+      .query("SELECT id FROM expenses WHERE group_id = 'shared-group' ORDER BY id")
+      .all();
+    expect(left).toEqual([{ id: 'mine-1' }, { id: 'mine-2' }]);
+  });
+
+  test('updating one leg does not take its version from another owner’s leg', async () => {
+    ctx.sqlite.run("UPDATE expenses SET updated_at = 4102444800 WHERE id = 'theirs-1'");
+    const res = await ctx.authed('PUT', '/api/v1/expenses/mine-1', { description: 'Oil' });
+    expect(res.status, await res.clone().text()).toBe(200);
+    const mine = ctx.sqlite.query("SELECT updated_at FROM expenses WHERE id = 'mine-1'").get() as {
+      updated_at: number;
+    };
+    expect(mine.updated_at).toBeLessThan(4102444800);
+  });
+
   test('someone with no legs gets nothing when the owners are mixed', async () => {
     const third = await createInvitee(ctx, 'split-third', 'Third');
     const res = await third.request('GET', '/api/v1/expenses/split/shared-group');

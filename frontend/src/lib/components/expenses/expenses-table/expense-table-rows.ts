@@ -6,8 +6,19 @@ import {
 	type SortableRow
 } from '#lib/utils/expense-helpers.ts';
 import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-import { formatDateWith, formatNumberUpTo, fromMinor, toMinor } from '#lib/utils/formatters.ts';
+import {
+	formatDate,
+	formatDateWith,
+	formatNumberUpTo,
+	fromMinor,
+	toMinor
+} from '#lib/utils/formatters.ts';
 import { getChargeUnitLabel, getVolumeUnitLabel, isElectricFuelType } from '#lib/utils/units.ts';
+
+export function rowDate(date: string | Date, underMonth: boolean): string {
+	const day = new Date(date);
+	return underMonth ? formatDateWith(day, { month: 'short', day: 'numeric' }) : formatDate(day);
+}
 
 export function fillLabel(expense: Expense, units: UnitPreferences): string | null {
 	if (expense.category !== 'fuel') return null;

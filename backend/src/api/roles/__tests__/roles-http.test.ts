@@ -265,14 +265,13 @@ describe('overrides', () => {
     }
   });
 
-  test('a full restore is refused while the vehicles carry per-person changes', async () => {
+  test('a full restore keeps a per-person change made through the API', async () => {
     await asOwner('PUT', '/api/v1/overrides', override(editor.id, 'vehicle.trip.read', 'deny'));
     const { backupService } = await import('../../sync/backup');
     const { restoreService } = await import('../../sync/restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
-    await expect(restoreService.restoreFromBackup(ctx.user.id, zip, 'replace')).rejects.toThrow(
-      'full restore would remove them'
-    );
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
+    expect(result.grants?.dropped).toEqual([]);
     expect(count('permission_overrides', editor.id)).toBe(1);
   });
 });
