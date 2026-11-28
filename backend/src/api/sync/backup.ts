@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
@@ -427,6 +428,19 @@ export function resolveBackupFolderPath(
   return joinStoragePath(providerRootPath, settings.folderPath);
 }
 
+export function backupFilePrefix(userId: string): string {
+  const account = createHash('sha256').update(userId).digest('hex').slice(0, 12);
+  return `vroom-backup-${account}-`;
+}
+
+function isOwnBackup(name: string, userId: string): boolean {
+  return name.startsWith(backupFilePrefix(userId)) && name.endsWith('.zip');
+}
+
+function isBackupFile(name: string): boolean {
+  return name.startsWith('vroom-backup-') && name.endsWith('.zip');
+}
+
 async function providerReadError(error: unknown, missing: string): Promise<unknown> {
   if (isMissingObject(error)) return new NotFoundError(missing);
   const failure = isMissingBucket(error) ? 'config' : credentialCodeOf(error);
@@ -463,7 +477,7 @@ class BackupService {
     const files = await provider.list(folderPath);
 
     const backupFiles = files
-      .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
+      .filter((f) => isOwnBackup(f.name, userId))
       .sort((a, b) => b.lastModified.localeCompare(a.lastModified));
 
     if (backupFiles.length <= settings.retentionCount) return 0;
@@ -509,7 +523,7 @@ class BackupService {
     });
 
     const backups = files
-      .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
+      .filter((f) => isBackupFile(f.name))
       .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
       .map((f, i) => ({
         providerId,

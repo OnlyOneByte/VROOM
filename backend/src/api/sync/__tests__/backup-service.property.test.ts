@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import fc from 'fast-check';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import type { StorageFileInfo } from '../../providers/domains/storage/storage-provider';
+import { backupFilePrefix } from '../backup';
 
 const PROVIDER_ID = 'prov-listing';
 const BASE_MS = Date.UTC(2024, 0, 1);
@@ -64,6 +65,13 @@ function uniqueFiles(files: StorageFileInfo[]): StorageFileInfo[] {
   }));
 }
 
+function ownedBy(files: StorageFileInfo[], userId: string): StorageFileInfo[] {
+  return files.map((f) => ({
+    ...f,
+    name: f.name.replace('vroom-backup-', backupFilePrefix(userId)),
+  }));
+}
+
 const backupFileArb: fc.Arbitrary<StorageFileInfo> = fc
   .record({
     name: fc
@@ -75,6 +83,16 @@ const backupFileArb: fc.Arbitrary<StorageFileInfo> = fc
     key: 'unused',
     name,
     size,
+    createdTime: new Date(BASE_MS).toISOString(),
+    lastModified: new Date(BASE_MS).toISOString(),
+  }));
+
+const untaggedBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc
+  .stringMatching(/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{3}Z$/)
+  .map((ts) => ({
+    key: 'unused',
+    name: `vroom-backup-${ts}.zip`,
+    size: 1,
     createdTime: new Date(BASE_MS).toISOString(),
     lastModified: new Date(BASE_MS).toISOString(),
   }));
@@ -98,7 +116,7 @@ const nonBackupFileArb: fc.Arbitrary<StorageFileInfo> = fc
 const retentionCountArb = fc.integer({ min: 1, max: 100 });
 
 describe('listBackups: the backup listing', () => {
-  test('lists only vroom-backup-*.zip files, newest first, with exactly one marked latest', async () => {
+  test('lists every backup file in the folder, newest first, with exactly one marked latest', async () => {
     const { backupService } = await import('../backup');
     await fc.assert(
       fc.asyncProperty(
@@ -133,15 +151,22 @@ describe('listBackups: the backup listing', () => {
 });
 
 describe('enforceRetention: the retention sweep', () => {
-  test('deletes exactly the backups beyond the retention count, oldest first, and no other file', async () => {
+  test("deletes exactly the backups beyond the retention count, oldest first, and no other file, other account's or untagged backup", async () => {
     const { backupService } = await import('../backup');
     await fc.assert(
       fc.asyncProperty(
         fc.array(backupFileArb, { minLength: 0, maxLength: 20 }),
         fc.array(nonBackupFileArb, { minLength: 0, maxLength: 6 }),
         retentionCountArb,
-        async (backups, nonBackups, retentionCount) => {
-          const files = uniqueFiles([...backups, ...nonBackups]);
+        fc.array(backupFileArb, { minLength: 0, maxLength: 6 }),
+        fc.array(untaggedBackupFileArb, { minLength: 0, maxLength: 6 }),
+        async (backups, nonBackups, retentionCount, foreign, untagged) => {
+          const files = uniqueFiles([
+            ...ownedBy(backups, ctx.user.id),
+            ...nonBackups,
+            ...ownedBy(foreign, 'another-account'),
+            ...untagged,
+          ]);
           const backupKeys = new Set(files.slice(0, backups.length).map((f) => f.key));
           const nonBackupKeys = new Set(files.slice(backups.length).map((f) => f.key));
           const newestFirst = files
