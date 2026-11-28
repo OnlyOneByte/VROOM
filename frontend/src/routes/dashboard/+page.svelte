@@ -317,7 +317,7 @@
 
 {#snippet invitationsCard()}
 	<SharedWithMeCard
-		invitations={waitingInvitations}
+		{invitations}
 		loadError={invitationsError}
 		onRetry={retryInvitations}
 		onAccepted={loadDashboardData}

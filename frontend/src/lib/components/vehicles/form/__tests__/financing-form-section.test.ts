@@ -272,7 +272,9 @@ describe('FinancingFormSection validation errors', () => {
 		expect(screen.getByText('Payment must be at least $0.01')).toBeTruthy();
 		const payment = screen.getByLabelText(/Monthly payment/);
 		expect(payment.getAttribute('aria-invalid')).toBe('true');
-		expect(payment.getAttribute('aria-describedby')).toBe('paymentAmount-error');
+		expect(payment.getAttribute('aria-describedby')).toBe(
+			'paymentAmount-error paymentAmount-currency'
+		);
 		expect(screen.getByLabelText(/Leasing company/).getAttribute('aria-invalid')).toBe('true');
 	});
 
@@ -288,7 +290,7 @@ describe('FinancingFormSection validation errors', () => {
 		});
 		expect(screen.getByLabelText(/Lender/)).toHaveAccessibleDescription('Provider is required');
 		expect(screen.getByLabelText(/^Loan amount/)).toHaveAccessibleDescription(
-			'Amount must be positive'
+			'Amount must be positive Currency: US Dollar'
 		);
 		expect(screen.getByLabelText(/APR/)).toHaveAccessibleDescription('APR is required');
 		expect(document.getElementById('termMonths')).toHaveAccessibleDescription('Pick a term');
@@ -307,7 +309,7 @@ describe('FinancingFormSection validation errors', () => {
 		mount({ ownershipType: 'lease' });
 		const payment = screen.getByLabelText(/Monthly payment/);
 		expect(payment.getAttribute('aria-invalid')).toBe('false');
-		expect(payment.getAttribute('aria-describedby')).toBeNull();
+		expect(payment.getAttribute('aria-describedby')).toBe('paymentAmount-currency');
 	});
 });
 

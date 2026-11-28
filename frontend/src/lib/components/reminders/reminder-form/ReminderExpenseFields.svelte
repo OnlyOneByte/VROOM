@@ -1,11 +1,10 @@
 <script lang="ts">
 	import * as Select from '#lib/components/ui/select/index.ts';
-	import { Input } from '#lib/components/ui/input/index.ts';
+	import MoneyInput from '#lib/components/common/MoneyInput.svelte';
 	import { Label } from '#lib/components/ui/label/index.ts';
 	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import TagInput from '#lib/components/expenses/form/TagInput.svelte';
 	import { categoryLabels } from '#lib/utils/expense-helpers.ts';
-	import { amountPlaceholder, amountStep, getCurrencySymbol } from '#lib/utils/formatters.ts';
 	import type { ReminderFormState } from './reminder-form-state.svelte';
 	import { EXPENSE_CATEGORIES, isFuelAllowed } from './reminder-form-model';
 
@@ -15,7 +14,6 @@
 
 	let { form }: Props = $props();
 
-	const currencySymbol = $derived(getCurrencySymbol(form.currency));
 	const fuelAllowed = $derived(isFuelAllowed(form.values));
 </script>
 
@@ -47,22 +45,16 @@
 		</div>
 		<div class="space-y-2">
 			<Label for="reminder-expense-amount">Amount *</Label>
-			<div class="relative">
-				<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-					<span class="text-muted-foreground">{currencySymbol}</span>
-				</div>
-				<Input
-					id="reminder-expense-amount"
-					type="number"
-					step={amountStep(form.currency)}
-					min="0"
-					bind:value={form.values.expenseAmount}
-					placeholder={amountPlaceholder(form.currency)}
-					class={currencySymbol.length > 1 ? 'pl-14' : 'pl-8'}
-					aria-invalid={!!form.errors['expenseAmount']}
-				/>
-			</div>
-			{#if form.errors['expenseAmount']}<FormFieldError>
+			<MoneyInput
+				id="reminder-expense-amount"
+				currency={form.currency}
+				bind:value={form.values.expenseAmount}
+				aria-invalid={!!form.errors['expenseAmount']}
+				aria-describedby={form.errors['expenseAmount']
+					? 'reminder-expense-amount-error'
+					: undefined}
+			/>
+			{#if form.errors['expenseAmount']}<FormFieldError id="reminder-expense-amount-error">
 					{form.errors['expenseAmount']}
 				</FormFieldError>{/if}
 		</div>

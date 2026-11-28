@@ -41,7 +41,7 @@
 
 	const DAY_MS = 86_400_000;
 	const SOON_DAYS = 30;
-	const SOON_DISTANCE = 1000;
+	let soonDistance = $derived(distanceLabel === 'km' ? 1600 : 1000);
 
 	let menuOpen = $state(false);
 
@@ -79,7 +79,7 @@
 			const left = Math.max(0, reminder.nextDueOdometer - current);
 			return {
 				text: `In ${formatNumber(left, 0)} ${distanceLabel}`,
-				tone: left <= SOON_DISTANCE ? 'warning' : 'muted'
+				tone: left <= soonDistance ? 'warning' : 'muted'
 			};
 		}
 		return { text: 'Scheduled', tone: 'muted' };
@@ -159,6 +159,8 @@
 			>
 				{servicing ? 'Marking…' : 'Mark serviced'}
 			</Button>
+		{:else if servicing}
+			<p class="text-xs text-muted-foreground" role="status">Marking serviced…</p>
 		{:else if canResume}
 			<Button variant="link" class="h-10 px-0" onclick={() => onToggleActive(item)}>Resume</Button>
 		{/if}
@@ -191,7 +193,7 @@
 					onclick={() => choose(onMarkServiced)}
 				>
 					<Gauge />
-					Mark serviced
+					{servicing ? 'Marking…' : 'Mark serviced'}
 				</Button>
 			{/if}
 			{#if reminder.type === 'expense'}
