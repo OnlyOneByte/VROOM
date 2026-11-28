@@ -8,6 +8,7 @@
 	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { isReminderTimeDue } from '#lib/utils/reminder-helpers.ts';
+	import { focusLeftOn } from '#lib/utils/focus.ts';
 	import { appStore } from '#lib/stores/app.svelte.ts';
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { getDistanceUnitLabel } from '#lib/utils/units.ts';
@@ -114,7 +115,7 @@
 		}
 		if (!created) return;
 		await tick();
-		newReminderButton?.focus();
+		if (focusLeftOn(newReminderButton)) newReminderButton?.focus();
 	}
 
 	async function runDueReminders() {

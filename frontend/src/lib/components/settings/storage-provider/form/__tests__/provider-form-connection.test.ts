@@ -226,7 +226,7 @@ describe('ProviderForm connection contract', () => {
 });
 
 describe('ProviderForm save explains what is missing', () => {
-	test('without a name, Save storage stays focusable, says why, and saves nothing', async () => {
+	test('Save storage stays focusable, says what is missing, and saves nothing until the form is complete', async () => {
 		render(ProviderForm, { props: {} });
 		await fireEvent.click(screen.getByRole('button', { name: /S3 \/ B2 \/ R2/ }));
 
@@ -236,6 +236,11 @@ describe('ProviderForm save explains what is missing', () => {
 		expect(createProvider).not.toHaveBeenCalled();
 
 		await type('Name', 'My Provider');
+		await type('Endpoint', 'https://s3.example.com');
+		expect(saveButton()).toHaveAttribute('aria-disabled', 'true');
 		expect(saveButton()).toHaveAccessibleDescription('Finish the connection details to save.');
+		await fireEvent.click(saveButton());
+		await fireEvent.keyDown(saveButton(), { key: 'Enter' });
+		expect(createProvider).not.toHaveBeenCalled();
 	});
 });
