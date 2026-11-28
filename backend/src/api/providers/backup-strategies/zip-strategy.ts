@@ -1,5 +1,10 @@
 import { logger } from '../../../utils/logger';
-import { backupFilePrefix, backupService, resolveBackupFolderPath } from '../../sync/backup';
+import {
+  backupFilePrefix,
+  backupService,
+  RetentionIncompleteError,
+  resolveBackupFolderPath,
+} from '../../sync/backup';
 import type {
   BackupCapabilityResult,
   BackupStrategy,
@@ -47,6 +52,7 @@ export async function uploadZipBackup(
         error: error instanceof Error ? error.message : String(error),
       });
       warning = RETENTION_WARNING;
+      if (error instanceof RetentionIncompleteError) deletedOldBackups = error.deleted;
     }
 
     return {

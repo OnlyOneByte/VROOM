@@ -7,7 +7,10 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { GoogleDriveStrategy } from '../../providers/backup-strategies/google-drive-strategy';
-import { ZipBackupStrategy } from '../../providers/backup-strategies/zip-strategy';
+import {
+  RETENTION_WARNING,
+  ZipBackupStrategy,
+} from '../../providers/backup-strategies/zip-strategy';
 import { FakeStorageProvider } from '../../providers/domains/storage/fake-provider';
 import {
   getStorageProviderRegistry,
@@ -180,6 +183,44 @@ describe('ZIP backups to an S3 provider', () => {
     expect(listedNames).toContain(untagged);
     expect(listedNames).toContain(otherAccount);
     expect(listedNames).toHaveLength(3);
+  });
+
+  test('a denied delete keeps a warning on the provider until a cleanup works', async () => {
+    const old = `${backupFilePrefix(ctx.user.id)}old.zip`;
+    bucket = new FakeStorageProvider([
+      {
+        key: `VROOM/Backups/${old}`,
+        name: old,
+        size: 1,
+        createdTime: '1969-12-31T00:00:00.000Z',
+        lastModified: '1969-12-31T00:00:00.000Z',
+      },
+    ]);
+    await setBackupConfig({ 'p-s3': { ...zipOn, retentionCount: 1 } });
+    const storedWarning = async () => {
+      const row = (await ctx.sql.get(
+        'SELECT backup_config FROM user_preferences WHERE user_id = ?',
+        [ctx.user.id]
+      )) as { backup_config: string };
+      return JSON.parse(row.backup_config).providers['p-s3'].backupWarning as string | undefined;
+    };
+
+    const denied = spyOn(bucket, 'delete').mockRejectedValue(new Error('AccessDenied'));
+    try {
+      const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: { results: Record<string, { capabilities: { zip?: { warning?: string } } }> };
+      };
+      expect(body.data.results['p-s3']?.capabilities.zip?.warning).toBe(RETENTION_WARNING);
+      expect(await storedWarning()).toBe(RETENTION_WARNING);
+    } finally {
+      denied.mockRestore();
+    }
+
+    const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+    expect(res.status).toBe(200);
+    expect(await storedWarning()).toBeUndefined();
   });
 
   test('a stale ZIP setting on a photo-only provider is ignored, so the run still succeeds', async () => {

@@ -137,6 +137,7 @@ function mergeStorageConfig(
 
 const SERVER_OWNED_BACKUP_FIELDS = new Set([
   'lastBackupAt',
+  'backupWarning',
   'sheetsSpreadsheetId',
   'sheetsAutoPausedAt',
 ]);

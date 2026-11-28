@@ -292,7 +292,8 @@ export class BackupOrchestrator {
 
         if (result.success) {
           anySuccess = true;
-          configPatch[providerId] = { lastBackupAt: timestamp };
+          const warning = Object.values(result.capabilities).find((c) => c.warning)?.warning;
+          configPatch[providerId] = { lastBackupAt: timestamp, backupWarning: warning ?? null };
         } else {
           failedProviders.push(providerId);
         }
