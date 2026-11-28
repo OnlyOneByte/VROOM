@@ -436,7 +436,10 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return rows.map((r) => r.id);
   }
 
-  async getSplitGroupAccessInfo(groupId: string): Promise<{
+  async getSplitGroupAccessInfo(
+    groupId: string,
+    requesterId: string
+  ): Promise<{
     vehicleIds: string[];
     ownerId: string;
     authors: (string | null)[];
@@ -453,13 +456,16 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
       })
       .from(expenses)
       .where(eq(expenses.groupId, groupId));
-    if (rows.length === 0) return null;
+    const owners = new Set(rows.map((r) => r.userId));
+    const ownerId = owners.has(requesterId) ? requesterId : owners.size === 1 ? rows[0]?.userId : undefined;
+    const own = rows.filter((r) => r.userId === ownerId);
+    if (!ownerId || own.length === 0) return null;
     return {
-      vehicleIds: [...new Set(rows.map((r) => r.vehicleId))],
-      ownerId: rows[0].userId,
-      authors: [...new Set(rows.map((r) => r.createdBy))],
-      sourceType: rows[0].sourceType,
-      category: rows[0].category,
+      vehicleIds: [...new Set(own.map((r) => r.vehicleId))],
+      ownerId,
+      authors: [...new Set(own.map((r) => r.createdBy))],
+      sourceType: own[0].sourceType,
+      category: own[0].category,
     };
   }
 
