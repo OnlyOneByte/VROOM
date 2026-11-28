@@ -139,8 +139,8 @@ if (CONFIG.env === 'development') {
 
 app.use('*', activityTracker);
 
-app.get('/health', (c) => {
-  const healthy = checkDatabaseHealth();
+app.get('/health', async (c) => {
+  const healthy = await checkDatabaseHealth();
   return c.json(
     {
       status: healthy ? 'ok' : 'unavailable',

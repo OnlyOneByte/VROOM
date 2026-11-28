@@ -274,7 +274,7 @@ describe('the active dialect', () => {
     expect(is(active.users, SQLiteTable)).toBe(true);
   });
 
-  test('a Postgres URL switches db/schema to the Postgres tables and the connection refuses it', () => {
+  test('a Postgres URL switches db/schema to the Postgres tables and getDb() refuses the SQLite handle', () => {
     const script = [
       "const schema = await import('./src/db/schema.ts');",
       "const pg = await import('./src/db/pg/schema.ts');",
@@ -293,7 +293,7 @@ describe('the active dialect', () => {
     expect(run.exitCode, run.stderr.toString()).toBe(0);
     const out = JSON.parse(run.stdout.toString().trim().split('\n').at(-1) ?? '{}');
     expect(out.same, run.stderr.toString()).toBe(true);
-    expect(out.refused).toContain('cannot connect to yet (#1635)');
+    expect(out.refused).toContain('the SQLite handle is not available');
     expect(is(pgSchema.expenses, PgTable)).toBe(true);
   });
 });
