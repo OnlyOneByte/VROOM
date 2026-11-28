@@ -49,7 +49,11 @@ const GUESSES: Array<[NativeImportField, Array<RegExp>, RegExp?]> = [
 		[/total/, /amount/, /cost/, /spent/, /paid/, /price/],
 		/volume|gallon|litre|liter|fill|distance|mileage|odometer|\bkm\b|\bmiles?\b/
 	],
-	['category', [/categor/, /\btype\b/, /\bkind\b/], /fuel|payment/],
+	[
+		'category',
+		[/categor/, /\btype\b/, /\bkind\b/],
+		/fuel|gas|oil|payment|vehicle|\bcar\b|charger|plug/
+	],
 	['vehicle', [/vehicle/, /\bcar\b/]],
 	['description', [/note/, /description/, /comment/]],
 	['tags', [/\btags?\b/]]

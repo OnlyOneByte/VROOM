@@ -144,7 +144,7 @@ describe('guessManualColumns', () => {
 		});
 	});
 
-	test('totals of volume or distance go to their own fields, and entry or service types are categories', () => {
+	test('a volume total is volume, a distance total is never the amount, and entry or service types are categories', () => {
 		expect(
 			guessManualColumns(['Date', 'Total gallons', 'Total distance', 'Price', 'Service type'])
 		).toEqual({
@@ -156,6 +156,9 @@ describe('guessManualColumns', () => {
 		expect(guessManualColumns(['Date', 'Entry type', 'Payment type', 'Amount']).category).toBe(
 			'Entry type'
 		);
+		for (const header of ['Vehicle type', 'Car type', 'Gas type', 'Oil type', 'Charger type']) {
+			expect(guessManualColumns(['Date', header, 'Amount']).category).toBeUndefined();
+		}
 	});
 
 	test('an un-guessable header set leaves fields unmapped (no invented columns)', () => {
