@@ -1,3 +1,4 @@
+import { anthropicMaxTokens } from '../model/anthropic-limits';
 import type { ModelProviderSettings } from '../model/model-registry';
 import { postModelJson, trimBaseUrl } from '../model/model-transport';
 import {
@@ -11,7 +12,6 @@ import {
 } from './llm-provider';
 
 const REQUEST_TIMEOUT_MS = 60_000;
-const MAX_TOKENS = 16_000;
 const ANTHROPIC_VERSION = '2023-06-01';
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 
@@ -63,7 +63,7 @@ export class AnthropicLlmProvider implements LlmProvider {
       outbound: this.outbound,
       body: {
         model: this.model,
-        max_tokens: MAX_TOKENS,
+        max_tokens: anthropicMaxTokens(this.model),
         ...(system ? { system } : {}),
         messages: toAnthropicMessages(request.messages),
         ...(request.tools.length > 0 ? { tools: request.tools.map(toAnthropicTool) } : {}),

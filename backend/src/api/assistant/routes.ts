@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { CONFIG } from '../../config';
-import { AppError } from '../../errors';
 import { rateLimiter, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import { logger } from '../../utils/logger';
 import { isValidTimeZone } from '../../utils/time-zone';
 import { withoutIdleTimeout } from '../../utils/timeout';
 import { zValidator } from '../../utils/validation';
+import { aiFailure, loadAiProvider } from '../providers/ai-failure';
 import type { ChatMessage } from '../providers/domains/llm/llm-provider';
 import { runAssistant } from '../providers/domains/llm/orchestrator';
 import { getLlmProvider } from '../providers/domains/llm/registry';
@@ -49,7 +49,7 @@ routes.post(
     const user = c.get('user');
     const body = c.req.valid('json');
     const providerRow = await resolveProvider(user.id, 'ai.llm');
-    const provider = await getLlmProvider(providerRow);
+    const provider = await loadAiProvider(() => getLlmProvider(providerRow));
     const history: ChatMessage[] = (body.history ?? []).map((m) => ({
       role: m.role,
       content: m.content,
@@ -67,7 +67,7 @@ routes.post(
         providerType: providerRow.providerType,
         error: message,
       });
-      throw new AppError('The assistant provider could not be reached. Try again.', 502);
+      throw aiFailure(err, 'The assistant provider could not be reached. Try again.');
     }
   }
 );

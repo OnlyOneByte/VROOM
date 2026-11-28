@@ -132,11 +132,19 @@ describe('POST /api/v1/receipts/parse', () => {
     expect(await res.text()).toMatch(/No readable text found/);
   }, 60_000);
 
-  test('a provider transport or HTTP failure returns 502', async () => {
+  test.each([
+    [401, 502, "didn't accept its key"],
+    [404, 502, 'Check the key and model name'],
+    [429, 503, 'limiting requests'],
+    [500, 502, 'could not be reached'],
+  ])('a provider HTTP %i answers %i saying what went wrong', async (upstream, status, text) => {
     await seedVlmProvider();
-    stubModelFailure(429);
+    stubModelFailure(upstream);
     const res = await postImage(IMG, 'image/jpeg');
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(status);
+    const body = await res.text();
+    expect(body).toContain(text);
+    expect(body).not.toContain('sk-secret-key');
   });
 
   test('a wrong image type → 400', async () => {
