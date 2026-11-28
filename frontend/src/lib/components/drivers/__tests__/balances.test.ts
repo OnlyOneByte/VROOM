@@ -103,6 +103,34 @@ describe('balances', () => {
 		expect(screen.getByText('No shared costs in this period yet.')).toBeTruthy();
 	});
 
+	test('a driver who sees only their own balance and owes nothing sees Settled, not "No shared costs"', async () => {
+		balances.mockResolvedValue(
+			data({
+				scope: 'own',
+				drivers: [
+					{
+						driverId: 'a',
+						name: 'Alex',
+						color: 'chart-1',
+						guest: false,
+						you: true,
+						owed: 0,
+						paid: 0,
+						balance: 0
+					}
+				],
+				transfers: [],
+				total: null,
+				unassigned: null,
+				unpaid: null
+			})
+		);
+		mount();
+		await settle();
+		expect(screen.getByText('Settled')).toBeTruthy();
+		expect(screen.queryByText('No shared costs in this period yet.')).toBeNull();
+	});
+
 	test('a refund with no payer is reported too', async () => {
 		balances.mockResolvedValue(data({ unpaid: -15 }));
 		mount();

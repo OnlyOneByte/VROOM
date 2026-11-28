@@ -106,7 +106,7 @@
 						Retry
 					</Button>
 				</div>
-			{:else if data && data.drivers.every(d => d.owed === 0 && d.paid === 0)}
+			{:else if data && data.drivers.length === 0}
 				<p class="text-sm text-muted-foreground">
 					{pending
 						? `${pending}. Fill in drivers to include it.`
