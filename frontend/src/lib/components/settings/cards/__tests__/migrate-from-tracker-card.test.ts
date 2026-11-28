@@ -211,7 +211,7 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 			source: 'fuelio',
 			columns: {},
 			dateFormat: 'iso',
-			targetVehicle: '2019 Toyota Corolla',
+			targetVehicle: 'v1',
 			categoryMap: {}
 		});
 		expect(screen.getByText('fuelio.csv')).toBeInTheDocument();
@@ -388,7 +388,7 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		expect(importExpensesCsv).toHaveBeenCalledWith(
 			CSV,
 			true,
-			expect.objectContaining({ targetVehicle: 'Weekend Car' })
+			expect.objectContaining({ targetVehicle: 'v2' })
 		);
 		expect(screen.getByTestId('migrate-vehicle')).toHaveTextContent('Weekend Car');
 	});
@@ -483,7 +483,7 @@ describe('MigrateFromTrackerCard dialog flow', () => {
 		expect(importExpensesCsv).toHaveBeenCalledWith(
 			CSV,
 			true,
-			expect.objectContaining({ targetVehicle: 'Weekend Car' })
+			expect.objectContaining({ targetVehicle: 'v2' })
 		);
 		expect(screen.getByTestId('migrate-preview')).toBeInTheDocument();
 	});

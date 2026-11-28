@@ -21,7 +21,9 @@
 	function handleFileChange(event: Event) {
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
-		if (file) onFileChange(file);
+		if (!file) return;
+		input.value = '';
+		onFileChange(file);
 	}
 </script>
 

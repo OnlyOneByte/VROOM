@@ -38,23 +38,54 @@ export function isNativeImportHeaders(headers: string[]): boolean {
 	return NATIVE_HEADERS.every(h => lower.has(h));
 }
 
+const UNIT_PRICE = /\bper\b|\/\s*(gal|l|litre|liter)\b|unit price/;
+
+const GUESSES: Array<[NativeImportField, Array<RegExp>, RegExp?]> = [
+	['date', [/date/]],
+	['mileage', [/odometer/, /mileage/, /\bodo\b/]],
+	['volume', [/volume/, /gallon/, /litre|liter/, /fuel amount/, /\bfill/], /price|cost|paid|spent/],
+	[
+		'amount',
+		[/total/, /amount/, /cost/, /spent/, /paid/, /price/],
+		/volume|gallon|litre|liter|fill|distance|mileage|odometer|\bkm\b|\bmiles?\b/
+	],
+	[
+		'category',
+		[/categor/, /\btype\b/, /\bkind\b/],
+		/fuel|gas|oil|payment|vehicle|\bcar\b|charger|plug/
+	],
+	['vehicle', [/vehicle/, /\bcar\b/], /\btype\b/],
+	['description', [/note/, /description/, /comment/]],
+	['tags', [/\btags?\b/]]
+];
+
+function headerWords(header: string): string {
+	return header
+		.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+		.replace(/[_\-.]+/g, ' ')
+		.toLowerCase();
+}
+
 export function guessManualColumns(headers: string[]): Partial<Record<NativeImportField, string>> {
 	const guess: Partial<Record<NativeImportField, string>> = {};
-	const find = (...needles: string[]) =>
-		headers.find(h => needles.some(n => h.toLowerCase().includes(n)));
-	const set = (field: NativeImportField, ...needles: string[]) => {
-		const m = find(...needles);
-		if (m) guess[field] = m;
-	};
-	set('date', 'date');
-	set('amount', 'amount', 'price', 'cost', 'spent', 'paid', 'total');
-	set('category', 'category', 'type', 'kind');
-	set('vehicle', 'vehicle', 'car');
-	set('mileage', 'odometer', 'mileage', 'odo');
-	set('volume', 'volume', 'gallon', 'litre', 'liter', 'fuel amount', 'fill');
-	set('description', 'note', 'description', 'comment');
-	set('tags', 'tag');
+	const claimed = new Set<string>();
+	for (const [field, needles, exclude] of GUESSES) {
+		const open = headers.filter(h => !claimed.has(h) && !exclude?.test(headerWords(h)));
+		const ranked =
+			field === 'amount' ? [...open].sort((a, b) => unitPriceRank(a) - unitPriceRank(b)) : open;
+		const match = needles
+			.map(needle => ranked.find(h => needle.test(headerWords(h))))
+			.find(Boolean);
+		if (match) {
+			guess[field] = match;
+			claimed.add(match);
+		}
+	}
 	return guess;
+}
+
+function unitPriceRank(header: string): number {
+	return UNIT_PRICE.test(headerWords(header)) ? 1 : 0;
 }
 
 export function presetImportMapping(

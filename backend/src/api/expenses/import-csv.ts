@@ -346,6 +346,7 @@ export function buildImportPlan(
     if (v.nickname) register(v.nickname, v.id);
     register(`${v.year} ${v.make} ${v.model}`, v.id);
   }
+  for (const v of vehicles) vehicleByName.set(vehicleNameKey(v.id), v.id);
 
   const occurrences = new Map<string, number>();
 

@@ -742,11 +742,13 @@ function targetUnitsResolver(
 ): TargetUnitsResolver {
   return (vehicleName) => {
     const wanted = vehicleNameKey(vehicleName);
-    const match = vehicles.find(
-      (v) =>
-        (v.nickname && vehicleNameKey(v.nickname) === wanted) ||
-        vehicleNameKey(`${v.year} ${v.make} ${v.model}`) === wanted
-    );
+    const match =
+      vehicles.find((v) => vehicleNameKey(v.id) === wanted) ??
+      vehicles.find(
+        (v) =>
+          (v.nickname && vehicleNameKey(v.nickname) === wanted) ||
+          vehicleNameKey(`${v.year} ${v.make} ${v.model}`) === wanted
+      );
     if (!match) return {};
     return {
       distanceUnit: match.unitPreferences.distanceUnit,

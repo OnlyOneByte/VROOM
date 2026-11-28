@@ -9,7 +9,6 @@ import type {
 } from '#lib/types/index.ts';
 import type { DetectedImportFormat } from '#lib/types/import-mapping.ts';
 import { presetImportMapping } from '#lib/utils/import-mapping-helpers.ts';
-import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 
 export type ManualColumns = Partial<Record<NativeImportField, string>>;
 
@@ -21,7 +20,7 @@ export interface ManualMappingInput {
 	volumeUnit: VolumeUnit;
 }
 
-export type TargetVehicle = Pick<Vehicle, 'year' | 'make' | 'model' | 'nickname'>;
+export type TargetVehicle = Pick<Vehicle, 'id'>;
 
 export interface MappingInput {
 	preset: DetectedImportFormat | null;
@@ -49,7 +48,7 @@ export function buildImportMapping(input: MappingInput): ImportColumnMapping | n
 	const hasRemap = Object.keys(remap).length > 0;
 
 	if (preset && targetVehicle) {
-		return presetImportMapping(preset, getVehicleDisplayName(targetVehicle), remap);
+		return presetImportMapping(preset, targetVehicle.id, remap);
 	}
 
 	const hasVehicle = !!manual.columns.vehicle || !!targetVehicle;
@@ -61,9 +60,8 @@ export function buildImportMapping(input: MappingInput): ImportColumnMapping | n
 			...(columns.mileage ? { distanceUnit: manual.distanceUnit } : {}),
 			...(columns.volume ? { volumeUnit: manual.volumeUnit } : {}),
 			...(hasRemap ? { categoryMap: remap } : {}),
-			...(columns.vehicle || !targetVehicle
-				? {}
-				: { targetVehicle: getVehicleDisplayName(targetVehicle) })
+			...(columns.category ? {} : { defaultCategory: 'misc' as const }),
+			...(columns.vehicle || !targetVehicle ? {} : { targetVehicle: targetVehicle.id })
 		};
 	}
 
