@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { tick } from 'svelte';
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('#lib/components/analytics/explore/ExploreTab.svelte', async () => ({
@@ -40,8 +41,19 @@ beforeEach(() => {
 	getExpenseSummary.mockResolvedValue({ expenseCount: 0 });
 });
 
+/** Wait until both loads the decision rests on have settled, so a "no" is a real no. */
+async function settled() {
+	await waitFor(() => expect(getExpenseSummary).toHaveBeenCalled());
+	await waitFor(() => expect(getVehicles).toHaveBeenCalled());
+	await Promise.allSettled([
+		...getExpenseSummary.mock.results.map(r => r.value),
+		...getVehicles.mock.results.map(r => r.value)
+	]);
+	await tick();
+}
+
 describe('analytics with a car but nothing logged', () => {
-	test('explains itself and offers the first expense instead of the measure controls', async () => {
+	test('the Explore tab explains itself and offers the first expense instead of the measures', async () => {
 		render(Page);
 
 		expect(
@@ -51,34 +63,41 @@ describe('analytics with a car but nothing logged', () => {
 			'href',
 			'/expenses/new'
 		);
-		expect(screen.queryByRole('tablist')).toBeNull();
 		expect(screen.getByRole('heading', { level: 1, name: 'Explore' })).toBeInTheDocument();
 		expect(getExpenseSummary).toHaveBeenCalledWith({ period: 'all' });
 	});
 
-	test('once anything is logged, the tabs show as usual', async () => {
+	test('the other tabs stay, since loans, insurance and trips need no expense', async () => {
+		render(Page);
+		await screen.findByRole('heading', { name: 'Nothing to explore yet' });
+
+		await fireEvent.click(screen.getByRole('tab', { name: 'Year in review' }));
+		expect(screen.getByRole('heading', { level: 1, name: 'Year in review' })).toBeInTheDocument();
+		expect(screen.queryByRole('heading', { name: 'Nothing to explore yet' })).toBeNull();
+	});
+
+	test('once anything is logged, Explore shows as usual', async () => {
 		getExpenseSummary.mockResolvedValue({ expenseCount: 1 });
 		render(Page);
+		await settled();
 
-		expect(await screen.findByRole('tablist')).toBeTruthy();
-		await waitFor(() => expect(getExpenseSummary).toHaveBeenCalled());
+		expect(screen.getByRole('tablist')).toBeTruthy();
 		expect(screen.queryByRole('heading', { name: 'Nothing to explore yet' })).toBeNull();
 	});
 
-	test('a car shared with me may have data of its own, so the tabs stay', async () => {
+	test('a car shared with me may have data of its own, so Explore shows as usual', async () => {
 		getVehicles.mockResolvedValue([OWN, SHARED]);
 		render(Page);
+		await settled();
 
-		expect(await screen.findByRole('tablist')).toBeTruthy();
-		await waitFor(() => expect(getVehicles).toHaveBeenCalled());
 		expect(screen.queryByRole('heading', { name: 'Nothing to explore yet' })).toBeNull();
 	});
 
-	test('if the count cannot load, the page makes no claim and shows the tabs', async () => {
+	test('if the count cannot load, the page makes no claim and Explore shows as usual', async () => {
 		getExpenseSummary.mockRejectedValue(new Error('offline'));
 		render(Page);
+		await settled();
 
-		expect(await screen.findByRole('tablist')).toBeTruthy();
 		expect(screen.queryByRole('heading', { name: 'Nothing to explore yet' })).toBeNull();
 	});
 });

@@ -284,7 +284,10 @@ test.describe('Analytics', () => {
 			'/expenses/new'
 		);
 		await expect(page.getByRole('heading', { level: 1, name: 'Explore' })).toBeVisible();
-		await expect(page.getByRole('tablist')).toBeHidden();
+
+		await page.getByRole('tab', { name: 'Cross-vehicle' }).click();
+		await expect(page.getByRole('heading', { level: 1, name: 'Cross-vehicle' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Nothing to explore yet' })).toBeHidden();
 	});
 
 	test('a failed load shows an error with a retry that re-requests', async ({ page }) => {

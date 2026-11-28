@@ -228,7 +228,8 @@
 
 	let quickStats = $derived(summary?.quickStats ?? null);
 	let noVehicles = $derived(!isLoading && !error && quickStats?.vehicleCount === 0 && !vehicleIds);
-	// Own cars only and nothing logged on them yet: every measure would be empty.
+	// Own cars only and no expenses on them yet: every Explore measure would be empty. Only the
+	// Explore tab steps aside; other tabs can show loans, insurance or trips without any expense.
 	let nothingLogged = $derived(
 		!noVehicles &&
 			vehiclesLoaded &&
@@ -237,9 +238,7 @@
 			vehicles.every(v => !v.sharedAccess) &&
 			ownExpenseCount === 0
 	);
-	let showTabs = $derived(
-		!nothingLogged && (quickStats ? quickStats.vehicleCount > 0 || !!vehicleIds : !!error)
-	);
+	let showTabs = $derived(quickStats ? quickStats.vehicleCount > 0 || !!vehicleIds : !!error);
 	let fuelStats = $derived(summary?.fuelStats ?? null);
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
 
@@ -298,22 +297,6 @@
 		<NoVehiclesEmptyState
 			description="Analytics compare what your vehicles cost over time. Add one and log a few expenses to see them."
 		/>
-	{:else if nothingLogged}
-		<EmptyState>
-			{#snippet icon()}
-				<ChartColumn class="mb-4 h-12 w-12 text-muted-foreground" aria-hidden="true" />
-			{/snippet}
-			{#snippet title()}Nothing to explore yet{/snippet}
-			{#snippet description()}
-				Log a fill-up or an expense and your costs show up here, by month, category and car.
-			{/snippet}
-			{#snippet action()}
-				<Button size="lg" href={resolve(routes.expenseNew)}>
-					<Plus class="mr-2 h-4 w-4" aria-hidden="true" />
-					Add first expense
-				</Button>
-			{/snippet}
-		</EmptyState>
 	{/if}
 
 	{#if showTabs}
@@ -354,32 +337,50 @@
 
 			{#if activeTab === 'explore'}
 				<Tabs.Content value="explore">
-					{#await import('#lib/components/analytics/explore/ExploreTab.svelte')}
-						<div class="flex min-h-[480px] justify-center p-8" aria-busy="true">
-							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
-						</div>
-					{:then { default: ExploreTab }}
-						<ExploreTab
-							query={explore}
-							onQueryChange={setExplore}
-							rangeText={rangeLabel(filters, d => formatDate(d))}
-							carsText={carsLabel(filters.cars, new Map(vehicleOptions.map(v => [v.id, v.name])))}
-							onOnlyCar={onlyCar}
-							onAllCars={() => setFilters({ ...filters, cars: [] })}
-							{dateRange}
-							{vehicleIds}
-							{vehicleColors}
-							filterLabel={filtered ? filterLabel : undefined}
-							onClearFilters={filtered ? clearFilters : undefined}
-							onApplyInsight={applyInsight}
-							driverSplit={sharedCars.some(v => !v.sharedAccess)}
-							filters={exploreFilterChips}
-							carCount={vehiclesLoaded && !vehiclesError ? vehicles.length : undefined}
-						/>
-					{:catch}
-						{@render filterChips(false)}
-						{@render tabLoadError('Explore')}
-					{/await}
+					{#if nothingLogged}
+						<EmptyState level={2}>
+							{#snippet icon()}
+								<ChartColumn class="mb-4 h-12 w-12 text-muted-foreground" aria-hidden="true" />
+							{/snippet}
+							{#snippet title()}Nothing to explore yet{/snippet}
+							{#snippet description()}
+								Log a fill-up or an expense and your costs show up here, by month, category and car.
+							{/snippet}
+							{#snippet action()}
+								<Button size="lg" href={resolve(routes.expenseNew)}>
+									<Plus class="mr-2 h-4 w-4" aria-hidden="true" />
+									Add first expense
+								</Button>
+							{/snippet}
+						</EmptyState>
+					{:else}
+						{#await import('#lib/components/analytics/explore/ExploreTab.svelte')}
+							<div class="flex min-h-[480px] justify-center p-8" aria-busy="true">
+								<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+							</div>
+						{:then { default: ExploreTab }}
+							<ExploreTab
+								query={explore}
+								onQueryChange={setExplore}
+								rangeText={rangeLabel(filters, d => formatDate(d))}
+								carsText={carsLabel(filters.cars, new Map(vehicleOptions.map(v => [v.id, v.name])))}
+								onOnlyCar={onlyCar}
+								onAllCars={() => setFilters({ ...filters, cars: [] })}
+								{dateRange}
+								{vehicleIds}
+								{vehicleColors}
+								filterLabel={filtered ? filterLabel : undefined}
+								onClearFilters={filtered ? clearFilters : undefined}
+								onApplyInsight={applyInsight}
+								driverSplit={sharedCars.some(v => !v.sharedAccess)}
+								filters={exploreFilterChips}
+								carCount={vehiclesLoaded && !vehiclesError ? vehicles.length : undefined}
+							/>
+						{:catch}
+							{@render filterChips(false)}
+							{@render tabLoadError('Explore')}
+						{/await}
+					{/if}
 				</Tabs.Content>
 			{:else if activeTab === 'fuel-stats'}
 				<Tabs.Content value="fuel-stats">
