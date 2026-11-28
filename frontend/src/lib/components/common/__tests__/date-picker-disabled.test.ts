@@ -44,16 +44,32 @@ describe('DatePicker id', () => {
 
 describe('DatePicker value parsing', () => {
 	test.each(['2026-02-30', '2026-13-01', '26-05-10', 'not a date'])(
-		'%s is not a date, so the placeholder shows',
-		value => {
-			render(DatePicker, { props: { value, id: 'pick', placeholder: 'Pick a date' } });
+		'%s is not a date, so the placeholder shows and the value is cleared',
+		async value => {
+			let bound: string | undefined = value;
+			render(DatePicker, {
+				props: {
+					get value() {
+						return bound;
+					},
+					set value(next: string | undefined) {
+						bound = next;
+					},
+					id: 'pick',
+					placeholder: 'Pick a date'
+				}
+			});
 			expect(document.getElementById('pick')).toHaveTextContent('Pick a date');
+			await vi.waitFor(() => expect(bound).toBeUndefined());
 		}
 	);
 
-	test('a leap day reads as that day', () => {
-		render(DatePicker, { props: { value: '2028-02-29', id: 'pick' } });
-		expect(document.getElementById('pick-value')?.textContent).toBe('February 29, 2028');
+	test.each([
+		['2028-02-29', 'February 29, 2028'],
+		['0999-05-10', 'May 10, 999']
+	])('%s reads as %s', (value, text) => {
+		render(DatePicker, { props: { value, id: 'pick' } });
+		expect(document.getElementById('pick-value')?.textContent).toBe(text);
 	});
 });
 

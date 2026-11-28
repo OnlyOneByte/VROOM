@@ -1,19 +1,33 @@
+<script lang="ts" module>
+	type PickerCalendarComponent = (typeof import('./date-picker-calendar.svelte'))['default'];
+
+	let calendarModule: Promise<PickerCalendarComponent> | undefined;
+	let PickerCalendar = $state<PickerCalendarComponent>();
+
+	function loadCalendar(): Promise<PickerCalendarComponent> {
+		calendarModule ??= import('./date-picker-calendar.svelte').then(
+			module => (PickerCalendar = module.default),
+			error => {
+				calendarModule = undefined;
+				throw error;
+			}
+		);
+		return calendarModule;
+	}
+
+	function prefetchCalendar() {
+		loadCalendar().catch(() => {});
+	}
+</script>
+
 <script lang="ts">
-	import { currentLocale } from '#lib/utils/formatters.ts';
+	import { formatDateWith } from '#lib/utils/formatters.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import { cn } from '#lib/utils.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Popover from '#lib/components/ui/popover/index.js';
-
-	type PickerCalendar = (typeof import('./date-picker-calendar.svelte'))['default'];
-
-	let calendarModule: Promise<unknown> | undefined;
-	let PickerCalendar = $state<PickerCalendar>();
-	function loadCalendar() {
-		calendarModule ??= import('./date-picker-calendar.svelte').then(module => {
-			PickerCalendar = module.default;
-		});
-	}
 
 	interface Props {
 		value?: string | undefined;
@@ -37,9 +51,6 @@
 		'aria-describedby': ariaDescribedby
 	}: Props = $props();
 
-	const df = new Intl.DateTimeFormat(currentLocale(), { dateStyle: 'long' });
-	const shortDf = new Intl.DateTimeFormat(currentLocale(), { dateStyle: 'medium' });
-
 	function localDate(text: string | undefined): Date | undefined {
 		const match = text?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 		if (!match) return undefined;
@@ -58,11 +69,19 @@
 	});
 
 	$effect(() => {
-		if (open) loadCalendar();
+		if (!open) return;
+		loadCalendar().catch(error => {
+			open = false;
+			appStore.showError(`Couldn't open the calendar. ${userFacingErrorMessage(error)}`);
+		});
 	});
 
-	let displayValue = $derived(selected ? (label ?? df.format(selected)) : placeholder);
-	let shortValue = $derived(selected && !label ? shortDf.format(selected) : null);
+	let displayValue = $derived(
+		selected ? (label ?? formatDateWith(selected, { dateStyle: 'long' })) : placeholder
+	);
+	let shortValue = $derived(
+		selected && !label ? formatDateWith(selected, { dateStyle: 'medium' }) : null
+	);
 
 	let content = $state<HTMLElement | null>(null);
 
@@ -98,7 +117,7 @@
 </script>
 
 <Popover.Root bind:open>
-	<Popover.Trigger {disabled} {id}>
+	<Popover.Trigger {disabled} {id} onpointerenter={prefetchCalendar} onfocusin={prefetchCalendar}>
 		{#snippet child({ props })}
 			<Button
 				variant="outline"
@@ -110,8 +129,6 @@
 				)}
 				aria-invalid={ariaInvalid}
 				aria-describedby={describedBy}
-				onpointerenter={loadCalendar}
-				onfocusin={loadCalendar}
 				{...props}
 			>
 				<CalendarIcon class="size-4" />
