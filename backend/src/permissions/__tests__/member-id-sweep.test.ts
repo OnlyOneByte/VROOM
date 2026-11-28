@@ -39,16 +39,7 @@ const ALLOWED: Record<string, Exception> = {
   },
 };
 
-const KNOWN_GAPS: Record<string, Exception> = {
-  'GET /api/v1/vehicles/:vehicleId/drivers $.data[].userId': {
-    roles: ['editor', 'coOwner'],
-    why: '#2174',
-  },
-  'PUT /api/v1/vehicles/:vehicleId/car-share $.data.drivers[].userId': {
-    roles: ['coOwner'],
-    why: '#2174',
-  },
-};
+const KNOWN_GAPS: Record<string, Exception> = {};
 
 function seedMemberRecords(ctx: TestApp, members: Members): void {
   const run = (sql: string, params: (string | number)[]) => ctx.sqlite.run(sql, params);
