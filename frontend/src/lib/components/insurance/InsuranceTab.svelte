@@ -213,9 +213,9 @@
 									<span class="block text-sm text-muted-foreground">{coverage}</span>
 								{/if}
 							</span>
-							<span class="shrink-0 text-right">
+							<span class="max-w-[40%] shrink-0 text-right">
 								{#if cost}
-									<span class="block font-semibold tabular-nums">{cost}</span>
+									<span class="block font-semibold whitespace-nowrap tabular-nums">{cost}</span>
 								{/if}
 								{#if term && days !== null && policy.isActive}
 									{#if split?.startsLater && term}
