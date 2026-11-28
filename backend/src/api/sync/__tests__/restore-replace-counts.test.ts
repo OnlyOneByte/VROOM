@@ -45,6 +45,18 @@ describe('replace restore', () => {
     expense('left-out', carId, ctx.user.id, 'taken-group');
     photo('kept-photo', 'kept-expense');
     photo('left-out-photo', 'left-out');
+    ctx.sqlite.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials)
+       VALUES ('my-storage', ?, 'storage', 'local', 'Disk', '{}')`,
+      [ctx.user.id]
+    );
+    for (const photoId of ['kept-photo', 'left-out-photo']) {
+      ctx.sqlite.run(
+        `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
+         VALUES (?, ?, 'my-storage', ?, 'active')`,
+        [`ref-${photoId}`, photoId, `photos/${photoId}.jpg`]
+      );
+    }
     const { backupService } = await import('../backup');
     const zip = await backupService.exportAsZip(ctx.user.id);
     ctx.sqlite.run(
@@ -62,5 +74,8 @@ describe('replace restore', () => {
     expect(result.imported?.photos).toBe(1);
     expect(count("SELECT COUNT(*) AS n FROM photos WHERE id = 'left-out-photo'")).toBe(0);
     expect(count("SELECT COUNT(*) AS n FROM photos WHERE id = 'kept-photo'")).toBe(1);
+    expect(result.imported?.photoRefs).toBe(1);
+    expect(count("SELECT COUNT(*) AS n FROM photo_refs WHERE photo_id = 'left-out-photo'")).toBe(0);
+    expect(count("SELECT COUNT(*) AS n FROM photo_refs WHERE photo_id = 'kept-photo'")).toBe(1);
   });
 });

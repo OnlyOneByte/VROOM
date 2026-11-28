@@ -525,7 +525,11 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
     return this.db.transaction(async (tx) => {
       const storedVersion = async () => {
         const [row] = await tx
-          .select({ updatedAt: expenses.updatedAt, groupId: expenses.groupId })
+          .select({
+            updatedAt: expenses.updatedAt,
+            groupId: expenses.groupId,
+            userId: expenses.userId,
+          })
           .from(expenses)
           .where(eq(expenses.id, id));
         return row;
@@ -539,7 +543,7 @@ export class ExpenseRepository extends BaseRepository<Expense, NewExpense> {
             await tx
               .select({ updatedAt: expenses.updatedAt })
               .from(expenses)
-              .where(eq(expenses.groupId, current.groupId))
+              .where(this.groupOwnedBy(current.groupId, current.userId))
           ).map((leg) => leg.updatedAt)
         : [];
       const [updated] = await tx
