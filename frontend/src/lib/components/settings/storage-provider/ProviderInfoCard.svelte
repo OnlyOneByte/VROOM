@@ -62,6 +62,7 @@
 		onReconnect?: (_provider: UserProviderInfo) => void;
 	} = $props();
 
+	let cleanupWarning = $derived(backupEnabled ? backupWarning : undefined);
 	let expanded = $state(false);
 	let syncStatus = $state<Record<string, { total: number; synced: number; failed: number }> | null>(
 		null
@@ -213,7 +214,7 @@
 			{#if lastBackupAt}
 				<Badge variant="ok">Last backup {formatLastSync(lastBackupAt)}</Badge>
 			{/if}
-			{#if backupWarning}
+			{#if cleanupWarning}
 				<Badge variant="soon">Couldn't remove old backups</Badge>
 			{/if}
 		</div>
@@ -236,24 +237,23 @@
 			{:else if !providerCatalog.loaded}
 				<span class="sr-only">Loading backup options</span>
 			{:else if supportsZipBackup}
-				<div class="flex items-center justify-between">
+				<div class="flex items-center justify-between gap-3">
 					<div class="space-y-0.5">
 						<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
 						<p class="text-xs text-muted-foreground">Store ZIP backups in this storage</p>
-						{#if backupWarning}
+						{#if cleanupWarning}
 							<p
 								id="backup-warning-{provider.id}"
 								class="text-sm text-warning"
 								data-testid="backup-warning"
 							>
-								Old backups weren't removed after the last backup. VROOM needs permission to list
-								and delete files in this storage.
+								{cleanupWarning}
 							</p>
 						{/if}
 					</div>
 					<Switch
 						id="backup-{provider.id}"
-						aria-describedby={backupWarning ? `backup-warning-${provider.id}` : undefined}
+						aria-describedby={cleanupWarning ? `backup-warning-${provider.id}` : undefined}
 						checked={backupEnabled}
 						onCheckedChange={checked => onBackupToggle?.(provider.id, checked === true)}
 					/>
@@ -270,7 +270,7 @@
 				</p>
 			{/if}
 			{#if supportsSheets}
-				<div class="flex items-center justify-between">
+				<div class="flex items-center justify-between gap-3">
 					<div class="space-y-0.5">
 						<Label for="sheets-{provider.id}" class="text-sm">Sheets sync</Label>
 						<p class="text-xs text-muted-foreground">Sync data to a Google Spreadsheet</p>

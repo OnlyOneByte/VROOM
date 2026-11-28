@@ -292,18 +292,28 @@ describe('ProviderInfoCard header', () => {
 
 describe('ProviderInfoCard backup cleanup warning', () => {
 	const warning =
-		"Backed up, but old backups couldn't be removed. VROOM needs permission to list and delete files in this storage.";
+		"Old backups couldn't be removed. VROOM needs permission to list and delete files in this storage.";
 
 	test('a stored warning shows a badge next to the last backup and the reason under ZIP backup', async () => {
-		await mount({ lastBackupAt: '2026-05-10T00:00:00.000Z', backupWarning: warning });
+		await mount({
+			lastBackupAt: '2026-05-10T00:00:00.000Z',
+			backupEnabled: true,
+			backupWarning: warning
+		});
 		const badge = screen.getByText("Couldn't remove old backups");
 		expect(badge.parentElement).toBe(screen.getByText('Last backup 12 hours ago').parentElement);
-		expect(screen.getByTestId('backup-warning')).toHaveTextContent(
-			"Old backups weren't removed after the last backup. VROOM needs permission to list and delete files in this storage."
-		);
-		expect(screen.getByRole('switch', { name: 'ZIP backup' })).toHaveAccessibleDescription(
-			"Old backups weren't removed after the last backup. VROOM needs permission to list and delete files in this storage."
-		);
+		expect(screen.getByTestId('backup-warning')).toHaveTextContent(warning);
+		expect(screen.getByRole('switch', { name: 'ZIP backup' })).toHaveAccessibleDescription(warning);
+	});
+
+	test('with ZIP backup off, a stored warning is not shown', async () => {
+		await mount({
+			lastBackupAt: '2026-05-10T00:00:00.000Z',
+			backupEnabled: false,
+			backupWarning: warning
+		});
+		expect(screen.queryByText("Couldn't remove old backups")).not.toBeInTheDocument();
+		expect(screen.queryByTestId('backup-warning')).not.toBeInTheDocument();
 	});
 
 	test('no warning, no badge and no message', async () => {
