@@ -266,7 +266,13 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     const [claimed] = await tx
       .update(reminders)
       .set({ nextDueDate, lastTriggeredAt, updatedAt: new Date() })
-      .where(and(eq(reminders.id, id), eq(reminders.nextDueDate, expectedCurrentDueDate)))
+      .where(
+        and(
+          eq(reminders.id, id),
+          eq(reminders.nextDueDate, expectedCurrentDueDate),
+          eq(reminders.isActive, true)
+        )
+      )
       .returning();
     return claimed ?? null;
   }
@@ -337,6 +343,34 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       }
       return changed;
     });
+  }
+
+  async stillDueAt(id: string, userId: string, dueOdometer: number): Promise<boolean> {
+    const rows = await this.db
+      .update(reminders)
+      .set({ updatedAt: new Date() })
+      .where(
+        and(
+          eq(reminders.id, id),
+          eq(reminders.userId, userId),
+          eq(reminders.nextDueOdometer, dueOdometer),
+          eq(reminders.isActive, true)
+        )
+      )
+      .returning({ id: reminders.id });
+    return rows.length > 0;
+  }
+
+  async rearmMileage(
+    id: string,
+    userId: string,
+    lastServiceOdometer: number,
+    nextDueOdometer: number
+  ): Promise<void> {
+    await this.db
+      .update(reminders)
+      .set({ lastServiceOdometer, nextDueOdometer, updatedAt: new Date() })
+      .where(and(eq(reminders.id, id), eq(reminders.userId, userId)));
   }
 
   async markServiced(
