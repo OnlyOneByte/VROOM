@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
+import { failWrites } from '../../../test-helpers/fail-writes';
+import {
+  createTestApp,
+  ON_POSTGRES,
+  SETUP_TIMEOUT_MS,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 let resolveNewUser: typeof import('../routes').resolveNewUser;
@@ -14,27 +20,32 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedAuthUser(userId: string, email: string, provider: string, accountId: string): void {
-  ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+async function seedAuthUser(
+  userId: string,
+  email: string,
+  provider: string,
+  accountId: string
+): Promise<void> {
+  await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
     userId,
     email,
     'Seed',
   ]);
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status)
      VALUES (?, ?, 'auth', ?, ?, 'Seed', '', 'active')`,
     [`p-${userId}`, userId, provider, accountId]
   );
 }
 
-function userCount(): number {
-  return (ctx.sqlite.query('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n;
+async function userCount(): Promise<number> {
+  return ((await ctx.sql.get('SELECT COUNT(*) AS n FROM users')) as { n: number }).n;
 }
 
 describe('resolveNewUser — pre-check (no implicit account merge)', () => {
   test('an email already owned by another account is refused', async () => {
-    seedAuthUser('u-first', 'shared@example.com', 'github', 'gh-1');
-    const before = userCount();
+    await seedAuthUser('u-first', 'shared@example.com', 'github', 'gh-1');
+    const before = await userCount();
 
     const result = await resolveNewUser('google', {
       providerAccountId: 'g-1',
@@ -43,7 +54,7 @@ describe('resolveNewUser — pre-check (no implicit account merge)', () => {
     });
 
     expect(result).toEqual({ redirect: emailExists });
-    expect(userCount()).toBe(before);
+    expect(await userCount()).toBe(before);
   });
 
   test('a fresh email creates the user and its auth link together', async () => {
@@ -55,19 +66,17 @@ describe('resolveNewUser — pre-check (no implicit account merge)', () => {
 
     expect('userId' in result).toBe(true);
     const userId = (result as { userId: string }).userId;
-    const link = ctx.sqlite
-      .query(
-        "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = 'google' AND provider_account_id = 'g-new'"
-      )
-      .get() as { user_id: string } | null;
+    const link = (await ctx.sql.get(
+      "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = 'google' AND provider_account_id = 'g-new'"
+    )) as { user_id: string } | null;
     expect(link?.user_id).toBe(userId);
   });
 });
 
 describe('resolveNewUser — UNIQUE conflict inside the insert transaction', () => {
   test('the same provider identity already linked → its user is returned and nothing is half-created', async () => {
-    seedAuthUser('u-winner', 'winner@example.com', 'google', 'g-race');
-    const before = userCount();
+    await seedAuthUser('u-winner', 'winner@example.com', 'google', 'g-race');
+    const before = await userCount();
 
     const result = await resolveNewUser('google', {
       providerAccountId: 'g-race',
@@ -76,19 +85,19 @@ describe('resolveNewUser — UNIQUE conflict inside the insert transaction', () 
     });
 
     expect(result).toEqual({ userId: 'u-winner' });
-    expect(userCount(), 'the rolled-back user row must not survive').toBe(before);
+    expect(await userCount(), 'the rolled-back user row must not survive').toBe(before);
   });
 
   test('the retry sign-in attaches pending invites, like the normal sign-in', async () => {
-    seedAuthUser('u-winner', 'winner@example.com', 'google', 'g-race');
-    ctx.sqlite.run(
+    await seedAuthUser('u-winner', 'winner@example.com', 'google', 'g-race');
+    await ctx.sql.run(
       `INSERT INTO vehicles (id, user_id, make, model, year, created_at, updated_at)
-       VALUES ('v-shared', ?, 'Honda', 'Civic', 2020, unixepoch(), unixepoch())`,
+       VALUES ('v-shared', ?, 'Honda', 'Civic', 2020, 1700000000, 1700000000)`,
       [ctx.user.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, invited_email, level, status, created_at)
-       VALUES ('s-pending', 'v-shared', ?, 'winner@example.com', 'viewer', 'pending', unixepoch())`,
+       VALUES ('s-pending', 'v-shared', ?, 'winner@example.com', 'viewer', 'pending', 1700000000)`,
       [ctx.user.id]
     );
 
@@ -99,15 +108,15 @@ describe('resolveNewUser — UNIQUE conflict inside the insert transaction', () 
     });
 
     expect(result).toEqual({ userId: 'u-winner' });
-    const share = ctx.sqlite
-      .query("SELECT shared_with_id FROM vehicle_shares WHERE id = 's-pending'")
-      .get() as { shared_with_id: string | null };
+    const share = (await ctx.sql.get(
+      "SELECT shared_with_id FROM vehicle_shares WHERE id = 's-pending'"
+    )) as { shared_with_id: string | null };
     expect(share.shared_with_id).toBe('u-winner');
   });
 
   test('a collision with a different identity → email_exists, never a cross-account login', async () => {
-    seedAuthUser('u-other', 'other@example.com', 'github', 'shared-account-id');
-    ctx.sqlite.run(
+    await seedAuthUser('u-other', 'other@example.com', 'github', 'shared-account-id');
+    await ctx.sql.run(
       'CREATE UNIQUE INDEX temp_one_account_id ON user_providers (provider_account_id)'
     );
     try {
@@ -118,15 +127,17 @@ describe('resolveNewUser — UNIQUE conflict inside the insert transaction', () 
       });
       expect(result).toEqual({ redirect: emailExists });
     } finally {
-      ctx.sqlite.run('DROP INDEX temp_one_account_id');
+      await ctx.sql.run('DROP INDEX temp_one_account_id');
     }
   });
 
   test('a non-UNIQUE failure propagates even when its message mentions UNIQUE', async () => {
-    ctx.sqlite.run(
-      `CREATE TEMP TRIGGER reject_auth_link BEFORE INSERT ON user_providers
-       BEGIN SELECT RAISE(ABORT, 'UNIQUE constraint failed: simulated by message only'); END`
-    );
+    const restore = await failWrites(ctx.sql, {
+      name: 'reject_auth_link',
+      table: 'user_providers',
+      event: 'INSERT',
+      message: 'UNIQUE constraint failed: simulated by message only',
+    });
     try {
       await expect(
         resolveNewUser('google', {
@@ -136,16 +147,18 @@ describe('resolveNewUser — UNIQUE conflict inside the insert transaction', () 
         })
       ).rejects.toThrow();
     } finally {
-      ctx.sqlite.run('DROP TRIGGER reject_auth_link');
+      await restore();
     }
   });
 });
 
 describe('resolveNewUser — the schema the race-retry relies on', () => {
-  test('a unique auth-identity index exists on (provider_type, provider_account_id)', () => {
-    const indexes = ctx.sqlite
-      .query("SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'user_providers'")
-      .all() as Array<{ sql: string | null }>;
+  test('a unique auth-identity index exists on (provider_type, provider_account_id)', async () => {
+    const indexes = await ctx.sql.all<{ sql: string | null }>(
+      ON_POSTGRES
+        ? "SELECT indexdef AS sql FROM pg_indexes WHERE tablename = 'user_providers'"
+        : "SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'user_providers'"
+    );
     const uniqueAuthIdentity = indexes.some(
       ({ sql }) =>
         sql?.toUpperCase().includes('UNIQUE') &&

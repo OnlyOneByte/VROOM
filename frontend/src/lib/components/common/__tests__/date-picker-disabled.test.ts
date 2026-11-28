@@ -1,6 +1,9 @@
-import { describe, expect, test, vi } from 'vitest';
+import { beforeAll, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import DatePicker from '../date-picker.svelte';
+import { warmDatePickerCalendar } from '../../../../test-utils/date-picker';
+
+beforeAll(warmDatePickerCalendar);
 
 describe('DatePicker disabled state', () => {
 	test('a disabled picker renders a disabled trigger that does not open the calendar', async () => {

@@ -13,8 +13,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedProvider(id: string): void {
-  ctx.sqlite.run(
+async function seedProvider(id: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
      VALUES (?, ?, 'storage', 'google-drive', ?, '', 'active')`,
     [id, ctx.user.id, `Provider ${id}`]
@@ -54,7 +54,7 @@ function categoryMap(over: Record<string, { enabled: boolean; folderPath: string
 
 describe('PUT /settings storageConfig consistency validation', () => {
   test('a fully-consistent storageConfig is accepted (positive control)', async () => {
-    seedProvider('drive-1');
+    await seedProvider('drive-1');
     const res = await putStorageConfig({
       defaults: defaults({ vehicle_photos: 'drive-1' }),
       providerCategories: { 'drive-1': categoryMap() },
@@ -73,7 +73,7 @@ describe('PUT /settings storageConfig consistency validation', () => {
   });
 
   test('a default whose provider has NO providerCategories entry → 400', async () => {
-    seedProvider('drive-2');
+    await seedProvider('drive-2');
     const res = await putStorageConfig({
       defaults: defaults({ vehicle_photos: 'drive-2' }),
       providerCategories: {},
@@ -84,7 +84,7 @@ describe('PUT /settings storageConfig consistency validation', () => {
   });
 
   test('a default whose category is present but disabled → 400', async () => {
-    seedProvider('drive-3');
+    await seedProvider('drive-3');
     const res = await putStorageConfig({
       defaults: defaults({ vehicle_photos: 'drive-3' }),
       providerCategories: {
@@ -99,7 +99,7 @@ describe('PUT /settings storageConfig consistency validation', () => {
 
 describe('PUT /settings accepts a partial storageConfig and merges it per category', () => {
   test('a payload naming one default keeps the stored defaults it omits', async () => {
-    seedProvider('drive-4');
+    await seedProvider('drive-4');
     const providerCategories = { 'drive-4': categoryMap() };
     const first = await putStorageConfig({
       defaults: defaults({ vehicle_photos: 'drive-4' }),
@@ -121,7 +121,7 @@ describe('PUT /settings accepts a partial storageConfig and merges it per catego
   });
 
   test('a payload with no defaults at all is accepted', async () => {
-    seedProvider('drive-5');
+    await seedProvider('drive-5');
     const res = await putStorageConfig({ providerCategories: { 'drive-5': categoryMap() } });
     expect(res.status).toBe(200);
   });

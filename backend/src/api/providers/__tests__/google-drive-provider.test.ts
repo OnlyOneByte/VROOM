@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
-import { SyncErrorCode } from '../../../errors';
+import { beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { PayloadTooLargeError, SyncErrorCode } from '../../../errors';
 import {
   FakeGoogleStore,
   googleApiError,
@@ -11,11 +11,12 @@ import type { StorageRef } from '../domains/storage/storage-provider';
 import { GoogleDriveService } from '../services/google-drive-service';
 
 let store: FakeGoogleStore;
+let driveService: GoogleDriveService;
 let provider: GoogleDriveProvider;
 
 beforeEach(() => {
   store = new FakeGoogleStore();
-  const driveService = new GoogleDriveService('fake-refresh-token', makeFakeDrive(store));
+  driveService = new GoogleDriveService('fake-refresh-token', makeFakeDrive(store));
   provider = new GoogleDriveProvider('fake-refresh-token', driveService);
 });
 
@@ -91,6 +92,51 @@ describe('GoogleDriveProvider', () => {
       });
       expect(store.files.get(result.externalId)?.parents).toEqual([]);
     });
+
+    test('the top-level folder is looked up in My Drive, not anywhere in the account', async () => {
+      const shared = store.seedFolder('Shared stuff');
+      const nested = store.seedFolder('VROOM', shared);
+
+      const result = await provider.upload({
+        fileName: 'car.jpg',
+        buffer: Buffer.from('x'),
+        mimeType: 'image/jpeg',
+        entityType: 'vehicle',
+        entityId: 'v-1',
+        pathHint: 'VROOM',
+      });
+
+      const topLevel = store.childrenOf('').filter((f) => f.name === 'VROOM');
+      expect(topLevel).toHaveLength(1);
+      expect(store.files.get(result.externalId)?.parents).toEqual([idOf(topLevel[0])]);
+      expect(store.files.get(result.externalId)?.parents).not.toEqual([nested]);
+    });
+
+    test('uploads for one account through separate providers share one new folder', async () => {
+      const providerFor = () =>
+        new GoogleDriveProvider(
+          'same-account-token',
+          new GoogleDriveService('same-account-token', makeFakeDrive(store))
+        );
+      const upload = (fileName: string) =>
+        providerFor().upload({
+          fileName,
+          buffer: Buffer.from(fileName),
+          mimeType: 'image/jpeg',
+          entityType: 'vehicle',
+          entityId: 'v-1',
+          pathHint: 'VROOM/Vehicle',
+        });
+
+      const [a, b] = await Promise.all([upload('a.jpg'), upload('b.jpg')]);
+
+      const vroom = store.childrenOf('').filter((f) => f.name === 'VROOM');
+      expect(vroom).toHaveLength(1);
+      const vehicle = store.childrenOf(idOf(vroom[0])).filter((f) => f.name === 'Vehicle');
+      expect(vehicle).toHaveLength(1);
+      expect(store.files.get(a.externalId)?.parents).toEqual([idOf(vehicle[0])]);
+      expect(store.files.get(b.externalId)?.parents).toEqual([idOf(vehicle[0])]);
+    });
   });
 
   describe('download', () => {
@@ -105,6 +151,25 @@ describe('GoogleDriveProvider', () => {
       });
       const ref: StorageRef = { providerType: 'google-drive', externalId: up.externalId };
       expect((await provider.download(ref)).equals(Buffer.from([9, 8, 7]))).toBe(true);
+    });
+
+    test('refuses a file over maxBytes before downloading its content', async () => {
+      const up = await provider.upload({
+        fileName: 'big.zip',
+        buffer: Buffer.alloc(64),
+        mimeType: 'application/zip',
+        entityType: 'backup',
+        entityId: 'u-1',
+        pathHint: '',
+      });
+      const ref: StorageRef = { providerType: 'google-drive', externalId: up.externalId };
+      const content = spyOn(driveService, 'downloadFile');
+      await expect(provider.download(ref, { maxBytes: 32 })).rejects.toBeInstanceOf(
+        PayloadTooLargeError
+      );
+      expect(content).not.toHaveBeenCalled();
+      expect((await provider.download(ref, { maxBytes: 64 })).length).toBe(64);
+      expect(content).toHaveBeenCalledTimes(1);
     });
   });
 

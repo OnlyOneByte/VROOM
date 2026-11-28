@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { warmDatePickerCalendar } from '../../../../test-utils/date-picker';
 import { signInAsDemo } from '../../../../test-utils/demo-user';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
@@ -93,6 +94,8 @@ function mount(
 ) {
 	return render(ClaimsSection, { props: { policyId: 'p1', ...props } });
 }
+
+beforeAll(warmDatePickerCalendar);
 
 beforeEach(() => {
 	vi.useFakeTimers({ toFake: ['Date'] });

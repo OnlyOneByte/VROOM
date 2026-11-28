@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { warmDatePickerCalendar } from '../../../test-utils/date-picker';
 import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { Expense, ExpenseSummary, UserSettings, Vehicle } from '#lib/types/index.ts';
@@ -171,6 +172,8 @@ async function addTagFilter(tag: string) {
 function callTable<T extends unknown[]>(name: string, ...args: T): unknown {
 	return (captured.table[name] as (...a: T) => unknown)(...args);
 }
+
+beforeAll(warmDatePickerCalendar);
 
 beforeEach(() => {
 	vi.clearAllMocks();

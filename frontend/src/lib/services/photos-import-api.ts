@@ -8,6 +8,7 @@ export interface ReceiptDraftItem {
 	photoId: string;
 	draft: ReceiptDraft;
 	thumbnailUrl: string | null;
+	failed?: boolean;
 }
 
 export interface ConfirmDraftInput {

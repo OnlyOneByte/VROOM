@@ -86,8 +86,8 @@
 				<Select.Item value={driver.id} label={driver.name}>
 					{@render dot(driver)}
 					{driver.name}
-					{#if driver.userId === me}<span class="text-muted-foreground">(you)</span>
-					{:else if !driver.userId}<span class="text-muted-foreground">· guest</span>{/if}
+					{#if me && driver.userId === me}<span class="text-muted-foreground">(you)</span>
+					{:else if driver.guest}<span class="text-muted-foreground">· guest</span>{/if}
 				</Select.Item>
 			{/each}
 			<Select.Item value={NONE} label="No one">No one</Select.Item>

@@ -9,16 +9,16 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function rowCount(table: 'user_preferences' | 'sync_state'): number {
-  const row = ctx.sqlite
-    .query(`SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`)
-    .get(ctx.user.id) as { n: number };
+async function rowCount(table: 'user_preferences' | 'sync_state'): Promise<number> {
+  const row = (await ctx.sql.get(`SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`, [
+    ctx.user.id,
+  ])) as { n: number };
   return row.n;
 }
 
 describe('lazy row creation under concurrency', () => {
   test('three concurrent first-time GET /settings all succeed', async () => {
-    expect(rowCount('user_preferences')).toBe(0);
+    expect(await rowCount('user_preferences')).toBe(0);
 
     const responses = await Promise.all([
       ctx.authed('GET', '/api/v1/settings'),
@@ -27,7 +27,7 @@ describe('lazy row creation under concurrency', () => {
     ]);
 
     expect(responses.map((r) => r.status)).toEqual([200, 200, 200]);
-    expect(rowCount('user_preferences')).toBe(1);
+    expect(await rowCount('user_preferences')).toBe(1);
   });
 
   test('concurrent repos().preferences.getOrCreate returns one shared row', async () => {
@@ -37,7 +37,7 @@ describe('lazy row creation under concurrency', () => {
       repos().preferences.getOrCreate(ctx.user.id),
     ]);
 
-    expect(rowCount('user_preferences')).toBe(1);
+    expect(await rowCount('user_preferences')).toBe(1);
     for (const row of rows) {
       expect(row.userId).toBe(ctx.user.id);
       expect(row.currencyUnit).toBe('USD');
@@ -51,7 +51,7 @@ describe('lazy row creation under concurrency', () => {
       repos().syncState.getOrCreate(ctx.user.id),
     ]);
 
-    expect(rowCount('sync_state')).toBe(1);
+    expect(await rowCount('sync_state')).toBe(1);
     for (const row of rows) {
       expect(row.userId).toBe(ctx.user.id);
     }
@@ -63,7 +63,7 @@ describe('lazy row creation under concurrency', () => {
       repos().syncState.markDataChanged(ctx.user.id),
     ]);
 
-    expect(rowCount('sync_state')).toBe(1);
+    expect(await rowCount('sync_state')).toBe(1);
     const state = await repos().syncState.getOrCreate(ctx.user.id);
     expect(state.lastDataChangeDate).not.toBeNull();
   });

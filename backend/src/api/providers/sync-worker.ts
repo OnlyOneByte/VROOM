@@ -113,13 +113,30 @@ async function processRefs(
   deps: SyncWorkerDeps
 ): Promise<void> {
   const providerCache = new Map<string, StorageProvider>();
+  const lanes = new Map<string, PhotoRef[]>();
   for (const ref of pendingRefs) {
+    lanes.set(ref.providerId, [...(lanes.get(ref.providerId) ?? []), ref]);
+  }
+  await Promise.all(
+    [...lanes.values()].map((lane) => processLane(lane, startedAt, now, providerCache, deps))
+  );
+}
+
+async function processLane(
+  lane: PhotoRef[],
+  startedAt: number,
+  now: Date,
+  providerCache: Map<string, StorageProvider>,
+  deps: SyncWorkerDeps
+): Promise<void> {
+  for (const ref of lane) {
     if (processingSince !== startedAt) break;
     if (!shouldProcessRef(ref, now)) continue;
 
     inFlightRefs.set(ref.id, Date.now());
     try {
-      await processSingleRef(ref, providerCache, deps);
+      const outcome = await processSingleRef(ref, providerCache, deps);
+      if (outcome === 'unreachable') break;
     } catch (error) {
       logger.warn('Sync worker: failed to process ref', {
         refId: ref.id,
@@ -220,7 +237,7 @@ async function processSingleRef(
   ref: PhotoRef,
   providerCache: Map<string, StorageProvider>,
   deps: SyncWorkerDeps
-): Promise<void> {
+): Promise<'unreachable' | undefined> {
   const sourceRef = await deps.photoRefRepository.findActiveByPhoto(ref.photoId);
   if (!sourceRef) {
     await recordUnsyncableRef(ref, 'No active source copy available for this photo', deps);
@@ -321,32 +338,41 @@ async function processSingleRef(
       targetProviderId: ref.providerId,
     });
   } catch (error) {
-    const errorMessage = extractErrorMessage(error);
-
-    const isTerminalAuth =
-      isSyncError(error) &&
-      (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED);
-    const retryCount = isTerminalAuth ? MAX_RETRY_COUNT : priorRetries(ref) + 1;
-
-    await deps.photoRefRepository.updateStatus(ref.id, {
-      status: 'failed',
-      errorMessage: isTerminalAuth ? `Reconnect required: ${errorMessage}` : errorMessage,
-      retryCount,
-      syncedAt: new Date(),
-    });
-
-    logger.warn(
-      isTerminalAuth
-        ? 'Sync worker: ref sync failed with a terminal auth error, will NOT retry'
-        : 'Sync worker: ref sync failed, will retry',
-      {
-        refId: ref.id,
-        photoId: ref.photoId,
-        retryCount,
-        error: errorMessage,
-      }
-    );
+    return recordSyncFailure(ref, error, deps);
   }
+}
+
+async function recordSyncFailure(
+  ref: PhotoRef,
+  error: unknown,
+  deps: SyncWorkerDeps
+): Promise<'unreachable' | undefined> {
+  const errorMessage = extractErrorMessage(error);
+
+  const isTerminalAuth =
+    isSyncError(error) &&
+    (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED);
+  const retryCount = isTerminalAuth ? MAX_RETRY_COUNT : priorRetries(ref) + 1;
+
+  await deps.photoRefRepository.updateStatus(ref.id, {
+    status: 'failed',
+    errorMessage: isTerminalAuth ? `Reconnect required: ${errorMessage}` : errorMessage,
+    retryCount,
+    syncedAt: new Date(),
+  });
+
+  logger.warn(
+    isTerminalAuth
+      ? 'Sync worker: ref sync failed with a terminal auth error, will NOT retry'
+      : 'Sync worker: ref sync failed, will retry',
+    {
+      refId: ref.id,
+      photoId: ref.photoId,
+      retryCount,
+      error: errorMessage,
+    }
+  );
+  return healthCodeOf(error) === 'unreachable' ? 'unreachable' : undefined;
 }
 
 export function startSyncWorker(): void {

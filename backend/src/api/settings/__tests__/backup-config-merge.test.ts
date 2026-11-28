@@ -14,8 +14,8 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedProvider(id: string, displayName: string): void {
-  ctx.sqlite.run(
+async function seedProvider(id: string, displayName: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
      VALUES (?, ?, 'storage', 'google-drive', ?, '', 'active')`,
     [id, ctx.user.id, displayName]
@@ -45,8 +45,8 @@ function providerSettings(id: string, over: Record<string, unknown> = {}) {
 
 describe('PUT /settings backupConfig is merged per provider, not replaced wholesale', () => {
   test('a partial backupConfig PUT preserves providers it does not name', async () => {
-    seedProvider('drive-a', 'Drive A');
-    seedProvider('drive-b', 'Drive B');
+    await seedProvider('drive-a', 'Drive A');
+    await seedProvider('drive-b', 'Drive B');
 
     const seed = await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: {
@@ -81,7 +81,7 @@ describe('PUT /settings backupConfig is merged per provider, not replaced wholes
   });
 
   test('a named provider entry is replaced wholesale', async () => {
-    seedProvider('drive-a', 'Drive A');
+    await seedProvider('drive-a', 'Drive A');
 
     await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: {
@@ -100,7 +100,7 @@ describe('PUT /settings backupConfig is merged per provider, not replaced wholes
 
 describe('PUT /settings never overwrites server-owned backup fields', () => {
   test('a stale page-load copy keeps the server-written lastBackupAt and sheetsSpreadsheetId', async () => {
-    seedProvider('drive-s', 'Drive S');
+    await seedProvider('drive-s', 'Drive S');
     await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: { providers: { 'drive-s': providerSettings('drive-s') } },
     });
@@ -122,9 +122,10 @@ describe('PUT /settings never overwrites server-owned backup fields', () => {
     });
     expect(res.status).toBe(200);
 
-    const stored = ctx.sqlite
-      .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-      .get(ctx.user.id) as { backup_config: string };
+    const stored = (await ctx.sql.get(
+      'SELECT backup_config FROM user_preferences WHERE user_id = ?',
+      [ctx.user.id]
+    )) as { backup_config: string };
     expect(JSON.parse(stored.backup_config).providers['drive-s']).toEqual({
       enabled: true,
       folderPath: '/Backups/drive-s',

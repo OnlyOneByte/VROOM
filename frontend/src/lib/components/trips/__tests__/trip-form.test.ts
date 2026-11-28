@@ -449,8 +449,8 @@ describe('TripForm driver chip', () => {
 		carShare: { enabled: true, manage: false, record: true }
 	} as Vehicle;
 	const DRIVERS: Driver[] = [
-		{ id: 'd-sam', userId: 'u-sam', name: 'Sam', color: 'chart-2', archived: false },
-		{ id: 'd-riley', userId: null, name: 'Riley', color: null, archived: false }
+		{ id: 'd-sam', guest: false, name: 'Sam', color: 'chart-2', archived: false },
+		{ id: 'd-riley', guest: true, name: 'Riley', color: null, archived: false }
 	];
 
 	test('an unchanged edit keeps the trip credited to its driver', async () => {

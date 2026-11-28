@@ -5,7 +5,13 @@ import {
   json,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
+import {
+  type Members,
+  memberDriverId,
+  overrideOn,
+  seedCar,
+  seedMembers,
+} from '../../../test-helpers/members';
 
 let ctx: TestApp;
 let m: Members;
@@ -60,11 +66,8 @@ beforeEach(async () => {
   await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'sp');
   await ctx.authed('PUT', `/api/v1/vehicles/${CAR}/car-share`, { enabled: true });
-  const list = (
-    await json<DataEnvelope<{ id: string; userId: string | null }[]>>(await ctx.authed('GET', base))
-  ).data;
-  owner = list.find((d) => d.userId === ctx.user.id)?.id ?? '';
-  editor = list.find((d) => d.userId === m.editor.id)?.id ?? '';
+  owner = (await memberDriverId(ctx, CAR, ctx.user.id)) ?? '';
+  editor = (await memberDriverId(ctx, CAR, m.editor.id)) ?? '';
   await trip('sp-t1', 1000, 1300, owner);
   await trip('sp-t2', 1300, 1400, editor);
   await expense('sp-fuel', 'fuel', 8000, owner);

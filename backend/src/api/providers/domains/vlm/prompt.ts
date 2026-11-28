@@ -25,6 +25,11 @@ export const RECEIPT_EXTRACTION_PROMPT = [
 
 const VENDOR_MAX = 120;
 
+function isCalendarDate(s: string): boolean {
+  const time = Date.parse(`${s}T00:00:00Z`);
+  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === s;
+}
+
 export const receiptExtractionSchema = z
   .object({
     amount: z
@@ -34,10 +39,7 @@ export const receiptExtractionSchema = z
     date: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD')
-      .refine(
-        (s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)),
-        'date must be a real calendar date'
-      )
+      .refine(isCalendarDate, 'date must be a real calendar date')
       .optional(),
     odometer: z.number().int().min(0).optional(),
     category: z.enum(EXPENSE_CATEGORIES).optional(),

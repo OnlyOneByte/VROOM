@@ -4,11 +4,12 @@ import { Hono } from 'hono';
 import type { Session } from 'lucia';
 import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
-import { getDb } from '../../../db/connection';
 import { sessions, users } from '../../../db/schema';
+import { failWrites } from '../../../test-helpers/fail-writes';
 import {
   createTestApp,
   json,
+  ON_POSTGRES,
   SETUP_TIMEOUT_MS,
   socketFrom,
   type TestApp,
@@ -16,8 +17,6 @@ import {
 import { seedVehicle } from '../../../test-helpers/seed';
 import { DEMO_USER_ID, prepareDemoGarage } from '../demo';
 import { setSessionCookie } from '../utils';
-
-const db = getDb();
 
 const demoConfig = CONFIG.demo as { enabled: boolean };
 let ctx: TestApp;
@@ -52,18 +51,17 @@ async function demoCookie(): Promise<string> {
   return setCookie.split(';')[0];
 }
 
+const TABLES_SQL = ON_POSTGRES
+  ? "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'sessions'"
+  : "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('__drizzle_migrations', 'sessions')";
+
 async function rowCounts(): Promise<Record<string, number>> {
-  const tables = ctx.sqlite
-    .query(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('__drizzle_migrations', 'sessions')"
-    )
-    .all() as { name: string }[];
-  return Object.fromEntries(
-    tables.map(({ name }) => [
-      name,
-      (ctx.sqlite.query(`SELECT COUNT(*) AS n FROM "${name}"`).get() as { n: number }).n,
-    ])
-  );
+  const counts: [string, number][] = [];
+  for (const { name } of await ctx.sql.all<{ name: string }>(TABLES_SQL)) {
+    const row = await ctx.sql.get<{ n: number }>(`SELECT COUNT(*) AS n FROM "${name}"`);
+    counts.push([name, Number(row?.n)]);
+  }
+  return Object.fromEntries(counts);
 }
 
 beforeEach(async () => {
@@ -86,7 +84,9 @@ describe('demo garage, off by default', () => {
     );
     expect(status.data.available).toBe(false);
     expect((await startDemo()).status).toBe(404);
-    expect(await db.select().from(users).where(eq(users.id, DEMO_USER_ID))).toEqual([]);
+    expect(
+      await appContext().asyncDb.select().from(users).where(eq(users.id, DEMO_USER_ID))
+    ).toEqual([]);
   });
 });
 
@@ -158,7 +158,9 @@ describe('demo garage, on', () => {
     );
     expect(me.data.demo).toBe(false);
     expect(me.data.user.id).toBe(ctx.user.id);
-    expect(await db.select().from(sessions).where(eq(sessions.userId, DEMO_USER_ID))).toEqual([]);
+    expect(
+      await appContext().asyncDb.select().from(sessions).where(eq(sessions.userId, DEMO_USER_ID))
+    ).toEqual([]);
   });
 
   test('a stale session cookie still gets a demo session', async () => {
@@ -280,7 +282,9 @@ describe('demo garage, on', () => {
     const cookie = await demoCookie();
     await prepareDemoGarage();
     expect((await send(cookie, 'GET', '/api/v1/vehicles')).status).toBe(401);
-    expect(await db.select().from(users).where(eq(users.id, DEMO_USER_ID))).toHaveLength(1);
+    expect(
+      await appContext().asyncDb.select().from(users).where(eq(users.id, DEMO_USER_ID))
+    ).toHaveLength(1);
   });
 
   test('a demo session expires after its hour, however often it is used', async () => {
@@ -292,7 +296,9 @@ describe('demo garage, on', () => {
       '/api/v1/vehicles'
     );
     expect(res.status).toBe(401);
-    expect(await db.select().from(sessions).where(eq(sessions.id, stale))).toEqual([]);
+    expect(
+      await appContext().asyncDb.select().from(sessions).where(eq(sessions.id, stale))
+    ).toEqual([]);
 
     const cookie = await demoCookie();
     const refreshed = await json<{ data: { session: { expiresAt: string } } }>(
@@ -307,14 +313,16 @@ describe('demo garage, on', () => {
     const stale = `demo_${Date.now() - CONFIG.demo.sessionDuration - 1000}_stale`;
     await appContext().lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
     expect((await appContext().lucia.validateSession(stale)).session).toBeNull();
-    expect(await db.select().from(sessions).where(eq(sessions.id, stale))).toEqual([]);
+    expect(
+      await appContext().asyncDb.select().from(sessions).where(eq(sessions.id, stale))
+    ).toEqual([]);
 
     const live = (await demoCookie()).split('=')[1];
     expect((await appContext().lucia.validateSession(live)).user?.id).toBe(DEMO_USER_ID);
-    const [row] = await db.select().from(sessions).where(eq(sessions.id, live));
+    const [row] = await appContext().asyncDb.select().from(sessions).where(eq(sessions.id, live));
     expect(row.expiresAt * 1000).toBeLessThanOrEqual(Date.now() + CONFIG.demo.sessionDuration);
     await appContext().lucia.validateSession(live);
-    const [after] = await db.select().from(sessions).where(eq(sessions.id, live));
+    const [after] = await appContext().asyncDb.select().from(sessions).where(eq(sessions.id, live));
     expect(after.expiresAt).toBe(row.expiresAt);
   });
 
@@ -337,46 +345,61 @@ describe('demo garage, on', () => {
     const stale = `demo_${Date.now() - CONFIG.demo.sessionDuration - 1000}_stale`;
     await appContext().lucia.createSession(DEMO_USER_ID, {}, { sessionId: stale });
     await demoCookie();
-    const left = await db.select().from(sessions).where(eq(sessions.userId, DEMO_USER_ID));
+    const left = await appContext()
+      .asyncDb.select()
+      .from(sessions)
+      .where(eq(sessions.userId, DEMO_USER_ID));
     expect(left.map((s) => s.id)).not.toContain(stale);
     expect(left).toHaveLength(1);
   });
 
   test('a rebuild that fails partway leaves no demo account behind', async () => {
-    ctx.sqlite.exec(
-      `CREATE TRIGGER fail_demo_seed BEFORE INSERT ON vehicles WHEN NEW.user_id = '${DEMO_USER_ID}' BEGIN SELECT RAISE(ABORT, 'seed failed'); END`
-    );
+    const restore = await failWrites(ctx.sql, {
+      name: 'fail_demo_seed',
+      table: 'vehicles',
+      event: 'INSERT',
+      message: 'seed failed',
+      when: `NEW.user_id = '${DEMO_USER_ID}'`,
+    });
     try {
       await expect(prepareDemoGarage()).rejects.toThrow();
     } finally {
-      ctx.sqlite.exec('DROP TRIGGER fail_demo_seed');
+      await restore();
     }
-    expect(await db.select().from(users).where(eq(users.id, DEMO_USER_ID))).toEqual([]);
-    const leftovers = ctx.sqlite
-      .query("SELECT COUNT(*) AS n FROM user_preferences WHERE user_id = 'demo-garage'")
-      .get() as { n: number };
+    expect(
+      await appContext().asyncDb.select().from(users).where(eq(users.id, DEMO_USER_ID))
+    ).toEqual([]);
+    const leftovers = (await ctx.sql.get(
+      "SELECT COUNT(*) AS n FROM user_preferences WHERE user_id = 'demo-garage'"
+    )) as { n: number };
     expect(leftovers.n).toBe(0);
     expect((await startDemo()).status).toBe(404);
   });
 
   test('a failed rebuild surfaces the seeding error and leaves nothing of the new garage', async () => {
-    await db.delete(users).where(eq(users.id, DEMO_USER_ID));
-    ctx.sqlite.exec(
-      `CREATE TRIGGER fail_demo_seed BEFORE INSERT ON vehicles WHEN NEW.user_id = '${DEMO_USER_ID}' BEGIN SELECT RAISE(ABORT, 'seed failed'); END`
-    );
+    await appContext().asyncDb.delete(users).where(eq(users.id, DEMO_USER_ID));
+    const restore = await failWrites(ctx.sql, {
+      name: 'fail_demo_seed',
+      table: 'vehicles',
+      event: 'INSERT',
+      message: 'seed failed',
+      when: `NEW.user_id = '${DEMO_USER_ID}'`,
+    });
     let error: unknown;
     try {
       error = await prepareDemoGarage().catch((e: unknown) => e);
     } finally {
-      ctx.sqlite.exec('DROP TRIGGER fail_demo_seed');
+      await restore();
     }
     const cause = (error as { cause?: unknown }).cause ?? error;
     expect(String((cause as Error).message)).toContain('seed failed');
-    const left = ctx.sqlite
-      .query("SELECT COUNT(*) AS n FROM role_assignments WHERE user_id = 'demo-garage'")
-      .get() as { n: number };
+    const left = (await ctx.sql.get(
+      "SELECT COUNT(*) AS n FROM role_assignments WHERE user_id = 'demo-garage'"
+    )) as { n: number };
     expect(left.n).toBe(0);
-    expect(await db.select().from(users).where(eq(users.id, DEMO_USER_ID))).toEqual([]);
+    expect(
+      await appContext().asyncDb.select().from(users).where(eq(users.id, DEMO_USER_ID))
+    ).toEqual([]);
     expect((await startDemo()).status).toBe(404);
   });
 });

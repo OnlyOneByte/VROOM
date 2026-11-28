@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { PayloadTooLargeError } from '../../../errors';
 import { ALLOW_PRIVATE, BLOCK_PRIVATE, EndpointNotAllowedError } from '../../../utils/outbound-url';
 import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
 import { ProviderConfigError, type StorageRef } from '../domains/storage/storage-provider';
@@ -158,6 +159,54 @@ describe('S3CompatProvider', () => {
         Bucket: 'test-bucket',
         Key: 'vroom/vehicle/v-1/photo.jpg',
       });
+    });
+
+    function chunkedBody(chunkCount: number, chunkBytes: number) {
+      const state = { read: 0 };
+      const destroy = mock(() => {});
+      const body = {
+        destroy,
+        transformToByteArray: mock(() => Promise.resolve(new Uint8Array(chunkCount * chunkBytes))),
+        async *[Symbol.asyncIterator]() {
+          for (let i = 0; i < chunkCount; i++) {
+            state.read++;
+            yield new Uint8Array(chunkBytes);
+          }
+        },
+      };
+      return { body, state, destroy };
+    }
+
+    const backupRef: StorageRef = { providerType: 's3', externalId: 'Backups/vroom-backup-1.zip' };
+
+    test('refuses an object over maxBytes without reading its body', async () => {
+      const { body, state, destroy } = chunkedBody(4, 16);
+      mockSend.mockResolvedValueOnce({ ContentLength: 64, Body: body });
+
+      await expect(provider.download(backupRef, { maxBytes: 32 })).rejects.toBeInstanceOf(
+        PayloadTooLargeError
+      );
+      expect(state.read).toBe(0);
+      expect(body.transformToByteArray).not.toHaveBeenCalled();
+      expect(destroy).toHaveBeenCalledTimes(1);
+    });
+
+    test('with no size header, stops reading as soon as the body passes maxBytes', async () => {
+      const { body, state, destroy } = chunkedBody(1000, 16);
+      mockSend.mockResolvedValueOnce({ Body: body });
+
+      await expect(provider.download(backupRef, { maxBytes: 32 })).rejects.toBeInstanceOf(
+        PayloadTooLargeError
+      );
+      expect(state.read).toBe(3);
+      expect(body.transformToByteArray).not.toHaveBeenCalled();
+      expect(destroy).toHaveBeenCalledTimes(1);
+    });
+
+    test('a body within maxBytes is returned whole', async () => {
+      const { body } = chunkedBody(2, 16);
+      mockSend.mockResolvedValueOnce({ ContentLength: 32, Body: body });
+      expect((await provider.download(backupRef, { maxBytes: 32 })).length).toBe(32);
     });
 
     test('throws when response body is empty', async () => {

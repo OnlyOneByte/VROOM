@@ -13,6 +13,7 @@ import {
   getStorageProviderRegistry,
   STORAGE_PROVIDER_TYPES,
 } from '../../providers/domains/storage/registry';
+import { backupFilePrefix } from '../backup';
 import { isPhotoOnlyProviderType } from '../backup-strategy';
 import { backupStrategyRegistry } from '../backup-strategy-registry';
 import '../init';
@@ -135,8 +136,8 @@ describe('ZIP backups to an S3 provider', () => {
   test('retention prunes the oldest S3 backups past the configured count', async () => {
     bucket = new FakeStorageProvider([
       {
-        key: 'VROOM/Backups/vroom-backup-old.zip',
-        name: 'vroom-backup-old.zip',
+        key: `VROOM/Backups/${backupFilePrefix(ctx.user.id)}old.zip`,
+        name: `${backupFilePrefix(ctx.user.id)}old.zip`,
         size: 1,
         createdTime: '1969-12-31T00:00:00.000Z',
         lastModified: '1969-12-31T00:00:00.000Z',
@@ -149,7 +150,36 @@ describe('ZIP backups to an S3 provider', () => {
 
     const names = (await bucket.list('VROOM/Backups')).map((f) => f.name);
     expect(names).toHaveLength(1);
-    expect(names[0]).not.toBe('vroom-backup-old.zip');
+    expect(names[0]).not.toBe(`${backupFilePrefix(ctx.user.id)}old.zip`);
+    expect(names[0]?.startsWith(backupFilePrefix(ctx.user.id))).toBe(true);
+  });
+
+  test("in a shared folder, retention keeps other accounts' backups and untagged older ones", async () => {
+    const file = (name: string) => ({
+      key: `VROOM/Backups/${name}`,
+      name,
+      size: 1,
+      createdTime: '1969-12-31T00:00:00.000Z',
+      lastModified: '1969-12-31T00:00:00.000Z',
+    });
+    const otherAccount = `${backupFilePrefix('another-account')}2026-01-01T00-00-00-000Z.zip`;
+    const untagged = 'vroom-backup-2025-06-01T10-20-30-400Z.zip';
+    bucket = new FakeStorageProvider([file(otherAccount), file(untagged)]);
+    await setBackupConfig({ 'p-s3': { ...zipOn, retentionCount: 1 } });
+
+    const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+    expect(res.status).toBe(200);
+
+    const names = (await bucket.list('VROOM/Backups')).map((f) => f.name);
+    expect(names).toContain(otherAccount);
+    expect(names).toContain(untagged);
+    expect(names).toHaveLength(3);
+
+    const listed = (await listedBackups()).find((p) => p.providerId === 'p-s3');
+    const listedNames = listed?.backups.map((b) => b.fileName) ?? [];
+    expect(listedNames).toContain(untagged);
+    expect(listedNames).toContain(otherAccount);
+    expect(listedNames).toHaveLength(3);
   });
 
   test('a stale ZIP setting on a photo-only provider is ignored, so the run still succeeds', async () => {

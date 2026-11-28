@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { PayloadTooLargeError } from '../../../errors';
 import { ALLOW_PRIVATE, outboundResolver, urlForAddress } from '../../../utils/outbound-url';
 import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
 
@@ -57,6 +58,17 @@ function fakeS3() {
           headers: { 'content-type': 'application/xml' },
         });
       }
+      if (key.endsWith('/unsized.bin')) {
+        let sent = 0;
+        const chunked = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (sent >= 64) return controller.close();
+            sent += 16;
+            controller.enqueue(new Uint8Array(16));
+          },
+        });
+        return new Response(chunked);
+      }
       const stored = objects.get(key);
       if (!stored) return new Response('<Error><Code>NoSuchKey</Code></Error>', { status: 404 });
       return new Response(stored, { headers: { 'content-length': String(stored.length) } });
@@ -101,6 +113,41 @@ describe('the real S3 client through the outbound request handler', () => {
       ]);
       expect(seen.every((r) => r.signed && r.host?.startsWith('s3.test:'))).toBe(true);
       expect(seen[1]?.bodyLength).toBe('real s3 client bytes'.length);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test('a capped download is refused over the limit and returned whole within it', async () => {
+    const { server } = fakeS3();
+    try {
+      outboundResolver.lookup = async () => ['127.0.0.1'];
+      outboundResolver.connectUrl = urlForAddress;
+      const provider = new S3CompatProvider(
+        { accessKeyId: 'AKIDEXAMPLE', secretAccessKey: 'secret' },
+        { endpoint: `http://s3.test:${server.port}`, bucket: 'photos', region: 'us-east-1' },
+        ALLOW_PRIVATE
+      );
+      const ref = await provider.upload({
+        buffer: Buffer.alloc(64),
+        fileName: 'vroom-backup-1.zip',
+        mimeType: 'application/zip',
+        entityType: 'backup',
+        entityId: 'u1',
+        pathHint: '',
+        rawPath: 'Backups',
+      });
+
+      expect((await provider.download(ref, { maxBytes: 64 })).length).toBe(64);
+      await expect(provider.download(ref, { maxBytes: 32 })).rejects.toBeInstanceOf(
+        PayloadTooLargeError
+      );
+
+      const unsized = { providerType: 's3', externalId: 'Backups/unsized.bin' };
+      expect((await provider.download(unsized, { maxBytes: 64 })).length).toBe(64);
+      await expect(provider.download(unsized, { maxBytes: 32 })).rejects.toBeInstanceOf(
+        PayloadTooLargeError
+      );
     } finally {
       server.stop(true);
     }

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { AsyncAppDatabase } from '../../db/async-sqlite';
 import { countNum } from '../../db/dialect';
 import { type NewPhotoRef, type PhotoRef, photoRefs, userProviders } from '../../db/schema';
@@ -64,12 +64,17 @@ export class PhotoRefRepository {
 
   async findPendingOrFailed(limit: number): Promise<PhotoRef[]> {
     const queued = await this.db
-      .select()
+      .select(getTableColumns(photoRefs))
       .from(photoRefs)
+      .innerJoin(userProviders, eq(userProviders.id, photoRefs.providerId))
       .where(
         and(inArray(photoRefs.status, ['pending', 'failed']), sql`${photoRefs.retryCount} < 3`)
       )
-      .orderBy(asc(photoRefs.createdAt))
+      .orderBy(
+        sql`row_number() over (partition by ${userProviders.userId} order by ${photoRefs.createdAt}, ${photoRefs.id})`,
+        asc(photoRefs.createdAt),
+        asc(photoRefs.id)
+      )
       .limit(limit);
     if (queued.length >= limit) return queued;
     return [...queued, ...(await this.findRevivedSinceProviderUpdate(limit - queued.length))];

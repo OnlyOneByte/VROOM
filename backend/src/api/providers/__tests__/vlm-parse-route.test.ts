@@ -106,12 +106,24 @@ describe('POST /api/v1/receipts/parse', () => {
     expect(draft).toEqual({ date: '2024-06-01', vendor: 'BP' });
   });
 
-  test('an unparseable model response yields an empty draft (200, user fills by hand)', async () => {
+  test.each([
+    ['a refusal in prose', 'I could not read this receipt.'],
+    ['an empty reply', ''],
+    ['JSON with no usable field', '{"amount": -5, "category": "groceries"}'],
+  ])('%s is a 422 that asks for a better photo, not an empty success', async (_, reply) => {
     await seedVlmProvider();
-    stubModel('I could not read this receipt.');
+    stubModel(reply);
+    const res = await postImage(IMG, 'image/jpeg');
+    expect(res.status).toBe(422);
+    expect(await res.text()).toMatch(/Couldn't read anything on this receipt/);
+  });
+
+  test('an impossible date from the model is dropped', async () => {
+    await seedVlmProvider();
+    stubModel('{"amount": 10, "date": "2024-02-30"}');
     const res = await postImage(IMG, 'image/jpeg');
     expect(res.status).toBe(200);
-    expect((await json<DataEnvelope<DraftEnvelope>>(res)).data.draft).toEqual({});
+    expect((await json<DataEnvelope<DraftEnvelope>>(res)).data.draft).toEqual({ amount: 10 });
   });
 
   test('with no configured provider, the built-in reader answers and an unreadable image is a 422', async () => {

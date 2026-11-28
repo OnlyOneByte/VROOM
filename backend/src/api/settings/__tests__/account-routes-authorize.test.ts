@@ -37,7 +37,7 @@ describe('account routes resolve through can()', () => {
   });
 
   test('an account without a server role is refused', async () => {
-    ctx.sqlite.run('DELETE FROM role_assignments WHERE user_id = ? AND scope_id IS NULL', [
+    await ctx.sql.run('DELETE FROM role_assignments WHERE user_id = ? AND scope_id IS NULL', [
       m.stranger.id,
     ]);
     for (const path of ACCOUNT_READS) {

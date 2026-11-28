@@ -360,7 +360,11 @@ describe('Profile link callback banners', () => {
 			'no_email',
 			"We couldn't retrieve your email from this provider. Please check your provider's privacy settings."
 		],
-		['provider_unavailable', 'The sign-in provider is temporarily unavailable. Please try again.']
+		['provider_unavailable', 'The sign-in provider is temporarily unavailable. Please try again.'],
+		[
+			'provider_error',
+			'The sign-in provider refused the request. Try again later, or ask the admin to check the sign-in settings.'
+		]
 	])('link_error=%s shows its message', async (code, message) => {
 		page.url = new URL(`https://app.example/profile?link_error=${code}`);
 		await mount();

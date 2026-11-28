@@ -6,7 +6,13 @@ import {
   type RequestFn,
   type TestApp,
 } from '../../../test-helpers/http-client';
-import { type Members, overrideOn, seedCar, seedMembers } from '../../../test-helpers/members';
+import {
+  type Members,
+  memberDriverId,
+  overrideOn,
+  seedCar,
+  seedMembers,
+} from '../../../test-helpers/members';
 
 let ctx: TestApp;
 let m: Members;
@@ -39,9 +45,7 @@ async function read(request: RequestFn, path = stats): Promise<Stats> {
 }
 
 async function driverOf(userId: string): Promise<string> {
-  const res = await ctx.authed('GET', `/api/v1/vehicles/${CAR}/drivers`);
-  const list = (await json<DataEnvelope<{ id: string; userId: string | null }[]>>(res)).data;
-  return list.find((d) => d.userId === userId)?.id ?? '';
+  return (await memberDriverId(ctx, CAR, userId)) ?? '';
 }
 
 beforeEach(async () => {

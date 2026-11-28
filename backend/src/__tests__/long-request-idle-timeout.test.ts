@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { connect } from 'node:net';
 import type { Server } from 'bun';
+import { setPhotosServiceBuilderForTest } from '../api/photos/receipt-drafts-route';
+import * as receiptDrafts from '../api/photos/receipt-drafts-service';
 import * as llmOrchestrator from '../api/providers/domains/llm/orchestrator';
 import * as llmRegistry from '../api/providers/domains/llm/registry';
 import * as vlmRegistry from '../api/providers/domains/vlm/registry';
@@ -186,21 +188,100 @@ describe('long requests outlive the idle timeout', () => {
     SLOW_TEST_TIMEOUT_MS
   );
 
+  async function seedProvider(id: string, domain: string, providerType: string) {
+    await ctx.sql.run(
+      `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
+       VALUES (?, ?, ?, ?, 'Test', '', ?, 'active')`,
+      [id, ctx.user.id, domain, providerType, JSON.stringify({})]
+    );
+  }
+
+  test(
+    'a restore from a storage provider that takes longer than the idle timeout still answers',
+    async () => {
+      await seedProvider('p-restore', 'storage', 's3');
+      const spies: { mockRestore(): void }[] = [];
+      try {
+        spies.push(spyOn(backupService, 'downloadBackup').mockResolvedValue(Buffer.from('zip')));
+        spies.push(
+          spyOn(restoreService, 'restoreFromBackup').mockImplementation(async () => {
+            await Bun.sleep(SLOW_MS);
+            return { success: true } as unknown as RestoreResponse;
+          })
+        );
+        const res = await fetch(url('/sync/restore/from-provider'), {
+          method: 'POST',
+          headers: {
+            cookie: ctx.cookie,
+            origin: TEST_ORIGIN,
+            'content-type': 'application/json',
+            'idempotency-key': 'slow-provider-restore',
+          },
+          body: JSON.stringify({
+            sourceType: 'zip',
+            providerId: 'p-restore',
+            fileRef: 'Backups/vroom-backup-1.zip',
+            mode: 'preview',
+          }),
+        });
+        expect(res.status).toBe(200);
+        expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS
+  );
+
+  test(
+    'an import of receipts from Google Photos that takes longer than the idle timeout still answers',
+    async () => {
+      await seedProvider('p-photos', 'storage', 'google-photos');
+      const spies: { mockRestore(): void }[] = [];
+      setPhotosServiceBuilderForTest(() => ({}) as never);
+      try {
+        spies.push(
+          spyOn(providerResolve, 'resolveProvider').mockResolvedValue({
+            id: 'vlm-1',
+            providerType: 'openai-compatible',
+          } as never)
+        );
+        spies.push(spyOn(vlmRegistry, 'getVlmProvider').mockResolvedValue({} as never));
+        spies.push(
+          spyOn(receiptDrafts, 'stageReceiptDrafts').mockImplementation(async () => {
+            await Bun.sleep(SLOW_MS);
+            return [];
+          })
+        );
+        const res = await fetch(url('/photos/receipt-drafts'), { headers: { cookie: ctx.cookie } });
+        expect(res.status).toBe(200);
+        expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+        setPhotosServiceBuilderForTest(null);
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS
+  );
+
   test(
     'an assistant reply that takes longer than the idle timeout still answers',
     async () => {
-      const spies = [
-        spyOn(providerResolve, 'resolveProvider').mockResolvedValue({
-          id: 'llm-1',
-          providerType: 'openai-compatible',
-        } as never),
-        spyOn(llmRegistry, 'getLlmProvider').mockResolvedValue({} as never),
-        spyOn(llmOrchestrator, 'runAssistant').mockImplementation(async () => {
-          await Bun.sleep(SLOW_MS);
-          return { reply: 'done', toolsUsed: [] };
-        }),
-      ];
+      const spies: { mockRestore(): void }[] = [];
       try {
+        spies.push(
+          spyOn(providerResolve, 'resolveProvider').mockResolvedValue({
+            id: 'llm-1',
+            providerType: 'openai-compatible',
+          } as never)
+        );
+        spies.push(spyOn(llmRegistry, 'getLlmProvider').mockResolvedValue({} as never));
+        spies.push(
+          spyOn(llmOrchestrator, 'runAssistant').mockImplementation(async () => {
+            await Bun.sleep(SLOW_MS);
+            return { reply: 'done', toolsUsed: [] };
+          })
+        );
         const res = await fetch(url('/assistant/chat'), {
           method: 'POST',
           headers: { cookie: ctx.cookie, origin: TEST_ORIGIN, 'content-type': 'application/json' },
@@ -218,19 +299,22 @@ describe('long requests outlive the idle timeout', () => {
   test(
     'a receipt scan that takes longer than the idle timeout still answers',
     async () => {
-      const spies = [
-        spyOn(providerResolve, 'resolveProvider').mockResolvedValue({
-          id: 'vlm-1',
-          providerType: 'openai-compatible',
-        } as never),
-        spyOn(vlmRegistry, 'getVlmProvider').mockResolvedValue({
-          extractReceipt: async () => {
-            await Bun.sleep(SLOW_MS);
-            return '{}';
-          },
-        } as never),
-      ];
+      const spies: { mockRestore(): void }[] = [];
       try {
+        spies.push(
+          spyOn(providerResolve, 'resolveProvider').mockResolvedValue({
+            id: 'vlm-1',
+            providerType: 'openai-compatible',
+          } as never)
+        );
+        spies.push(
+          spyOn(vlmRegistry, 'getVlmProvider').mockResolvedValue({
+            extractReceipt: async () => {
+              await Bun.sleep(SLOW_MS);
+              return '{"amount": 12.5}';
+            },
+          } as never)
+        );
         const form = new FormData();
         form.append('image', new Blob([new Uint8Array(16)], { type: 'image/jpeg' }), 'r.jpg');
         const res = await fetch(url('/receipts/parse'), {
@@ -262,4 +346,49 @@ describe('long requests outlive the idle timeout', () => {
       spy.mockRestore();
     }
   });
+
+  test(
+    'a sign-in whose provider answers slowly still finishes',
+    async () => {
+      const { CONFIG } = await import('../config');
+      const auth = CONFIG.auth as unknown as Record<string, unknown>;
+      const saved = {
+        id: auth.githubClientId,
+        secret: auth.githubClientSecret,
+        noLimit: CONFIG.disableRateLimit,
+      };
+      auth.githubClientId = 'id';
+      auth.githubClientSecret = 'secret';
+      (CONFIG as unknown as { disableRateLimit: boolean }).disableRateLimit = true;
+      const { githubAuthProvider } = await import('../api/auth/providers/github');
+      const spies = [
+        spyOn(githubAuthProvider, 'validateAuthorizationCode').mockImplementation(async () => {
+          await Bun.sleep(SLOW_MS / 2);
+          return { accessToken: 't' };
+        }),
+        spyOn(githubAuthProvider, 'fetchUserInfo').mockImplementation(async () => {
+          await Bun.sleep(SLOW_MS / 2);
+          return { providerAccountId: 'gh-1', email: 'slow@example.com', displayName: 'Slow' };
+        }),
+      ];
+      try {
+        const start = await fetch(url('/auth/login/github'), { redirect: 'manual' });
+        const state = new URL(start.headers.get('location') ?? '').searchParams.get('state');
+        const cookie = start.headers.get('set-cookie')?.match(/oauth_login_state=[^;]*/)?.[0] ?? '';
+        const res = await fetch(url(`/auth/callback/github?code=c&state=${state}`), {
+          headers: { cookie },
+          redirect: 'manual',
+        });
+        expect(res.status).toBe(302);
+        expect(res.headers.get('location') ?? '').not.toContain('auth_error');
+        expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+        auth.githubClientId = saved.id;
+        auth.githubClientSecret = saved.secret;
+        (CONFIG as unknown as { disableRateLimit: boolean }).disableRateLimit = saved.noLimit;
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS
+  );
 });

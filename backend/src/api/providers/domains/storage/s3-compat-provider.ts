@@ -14,13 +14,19 @@ import { ValidationError } from '../../../../errors';
 import { logger } from '../../../../utils/logger';
 import { fetchOutbound, type PrivateEndpointPolicy } from '../../../../utils/outbound-url';
 import { assertSafeStoragePath } from '../../../../utils/paths';
+import { OPERATION_TIMEOUTS } from '../../../../utils/timeout';
 import type {
   StorageFileInfo,
   StorageProvider,
   StorageRef,
   UploadParams,
 } from './storage-provider';
-import { credentialFailureOf, ProviderConfigError } from './storage-provider';
+import {
+  assertWithinSize,
+  credentialFailureOf,
+  type DownloadOptions,
+  ProviderConfigError,
+} from './storage-provider';
 
 interface S3Credentials {
   accessKeyId: string;
@@ -88,18 +94,38 @@ async function requestBody(body: unknown): Promise<RequestInit['body'] | undefin
   return body as RequestInit['body'];
 }
 
+const SLOWEST_UPLOAD_BYTES_PER_MS = 100;
+
+export function s3RequestTimeoutMs(bodyBytes: number): number {
+  return Math.max(OPERATION_TIMEOUTS.DOWNLOAD, 60_000 + bodyBytes / SLOWEST_UPLOAD_BYTES_PER_MS);
+}
+
+function bodyLength(body: RequestInit['body'] | undefined): number {
+  if (body instanceof Uint8Array) return body.byteLength;
+  return typeof body === 'string' ? Buffer.byteLength(body) : 0;
+}
+
+function withRequestTimeout(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
 export function s3RequestHandlerFor(policy: PrivateEndpointPolicy) {
   return {
     async handle(request: S3WireRequest, options?: { abortSignal?: unknown }) {
       const port = request.port ? `:${request.port}` : '';
       const url = `${request.protocol}//${request.hostname}${port}${request.path}${buildQuery(request.query)}`;
+      const body = await requestBody(request.body);
       const res = await fetchOutbound(
         url,
         {
           method: request.method,
           headers: request.headers,
-          signal: options?.abortSignal as AbortSignal | undefined,
-          body: await requestBody(request.body),
+          signal: withRequestTimeout(
+            options?.abortSignal as AbortSignal | undefined,
+            s3RequestTimeoutMs(bodyLength(body))
+          ),
+          body,
         },
         'S3 endpoint',
         policy
@@ -159,7 +185,7 @@ export class S3CompatProvider implements StorageProvider {
     };
   }
 
-  async download(ref: StorageRef): Promise<Buffer> {
+  async download(ref: StorageRef, options?: DownloadOptions): Promise<Buffer> {
     const response = await this.client.send(
       new GetObjectCommand({
         Bucket: this.bucket,
@@ -171,7 +197,25 @@ export class S3CompatProvider implements StorageProvider {
       throw new Error(`Empty response body for key: ${ref.externalId}`);
     }
 
-    return Buffer.from(await response.Body.transformToByteArray());
+    if (options?.maxBytes === undefined) {
+      return Buffer.from(await response.Body.transformToByteArray());
+    }
+    const body = response.Body as unknown as AsyncIterable<Uint8Array> & { destroy?: () => void };
+    const chunks: Buffer[] = [];
+    let total = response.ContentLength ?? 0;
+    try {
+      assertWithinSize(total, options);
+      total = 0;
+      for await (const chunk of body) {
+        total += chunk.length;
+        assertWithinSize(total, options);
+        chunks.push(Buffer.from(chunk));
+      }
+    } catch (error) {
+      body.destroy?.();
+      throw error;
+    }
+    return Buffer.concat(chunks);
   }
 
   async delete(ref: StorageRef): Promise<void> {

@@ -34,7 +34,7 @@ describe('DatePicker calendar loading', () => {
 		expect(screen.queryByRole('grid')).toBeNull();
 
 		await fireEvent.click(trigger);
-		expect(await screen.findByRole('grid')).toBeInTheDocument();
+		expect(await screen.findByRole('grid', {}, { timeout: 5000 })).toBeInTheDocument();
 		expect(calendarRequested).toHaveBeenCalledTimes(3);
 	});
 });

@@ -205,6 +205,15 @@ describe('POST /providers/:id/test works for every capability', () => {
     }
   );
 
+  test.each([
+    ['an empty reply', JSON.stringify({ choices: [{ message: { content: '' } }] })],
+    ['a page that is not a model reply', '<html>Welcome</html>'],
+  ])('a model that answers 200 with %s is not Connected', async (_, body) => {
+    const id = await createModel('vlm');
+    globalThis.fetch = (async () => new Response(body, { status: 200 })) as unknown as typeof fetch;
+    expect((await testProvider(id)).data).toMatchObject({ ok: false, code: 'config' });
+  });
+
   test('a provider whose stored secret cannot be read needs reconnecting', async () => {
     const id = await createModel('llm');
     await ctx.sql.run("UPDATE user_providers SET credentials = 'garbage' WHERE id = ?", [id]);

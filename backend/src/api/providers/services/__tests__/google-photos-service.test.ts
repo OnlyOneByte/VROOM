@@ -5,7 +5,12 @@ import {
   makeFakePhotosClient,
   photosApiError,
 } from '../../../../test-helpers/fake-google-photos-client';
-import { GooglePhotosService, VROOM_ALBUM_TITLE } from '../google-photos-service';
+import {
+  classifyPhotosApiError,
+  GooglePhotosService,
+  listAllAlbums,
+  VROOM_ALBUM_TITLE,
+} from '../google-photos-service';
 
 let store: FakePhotosStore;
 let svc: GooglePhotosService;
@@ -103,5 +108,71 @@ describe('GooglePhotosService — error/resilience paths', () => {
     );
     const ok = await svc.uploadImage(Buffer.from('y'), 'image/jpeg', 'b.jpg');
     expect(ok.id).toBeTruthy();
+  });
+});
+
+describe('Google Photos API errors', () => {
+  test('a 401 is a sign-in failure', () => {
+    expect(classifyPhotosApiError(401, 'unauthenticated').code).toBe(SyncErrorCode.AUTH_INVALID);
+  });
+
+  test('a quota or rate-limit 403, or a 429, is retryable quota, not a reconnect', () => {
+    const quota = '{"error":{"code":403,"status":"RESOURCE_EXHAUSTED","message":"Quota exceeded"}}';
+    expect(classifyPhotosApiError(403, quota).code).toBe(SyncErrorCode.QUOTA_EXCEEDED);
+    expect(classifyPhotosApiError(403, 'rateLimitExceeded').code).toBe(
+      SyncErrorCode.QUOTA_EXCEEDED
+    );
+    expect(classifyPhotosApiError(429, 'too many requests').code).toBe(
+      SyncErrorCode.QUOTA_EXCEEDED
+    );
+  });
+
+  test('any other 403 is a permission failure', () => {
+    const denied = '{"error":{"code":403,"status":"PERMISSION_DENIED"}}';
+    expect(classifyPhotosApiError(403, denied).code).toBe(SyncErrorCode.PERMISSION_DENIED);
+  });
+
+  test('a 403 that only mentions a quota project is a permission failure, not throttling', () => {
+    const body =
+      '{"error":{"code":403,"status":"PERMISSION_DENIED","message":"This API requires a quota project"}}';
+    expect(classifyPhotosApiError(403, body).code).toBe(SyncErrorCode.PERMISSION_DENIED);
+  });
+
+  test('a newer RATE_LIMIT_EXCEEDED reason is throttling', () => {
+    const body = '{"error":{"code":403,"details":[{"reason":"RATE_LIMIT_EXCEEDED"}]}}';
+    expect(classifyPhotosApiError(403, body).code).toBe(SyncErrorCode.QUOTA_EXCEEDED);
+  });
+
+  test('other statuses are network errors', () => {
+    expect(classifyPhotosApiError(500, 'oops').code).toBe(SyncErrorCode.NETWORK_ERROR);
+  });
+});
+
+describe('listing Google Photos albums', () => {
+  test('follows nextPageToken until the last page', async () => {
+    const pages: Record<
+      string,
+      { albums: { id: string; title: string }[]; nextPageToken?: string }
+    > = {
+      first: { albums: [{ id: 'a1', title: 'A' }], nextPageToken: 'p2' },
+      p2: { albums: [{ id: 'a2', title: 'B' }], nextPageToken: 'p3' },
+      p3: { albums: [{ id: 'a3', title: 'C' }] },
+    };
+    const asked: (string | undefined)[] = [];
+    const albums = await listAllAlbums(async (token) => {
+      asked.push(token);
+      return pages[token ?? 'first'];
+    });
+    expect(albums.map((a) => a.id)).toEqual(['a1', 'a2', 'a3']);
+    expect(asked).toEqual([undefined, 'p2', 'p3']);
+  });
+
+  test('stops after a bounded number of pages if the token never ends', async () => {
+    let calls = 0;
+    await listAllAlbums(async () => {
+      calls++;
+      return { albums: [], nextPageToken: 'again' };
+    });
+    expect(calls).toBe(100);
   });
 });

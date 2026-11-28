@@ -1,6 +1,11 @@
 import { GitHub } from 'arctic';
 import { CONFIG } from '../../../config';
-import { NoVerifiedEmailError, type OAuthFlow, type OAuthProviderConfig } from './types';
+import {
+  IDP_TIMEOUT_MS,
+  NoVerifiedEmailError,
+  type OAuthFlow,
+  type OAuthProviderConfig,
+} from './types';
 
 function createGitHubClient(redirectUri: string): GitHub {
   return new GitHub(
@@ -51,12 +56,18 @@ export const githubAuthProvider: OAuthProviderConfig = {
       Accept: 'application/vnd.github+json',
     };
 
-    const userRes = await fetch('https://api.github.com/user', { headers });
+    const userRes = await fetch('https://api.github.com/user', {
+      headers,
+      signal: AbortSignal.timeout(IDP_TIMEOUT_MS),
+    });
     if (!userRes.ok) throw new Error('Failed to fetch GitHub user info');
     const userData = (await userRes.json()) as GitHubUser;
 
     // /user can return an unverified email, so the verified primary comes from /user/emails.
-    const emailRes = await fetch('https://api.github.com/user/emails', { headers });
+    const emailRes = await fetch('https://api.github.com/user/emails', {
+      headers,
+      signal: AbortSignal.timeout(IDP_TIMEOUT_MS),
+    });
     if (!emailRes.ok) throw new Error('Failed to fetch GitHub user emails');
     const emails = (await emailRes.json()) as GitHubEmail[];
     const primary = emails.find((e) => e.primary && e.verified);

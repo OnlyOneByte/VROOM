@@ -1,8 +1,13 @@
 import { describe, expect, test } from 'bun:test';
+import { SyncError, SyncErrorCode } from '../../../errors';
 import type { ReceiptDraft } from '../../providers/domains/vlm/prompt';
 import type { PhotosMediaItem } from '../../providers/services/google-photos-service';
 import {
+  MAX_RECEIPT_PHOTOS_LOOKED_AT,
   MAX_RECEIPT_PHOTOS_PER_RUN,
+  MAX_SCAN_BYTES,
+  ReceiptScanStopped,
+  type ScanStopReason,
   type StageDeps,
   stageReceiptDrafts,
 } from '../receipt-drafts-service';
@@ -102,18 +107,59 @@ describe('stageReceiptDrafts', () => {
     await expect(stageReceiptDrafts(deps)).rejects.toThrow('Photos API 503');
   });
 
-  test('the per-run cap is passed through to the Photos read', async () => {
+  test('the read looks past imported photos, and no more than the cap is staged', async () => {
     let calledWith = -1;
+    const all = Array.from({ length: 40 }, (_, i) => photo(`m-${i}`));
     const deps = makeDeps({
       listReceiptPhotos: async (max) => {
         calledWith = max;
-        return [];
+        return all.slice(0, max);
+      },
+      isAlreadyImported: async (id) => Number(id.slice(2)) < 30,
+    });
+    const drafts = await stageReceiptDrafts(deps);
+    expect(calledWith).toBe(MAX_RECEIPT_PHOTOS_LOOKED_AT);
+    expect(drafts.map((d) => d.photoId)).toEqual(all.slice(30).map((p) => p.id));
+    expect(await stageReceiptDrafts(deps, 5)).toHaveLength(5);
+    expect(MAX_RECEIPT_PHOTOS_PER_RUN).toBe(25);
+  });
+
+  test('a scan that reads nothing, a type that cannot be scanned and an oversized photo are marked unread', async () => {
+    const downloaded: string[] = [];
+    const deps = makeDeps({
+      listReceiptPhotos: async () => [photo('empty'), photo('heic', 'image/heic'), photo('big')],
+      downloadPhoto: async (id) => {
+        downloaded.push(id);
+        return id === 'big' ? Buffer.alloc(MAX_SCAN_BYTES + 1) : Buffer.from(id);
+      },
+      parseImage: async () => ({}),
+    });
+    const drafts = await stageReceiptDrafts(deps);
+    expect(drafts.map((d) => [d.photoId, d.failed])).toEqual([
+      ['empty', true],
+      ['heic', true],
+      ['big', true],
+    ]);
+    expect(downloaded).toEqual(['empty', 'big']);
+  });
+
+  test.each<[string, Error, ScanStopReason]>([
+    ['a rejected key', new Error('VLM provider returned HTTP 401'), 'ai_key'],
+    ['a rate limit', new Error('VLM provider returned HTTP 429'), 'ai_rate_limit'],
+    ['lost Photos access', new SyncError(SyncErrorCode.AUTH_INVALID, 'revoked'), 'photos_access'],
+  ])('%s stops the whole run after the first photo', async (_, failure, reason) => {
+    let scans = 0;
+    const deps = makeDeps({
+      listReceiptPhotos: async () => [photo('a'), photo('b'), photo('c')],
+      parseImage: async () => {
+        scans++;
+        throw failure;
       },
     });
-    await stageReceiptDrafts(deps);
-    expect(calledWith).toBe(MAX_RECEIPT_PHOTOS_PER_RUN);
-    await stageReceiptDrafts(deps, 5);
-    expect(calledWith).toBe(5);
+    const run = stageReceiptDrafts(deps);
+    await expect(run).rejects.toBeInstanceOf(ReceiptScanStopped);
+    await expect(run).rejects.toMatchObject({ reason });
+    expect(scans).toBe(1);
   });
 
   test('PERSISTS NOTHING — the orchestration only reads (no write seam in StageDeps)', () => {

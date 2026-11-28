@@ -23,10 +23,10 @@ function withCookie(method: string, path: string, cookie: string): Promise<Respo
   return Promise.resolve(ctx.app.request(path, { method, headers }));
 }
 
-function agePastHalfLife(): void {
+async function agePastHalfLife(): Promise<void> {
   const id = ctx.cookie.split('=')[1];
   const twentyHoursFromNow = Math.floor((Date.now() + 20 * 60 * 60 * 1000) / 1000);
-  ctx.sqlite.run('UPDATE sessions SET expires_at = ? WHERE id = ?', [twentyHoursFromNow, id]);
+  await ctx.sql.run('UPDATE sessions SET expires_at = ? WHERE id = ?', [twentyHoursFromNow, id]);
 }
 
 const SITES: { name: string; send: () => Promise<Response> }[] = [
@@ -44,8 +44,8 @@ const SITES: { name: string; send: () => Promise<Response> }[] = [
   },
   {
     name: 'POST /refresh on an extended session re-issues',
-    send: () => {
-      agePastHalfLife();
+    send: async () => {
+      await agePastHalfLife();
       return withCookie('POST', '/api/v1/auth/refresh', ctx.cookie);
     },
   },

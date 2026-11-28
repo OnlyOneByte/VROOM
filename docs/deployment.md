@@ -120,7 +120,7 @@ These have defaults, but the defaults only suit localhost.
 | `ADMIN_EMAILS` | empty | Comma-separated sign-in emails of this server's admins. When it is set, only admins' providers may use private network targets: an admin gets what `PRIVATE_PROVIDER_ENDPOINTS` allows, or every LAN and loopback host when that is empty, however many accounts exist; everyone else's S3 endpoints and model base URLs must be public `https://` hosts. Checked when a provider is saved, tested and used, so it also applies to providers saved earlier. Set it on a home server you share, e.g. `ADMIN_EMAILS=you@example.com`, to keep your own Ollama or MinIO while nobody else can reach your LAN. At startup the backend logs a warning for an entry that isn't an email address, and while no listed address belongs to an active account |
 | `DEMO_MODE` | off | Set to `1` to offer a read-only demo garage from the landing page. Anyone who can reach the instance can open it without signing in, for an hour at a time. It is a separate account the server rebuilds with sample data on every start, so it never holds or sees anyone else's data; every change is refused with 403, and it can call only the routes its read-only Demo role covers, so provider, backup, sign-in-method and assistant endpoints are closed to it. Turning it off removes the demo account on the next start |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | — | Set both to add a GitHub login button. Callback defaults to `http://localhost:3001/api/v1/auth/callback/github`; override with `GITHUB_REDIRECT_URI`. Register the OAuth app's callback URL as `https://yourdomain.com/api/v1/auth/callback`: GitHub accepts any redirect under it, so login and account linking both work |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | — | Set all three to sign in with your own OpenID Connect provider (Authentik, Keycloak, Pocket ID and the like). The backend reads `OIDC_ISSUER/.well-known/openid-configuration` at startup (5 s timeout); if that fails, or names a different issuer, it logs the error, hides the OIDC button and tries again on a later sign-in request, at most every 30 s. Accounts are keyed by issuer and subject, so changing `OIDC_ISSUER` does not carry sign-ins over: a user whose email already has an account is refused until they sign in another way and link the new identity from Profile. Sign-in uses PKCE, asks for `openid profile email` only, and refuses an account whose `email_verified` is not `true` |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | — | Set all three to sign in with your own OpenID Connect provider (Authentik, Keycloak, Pocket ID and the like). The backend reads `OIDC_ISSUER/.well-known/openid-configuration` at startup (5 s timeout); if that fails, or names a different issuer, it logs the error, hides the OIDC button and tries again on a later sign-in request, at most every 30 s. Accounts are keyed by issuer and subject, so changing `OIDC_ISSUER` does not carry sign-ins over: a user whose email already has an account is refused until they sign in another way and link the new identity from Profile. Sign-in uses PKCE, asks for `openid profile email` only, and refuses an account whose `email_verified` is not `true` (the string `"true"` also counts). A refusal logs whether the claim was missing or false. An issuer whose user info leaves the claim out, as Microsoft Entra ID usually does, can't be used for sign-in yet |
 | `OIDC_REDIRECT_URI` | `http://localhost:3001/api/v1/auth/callback/oidc` | OIDC login callback. Register it, and the link callback below, with your provider |
 | `OIDC_LINK_REDIRECT_URI` | derived from `OIDC_REDIRECT_URI` | Callback for linking OIDC to an account on Profile, `.../callback/link/oidc` |
 | `OIDC_DISPLAY_NAME` | `Single sign-on` | Button label: "Continue with <name>" |
@@ -335,8 +335,18 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Backups, restores, the assistant and receipt scans can take minutes before answering.
-    location ~ ^/api/(v1/)?(sync(/backups/download|/restore/from-provider)?|assistant/chat|receipts/parse|photos/receipt-drafts)$ {
+    # Backups, backup downloads and restores can take minutes before answering.
+    location ~ ^/api/(v1/)?sync(/backups/download|/restore/from-provider)?$ {
+        proxy_read_timeout 11m;
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # So can assistant replies, receipt scans and receipt imports, which wait on the AI provider.
+    location ~ ^/api/(v1/)?(assistant/chat|receipts/parse|photos/receipt-drafts)$ {
         proxy_read_timeout 11m;
         proxy_pass http://127.0.0.1:3001;
         proxy_set_header Host $host;
@@ -372,8 +382,9 @@ be blocked by a limit tuned for JSON payloads.
 A backup, backup download or restore sends nothing until it finishes, which can take up to 10
 minutes. An assistant reply or a receipt scan waits on the AI provider, and an import from
 Google Photos scans up to 25 receipts in a row. nginx closes an upstream that is silent for 60
-seconds (`proxy_read_timeout`), so the two blocks above raise it to 11 minutes for those paths only. Caddy has no such limit by default.
-Any other proxy in front (a load balancer, Cloudflare's 100-second cap) needs the same allowance.
+seconds (`proxy_read_timeout`), so the three blocks above raise it to 11 minutes for those
+paths only. Caddy has no such limit by default. Any other proxy in front (a load balancer,
+Cloudflare's 100-second cap) needs the same allowance.
 
 nginx's own `gzip` covers only `text/html` unless `gzip_types` names more. The backend already
 gzips its JSON and CSV, and nginx passes those through as they are; the two lines above
