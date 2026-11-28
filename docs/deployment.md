@@ -191,7 +191,9 @@ developer contact), set the Audience, and submit for verification. VROOM ships c
 `linux/amd64` and `linux/arm64`, so the same tag runs on an x86 server, a Raspberry Pi 4 or 5,
 or an ARM VPS such as Hetzner CAX or Oracle Ampere. Every build is scanned with Trivy: a fixable
 critical vulnerability stops the tag from being published, and the findings are listed under the
-repository's Security tab.
+repository's Security tab. A weekly workflow (`image-refresh.yml`, also run by hand) rebuilds the
+backend's runtime stage without the build cache, so the next published image carries the current
+Alpine package fixes.
 
 | Tag | Published on |
 |---|---|

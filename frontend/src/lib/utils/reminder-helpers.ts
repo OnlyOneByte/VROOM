@@ -33,6 +33,10 @@ export function isMileageTracking(reminder: Reminder): boolean {
 	return reminder.triggerMode === 'mileage' || reminder.triggerMode === 'both';
 }
 
+export function soonDistance(distanceLabel: string): number {
+	return distanceLabel === 'km' ? 1600 : 1000;
+}
+
 export function shouldTriggerRecurringExpenses(opts: {
 	isAuthed: boolean;
 	isOnline: boolean;
