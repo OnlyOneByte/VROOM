@@ -77,14 +77,16 @@
 				both with random noise added — never your own numbers.
 			</li>
 			<li>
-				What's used: make, model and model year, powertrain, vehicle kind, vehicle age, and your
-				fuel, maintenance and insurance costs from the last 12 months. Your region is used only if
-				you set one below.
+				What's used: make, model and model year, powertrain, vehicle kind, vehicle age, your
+				currency, and from the last 12 months your fuel, maintenance and insurance costs, your fuel
+				or charge amounts and the distance driven, worked out from your odometer readings. Your
+				region is used only if you set one below.
 			</li>
 			<li>
-				Never used: VIN, plate, nickname, notes, photos, locations, exact dates or odometer
-				readings.
+				Dates and odometer readings only pick the 12 months and measure distance. They're never
+				shown or stored in the stats.
 			</li>
+			<li>Never used: VIN, plate, nickname, notes, photos or locations.</li>
 			<li>You can turn this off at any time. You'll be left out from the next daily refresh.</li>
 		</ul>
 

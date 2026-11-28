@@ -63,8 +63,14 @@ describe('CommunityStatsCard', () => {
 			)
 		).toBeInTheDocument();
 		expect(
+			screen.getByText('Never used: VIN, plate, nickname, notes, photos or locations.')
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(/the distance driven, worked out from your odometer readings/)
+		).toBeInTheDocument();
+		expect(
 			screen.getByText(
-				'Never used: VIN, plate, nickname, notes, photos, locations, exact dates or odometer readings.'
+				"Dates and odometer readings only pick the 12 months and measure distance. They're never shown or stored in the stats."
 			)
 		).toBeInTheDocument();
 		expect(
