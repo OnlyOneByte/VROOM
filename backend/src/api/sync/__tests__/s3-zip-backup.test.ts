@@ -7,7 +7,10 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { GoogleDriveStrategy } from '../../providers/backup-strategies/google-drive-strategy';
-import { ZipBackupStrategy } from '../../providers/backup-strategies/zip-strategy';
+import {
+  RETENTION_WARNING,
+  ZipBackupStrategy,
+} from '../../providers/backup-strategies/zip-strategy';
 import { FakeStorageProvider } from '../../providers/domains/storage/fake-provider';
 import {
   getStorageProviderRegistry,
@@ -180,6 +183,87 @@ describe('ZIP backups to an S3 provider', () => {
     expect(listedNames).toContain(untagged);
     expect(listedNames).toContain(otherAccount);
     expect(listedNames).toHaveLength(3);
+  });
+
+  test('when only some old backups can be deleted, the rest stay and the real count is reported', async () => {
+    const prefix = backupFilePrefix(ctx.user.id);
+    const old = ['old-1', 'old-2', 'old-3'].map((stem, i) => ({
+      key: `VROOM/Backups/${prefix}${stem}.zip`,
+      name: `${prefix}${stem}.zip`,
+      size: 1,
+      createdTime: `1969-12-0${i + 1}T00:00:00.000Z`,
+      lastModified: `1969-12-0${i + 1}T00:00:00.000Z`,
+    }));
+    bucket = new FakeStorageProvider(old);
+    await setBackupConfig({ 'p-s3': { ...zipOn, retentionCount: 1 } });
+    const realDelete = bucket.delete.bind(bucket);
+    const denied = spyOn(bucket, 'delete').mockImplementation((ref) =>
+      ref.externalId === old[1]?.key ? Promise.reject(new Error('AccessDenied')) : realDelete(ref)
+    );
+    try {
+      const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: {
+          results: Record<
+            string,
+            {
+              capabilities: {
+                zip?: { warning?: string; metadata?: { deletedOldBackups?: number } };
+              };
+            }
+          >;
+        };
+      };
+      const zip = body.data.results['p-s3']?.capabilities.zip;
+      expect(zip?.warning).toBe(RETENTION_WARNING);
+      expect(zip?.metadata?.deletedOldBackups).toBe(2);
+
+      const names = (await bucket.list('VROOM/Backups')).map((f) => f.name);
+      expect(names).toContain(old[1]?.name);
+      expect(names).not.toContain(old[0]?.name);
+      expect(names).not.toContain(old[2]?.name);
+    } finally {
+      denied.mockRestore();
+    }
+  });
+
+  test('a denied delete keeps a warning on the provider until a cleanup works', async () => {
+    const old = `${backupFilePrefix(ctx.user.id)}old.zip`;
+    bucket = new FakeStorageProvider([
+      {
+        key: `VROOM/Backups/${old}`,
+        name: old,
+        size: 1,
+        createdTime: '1969-12-31T00:00:00.000Z',
+        lastModified: '1969-12-31T00:00:00.000Z',
+      },
+    ]);
+    await setBackupConfig({ 'p-s3': { ...zipOn, retentionCount: 1 } });
+    const storedWarning = async () => {
+      const row = (await ctx.sql.get(
+        'SELECT backup_config FROM user_preferences WHERE user_id = ?',
+        [ctx.user.id]
+      )) as { backup_config: string };
+      return JSON.parse(row.backup_config).providers['p-s3'].backupWarning as string | undefined;
+    };
+
+    const denied = spyOn(bucket, 'delete').mockRejectedValue(new Error('AccessDenied'));
+    try {
+      const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: { results: Record<string, { capabilities: { zip?: { warning?: string } } }> };
+      };
+      expect(body.data.results['p-s3']?.capabilities.zip?.warning).toBe(RETENTION_WARNING);
+      expect(await storedWarning()).toBe(RETENTION_WARNING);
+    } finally {
+      denied.mockRestore();
+    }
+
+    const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+    expect(res.status).toBe(200);
+    expect(await storedWarning()).toBeUndefined();
   });
 
   test('a stale ZIP setting on a photo-only provider is ignored, so the run still succeeds', async () => {

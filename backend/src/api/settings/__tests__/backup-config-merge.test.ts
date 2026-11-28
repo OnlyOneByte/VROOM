@@ -134,4 +134,28 @@ describe('PUT /settings never overwrites server-owned backup fields', () => {
       sheetsSpreadsheetId: 'sheet-live',
     });
   });
+
+  test('saving settings keeps the server-written backup warning', async () => {
+    seedProvider('drive-w', 'Drive W');
+    await ctx.authed('PUT', '/api/v1/settings', {
+      backupConfig: { providers: { 'drive-w': providerSettings('drive-w') } },
+    });
+    await repos().preferences.mergeJsonField(ctx.user.id, 'backupConfig', {
+      providers: { 'drive-w': { backupWarning: 'Old backups could not be removed' } },
+    });
+
+    const res = await ctx.authed('PUT', '/api/v1/settings', {
+      backupConfig: {
+        providers: { 'drive-w': providerSettings('drive-w', { retentionCount: 4 }) },
+      },
+    });
+    expect(res.status).toBe(200);
+
+    const stored = ctx.sqlite
+      .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
+      .get(ctx.user.id) as { backup_config: string };
+    expect(JSON.parse(stored.backup_config).providers['drive-w'].backupWarning).toBe(
+      'Old backups could not be removed'
+    );
+  });
 });

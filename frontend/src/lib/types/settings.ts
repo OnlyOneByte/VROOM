@@ -28,6 +28,7 @@ export interface ProviderBackupSettings {
 	folderPath: string;
 	retentionCount: number;
 	lastBackupAt?: string;
+	backupWarning?: string;
 	sheetsSyncEnabled?: boolean;
 	sheetsSpreadsheetId?: string;
 	sheetsAutoPausedAt?: string;
@@ -78,7 +79,7 @@ export interface BackupOrchestratorResult {
 			unusable?: boolean;
 			capabilities: Record<
 				string,
-				{ success: boolean; message?: string; metadata?: Record<string, unknown> }
+				{ success: boolean; message?: string; warning?: string; metadata?: Record<string, unknown> }
 			>;
 		}
 	>;
