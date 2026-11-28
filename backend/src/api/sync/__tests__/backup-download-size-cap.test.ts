@@ -31,8 +31,17 @@ describe('restoring a backup from a storage provider', () => {
       entityId: 'u-1',
       pathHint: '',
     });
-    const read = fake.download(ref, { maxBytes: 32 });
-    await expect(read).rejects.toBeInstanceOf(PayloadTooLargeError);
-    await expect(read).rejects.toMatchObject({ statusCode: 413 });
+    const lookup = spyOn(getStorageProviderRegistry(), 'getProvider').mockResolvedValue(fake);
+    const backupLimits = CONFIG.backup as { maxFileSize: number };
+    const realCap = backupLimits.maxFileSize;
+    backupLimits.maxFileSize = 32;
+    try {
+      const read = backupService.downloadBackup('u-1', 'p-1', ref.externalId);
+      await expect(read).rejects.toBeInstanceOf(PayloadTooLargeError);
+      await expect(read).rejects.toMatchObject({ statusCode: 413 });
+    } finally {
+      backupLimits.maxFileSize = realCap;
+      lookup.mockRestore();
+    }
   });
 });

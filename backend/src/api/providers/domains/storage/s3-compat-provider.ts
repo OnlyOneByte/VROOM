@@ -170,15 +170,25 @@ export class S3CompatProvider implements StorageProvider {
       throw new Error(`Empty response body for key: ${ref.externalId}`);
     }
 
+    if (options?.maxBytes === undefined) {
+      return Buffer.from(await response.Body.transformToByteArray());
+    }
+    const body = response.Body as unknown as AsyncIterable<Uint8Array> & { destroy?: () => void };
+    const chunks: Buffer[] = [];
+    let total = response.ContentLength ?? 0;
     try {
-      assertWithinSize(response.ContentLength ?? 0, options);
+      assertWithinSize(total, options);
+      total = 0;
+      for await (const chunk of body) {
+        total += chunk.length;
+        assertWithinSize(total, options);
+        chunks.push(Buffer.from(chunk));
+      }
     } catch (error) {
-      (response.Body as { destroy?: () => void }).destroy?.();
+      body.destroy?.();
       throw error;
     }
-    const buffer = Buffer.from(await response.Body.transformToByteArray());
-    assertWithinSize(buffer.length, options);
-    return buffer;
+    return Buffer.concat(chunks);
   }
 
   async delete(ref: StorageRef): Promise<void> {

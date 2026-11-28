@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { PayloadTooLargeError, SyncErrorCode } from '../../../errors';
 import {
   FakeGoogleStore,
@@ -11,11 +11,12 @@ import type { StorageRef } from '../domains/storage/storage-provider';
 import { GoogleDriveService } from '../services/google-drive-service';
 
 let store: FakeGoogleStore;
+let driveService: GoogleDriveService;
 let provider: GoogleDriveProvider;
 
 beforeEach(() => {
   store = new FakeGoogleStore();
-  const driveService = new GoogleDriveService('fake-refresh-token', makeFakeDrive(store));
+  driveService = new GoogleDriveService('fake-refresh-token', makeFakeDrive(store));
   provider = new GoogleDriveProvider('fake-refresh-token', driveService);
 });
 
@@ -117,10 +118,13 @@ describe('GoogleDriveProvider', () => {
         pathHint: '',
       });
       const ref: StorageRef = { providerType: 'google-drive', externalId: up.externalId };
+      const content = spyOn(driveService, 'downloadFile');
       await expect(provider.download(ref, { maxBytes: 32 })).rejects.toBeInstanceOf(
         PayloadTooLargeError
       );
+      expect(content).not.toHaveBeenCalled();
       expect((await provider.download(ref, { maxBytes: 64 })).length).toBe(64);
+      expect(content).toHaveBeenCalledTimes(1);
     });
   });
 

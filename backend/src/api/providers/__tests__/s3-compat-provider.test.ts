@@ -161,30 +161,52 @@ describe('S3CompatProvider', () => {
       });
     });
 
-    test('refuses an object over maxBytes without reading its body', async () => {
-      const read = mock(() => Promise.resolve(new Uint8Array(64)));
+    function chunkedBody(chunkCount: number, chunkBytes: number) {
+      const state = { read: 0 };
       const destroy = mock(() => {});
-      mockSend.mockResolvedValueOnce({
-        ContentLength: 64,
-        Body: { transformToByteArray: read, destroy },
-      });
+      const body = {
+        destroy,
+        transformToByteArray: mock(() => Promise.resolve(new Uint8Array(chunkCount * chunkBytes))),
+        async *[Symbol.asyncIterator]() {
+          for (let i = 0; i < chunkCount; i++) {
+            state.read++;
+            yield new Uint8Array(chunkBytes);
+          }
+        },
+      };
+      return { body, state, destroy };
+    }
 
-      const ref: StorageRef = { providerType: 's3', externalId: 'Backups/vroom-backup-1.zip' };
-      await expect(provider.download(ref, { maxBytes: 32 })).rejects.toBeInstanceOf(
+    const backupRef: StorageRef = { providerType: 's3', externalId: 'Backups/vroom-backup-1.zip' };
+
+    test('refuses an object over maxBytes without reading its body', async () => {
+      const { body, state, destroy } = chunkedBody(4, 16);
+      mockSend.mockResolvedValueOnce({ ContentLength: 64, Body: body });
+
+      await expect(provider.download(backupRef, { maxBytes: 32 })).rejects.toBeInstanceOf(
         PayloadTooLargeError
       );
-      expect(read).not.toHaveBeenCalled();
+      expect(state.read).toBe(0);
+      expect(body.transformToByteArray).not.toHaveBeenCalled();
       expect(destroy).toHaveBeenCalledTimes(1);
     });
 
-    test('refuses a body over maxBytes when the size header is missing', async () => {
-      mockSend.mockResolvedValueOnce({
-        Body: { transformToByteArray: () => Promise.resolve(new Uint8Array(64)) },
-      });
-      const ref: StorageRef = { providerType: 's3', externalId: 'Backups/vroom-backup-1.zip' };
-      await expect(provider.download(ref, { maxBytes: 32 })).rejects.toBeInstanceOf(
+    test('with no size header, stops reading as soon as the body passes maxBytes', async () => {
+      const { body, state, destroy } = chunkedBody(1000, 16);
+      mockSend.mockResolvedValueOnce({ Body: body });
+
+      await expect(provider.download(backupRef, { maxBytes: 32 })).rejects.toBeInstanceOf(
         PayloadTooLargeError
       );
+      expect(state.read).toBe(3);
+      expect(body.transformToByteArray).not.toHaveBeenCalled();
+      expect(destroy).toHaveBeenCalledTimes(1);
+    });
+
+    test('a body within maxBytes is returned whole', async () => {
+      const { body } = chunkedBody(2, 16);
+      mockSend.mockResolvedValueOnce({ ContentLength: 32, Body: body });
+      expect((await provider.download(backupRef, { maxBytes: 32 })).length).toBe(32);
     });
 
     test('throws when response body is empty', async () => {
