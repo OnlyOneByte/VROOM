@@ -339,6 +339,18 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     });
   }
 
+  async rearmMileage(
+    id: string,
+    userId: string,
+    lastServiceOdometer: number,
+    nextDueOdometer: number
+  ): Promise<void> {
+    await this.db
+      .update(reminders)
+      .set({ lastServiceOdometer, nextDueOdometer, updatedAt: new Date() })
+      .where(and(eq(reminders.id, id), eq(reminders.userId, userId)));
+  }
+
   async markServiced(
     id: string,
     userId: string,

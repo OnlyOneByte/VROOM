@@ -42,18 +42,25 @@ describe('mileage expense reminders', () => {
     ).toBe(1);
   });
 
-  test('a time-or-mileage expense reminder books only on its due date', async () => {
+  test('a time-or-mileage expense reminder books once on mileage and moves its due date on', async () => {
     const vehicleId = await seedVehicle(ctx);
     await seedMileageReminder(ctx, 'rem-both', vehicleId, 10000);
+    const due = Math.floor(Date.parse('2099-01-01') / 1000);
     await ctx.sql.run(
-      "UPDATE reminders SET type = 'expense', trigger_mode = 'both', frequency = 'yearly', expense_amount = 8000, expense_category = 'maintenance', next_due_date = ? WHERE id = 'rem-both'",
-      [Math.floor(Date.parse('2099-01-01') / 1000)]
+      "UPDATE reminders SET type = 'expense', trigger_mode = 'both', frequency = 'yearly', expense_amount = 8000, expense_category = 'maintenance', next_due_date = ?, start_date = ? WHERE id = 'rem-both'",
+      [due, due]
     );
     await addOdometerReading(ctx, vehicleId, 10200);
 
     await trigger();
+    await trigger();
 
-    expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE source_id = 'rem-both'")).toBe(0);
+    expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE source_id = 'rem-both'")).toBe(1);
+    const row = (await ctx.sql.get(
+      "SELECT next_due_date AS d, next_due_odometer AS o FROM reminders WHERE id = 'rem-both'"
+    )) as { d: number; o: number };
+    expect(row.o, '10200 + 5000').toBe(15200);
+    expect(row.d).toBeGreaterThan(due);
   });
 
   test('a notification reminder on mileage still books nothing', async () => {

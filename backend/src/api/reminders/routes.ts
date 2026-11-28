@@ -36,9 +36,8 @@ import { hideDriverFields } from '../drivers/attribution';
 import { recurringCostSummary } from './reminder-cost';
 import type { ReminderWithVehicles } from './repository';
 import {
-  advanceReminderDueDate,
   firstDueOnOrAfter,
-  previousDueBefore,
+  nextDueAfterService,
   type ReminderSchedule,
   reminderTriggerService,
 } from './trigger-service';
@@ -175,40 +174,6 @@ const timeZoneQuerySchema = z.object({
       return undefined;
     }),
 });
-
-function advanceToFirstFutureDue(
-  reminder: Reminder,
-  from: Date,
-  timeZone: string | undefined
-): Date {
-  const now = new Date();
-  let nextDue = advanceReminderDueDate(reminder, from, timeZone);
-  while (nextDue <= now) {
-    const advanced = advanceReminderDueDate(reminder, nextDue, timeZone);
-    if (advanced <= nextDue) {
-      throw new ValidationError(
-        `Reminder ${reminder.id} did not advance (frequency "${reminder.frequency}") — aborting re-arm`
-      );
-    }
-    nextDue = advanced;
-  }
-  return nextDue;
-}
-
-function nextDueAfterService(
-  reminder: Reminder,
-  due: Date,
-  now: Date,
-  timeZone: string | undefined
-): Date {
-  if (due <= now) return advanceToFirstFutureDue(reminder, due, timeZone);
-  const periodStart = previousDueBefore(reminder, due, timeZone);
-  const alreadyAdvanced =
-    periodStart !== null &&
-    (periodStart > now ||
-      (reminder.lastTriggeredAt !== null && reminder.lastTriggeredAt >= periodStart));
-  return alreadyAdvanced ? due : advanceReminderDueDate(reminder, due, timeZone);
-}
 
 const DAY_MS = 86_400_000;
 const NOON_MS = 12 * 3_600_000;
