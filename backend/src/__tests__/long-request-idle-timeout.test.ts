@@ -226,7 +226,7 @@ describe('long requests outlive the idle timeout', () => {
         spyOn(vlmRegistry, 'getVlmProvider').mockResolvedValue({
           extractReceipt: async () => {
             await Bun.sleep(SLOW_MS);
-            return '{}';
+            return '{"amount": 12.5}';
           },
         } as never),
       ];

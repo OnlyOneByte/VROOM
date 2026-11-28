@@ -92,10 +92,11 @@ async function runCheck(row: UserProvider): Promise<HealthResult> {
     ? LLM_PROVIDERS[row.providerType as keyof typeof LLM_PROVIDERS]
     : undefined;
   if (!descriptor) return healthFailure('config');
-  await descriptor
+  const reply = await descriptor
     .create(settings)
     .chat({ messages: [{ role: 'user', content: 'Reply with OK.' }], tools: [] });
-  return { ok: true, message: 'Connected' };
+  const answered = (reply.text ?? '').trim() !== '' || (reply.toolCalls?.length ?? 0) > 0;
+  return answered ? { ok: true, message: 'Connected' } : healthFailure('config');
 }
 
 export async function checkProviderHealth(row: UserProvider): Promise<HealthResult> {
