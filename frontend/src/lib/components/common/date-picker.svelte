@@ -5,8 +5,15 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Popover from '#lib/components/ui/popover/index.js';
 
-	let calendarModule: Promise<typeof import('./date-picker-calendar.svelte')> | undefined;
-	const loadCalendar = () => (calendarModule ??= import('./date-picker-calendar.svelte'));
+	type PickerCalendar = (typeof import('./date-picker-calendar.svelte'))['default'];
+
+	let calendarModule: Promise<unknown> | undefined;
+	let PickerCalendar = $state<PickerCalendar>();
+	function loadCalendar() {
+		calendarModule ??= import('./date-picker-calendar.svelte').then(module => {
+			PickerCalendar = module.default;
+		});
+	}
 
 	interface Props {
 		value?: string | undefined;
@@ -50,12 +57,16 @@
 		if (value && !selected) value = undefined;
 	});
 
+	$effect(() => {
+		if (open) loadCalendar();
+	});
+
 	let displayValue = $derived(selected ? (label ?? df.format(selected)) : placeholder);
 	let shortValue = $derived(selected && !label ? shortDf.format(selected) : null);
 
 	let content = $state<HTMLElement | null>(null);
 
-	function focusDay(event?: Event) {
+	function focusDay(event: Event) {
 		const day = [
 			'[data-selected]',
 			'[data-today]',
@@ -64,7 +75,7 @@
 			.map(state => content?.querySelector<HTMLElement>(`[data-bits-day]${state}`))
 			.find(Boolean);
 		if (!day) return;
-		event?.preventDefault();
+		event.preventDefault();
 		day.focus({ preventScroll: true });
 		requestAnimationFrame(() => day.scrollIntoView?.({ block: 'nearest' }));
 	}
@@ -115,11 +126,11 @@
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-auto p-0" onOpenAutoFocus={focusDay}>
-		<div bind:this={content} onkeydowncapture={keepSelectedOnEnter}>
-			{#await loadCalendar() then { default: PickerCalendar }}
-				<PickerCalendar bind:value onpick={() => (open = false)} onready={() => focusDay()} />
-			{/await}
-		</div>
-	</Popover.Content>
+	{#if PickerCalendar}
+		<Popover.Content class="w-auto p-0" onOpenAutoFocus={focusDay}>
+			<div bind:this={content} onkeydowncapture={keepSelectedOnEnter}>
+				<PickerCalendar bind:value onpick={() => (open = false)} />
+			</div>
+		</Popover.Content>
+	{/if}
 </Popover.Root>
