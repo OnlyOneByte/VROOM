@@ -234,12 +234,19 @@
 		return true;
 	});
 
+	let saveBlocker = $derived.by(() => {
+		if (canSave || !selectedType) return null;
+		if (!displayName.trim()) return 'Give this storage a name to save it.';
+		if (hasBackupErrors && anyBackupEnabled) return 'Fix the backup settings to save.';
+		return 'Finish the connection details to save.';
+	});
+
 	function navigateBack() {
 		goto(resolve(routes.settingsStorage));
 	}
 
 	async function handleSave() {
-		if (!selectedType || !displayName.trim()) return;
+		if (!canSave || isSaving || !selectedType) return;
 
 		isSaving = true;
 		try {
@@ -544,11 +551,17 @@
 			{/if}
 
 			<FormActionBar>
+				{#if saveBlocker && !isSaving}
+					<p id="provider-save-blocker" class="ml-auto text-sm text-muted-foreground">
+						{saveBlocker}
+					</p>
+				{/if}
 				<Button
 					size="lg"
-					class="ml-auto rounded-full"
+					class={saveBlocker && !isSaving ? 'rounded-full' : 'ml-auto rounded-full'}
 					onclick={handleSave}
-					disabled={!canSave || isSaving}
+					aria-disabled={!canSave || isSaving || undefined}
+					aria-describedby={saveBlocker && !isSaving ? 'provider-save-blocker' : undefined}
 				>
 					{#if isSaving}
 						<LoaderCircle class="animate-spin" aria-hidden="true" />

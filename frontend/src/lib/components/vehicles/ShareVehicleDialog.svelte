@@ -5,6 +5,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { Label } from '#lib/components/ui/label/index.ts';
+	import { FormFieldError } from '#lib/components/ui/form-field/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import ConfirmDialog from '#lib/components/common/ConfirmDialog.svelte';
@@ -28,6 +29,14 @@
 	let email = $state('');
 	let level = $state<ShareLevel>('viewer');
 	let inviting = $state(false);
+	let emailError = $state<string | null>(null);
+	let emailInput = $state<HTMLInputElement | null>(null);
+	const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+	function emailProblem(value: string): string | null {
+		if (!value) return 'Enter the email address of the person to invite';
+		return EMAIL_SHAPE.test(value) ? null : 'Enter a full email address, like person@example.com';
+	}
 
 	let isLoading = $state(false);
 	let loadError = $state<string | null>(null);
@@ -51,6 +60,7 @@
 		lastKey = key;
 		if (!open || !vehicleId) return;
 		loadError = null;
+		emailError = null;
 		void load();
 	});
 
@@ -73,7 +83,12 @@
 
 	async function invite(event: SubmitEvent) {
 		event.preventDefault();
-		if (!vehicleId || !email.trim()) return;
+		if (!vehicleId || inviting) return;
+		emailError = emailProblem(email.trim());
+		if (emailError) {
+			emailInput?.focus();
+			return;
+		}
 		inviting = true;
 		try {
 			await shareApi.invite({ vehicleId, email: email.trim(), level });
@@ -85,6 +100,7 @@
 			appStore.showError(`Couldn't send the invitation. ${userFacingErrorMessage(error)}`);
 		} finally {
 			inviting = false;
+			emailInput?.focus();
 		}
 	}
 
@@ -129,17 +145,22 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
-		<form class="space-y-3" onsubmit={invite}>
+		<form class="space-y-3" onsubmit={invite} novalidate>
 			<div class="space-y-1.5">
 				<Label for="share-email">Invitee email</Label>
 				<Input
 					id="share-email"
 					type="email"
+					bind:ref={emailInput}
 					bind:value={email}
+					oninput={() => (emailError = null)}
 					placeholder="person@example.com"
 					autocomplete="off"
 					required
+					aria-invalid={!!emailError}
+					aria-describedby={emailError ? 'share-email-error' : undefined}
 				/>
+				{#if emailError}<FormFieldError id="share-email-error">{emailError}</FormFieldError>{/if}
 			</div>
 			<div class="space-y-1.5">
 				<Label for="share-level">Access level</Label>
@@ -155,7 +176,7 @@
 					</Select.Content>
 				</Select.Root>
 			</div>
-			<Button type="submit" class="w-full" disabled={inviting || !email.trim()}>
+			<Button type="submit" class="w-full" aria-disabled={inviting || undefined}>
 				{inviting ? 'Sending…' : 'Send invitation'}
 			</Button>
 		</form>

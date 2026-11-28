@@ -91,10 +91,10 @@ describe('ProviderForm connection contract', () => {
 		await type('Bucket', 'vroom');
 		await type('Region', 'us-east-1');
 		await type('Access Key ID', 'AKIA');
-		expect(saveButton().disabled).toBe(true);
+		expect(saveButton()).toHaveAttribute('aria-disabled', 'true');
 
 		await type('Secret Access Key', 'secret');
-		expect(saveButton().disabled).toBe(false);
+		expect(saveButton()).not.toHaveAttribute('aria-disabled');
 		await fireEvent.click(saveButton());
 		await vi.waitFor(() => expect(createProvider).toHaveBeenCalled());
 
@@ -133,10 +133,10 @@ describe('ProviderForm connection contract', () => {
 		await type('Bucket', 'vroom');
 		await type('Access Key ID', 'AKIA');
 		await type('Secret Access Key', 'secret');
-		expect(saveButton().disabled).toBe(true);
+		expect(saveButton()).toHaveAttribute('aria-disabled', 'true');
 
 		await type('Region', 'us-east-1');
-		expect(saveButton().disabled).toBe(false);
+		expect(saveButton()).not.toHaveAttribute('aria-disabled');
 	});
 
 	test('switching from a filled-in S3 form to Drive leaves Save off until Google is connected', async () => {
@@ -146,20 +146,20 @@ describe('ProviderForm connection contract', () => {
 		await type('Region', 'us-east-1');
 		await type('Access Key ID', 'AKIA');
 		await type('Secret Access Key', 'secret');
-		expect(saveButton().disabled).toBe(false);
+		expect(saveButton()).not.toHaveAttribute('aria-disabled');
 
 		await fireEvent.click(screen.getByRole('button', { name: /Google Drive/ }));
-		expect(saveButton().disabled).toBe(true);
+		expect(saveButton()).toHaveAttribute('aria-disabled', 'true');
 	});
 
 	test('switching between Google types after connecting asks to connect again for the new one', async () => {
 		oauth.pendingEmail = 'me@example.com';
 		oauth.oauthNonce = '0f8fad5b-d9cb-469f-a165-70867728950e';
 		await startCreate(/Google Drive/);
-		expect(saveButton().disabled).toBe(false);
+		expect(saveButton()).not.toHaveAttribute('aria-disabled');
 
 		await fireEvent.click(screen.getByRole('button', { name: /Google Photos/ }));
-		expect(saveButton().disabled).toBe(true);
+		expect(saveButton()).toHaveAttribute('aria-disabled', 'true');
 	});
 
 	test('the Google prompt names backups for Drive only, since Google Photos holds photos alone', async () => {
@@ -183,7 +183,7 @@ describe('ProviderForm connection contract', () => {
 		await type('Endpoint', 'https://s3.example.com');
 		await fireEvent.click(screen.getByRole('button', { name: /Google Drive/ }));
 
-		expect(saveButton().disabled).toBe(false);
+		expect(saveButton()).not.toHaveAttribute('aria-disabled');
 		await fireEvent.click(saveButton());
 		await vi.waitFor(() => expect(createProvider).toHaveBeenCalled());
 
@@ -214,7 +214,7 @@ describe('ProviderForm connection contract', () => {
 				'https://s3.example.com'
 			)
 		);
-		expect(saveButton().disabled).toBe(false);
+		expect(saveButton()).not.toHaveAttribute('aria-disabled');
 
 		await fireEvent.click(saveButton());
 		await vi.waitFor(() => expect(updateProvider).toHaveBeenCalled());
@@ -222,5 +222,20 @@ describe('ProviderForm connection contract', () => {
 		const sent = updateProvider.mock.calls[0]?.[1];
 		expect(sent).not.toHaveProperty('credentials');
 		expect(sent?.config).toMatchObject({ endpoint: 'https://s3.example.com', region: 'eu-1' });
+	});
+});
+
+describe('ProviderForm save explains what is missing', () => {
+	test('without a name, Save storage stays focusable, says why, and saves nothing', async () => {
+		render(ProviderForm, { props: {} });
+		await fireEvent.click(screen.getByRole('button', { name: /S3 \/ B2 \/ R2/ }));
+
+		expect(saveButton()).toHaveAttribute('aria-disabled', 'true');
+		expect(saveButton()).toHaveAccessibleDescription('Give this storage a name to save it.');
+		await fireEvent.click(saveButton());
+		expect(createProvider).not.toHaveBeenCalled();
+
+		await type('Name', 'My Provider');
+		expect(saveButton()).toHaveAccessibleDescription('Finish the connection details to save.');
 	});
 });

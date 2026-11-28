@@ -19,6 +19,7 @@ vi.mock('#lib/services/driver-api.ts', () => ({
 	}
 }));
 
+import { authStore } from '#lib/stores/auth.svelte.ts';
 import CarSharingCard from '../CarSharingCard.svelte';
 
 const settle = async () => {
@@ -68,6 +69,33 @@ describe('CarSharingCard', () => {
 			carShareEnabled: true,
 			carShare: { enabled: true }
 		});
+	});
+
+	test('only the signed-in account’s own row says “you”, and nobody does before the account is known', async () => {
+		list.mockResolvedValue([
+			{ id: 'd-me', userId: 'u-me', guest: false, name: 'Alex', color: 'chart-1', archived: false },
+			{ id: 'd-sam', guest: false, name: 'Sam', color: 'chart-2', archived: false }
+		]);
+		render(CarSharingCard, { props: { vehicleId: 'car', enabled: true } });
+		await settle();
+		expect(screen.queryByText(/· you/)).toBeNull();
+		cleanup();
+
+		authStore.setUser({
+			id: 'u-me',
+			email: 'me@example.com',
+			displayName: 'Alex',
+			createdAt: '2026-01-01T00:00:00Z',
+			updatedAt: '2026-01-01T00:00:00Z'
+		});
+		try {
+			render(CarSharingCard, { props: { vehicleId: 'car', enabled: true } });
+			await settle();
+			expect(screen.getAllByText(/· you/)).toHaveLength(1);
+			expect(screen.getByText(/· you/).parentElement?.textContent).toContain('Alex');
+		} finally {
+			authStore.clearUser();
+		}
 	});
 
 	test('with car sharing off it asks for nothing', async () => {
