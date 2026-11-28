@@ -30,13 +30,16 @@ updates:
       - "dependencies"
       - "backend"
 
-  # The base images (oven/bun, node). Their tags float within a major, so every build already
-  # pulls the latest patch; this opens a PR when a new major (bun 2, node 24) comes out.
+  # The base images (oven/bun, node). node floats within a major, so every build pulls the latest
+  # patch and this opens a PR for a new major. oven/bun is pinned to the CI version (#1972).
   - package-ecosystem: "docker"
     directories:
       - "/backend"
       - "/frontend"
     ignore:
+      # Bun 1.4.x fails backend tests; lift this once #1972 is fixed.
+      - dependency-name: "oven/bun"
+        versions: [">= 1.4.0"]
       # Odd Node majors never become LTS.
       - dependency-name: "node"
         versions: ["~> 23.0", "~> 25.0", "~> 27.0"]

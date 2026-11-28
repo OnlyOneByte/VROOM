@@ -1,4 +1,4 @@
-FROM oven/bun:1 AS builder
+FROM oven/bun:1.3.14 AS builder
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun build src/index.ts src/scripts/rotate-provider-keys.ts --outdir ./dist --target bun --external tesseract.js --external @tesseract.js-data/eng
 
-FROM oven/bun:1-alpine AS production
+FROM oven/bun:1.3.14-alpine AS production
 
 WORKDIR /app
 
