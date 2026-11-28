@@ -1,7 +1,12 @@
 import { CodeChallengeMethod, OAuth2Client } from 'arctic';
 import { CONFIG } from '../../../config';
 import { logger } from '../../../utils/logger';
-import { NoVerifiedEmailError, type OAuthFlow, type OAuthProviderConfig } from './types';
+import {
+  IDP_TIMEOUT_MS,
+  NoVerifiedEmailError,
+  type OAuthFlow,
+  type OAuthProviderConfig,
+} from './types';
 
 const SCOPES = ['openid', 'profile', 'email'];
 
@@ -37,9 +42,27 @@ function issuerUrl(): string {
   return CONFIG.auth.oidc.issuer.replace(/\/+$/, '');
 }
 
+export function missingOidcSettings(): string[] {
+  const { issuer, clientId, clientSecret } = CONFIG.auth.oidc;
+  const settings = {
+    OIDC_ISSUER: issuer,
+    OIDC_CLIENT_ID: clientId,
+    OIDC_CLIENT_SECRET: clientSecret,
+  };
+  const missing = Object.entries(settings).flatMap(([name, value]) => (value ? [] : [name]));
+  return missing.length === Object.keys(settings).length ? [] : missing;
+}
+
+let warnedPartialConfig = false;
+
 export async function discoverOidc(): Promise<void> {
   endpoints = null;
   lastAttemptAt = Date.now();
+  const missing = missingOidcSettings();
+  if (missing.length > 0 && !warnedPartialConfig) {
+    warnedPartialConfig = true;
+    logger.warn(`OIDC sign-in is off: set ${missing.join(' and ')} too, or unset the others`);
+  }
   if (!oidcConfigured()) return;
   const issuer = issuerUrl();
   try {
@@ -117,6 +140,7 @@ export const oidcAuthProvider: OAuthProviderConfig = {
   fetchUserInfo: async (accessToken) => {
     const res = await fetch(discovered().userinfo, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(IDP_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error('Failed to fetch OIDC user info');
     const data = (await res.json()) as {

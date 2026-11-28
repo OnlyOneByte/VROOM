@@ -313,3 +313,37 @@ describe('GET /auth/callback/:authProvider — browser binding', () => {
     expect(res.headers.get('set-cookie') ?? '').toMatch(/oauth_login_state=;[^,]*Max-Age=0/);
   });
 });
+
+describe('GET /auth/callback/:authProvider — provider errors', () => {
+  async function returnWith(query: string): Promise<{ location: string | null; logged: string }> {
+    const { logger } = await import('../../../utils/logger');
+    const warn = spyOn(logger, 'warn').mockImplementation(() => {});
+    try {
+      const start = await ctx.anon('GET', '/api/v1/auth/login/github');
+      const state = new URL(start.headers.get('location') ?? '').searchParams.get('state');
+      const res = await callbackWithCookie(`${query}&state=${state}`, loginStateCookieFrom(start));
+      return { location: res.headers.get('location'), logged: JSON.stringify(warn.mock.calls) };
+    } finally {
+      warn.mockRestore();
+    }
+  }
+
+  test('a user who declines consent reads as cancelled', async () => {
+    const { location } = await returnWith('error=access_denied');
+    expect(location).toBe(`${frontendUrl()}/auth?auth_error=cancelled`);
+  });
+
+  test('any other provider error is reported as such and logged for the admin', async () => {
+    const { location, logged } = await returnWith(
+      'error=unauthorized_client&error_description=Client%20secret%20x'
+    );
+    expect(location).toBe(`${frontendUrl()}/auth?auth_error=provider_error`);
+    expect(logged).toContain('unauthorized_client');
+    expect(logged).not.toContain('Client secret');
+  });
+
+  test('an outage on the provider side reads as unavailable', async () => {
+    const { location } = await returnWith('error=temporarily_unavailable');
+    expect(location).toBe(`${frontendUrl()}/auth?auth_error=provider_unavailable`);
+  });
+});

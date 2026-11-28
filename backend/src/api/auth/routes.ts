@@ -19,6 +19,7 @@ import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
 import { readJsonBody } from '../../utils/request-body';
+import { withoutIdleTimeout, withTimeout } from '../../utils/timeout';
 import { attachPendingInvites } from '../shares/repository';
 import { decideSignup } from '../signup/policy';
 import {
@@ -39,7 +40,7 @@ import {
 } from './providers/google';
 import { ensureOidcDiscovered } from './providers/oidc';
 import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
-import { NoVerifiedEmailError, type OAuthFlow } from './providers/types';
+import { IDP_TIMEOUT_MS, NoVerifiedEmailError, type OAuthFlow } from './providers/types';
 import {
   clearSessionCookie,
   consumeOAuthState,
@@ -255,7 +256,11 @@ async function exchangeAuthTokens(
   flow: OAuthFlow
 ) {
   const cv = providerConfig.supportsPKCE ? codeVerifier : undefined;
-  const tokens = await providerConfig.validateAuthorizationCode(code, cv, flow);
+  const tokens = await withTimeout(
+    providerConfig.validateAuthorizationCode(code, cv, flow),
+    IDP_TIMEOUT_MS,
+    'Sign-in token exchange'
+  );
   const userInfo = await providerConfig.fetchUserInfo(tokens.accessToken);
   return userInfo;
 }
@@ -300,7 +305,6 @@ export async function updateExistingUserProfile(
         'Skipped email backfill due to UNIQUE conflict — another user already has this email',
         {
           userId,
-          attemptedEmail: userInfo.email,
         }
       );
       await db
@@ -454,6 +458,21 @@ async function holdsOnOwnAccount(userId: string, permission: PermissionId): Prom
   return (await resolverFor(userId, [account])).can(permission, account).allow;
 }
 
+const PROVIDER_SIDE_ERRORS = new Set(['server_error', 'temporarily_unavailable']);
+
+export function noCodeReason(
+  url: URL,
+  authProviderId: string
+): 'cancelled' | 'provider_error' | 'provider_unavailable' {
+  const error = url.searchParams.get('error');
+  if (!error || error === 'access_denied') return 'cancelled';
+  logger.warn('Sign-in provider returned an error', {
+    provider: authProviderId,
+    error: error.replace(/[^\w.-]/g, '').slice(0, 64),
+  });
+  return PROVIDER_SIDE_ERRORS.has(error) ? 'provider_unavailable' : 'provider_error';
+}
+
 // Register before the generic /callback/:authProvider route, which would shadow it.
 routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   const authProviderId = c.req.param('authProvider') ?? '';
@@ -464,7 +483,7 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
 
   if (!code) {
     if (stateParam) oauthStateStore.delete(stateParam);
-    return c.redirect(profileRedirect('link_error=cancelled'));
+    return c.redirect(profileRedirect(`link_error=${noCodeReason(url, authProviderId)}`));
   }
 
   const stateResult = validateLinkState(stateParam);
@@ -490,6 +509,7 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   if (!providerConfig) return c.redirect(profileRedirect('link_error=unknown_provider'));
 
   const tokenResult = await exchangeAuthTokensOrRedirect(
+    c,
     providerConfig,
     code,
     storedData.codeVerifier,
@@ -526,6 +546,7 @@ async function createAuthSession(c: Context, userId: string) {
 }
 
 async function exchangeAuthTokensOrRedirect(
+  c: Context,
   providerConfig: ReturnType<typeof getProvider> & object,
   code: string,
   codeVerifier: string | undefined,
@@ -536,7 +557,9 @@ async function exchangeAuthTokensOrRedirect(
   { userInfo: Awaited<ReturnType<typeof providerConfig.fetchUserInfo>> } | { redirect: string }
 > {
   try {
-    const userInfo = await exchangeAuthTokens(providerConfig, code, codeVerifier, flow);
+    const userInfo = await withoutIdleTimeout(c, () =>
+      exchangeAuthTokens(providerConfig, code, codeVerifier, flow)
+    );
     return { userInfo };
   } catch (err) {
     logger.error(`${errorPrefix} token exchange or user info fetch failed`, {
@@ -557,7 +580,7 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
 
   if (!code) {
     if (stateParam) oauthStateStore.delete(stateParam);
-    return c.redirect(authRedirect('auth_error=cancelled'));
+    return c.redirect(authRedirect(`auth_error=${noCodeReason(url, authProviderId)}`));
   }
 
   const stateResult = validateLoginState(stateParam, stateCookie);
@@ -567,6 +590,7 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
   if (!providerConfig) return c.redirect(authRedirect('auth_error=unknown_provider'));
 
   const tokenResult = await exchangeAuthTokensOrRedirect(
+    c,
     providerConfig,
     code,
     stateResult.data.codeVerifier,
@@ -850,7 +874,11 @@ async function validateProviderSession(
 }
 
 async function exchangeProviderTokens(code: string, codeVerifier: string) {
-  const tokens = await googleStorageClient.validateAuthorizationCode(code, codeVerifier);
+  const tokens = await withTimeout(
+    googleStorageClient.validateAuthorizationCode(code, codeVerifier),
+    IDP_TIMEOUT_MS,
+    'Provider token exchange'
+  );
   if (!tokens.hasRefreshToken()) return { tokens, refreshToken: null, email: null };
 
   const email = await fetchGoogleEmail(tokens.accessToken());
@@ -860,6 +888,7 @@ async function exchangeProviderTokens(code: string, codeVerifier: string) {
 async function fetchGoogleEmail(accessToken: string): Promise<string | null> {
   const resp = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(IDP_TIMEOUT_MS),
   });
   if (!resp.ok) return null;
   const data = (await resp.json()) as { email: string; email_verified?: boolean };
@@ -912,9 +941,14 @@ interface ProviderCallbackState {
   providerType: string;
 }
 
+function providerNoCodeError(url: URL): 'cancelled' | 'exchange_failed' {
+  return noCodeReason(url, 'google-provider') === 'cancelled' ? 'cancelled' : 'exchange_failed';
+}
+
 function resolveProviderState(
   stateParam: string | null,
-  code: string | null
+  code: string | null,
+  url: URL
 ): { state: ProviderCallbackState; returnTo: string } | { error: string; returnTo: string } {
   const storedData = stateParam ? oauthStateStore.get(stateParam) : undefined;
   // Fallback must be a page that renders provider_error, or the error lands on a 404.
@@ -926,7 +960,7 @@ function resolveProviderState(
 
   if (!code) {
     if (stateParam) oauthStateStore.delete(stateParam);
-    return { error: 'cancelled', returnTo };
+    return { error: providerNoCodeError(url), returnTo };
   }
 
   if (!stateParam || !storedData || storedData.flowType !== 'provider') {
@@ -970,7 +1004,7 @@ routes.get('/callback/provider/google', async (c) => {
   const stateParam = url.searchParams.get('state');
   const frontendRedirect = (path: string) => `${CONFIG.frontend.url}${path}`;
 
-  const resolved = resolveProviderState(stateParam, code);
+  const resolved = resolveProviderState(stateParam, code, url);
   if ('error' in resolved) {
     return c.redirect(frontendRedirect(`${resolved.returnTo}?provider_error=${resolved.error}`));
   }
@@ -997,7 +1031,9 @@ routes.get('/callback/provider/google', async (c) => {
 
   let result: Awaited<ReturnType<typeof exchangeProviderTokens>>;
   try {
-    result = await exchangeProviderTokens(authCode, state.codeVerifier);
+    result = await withoutIdleTimeout(c, () =>
+      exchangeProviderTokens(authCode, state.codeVerifier)
+    );
   } catch (err) {
     logger.error('Provider OAuth token exchange failed', {
       error: err instanceof Error ? err.message : String(err),

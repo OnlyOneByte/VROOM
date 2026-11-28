@@ -346,4 +346,49 @@ describe('long requests outlive the idle timeout', () => {
       spy.mockRestore();
     }
   });
+
+  test(
+    'a sign-in whose provider answers slowly still finishes',
+    async () => {
+      const { CONFIG } = await import('../config');
+      const auth = CONFIG.auth as unknown as Record<string, unknown>;
+      const saved = {
+        id: auth.githubClientId,
+        secret: auth.githubClientSecret,
+        noLimit: CONFIG.disableRateLimit,
+      };
+      auth.githubClientId = 'id';
+      auth.githubClientSecret = 'secret';
+      (CONFIG as unknown as { disableRateLimit: boolean }).disableRateLimit = true;
+      const { githubAuthProvider } = await import('../api/auth/providers/github');
+      const spies = [
+        spyOn(githubAuthProvider, 'validateAuthorizationCode').mockImplementation(async () => {
+          await Bun.sleep(SLOW_MS / 2);
+          return { accessToken: 't' };
+        }),
+        spyOn(githubAuthProvider, 'fetchUserInfo').mockImplementation(async () => {
+          await Bun.sleep(SLOW_MS / 2);
+          return { providerAccountId: 'gh-1', email: 'slow@example.com', displayName: 'Slow' };
+        }),
+      ];
+      try {
+        const start = await fetch(url('/auth/login/github'), { redirect: 'manual' });
+        const state = new URL(start.headers.get('location') ?? '').searchParams.get('state');
+        const cookie = start.headers.get('set-cookie')?.match(/oauth_login_state=[^;]*/)?.[0] ?? '';
+        const res = await fetch(url(`/auth/callback/github?code=c&state=${state}`), {
+          headers: { cookie },
+          redirect: 'manual',
+        });
+        expect(res.status).toBe(302);
+        expect(res.headers.get('location') ?? '').not.toContain('auth_error');
+        expect(timeoutCalls).toEqual([0, SERVER_IDLE_TIMEOUT_SECONDS]);
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+        auth.githubClientId = saved.id;
+        auth.githubClientSecret = saved.secret;
+        (CONFIG as unknown as { disableRateLimit: boolean }).disableRateLimit = saved.noLimit;
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS
+  );
 });
