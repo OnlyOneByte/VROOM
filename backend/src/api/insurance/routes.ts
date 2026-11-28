@@ -73,14 +73,13 @@ function sharedPolicyView<
 }
 
 function termExpenseParams(
-  policy: { termVehicleCoverage: Array<{ termId: string; vehicleId: string }> },
+  policy: { company: string; termVehicleCoverage: Array<{ termId: string; vehicleId: string }> },
   term: {
     id: string;
     totalCost: number | null;
     monthlyCost: number | null;
     startDate: Date;
     endDate: Date;
-    policyNumber: string | null;
   },
   userId: string
 ) {
@@ -91,7 +90,7 @@ function termExpenseParams(
     monthlyCost: term.monthlyCost,
     startDate: term.startDate,
     endDate: term.endDate,
-    policyNumber: term.policyNumber ?? undefined,
+    carrier: policy.company,
     userId,
   };
 }
@@ -283,7 +282,7 @@ routes.post(
           monthlyCost: termData.monthlyCost,
           startDate: termData.startDate,
           endDate: termData.endDate,
-          policyNumber: termData.policyNumber,
+          carrier: policy.company,
           userId: user.id,
         },
         scale

@@ -262,10 +262,6 @@
 		{/if}
 	</div>
 
-	{#if !noVehicles && activeTab !== 'explore'}
-		{@render filterChips(false)}
-	{/if}
-
 	{#if isLoading && !error && !summary}
 		<Skeleton class="h-10 w-full rounded-full" />
 	{:else if error}
@@ -307,6 +303,10 @@
 					</Tabs.Trigger>
 				{/if}
 			</Tabs.List>
+
+			{#if !noVehicles && activeTab !== 'explore'}
+				{@render filterChips(false)}
+			{/if}
 
 			{#if activeTab === 'explore'}
 				<Tabs.Content value="explore">

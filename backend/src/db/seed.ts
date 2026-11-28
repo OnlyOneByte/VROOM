@@ -309,7 +309,7 @@ async function seedGarageRows(userId: string) {
         monthlyCost: term.monthlyCost,
         startDate: term.startDate,
         endDate: term.endDate,
-        policyNumber: term.policyNumber,
+        carrier: term.policyId === policy1.id ? policy1.company : policy2.company,
         userId,
       });
     }

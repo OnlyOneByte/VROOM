@@ -122,7 +122,7 @@ describe('record month', () => {
     expect(record?.value).toBe(350);
     expect(record?.unit).toBe('money');
     expect(record?.sentence).toBe(
-      'June 2025 had the highest running costs in this period. The largest expense was Brake pads on the 2020 Toyota Camry ($300.00).'
+      'June 2025 had the highest running costs in this period. The largest expense was “Brake pads” on the 2020 Toyota Camry ($300.00).'
     );
     expect(record?.query).toEqual({
       metric: 'cost',

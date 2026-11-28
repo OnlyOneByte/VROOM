@@ -236,6 +236,41 @@ describe('AnnotationLane', () => {
 		expect(pills(container)).toEqual([['33px', '202']]);
 	});
 
+	test('a group of more than 3 months lists 3 and counts the rest, following the arrow keys', async () => {
+		const { container } = render(AnnotationLane, {
+			props: { annotations: crowded(), context: narrowContext(5) }
+		});
+		const tip = () =>
+			[...(container.querySelector('[data-annotation-group-tip]')?.children ?? [])].map(r =>
+				r.textContent?.replace(/\s+/g, ' ').trim()
+			);
+		await fireEvent.click(container.querySelector('[data-annotation-group]') as HTMLElement);
+		expect(tip()).toEqual([
+			'Jan 2026: Service 1',
+			'Feb 2026: Service 2',
+			'Mar 2026: Service 3',
+			'+1 more'
+		]);
+		const lane = screen.getByRole('group', { name: /^Services: 4 markers\./ });
+		await fireEvent.keyDown(lane, { key: 'End' });
+		expect(tip()).toEqual([
+			'Feb 2026: Service 2',
+			'Mar 2026: Service 3',
+			'Apr 2026: Service 4',
+			'+1 more'
+		]);
+	});
+
+	test('in a lane narrower than a pill, the pill keeps to the left edge', async () => {
+		laneOf(14);
+		const { container } = render(AnnotationLane, {
+			props: { annotations: crowded(), context: narrowContext(15) }
+		});
+		await settle();
+		const group = container.querySelector<HTMLElement>('[data-annotation-group]');
+		expect(group?.style.left).toBe('12px');
+	});
+
 	test("a group's tooltip shows each month's detail", async () => {
 		const annotations = crowded();
 		annotations.markers = annotations.markers?.map((m, i) => ({ ...m, detail: `Camry, $${i}0` }));
