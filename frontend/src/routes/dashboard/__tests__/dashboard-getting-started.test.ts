@@ -47,8 +47,9 @@ vi.mock('#lib/services/reminder-api.ts', () => ({
 vi.mock('#lib/services/insurance-api.ts', () => ({
 	insuranceApi: { getAllPolicies: () => Promise.resolve([]) }
 }));
+const analyticsQuery = vi.hoisted(() => vi.fn());
 vi.mock('#lib/services/analytics-api.ts', () => ({
-	analyticsApi: { query: () => Promise.resolve(null) }
+	analyticsApi: { query: (...args: unknown[]) => analyticsQuery(...args) }
 }));
 
 import Page from '../+page.svelte';
@@ -68,6 +69,8 @@ function steps(): string[] {
 
 beforeEach(() => {
 	getVehicles.mockReset();
+	analyticsQuery.mockReset();
+	analyticsQuery.mockResolvedValue(null);
 	summary.expenseCount = 0;
 	reminders.list = [];
 	reminders.recurring = { count: 0, monthlyTotal: 0 };
@@ -192,6 +195,41 @@ describe('dashboard getting started', () => {
 		fail(new Error('offline'));
 		await screen.findByText("Couldn't load the dashboard");
 		expect(screen.queryByRole('list', { name: 'Getting started' })).toBeNull();
+	});
+
+	test('an own car with no cost per mile gets the note under Your garage', async () => {
+		getVehicles.mockResolvedValue([OWNED]);
+		analyticsQuery.mockResolvedValue({ series: [], totals: { perDistance: null } });
+		render(Page);
+
+		expect(await screen.findByTestId('no-per-distance-note')).toHaveTextContent(
+			'not enough distance logged in the last 30 days'
+		);
+	});
+
+	test('a shared car alone with no cost per mile gets no note, since it may be left out of the query', async () => {
+		getVehicles.mockResolvedValue([
+			OWNED,
+			{ ...OWNED, id: 'v2', sharedAccess: { sharedBy: 'Sam' } }
+		]);
+		summary.expenseCount = 3;
+		analyticsQuery.mockResolvedValue({
+			series: [{ key: 'v1', label: 'Camry', values: [0.2] }],
+			totals: { perDistance: 0.2 }
+		});
+		render(Page);
+
+		await screen.findByTestId('vehicle-rows');
+		expect(screen.queryByTestId('no-per-distance-note')).toBeNull();
+	});
+
+	test('no note when the cost per mile could not load', async () => {
+		getVehicles.mockResolvedValue([OWNED]);
+		analyticsQuery.mockRejectedValue(new Error('offline'));
+		render(Page);
+
+		await screen.findByTestId('vehicle-rows');
+		expect(screen.queryByTestId('no-per-distance-note')).toBeNull();
 	});
 
 	test('once an expense exists the checklist is gone', async () => {

@@ -108,6 +108,12 @@
 	]);
 	let currentStep = $derived(onboardingSteps.findIndex(step => !step.done));
 
+	// Only when the per-distance query worked, and only for own cars (a shared car can be left out).
+	let explainNoPerDistance = $derived.by(() => {
+		if (!periodData.perDistance) return false;
+		const owned = new Set(ownedVehicles.map(v => v.id));
+		return vehicleRows.some(row => owned.has(row.id) && row.runningPerDistance === null);
+	});
 	let spend = $derived(combinePeriodSpend(periodData.summaries));
 	let distanceUnit = $derived<DistanceUnit>(settingsStore.unitPreferences.distanceUnit);
 	let distanceLabel = $derived(getDistanceUnitLabel(distanceUnit, true));
@@ -369,7 +375,12 @@
 {/snippet}
 
 {#snippet vehiclesSection()}
-	<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
+	<VehicleRowsCard
+		rows={vehicleRows}
+		periodLabel={PERIOD_PHRASES[period].chip}
+		{distanceLabel}
+		{explainNoPerDistance}
+	/>
 {/snippet}
 
 {#snippet chartSection()}
@@ -501,7 +512,12 @@
 
 		{@render invitationsCard()}
 		<NeedsAttentionCard items={attention} showAll />
-		<VehicleRowsCard rows={vehicleRows} periodLabel={PERIOD_PHRASES[period].chip} {distanceLabel} />
+		<VehicleRowsCard
+			rows={vehicleRows}
+			periodLabel={PERIOD_PHRASES[period].chip}
+			{distanceLabel}
+			{explainNoPerDistance}
+		/>
 		{#if recurringCost.count > 0}
 			<RecurringCostCard count={recurringCost.count} monthlyTotal={recurringCost.monthlyTotal} />
 		{/if}
