@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Select from '#lib/components/ui/select/index.ts';
-	import { splitCsvLine } from '#lib/utils/import-mapping-helpers.ts';
+	import { csvDelimiter, splitCsvLine } from '#lib/utils/import-mapping-helpers.ts';
 	import type {
 		ImportDateFormat,
 		DistanceUnit,
@@ -46,7 +46,8 @@
 				.split('\n')
 				.slice(1)
 				.find(line => line.trim())
-				?.trim() ?? ''
+				?.trim() ?? '',
+			csvDelimiter(form.csvText)
 		)
 	);
 	const missing = $derived(
@@ -120,6 +121,12 @@
 	>
 		{missing.length > 0 ? `Still needed: ${missing.join(' and ')}` : ''}
 	</p>
+
+	{#if !form.manualColumns.category}
+		<p class="text-sm text-muted-foreground" data-testid="mapping-misc-note">
+			With no Category column, every row is filed as <span class="text-foreground">Misc</span>.
+		</p>
+	{/if}
 
 	<div class="flex items-center gap-2">
 		<label for="manual-date-format" class="w-32 shrink-0 text-sm text-muted-foreground">

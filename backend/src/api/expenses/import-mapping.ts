@@ -2,6 +2,7 @@ import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
+import { csvDelimiter } from '../../utils/csv-delimiter';
 import { convertDistance, convertVolume } from '../../utils/unit-conversions';
 import { buildImportDate } from './local-date';
 
@@ -303,6 +304,7 @@ export function applyMapping(
   try {
     records = parse(foreignCsv, {
       bom: true,
+      delimiter: csvDelimiter(foreignCsv),
       columns: true,
       skip_empty_lines: true,
       trim: true,

@@ -5,7 +5,24 @@ export const NATIVE_HEADERS = ['date', 'vehicle', 'category', 'amount'] as const
 
 export const DETECT_SAMPLE_LENGTH = 8192;
 
-export function splitCsvLine(line: string): string[] {
+const DELIMITERS = [',', ';', '\t'] as const;
+
+/** The delimiter used most often outside quotes on the first non-empty line; a comma on a tie. */
+export function csvDelimiter(csvText: string): string {
+	const line = csvText.split(/\r?\n/).find(l => l.trim() !== '') ?? '';
+	const counts = new Map<string, number>();
+	let quoted = false;
+	for (const ch of line) {
+		if (ch === '"') quoted = !quoted;
+		else if (!quoted) counts.set(ch, (counts.get(ch) ?? 0) + 1);
+	}
+	return DELIMITERS.reduce<string>(
+		(best, d) => ((counts.get(d) ?? 0) > (counts.get(best) ?? 0) ? d : best),
+		','
+	);
+}
+
+export function splitCsvLine(line: string, delimiter = ','): string[] {
 	const cells: string[] = [];
 	let cell = '';
 	let quoted = false;
@@ -16,7 +33,7 @@ export function splitCsvLine(line: string): string[] {
 			i++;
 		} else if (ch === '"') {
 			quoted = !quoted;
-		} else if (ch === ',' && !quoted) {
+		} else if (ch === delimiter && !quoted) {
 			cells.push(cell.trim());
 			cell = '';
 		} else {
@@ -30,7 +47,7 @@ export function splitCsvLine(line: string): string[] {
 export function parseCsvHeaders(csvText: string): string[] {
 	const firstLine = csvText.split('\n', 1)[0]?.trim();
 	if (!firstLine) return [];
-	return splitCsvLine(firstLine);
+	return splitCsvLine(firstLine, csvDelimiter(firstLine));
 }
 
 export function isNativeImportHeaders(headers: string[]): boolean {
@@ -46,7 +63,7 @@ const GUESSES: Array<[NativeImportField, Array<RegExp>, RegExp?]> = [
 	['volume', [/volume/, /gallon/, /litre|liter/, /fuel amount/, /\bfill/], /price|cost|paid|spent/],
 	[
 		'amount',
-		[/total/, /amount/, /cost/, /spent/, /paid/, /price/],
+		[/^(total|amount)$/, /amount/, /total/, /cost/, /spent/, /paid/, /price/],
 		/volume|gallon|litre|liter|fill|distance|mileage|odometer|\bkm\b|\bmiles?\b/
 	],
 	[

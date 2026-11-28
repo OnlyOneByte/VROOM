@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import {
+	csvDelimiter,
 	DETECT_SAMPLE_LENGTH,
 	guessManualColumns,
 	isNativeImportHeaders,
@@ -45,6 +46,27 @@ describe('parseCsvHeaders', () => {
 
 	test('a quoted header with a comma stays one header', () => {
 		expect(parseCsvHeaders('Date,"Cost, USD",Notes')).toEqual(['Date', 'Cost, USD', 'Notes']);
+	});
+
+	test('a semicolon or tab file splits on its own delimiter', () => {
+		expect(parseCsvHeaders('date;vehicle;"Cost, EUR"\n2024-01-01;Golf;1,5')).toEqual([
+			'date',
+			'vehicle',
+			'Cost, EUR'
+		]);
+		expect(parseCsvHeaders('date\tamount')).toEqual(['date', 'amount']);
+	});
+});
+
+describe('csvDelimiter', () => {
+	test.each([
+		['a,b,c', ','],
+		['a;b;c\n1,5;2;3', ';'],
+		['a\tb', '\t'],
+		['"x;y",b,c', ','],
+		['one', ',']
+	])('%j uses %j', (text, expected) => {
+		expect(csvDelimiter(text)).toBe(expected);
 	});
 });
 
@@ -182,6 +204,14 @@ describe('guessManualColumns', () => {
 	test('a vehicle or car type column is not the vehicle', () => {
 		expect(guessManualColumns(['Date', 'Vehicle type', 'Amount']).vehicle).toBeUndefined();
 		expect(guessManualColumns(['Date', 'Car type', 'Car', 'Amount']).vehicle).toBe('Car');
+	});
+
+	test('a column named Amount or Total beats one that only mentions a total', () => {
+		expect(guessManualColumns(['Date', 'Amount', 'Tax total']).amount).toBe('Amount');
+		expect(guessManualColumns(['Date', 'Running total', 'Amount']).amount).toBe('Amount');
+		expect(guessManualColumns(['Date', 'Amount', 'Subtotal']).amount).toBe('Amount');
+		expect(guessManualColumns(['Date', 'Subtotal', 'Total']).amount).toBe('Total');
+		expect(guessManualColumns(['Date', 'Total cost']).amount).toBe('Total cost');
 	});
 
 	test('an un-guessable header set leaves fields unmapped (no invented columns)', () => {

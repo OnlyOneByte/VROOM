@@ -143,6 +143,30 @@ describe('ManualMappingPanel: column mapping', () => {
 		expect(status).toHaveTextContent('');
 		expect(status).toHaveClass('sr-only');
 	});
+
+	test('says rows are filed as Misc until a Category column is mapped', async () => {
+		const form = manualForm();
+		form.fileHeaders = ['When', 'Spent', 'Type'];
+		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
+		expect(screen.getByTestId('mapping-misc-note')).toHaveTextContent(
+			'With no Category column, every row is filed as Misc.'
+		);
+
+		await pick(screen.getByTestId('map-column-2'), 'Category');
+		expect(screen.queryByTestId('mapping-misc-note')).toBeNull();
+	});
+
+	test('examples from a semicolon file land in their own columns', () => {
+		const form = manualForm();
+		form.csvText = `${HEADERS.join(';')}\n2025-03-14;38,20;28410;9,82;Camry`;
+		render(ManualMappingPanel, { form, vehicles: [CAMRY] });
+
+		const cells = within(screen.getByTestId('column-mapping'))
+			.getAllByRole('row')
+			.slice(1)
+			.map(row => row.querySelector('td')?.textContent?.trim());
+		expect(cells).toEqual(['2025-03-14', '38,20', '28410', '9,82', 'Camry']);
+	});
 });
 
 describe('ManualMappingPanel: formats and units', () => {

@@ -9,6 +9,7 @@ import {
   isElectricFuelType,
 } from '../../db/types';
 import { ValidationError } from '../../errors';
+import { csvDelimiter } from '../../utils/csv-delimiter';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
 import { dollarsToCents, hasAtMostTwoDecimals, parsedToMinor } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
@@ -20,7 +21,7 @@ import {
   ODOMETER_TOO_HIGH_MESSAGE,
   VOLUME_TOO_HIGH_MESSAGE,
 } from '../../utils/validation';
-import { buildImportDate } from './local-date';
+import { buildCalendarDate, buildImportDate } from './local-date';
 import { clearFuelFieldsIfNotFuel, MILEAGE_NOT_POSITIVE_MESSAGE } from './validation';
 
 export interface ImportVehicle {
@@ -121,14 +122,31 @@ function parseCategory(
   return { value: category as (typeof EXPENSE_CATEGORIES)[number] };
 }
 
+const ISO_DATE_TIME =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(Z|[+-]\d{2}:?\d{2})?)?$/i;
+
+function clockTime(
+  hh: string,
+  mm: string | undefined,
+  ss: string | undefined
+): [number, number, number] | null {
+  const time: [number, number, number] = [Number(hh), Number(mm ?? 0), Number(ss ?? 0)];
+  return time[0] <= 23 && time[1] <= 59 && time[2] <= 59 ? time : null;
+}
+
 function parseDate(raw: string, timeZone?: string): { value: Date } | { error: string } {
   const invalid = { error: `Invalid date "${raw}". Use YYYY-MM-DD` };
-  // new Date("YYYY-MM-DD") parses as UTC and would shift the day west of UTC.
-  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
-  if (dateOnly) {
-    const [year, month, day] = [Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3])];
-    if (!isDateInputYear(year)) return { error: DATE_OUT_OF_RANGE_MESSAGE };
-    const date = buildImportDate(year, month, day, timeZone);
+  const match = ISO_DATE_TIME.exec(raw.trim());
+  if (!match) return invalid;
+  const [, y, mo, d, hh, mm, ss, offset] = match;
+  const [year, month, day] = [Number(y), Number(mo), Number(d)];
+  if (!isDateInputYear(year)) return { error: DATE_OUT_OF_RANGE_MESSAGE };
+  if (!buildCalendarDate(year, month, day)) return invalid;
+  // new Date() reads a date or a date-time without an offset as UTC, which would shift it.
+  if (!offset) {
+    const time = hh === undefined ? undefined : clockTime(hh, mm, ss);
+    if (time === null) return invalid;
+    const date = buildImportDate(year, month, day, timeZone, time);
     return date ? { value: date } : invalid;
   }
   const parsed = dateInput.safeParse(raw);
@@ -306,6 +324,16 @@ function fitsCurrency(
   }
 }
 
+// A semicolon file comes from a decimal-comma locale, so "40,50" there means 40.50.
+function readDecimalCommas(records: Record<string, string>[]): void {
+  for (const record of records) {
+    for (const key of ['amount', 'mileage', 'volume']) {
+      const value = record[key];
+      if (value && /^\d+,\d+$/.test(value)) record[key] = value.replace(',', '.');
+    }
+  }
+}
+
 export function buildImportPlan(
   csv: string,
   vehicles: ImportVehicle[],
@@ -314,9 +342,11 @@ export function buildImportPlan(
   scale = 100
 ): ImportPlan {
   let records: Record<string, string>[];
+  const delimiter = csvDelimiter(csv);
   try {
     records = parse(csv, {
       bom: true,
+      delimiter,
       columns: true,
       skip_empty_lines: true,
       trim: true,
@@ -336,6 +366,8 @@ export function buildImportPlan(
       `Too many rows (${records.length}); the maximum is ${EXP.maxImportRows} per import`
     );
   }
+
+  if (delimiter === ';') readDecimalCommas(records);
 
   const vehicleByName = new Map<string, string | null>();
   const register = (name: string, id: string) => {
