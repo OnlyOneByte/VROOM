@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { warmDatePickerCalendar } from '../../../../../test-utils/date-picker';
 import { hasPendingSave } from '#lib/utils/pending-saves.ts';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { UpdateVehicleRequest, Vehicle, VehicleFinancing } from '#lib/types/index.ts';
@@ -131,6 +132,8 @@ async function fillRequired(): Promise<void> {
 	await type('make', 'Toyota');
 	await type('model', 'Camry');
 }
+
+beforeAll(warmDatePickerCalendar);
 
 beforeEach(() => {
 	vi.useFakeTimers({ toFake: ['Date'] });

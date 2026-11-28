@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { warmDatePickerCalendar } from '../../../../test-utils/date-picker';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import type {
 	CreateClaimRequest,
@@ -74,6 +75,8 @@ function localNoonISO(year: number, monthIndex: number, day: number): string {
 function mount(props: { vehicles?: Vehicle[]; readOnly?: boolean } = {}) {
 	return render(ClaimsSection, { props: { policyId: 'p1', ...props } });
 }
+
+beforeAll(warmDatePickerCalendar);
 
 beforeEach(() => {
 	vi.useFakeTimers({ toFake: ['Date'] });
