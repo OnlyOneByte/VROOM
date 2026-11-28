@@ -86,11 +86,9 @@ describe('a vehicle listed twice', () => {
       const text = await res.text();
       expect(res.status, text).toBe(400);
       expect(text).toContain(DUPLICATE_VEHICLE_MESSAGE);
-      const saved = ctx.sqlite
-        .query(
-          'SELECT (SELECT COUNT(*) FROM expenses) + (SELECT COUNT(*) FROM reminders) + (SELECT COUNT(*) FROM insurance_policies) AS n'
-        )
-        .get() as { n: number };
+      const saved = (await ctx.sql.get(
+        'SELECT (SELECT COUNT(*) FROM expenses) + (SELECT COUNT(*) FROM reminders) + (SELECT COUNT(*) FROM insurance_policies) AS n'
+      )) as { n: number };
       expect(saved.n).toBe(0);
     });
   }
@@ -112,9 +110,10 @@ describe('a stored reminder split that already lists a vehicle twice', () => {
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
     expect(created.status, JSON.stringify(body)).toBe(201);
     const id = body.data.reminder.id;
-    ctx.sqlite
-      .query('UPDATE reminders SET expense_split_config = ? WHERE id = ?')
-      .run(JSON.stringify({ method: 'even', vehicleIds: [vehicleId, other, other] }), id);
+    await ctx.sql.run('UPDATE reminders SET expense_split_config = ? WHERE id = ?', [
+      JSON.stringify({ method: 'even', vehicleIds: [vehicleId, other, other] }),
+      id,
+    ]);
 
     const pause = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { isActive: false });
     const rename = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { name: 'Old split' });

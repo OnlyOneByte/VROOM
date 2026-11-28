@@ -24,11 +24,11 @@ export async function storeSweepPhotos(ctx: TestApp, id: string): Promise<void> 
   }
 }
 
-export function seedSweepRecords(ctx: TestApp, id: string, inviterId: string): void {
+export async function seedSweepRecords(ctx: TestApp, id: string, inviterId: string): Promise<void> {
   const owner = ctx.user.id;
-  const run = (sql: string, params: (string | number)[]) => ctx.sqlite.run(sql, params);
+  const run = (sql: string, params: (string | number)[]) => ctx.sql.run(sql, params);
 
-  run(
+  await run(
     "INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status) VALUES (?, ?, 'storage', 's3', 'Sweep bucket', '', ?, 'active')",
     [
       id,
@@ -37,96 +37,93 @@ export function seedSweepRecords(ctx: TestApp, id: string, inviterId: string): v
     ]
   );
   for (const account of ['auth', 'auth-kept']) {
-    run(
+    await run(
       "INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials) VALUES (?, ?, 'auth', 'github', 'Sweep sign-in', '')",
       [`${id}-${account}`, owner]
     );
   }
-  run(
+  await run(
     "INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status) VALUES (?, ?, 'storage', 'fake', 'Sweep photos', '', 'active')",
     [photoStoreOf(id), owner]
   );
   for (const photoId of sweepPhotoIds(id)) {
-    run(
+    await run(
       "INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size) VALUES (?, ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', ?)",
       [photoId, owner, id, PHOTO_BYTES.length]
     );
-    run(
+    await run(
       "INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status) VALUES (?, ?, ?, ?, 'active')",
       [photoId, photoId, photoStoreOf(id), `sweep/${photoId}.jpg`]
     );
   }
-  run("INSERT INTO vehicle_drivers (id, vehicle_id, name, created_by) VALUES (?, ?, 'Sweep', ?)", [
-    id,
-    id,
-    owner,
-  ]);
-  run(
+  await run(
+    "INSERT INTO vehicle_drivers (id, vehicle_id, name, created_by) VALUES (?, ?, 'Sweep', ?)",
+    [id, id, owner]
+  );
+  await run(
     "INSERT INTO driver_backfills (id, vehicle_id, mode, entries, created_by) VALUES (?, ?, 'logged', '[]', ?)",
     [id, id, owner]
   );
-  run(
+  await run(
     "INSERT INTO vehicle_financing (id, vehicle_id, financing_type, provider, original_amount, term_months, start_date, payment_amount, payment_frequency) VALUES (?, ?, 'loan', 'Sweep Bank', 1000, 12, ?, 100, 'monthly')",
     [id, id, JUNE_2024]
   );
-  run(
+  await run(
     "INSERT INTO expenses (id, vehicle_id, category, date, expense_amount, user_id, created_by) VALUES (?, ?, 'maintenance', ?, 40, ?, ?)",
     [id, id, JUNE_2024, owner, owner]
   );
   for (const part of ['a', 'b']) {
-    run(
+    await run(
       "INSERT INTO expenses (id, vehicle_id, category, date, expense_amount, user_id, created_by, group_id, group_total, split_method) VALUES (?, ?, 'maintenance', ?, 15, ?, ?, ?, 30, 'even')",
       [`${id}-split-${part}`, id, JUNE_2024, owner, owner, id]
     );
   }
-  run("INSERT INTO insurance_policies (id, user_id, company) VALUES (?, ?, 'Sweep Mutual')", [
+  await run("INSERT INTO insurance_policies (id, user_id, company) VALUES (?, ?, 'Sweep Mutual')", [
     id,
     owner,
   ]);
-  run('INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)', [
-    id,
-    id,
-    JUNE_2024,
-    JUNE_2025,
-  ]);
-  run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [id, id]);
-  run(
+  await run(
+    'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
+    [id, id, JUNE_2024, JUNE_2025]
+  );
+  await run('INSERT INTO insurance_term_vehicles (term_id, vehicle_id) VALUES (?, ?)', [id, id]);
+  await run(
     "INSERT INTO insurance_claims (id, policy_id, term_id, vehicle_id, claim_date, claim_type) VALUES (?, ?, ?, ?, ?, 'collision')",
     [id, id, id, id, JUNE_2024]
   );
-  run(
+  await run(
     'INSERT INTO odometer_entries (id, vehicle_id, user_id, odometer, recorded_at, created_by) VALUES (?, ?, ?, 1000, ?, ?)',
     [id, id, owner, JUNE_2024, owner]
   );
-  run(
+  await run(
     "INSERT INTO reminders (id, user_id, name, type, frequency, start_date, created_by) VALUES (?, ?, 'Sweep', 'notification', 'monthly', ?, ?)",
     [id, owner, JUNE_2024, owner]
   );
-  run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [id, id]);
-  run(
+  await run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [id, id]);
+  await run(
     'INSERT INTO reminder_notifications (id, reminder_id, user_id, due_date) VALUES (?, ?, ?, ?)',
     [id, id, owner, JUNE_2024]
   );
-  run(
+  await run(
     "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, created_by) VALUES (?, ?, ?, 1000, 1100, 'business', ?, ?)",
     [id, id, owner, JUNE_2024, owner]
   );
-  run(
+  await run(
     "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, level, status, invited_email) VALUES (?, ?, ?, 'viewer', 'pending', 'sweep-invite@x.test')",
     [id, id, owner]
   );
   for (const invite of ['accept', 'decline']) {
-    run(
+    await run(
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Honda', 'Fit', 2019)",
       [`${id}-${invite}`, inviterId]
     );
-    run(
+    await run(
       "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, 'viewer', 'pending', 'sweep-owner@x.test')",
       [`${id}-${invite}`, `${id}-${invite}`, inviterId, owner]
     );
   }
-  run(
-    "INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES (?, 'vehicle', 'Sweep', 0, ?)",
+  await run(
+    "INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES (?, 'vehicle', 'Sweep', FALSE, ?)",
     [id, owner]
   );
   storePending(owner, id, 'sweep-refresh-token', 'sweep@x.test', 'google-photos');

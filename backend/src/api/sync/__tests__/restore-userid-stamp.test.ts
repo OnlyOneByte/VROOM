@@ -22,8 +22,8 @@ interface VehicleRowDb {
   make: string;
 }
 
-function vehicleRows(): VehicleRowDb[] {
-  return ctx.sqlite.query('SELECT id, user_id, make FROM vehicles').all() as VehicleRowDb[];
+async function vehicleRows(): Promise<VehicleRowDb[]> {
+  return (await ctx.sql.all('SELECT id, user_id, make FROM vehicles')) as VehicleRowDb[];
 }
 
 interface PolicyRowDb {
@@ -32,10 +32,10 @@ interface PolicyRowDb {
   company: string;
 }
 
-function policyRows(): PolicyRowDb[] {
-  return ctx.sqlite
-    .query('SELECT id, user_id, company FROM insurance_policies')
-    .all() as PolicyRowDb[];
+async function policyRows(): Promise<PolicyRowDb[]> {
+  return (await ctx.sql.all(
+    'SELECT id, user_id, company FROM insurance_policies'
+  )) as PolicyRowDb[];
 }
 
 interface PhotoRowDb {
@@ -44,8 +44,8 @@ interface PhotoRowDb {
   entity_id: string;
 }
 
-function photoRows(): PhotoRowDb[] {
-  return ctx.sqlite.query('SELECT id, user_id, entity_id FROM photos').all() as PhotoRowDb[];
+async function photoRows(): Promise<PhotoRowDb[]> {
+  return (await ctx.sql.all('SELECT id, user_id, entity_id FROM photos')) as PhotoRowDb[];
 }
 
 describe('restore stamps the importer userId (cross-tenant write guard)', () => {
@@ -65,7 +65,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
 
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    const db = (await import('../../../db/connection')).getDb();
+    const db = (await import('../../../app-context')).appContext().asyncDb;
     const schema = await import('../../../db/schema');
     const foreignId = 'victim-user-1';
     await db
@@ -83,7 +83,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows, 'exactly the one restored vehicle').toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].user_id, 'row must be stamped to the importer, not the file value').toBe(
@@ -122,7 +122,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const AdmZip = (await import('adm-zip')).default;
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    const db = (await import('../../../db/connection')).getDb();
+    const db = (await import('../../../app-context')).appContext().asyncDb;
     const schema = await import('../../../db/schema');
     const foreignId = 'victim-user-2';
     await db
@@ -140,7 +140,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    const rows = policyRows();
+    const rows = await policyRows();
     expect(rows, 'exactly the one restored policy').toHaveLength(1);
     expect(rows[0].id).toBe(polBody.data.id);
     expect(rows[0].user_id, 'policy row must be stamped to the importer, not the file value').toBe(
@@ -159,7 +159,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     expect(vehRes.status, JSON.stringify(vehBody)).toBeLessThan(300);
     const vehicleId = vehBody.data.id;
 
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-stamp-1', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 4096)`,
       [ctx.user.id, vehicleId]
@@ -170,7 +170,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const AdmZip = (await import('adm-zip')).default;
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    const db = (await import('../../../db/connection')).getDb();
+    const db = (await import('../../../app-context')).appContext().asyncDb;
     const schema = await import('../../../db/schema');
     const foreignId = 'victim-user-3';
     await db
@@ -188,7 +188,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const result = await restoreService.restoreFromBackup(ctx.user.id, tamperedZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    const rows = photoRows();
+    const rows = await photoRows();
     expect(rows, 'exactly the one restored photo').toHaveLength(1);
     expect(rows[0].id).toBe('photo-stamp-1');
     expect(rows[0].user_id, 'photo row must be stamped to the importer, not the file value').toBe(
@@ -213,7 +213,7 @@ describe('restore stamps the importer userId (cross-tenant write guard)', () => 
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
 
     expect(result.success, JSON.stringify(result)).toBe(true);
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].user_id).toBe(ctx.user.id);
@@ -230,7 +230,7 @@ describe('restore after the account record is recreated (same person, new user i
     });
     const body = await json<DataEnvelope<{ id: string }>>(created);
     expect(created.status, JSON.stringify(body)).toBeLessThan(300);
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
        VALUES ('exp-reinstall-1', ?, ?, 'fuel', 1700000000, 4200)`,
       [body.data.id, ctx.user.id]
@@ -238,10 +238,10 @@ describe('restore after the account record is recreated (same person, new user i
     return body.data.id;
   }
 
-  function reinstallAsNewAccount(): string {
+  async function reinstallAsNewAccount(): Promise<string> {
     const newId = `${ctx.user.id}-reinstalled`;
-    ctx.sqlite.run('DELETE FROM users WHERE id = ?', [ctx.user.id]);
-    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+    await ctx.sql.run('DELETE FROM users WHERE id = ?', [ctx.user.id]);
+    await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
       newId,
       ctx.user.email,
       ctx.user.displayName,
@@ -255,8 +255,8 @@ describe('restore after the account record is recreated (same person, new user i
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    const newId = reinstallAsNewAccount();
-    expect(vehicleRows(), 'reinstall starts from an empty account').toHaveLength(0);
+    const newId = await reinstallAsNewAccount();
+    expect(await vehicleRows(), 'reinstall starts from an empty account').toHaveLength(0);
 
     const preview = await restoreService.restoreFromBackup(newId, zip, 'preview');
     expect(preview.preview?.vehicles).toBe(1);
@@ -264,13 +264,14 @@ describe('restore after the account record is recreated (same person, new user i
     const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].user_id).toBe(newId);
-    const expense = ctx.sqlite
-      .query('SELECT user_id, expense_amount FROM expenses WHERE id = ?')
-      .get('exp-reinstall-1') as { user_id: string; expense_amount: number };
+    const expense = (await ctx.sql.get(
+      'SELECT user_id, expense_amount FROM expenses WHERE id = ?',
+      ['exp-reinstall-1']
+    )) as { user_id: string; expense_amount: number };
     expect(expense).toEqual({ user_id: newId, expense_amount: 4200 });
   });
 
@@ -299,14 +300,15 @@ describe('restore after the account record is recreated (same person, new user i
       zip.addFile(f, Buffer.from('id\n', 'utf-8'));
     }
 
-    const newId = reinstallAsNewAccount();
+    const newId = await reinstallAsNewAccount();
     const { restoreService } = await import('../restore');
     const result = await restoreService.restoreFromBackup(newId, zip.toBuffer(), 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    const expense = ctx.sqlite
-      .query('SELECT user_id, expense_amount FROM expenses WHERE id = ?')
-      .get('e-old') as { user_id: string; expense_amount: number };
+    const expense = (await ctx.sql.get(
+      'SELECT user_id, expense_amount FROM expenses WHERE id = ?',
+      ['e-old']
+    )) as { user_id: string; expense_amount: number };
     expect(expense).toEqual({ user_id: newId, expense_amount: 1234 });
   });
 
@@ -320,7 +322,7 @@ describe('restore after the account record is recreated (same person, new user i
       'fake-refresh-token',
       makeFakeSheetsClients(new FakeGoogleStore())
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_preferences (user_id, backup_config, storage_config) VALUES (?, ?, ?)
        ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config, storage_config = excluded.storage_config`,
       [
@@ -341,13 +343,13 @@ describe('restore after the account record is recreated (same person, new user i
     );
     const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Owner');
 
-    const newId = reinstallAsNewAccount();
-    ctx.sqlite.run(
+    const newId = await reinstallAsNewAccount();
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES ('prov-reinstall', ?, 'storage', 'google-drive', 'Drive', 'x', 'active')`,
       [newId]
     );
-    ctx.sqlite.run('INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
+    await ctx.sql.run('INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
       newId,
       JSON.stringify({ providers: { 'prov-reinstall': { sheetsSpreadsheetId: info.id } } }),
     ]);
@@ -361,14 +363,15 @@ describe('restore after the account record is recreated (same person, new user i
       spy.mockRestore();
     }
 
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].user_id).toBe(newId);
 
-    const prefs = ctx.sqlite
-      .query('SELECT backup_config, storage_config FROM user_preferences WHERE user_id = ?')
-      .get(newId) as { backup_config: string; storage_config: string };
+    const prefs = (await ctx.sql.get(
+      'SELECT backup_config, storage_config FROM user_preferences WHERE user_id = ?',
+      [newId]
+    )) as { backup_config: string; storage_config: string };
     expect(
       JSON.parse(prefs.backup_config),
       'the new provider keeps its backup settings; the old one is dropped'
@@ -379,9 +382,9 @@ describe('restore after the account record is recreated (same person, new user i
   });
 
   test('a Replace restore of a backup without preferences keeps the account settings', async () => {
-    const newId = reinstallAsNewAccount();
+    const newId = await reinstallAsNewAccount();
     const backupConfig = { providers: { 'prov-live': { enabled: true, folderPath: 'VROOM' } } };
-    ctx.sqlite.run(
+    await ctx.sql.run(
       'INSERT INTO user_preferences (user_id, currency_unit, backup_config) VALUES (?, ?, ?)',
       [newId, 'EUR', JSON.stringify(backupConfig)]
     );
@@ -405,16 +408,21 @@ describe('restore after the account record is recreated (same person, new user i
     const result = await restoreService.restoreFromBackup(newId, zip.toBuffer(), 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    const prefs = ctx.sqlite
-      .query('SELECT currency_unit, backup_config FROM user_preferences WHERE user_id = ?')
-      .get(newId) as { currency_unit: string; backup_config: string } | null;
+    const prefs = (await ctx.sql.get(
+      'SELECT currency_unit, backup_config FROM user_preferences WHERE user_id = ?',
+      [newId]
+    )) as { currency_unit: string; backup_config: string } | null;
     expect(prefs?.currency_unit).toBe('EUR');
     expect(JSON.parse(prefs?.backup_config ?? 'null')).toEqual(backupConfig);
-    expect(vehicleRows().map((r) => r.id)).toEqual(['v-np']);
+    expect((await vehicleRows()).map((r) => r.id)).toEqual(['v-np']);
   });
 
-  function insertDriveProvider(id: string, userId: string, accountEmail: string): void {
-    ctx.sqlite.run(
+  async function insertDriveProvider(
+    id: string,
+    userId: string,
+    accountEmail: string
+  ): Promise<void> {
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
        VALUES (?, ?, 'storage', 'google-drive', 'Drive', 'x', ?, 'active')`,
       [id, userId, JSON.stringify({ accountEmail })]
@@ -423,13 +431,13 @@ describe('restore after the account record is recreated (same person, new user i
 
   async function backupWithDrivePhoto(): Promise<Buffer> {
     const vehicleId = await seedOwnerData();
-    insertDriveProvider('prov-before', ctx.user.id, 'owner@drive.test');
-    ctx.sqlite.run(
+    await insertDriveProvider('prov-before', ctx.user.id, 'owner@drive.test');
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-drive', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 1)`,
       [ctx.user.id, vehicleId]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
        VALUES ('ref-drive', 'photo-drive', 'prov-before', 'drive-file-123', 'active')`
     );
@@ -437,8 +445,10 @@ describe('restore after the account record is recreated (same person, new user i
     return backupService.exportAsZip(ctx.user.id);
   }
 
-  function photoRefRows(): { provider_id: string; storage_ref: string; status: string }[] {
-    return ctx.sqlite.query('SELECT provider_id, storage_ref, status FROM photo_refs').all() as {
+  async function photoRefRows(): Promise<
+    { provider_id: string; storage_ref: string; status: string }[]
+  > {
+    return (await ctx.sql.all('SELECT provider_id, storage_ref, status FROM photo_refs')) as {
       provider_id: string;
       storage_ref: string;
       status: string;
@@ -447,20 +457,20 @@ describe('restore after the account record is recreated (same person, new user i
 
   test('photo links re-attach to the reconnected provider for the same storage account', async () => {
     const zip = await backupWithDrivePhoto();
-    const newId = reinstallAsNewAccount();
-    insertDriveProvider('prov-after', newId, 'owner@drive.test');
+    const newId = await reinstallAsNewAccount();
+    await insertDriveProvider('prov-after', newId, 'owner@drive.test');
 
     const { restoreService } = await import('../restore');
     const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect(photoRefRows()).toEqual([
+    expect(await photoRefRows()).toEqual([
       { provider_id: 'prov-after', storage_ref: 'drive-file-123', status: 'active' },
     ]);
   });
 
-  function insertS3Provider(id: string, userId: string, endpoint: string): void {
-    ctx.sqlite.run(
+  async function insertS3Provider(id: string, userId: string, endpoint: string): Promise<void> {
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
        VALUES (?, ?, 'storage', 's3', 'S3', 'x', ?, 'active')`,
       [id, userId, JSON.stringify({ endpoint, bucket: 'vroom-photos', region: 'auto' })]
@@ -469,38 +479,38 @@ describe('restore after the account record is recreated (same person, new user i
 
   test('S3 photo links re-attach when the endpoint differs only by case or a trailing slash', async () => {
     const vehicleId = await seedOwnerData();
-    insertS3Provider('s3-before', ctx.user.id, 'https://S3.Example.com/');
-    ctx.sqlite.run(
+    await insertS3Provider('s3-before', ctx.user.id, 'https://S3.Example.com/');
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-s3', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 1)`,
       [ctx.user.id, vehicleId]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
        VALUES ('ref-s3', 'photo-s3', 's3-before', 'vehicle/v/key.jpg', 'active')`
     );
     const { backupService } = await import('../backup');
     const zip = await backupService.exportAsZip(ctx.user.id);
-    const newId = reinstallAsNewAccount();
-    insertS3Provider('s3-after', newId, 'https://s3.example.com');
+    const newId = await reinstallAsNewAccount();
+    await insertS3Provider('s3-after', newId, 'https://s3.example.com');
 
     const { restoreService } = await import('../restore');
     const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(photoRefRows()).toEqual([
+    expect(await photoRefRows()).toEqual([
       { provider_id: 's3-after', storage_ref: 'vehicle/v/key.jpg', status: 'active' },
     ]);
   });
 
   test('a backup made before endpoints were normalized still re-links its S3 photos', async () => {
     const vehicleId = await seedOwnerData();
-    insertS3Provider('s3-old', ctx.user.id, 'https://s3.example.com');
-    ctx.sqlite.run(
+    await insertS3Provider('s3-old', ctx.user.id, 'https://s3.example.com');
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-old-s3', ?, 'vehicle', ?, 'car.jpg', 'image/jpeg', 1)`,
       [ctx.user.id, vehicleId]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
        VALUES ('ref-old-s3', 'photo-old-s3', 's3-old', 'vehicle/v/old.jpg', 'active')`
     );
@@ -509,13 +519,13 @@ describe('restore after the account record is recreated (same person, new user i
     const metadata = JSON.parse(archive.getEntry('metadata.json')?.getData().toString() ?? '{}');
     metadata.storageProviders = { 's3-old': 's3:https://S3.Example.com//vroom-photos' };
     archive.updateFile('metadata.json', Buffer.from(JSON.stringify(metadata), 'utf-8'));
-    const newId = reinstallAsNewAccount();
-    insertS3Provider('s3-new', newId, 'https://S3.Example.com/');
+    const newId = await reinstallAsNewAccount();
+    await insertS3Provider('s3-new', newId, 'https://S3.Example.com/');
 
     const { restoreService } = await import('../restore');
     const result = await restoreService.restoreFromBackup(newId, archive.toBuffer(), 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(photoRefRows().map((r) => r.provider_id)).toEqual(['s3-new']);
+    expect((await photoRefRows()).map((r) => r.provider_id)).toEqual(['s3-new']);
   });
 
   test('S3 endpoints differing only in path case stay distinct', async () => {
@@ -554,37 +564,37 @@ describe('restore after the account record is recreated (same person, new user i
       .replace('"ref-drive"', '"ref-drive-2"')
       .replace('"prov-before"', '"prov-older"');
     archive.updateFile('photo_refs.csv', Buffer.from(`${header}\n${row}\n${second}\n`, 'utf-8'));
-    const newId = reinstallAsNewAccount();
-    insertDriveProvider('prov-after', newId, 'owner@drive.test');
+    const newId = await reinstallAsNewAccount();
+    await insertDriveProvider('prov-after', newId, 'owner@drive.test');
 
     const { restoreService } = await import('../restore');
     const result = await restoreService.restoreFromBackup(newId, archive.toBuffer(), 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(photoRefRows().map((r) => r.provider_id)).toEqual(['prov-after']);
+    expect((await photoRefRows()).map((r) => r.provider_id)).toEqual(['prov-after']);
   });
 
   test('photo links are not re-attached when two reconnected providers match the account', async () => {
     const zip = await backupWithDrivePhoto();
-    const newId = reinstallAsNewAccount();
-    insertDriveProvider('prov-after-1', newId, 'owner@drive.test');
-    insertDriveProvider('prov-after-2', newId, 'owner@drive.test');
+    const newId = await reinstallAsNewAccount();
+    await insertDriveProvider('prov-after-1', newId, 'owner@drive.test');
+    await insertDriveProvider('prov-after-2', newId, 'owner@drive.test');
 
     const { restoreService } = await import('../restore');
     const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(photoRefRows()).toEqual([]);
+    expect(await photoRefRows()).toEqual([]);
   });
 
   test('photo links are not attached to a provider for a different storage account', async () => {
     const zip = await backupWithDrivePhoto();
-    const newId = reinstallAsNewAccount();
-    insertDriveProvider('prov-other', newId, 'someone-else@drive.test');
+    const newId = await reinstallAsNewAccount();
+    await insertDriveProvider('prov-other', newId, 'someone-else@drive.test');
 
     const { restoreService } = await import('../restore');
     const result = await restoreService.restoreFromBackup(newId, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect(photoRefRows()).toEqual([]);
+    expect(await photoRefRows()).toEqual([]);
   });
 
   test('a backup without provider identities restores photos without links, as before', async () => {
@@ -593,15 +603,15 @@ describe('restore after the account record is recreated (same person, new user i
     expect(metadata.storageProviders).toEqual({ 'prov-before': 'google-drive:owner@drive.test' });
     delete metadata.storageProviders;
     original.updateFile('metadata.json', Buffer.from(JSON.stringify(metadata), 'utf-8'));
-    const newId = reinstallAsNewAccount();
-    insertDriveProvider('prov-after', newId, 'owner@drive.test');
+    const newId = await reinstallAsNewAccount();
+    await insertDriveProvider('prov-after', newId, 'owner@drive.test');
 
     const { restoreService } = await import('../restore');
     const result = await restoreService.restoreFromBackup(newId, original.toBuffer(), 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect(photoRefRows()).toEqual([]);
-    expect(ctx.sqlite.query('SELECT id FROM photos').all()).toEqual([{ id: 'photo-drive' }]);
+    expect(await photoRefRows()).toEqual([]);
+    expect(await ctx.sql.all('SELECT id FROM photos')).toEqual([{ id: 'photo-drive' }]);
   });
 
   test("another tenant's backup cannot overwrite or steal that tenant's live rows", async () => {
@@ -611,7 +621,7 @@ describe('restore after the account record is recreated (same person, new user i
     const zip = await backupService.exportAsZip(ctx.user.id);
 
     const intruderId = 'intruder-user';
-    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+    await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
       intruderId,
       'intruder@test.com',
       'Intruder',
@@ -622,12 +632,13 @@ describe('restore after the account record is recreated (same person, new user i
     ).rejects.toBeInstanceOf(ConflictError);
     const merged = await restoreService.restoreFromBackup(intruderId, zip, 'merge');
     expect(merged.imported?.vehicles, 'the live car is not taken over').toBe(0);
-    const onLiveCar = ctx.sqlite
-      .query('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ? AND user_id = ?')
-      .get(vehicleId, intruderId) as { n: number };
+    const onLiveCar = (await ctx.sql.get(
+      'SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ? AND user_id = ?',
+      [vehicleId, intruderId]
+    )) as { n: number };
     expect(onLiveCar.n, 'nothing is added to the live car').toBe(0);
 
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].user_id, 'the live owner keeps their vehicle').toBe(ctx.user.id);

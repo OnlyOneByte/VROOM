@@ -136,7 +136,7 @@ describe('expense amounts', () => {
       )
     ).toBe(201);
     const csv = await (await ctx.authed('GET', '/api/v1/expenses/export')).text();
-    ctx.sqlite.run('DELETE FROM expenses WHERE user_id = ?', [ctx.user.id]);
+    await ctx.sql.run('DELETE FROM expenses WHERE user_id = ?', [ctx.user.id]);
 
     const res = await ctx.authed('POST', '/api/v1/expenses/import', { csv });
     const body = await json<DataEnvelope<{ imported: number }>>(res);
@@ -349,9 +349,10 @@ describe('reminder intervals', () => {
 
   test('a stored reminder already over the bounds can still be paused and renamed', async () => {
     const id = await createReminder();
-    ctx.sqlite
-      .query('UPDATE reminders SET interval_value = ?, last_service_odometer = ? WHERE id = ?')
-      .run(1_000_000_000, 9e15, id);
+    await ctx.sql.run(
+      'UPDATE reminders SET interval_value = ?, last_service_odometer = ? WHERE id = ?',
+      [1_000_000_000, 9e15, id]
+    );
     expect(await status('PUT', `/api/v1/reminders/${id}`, { isActive: false })).toBe(200);
     expect(await status('PUT', `/api/v1/reminders/${id}`, { name: 'Old reminder' })).toBe(200);
   });

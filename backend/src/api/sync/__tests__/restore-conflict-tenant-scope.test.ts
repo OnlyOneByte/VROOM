@@ -42,7 +42,7 @@ describe('restore merge stays inside the importing account', () => {
     const AdmZip = (await import('adm-zip')).default;
     const zip = await backupService.exportAsZip(ctx.user.id);
 
-    const db = (await import('../../../db/connection')).getDb();
+    const db = (await import('../../../app-context')).appContext().asyncDb;
     const schema = await import('../../../db/schema');
     const otherId = 'other-user-1';
     const otherVehicleId = 'other-vehicle-1';
@@ -63,7 +63,7 @@ describe('restore merge stays inside the importing account', () => {
       const csv = entry.getData().toString('utf-8');
       archive.updateFile(entry.entryName, Buffer.from(csv.split(myVehicleId).join(otherVehicleId)));
     }
-    ctx.sqlite.run('DELETE FROM expenses WHERE id = ?', [myExpenseId]);
+    await ctx.sql.run('DELETE FROM expenses WHERE id = ?', [myExpenseId]);
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, archive.toBuffer(), 'merge');
 
@@ -74,13 +74,14 @@ describe('restore merge stays inside the importing account', () => {
     expect(JSON.stringify(result)).not.toContain('Ferrari');
     expect(JSON.stringify(result)).not.toContain(otherId);
 
-    const otherCar = ctx.sqlite
-      .query('SELECT user_id, make FROM vehicles WHERE id = ?')
-      .all(otherVehicleId) as { user_id: string; make: string }[];
+    const otherCar = (await ctx.sql.all('SELECT user_id, make FROM vehicles WHERE id = ?', [
+      otherVehicleId,
+    ])) as { user_id: string; make: string }[];
     expect(otherCar).toEqual([{ user_id: otherId, make: 'Ferrari' }]);
-    const onOtherCar = ctx.sqlite
-      .query('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?')
-      .get(otherVehicleId) as { n: number };
+    const onOtherCar = (await ctx.sql.get(
+      'SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?',
+      [otherVehicleId]
+    )) as { n: number };
     expect(onOtherCar.n).toBe(0);
   });
 

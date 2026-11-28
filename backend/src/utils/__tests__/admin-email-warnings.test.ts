@@ -28,9 +28,12 @@ describe('ADMIN_EMAILS startup warnings', () => {
   });
 
   test('a listed account that is disabled does not count, and the match ignores case', async () => {
-    ctx.sqlite.run('UPDATE users SET email = ? WHERE id = ?', ['Admin@Example.com', ctx.user.id]);
+    await ctx.sql.run('UPDATE users SET email = ? WHERE id = ?', [
+      'Admin@Example.com',
+      ctx.user.id,
+    ]);
     expect(await adminEmailWarnings(['admin@example.com'])).toEqual([]);
-    ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [ctx.user.id]);
+    await ctx.sql.run('UPDATE users SET disabled_at = 1 WHERE id = ?', [ctx.user.id]);
     expect(await adminEmailWarnings(['admin@example.com'])).toHaveLength(1);
   });
 });

@@ -54,9 +54,9 @@ export function sweepRequests(
 
 export async function seedSweepCar(ctx: TestApp): Promise<Members> {
   await seedCar(ctx, VEHICLE_ID);
-  ctx.sqlite.run('UPDATE vehicles SET car_share_enabled = 1 WHERE id = ?', [VEHICLE_ID]);
+  await ctx.sql.run('UPDATE vehicles SET car_share_enabled = TRUE WHERE id = ?', [VEHICLE_ID]);
   const members = await seedMembers(ctx, VEHICLE_ID, 'sweep');
-  seedSweepRecords(ctx, VEHICLE_ID, members.stranger.id);
+  await seedSweepRecords(ctx, VEHICLE_ID, members.stranger.id);
   await storeSweepPhotos(ctx, VEHICLE_ID);
   return members;
 }
