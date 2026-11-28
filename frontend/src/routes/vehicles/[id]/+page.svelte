@@ -25,7 +25,6 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.ts';
-	import * as CardFull from '#lib/components/ui/card/index.ts';
 	import ChartCard from '#lib/components/charts/ChartCard.svelte';
 	import VehicleHeader from '#lib/components/vehicles/VehicleHeader.svelte';
 	import VehicleInfoCard from '#lib/components/vehicles/VehicleInfoCard.svelte';
@@ -41,10 +40,12 @@
 	import { resolveCurrentOdometer } from '#lib/utils/financing-calculations.ts';
 	import FuelEfficiencyStatsCard from '#lib/components/vehicles/FuelEfficiencyStatsCard.svelte';
 	import type { AttentionItem } from '#lib/components/dashboard/dashboard-data.ts';
-	import { formatDate } from '#lib/utils/formatters.ts';
+	import { formatDate, formatNumber } from '#lib/utils/formatters.ts';
+	import ChartGroup from '#lib/components/analytics/fuel/ChartGroup.svelte';
 	import {
 		fitsFirstPage,
 		matchesFilters,
+		withPendingByMonth,
 		withRowsInBreakdowns,
 		withoutRowsInBreakdowns,
 		type ListedPage
@@ -322,7 +323,9 @@
 		match: expense => expense.vehicleId === vehicleId,
 		refresh: () =>
 			Promise.all([
-				hasLoadedExpensesTab ? fetchExpensesPage(currentOffset) : undefined,
+				hasLoadedExpensesTab
+					? fetchExpensesPage(currentOffset, { keepMonthTotals: true })
+					: undefined,
 				loadSummary(),
 				loadOverviewLists()
 			]),
@@ -367,6 +370,37 @@
 			: tabListed
 	);
 	let tabWaiting = $derived(!expensesLoaded && tabExpenses.length === 0);
+	let tabCountLabel = $derived.by(() => {
+		const count =
+			totalCount +
+			pendingTabRows.filter(row => pending.states.get(row.id)?.status !== 'failed').length -
+			expenses.filter(isDeleteHidden).length;
+		return `${formatNumber(count, 0)} ${count === 1 ? 'expense' : 'expenses'}`;
+	});
+	const inTab = (row: Expense) => backOnThisCar(row) && matchesFilters(row, tabFilters);
+	const matchesSearch = (row: Expense) => matchesFilters(row, { search: searchTerm });
+	const searchUnknown = (was: Expense, now: Expense) => {
+		if (!searchTerm.trim()) return false;
+		if (inTab(was)) return !listedIds.has(was.id) && !matchesSearch(was);
+		return inTab(now) && !matchesSearch(now);
+	};
+	let shownMonthTotals = $derived.by(() => {
+		const edits = summaryEdits(monthTotalsRequestedAt, expenses);
+		const kept = edits.before.flatMap((was, i) => {
+			const now = edits.after[i];
+			return now && !searchUnknown(was, now) ? [{ was, now }] : [];
+		});
+		const saving = pending.saving.filter(row =>
+			matchesFilters(row, { ...tabFilters, search: searchTerm })
+		);
+		const removed = [
+			...expenses.filter(isDeleteHidden),
+			...kept.map(({ was }) => was).filter(inTab)
+		];
+		const added = kept.map(({ now }) => now).filter(inTab);
+		const withSaving = withPendingByMonth(monthTotals, saving);
+		return withPendingByMonth(withPendingByMonth(withSaving, removed, -1), added);
+	});
 
 	let firstExpense = $derived(
 		summary !== null &&
@@ -633,11 +667,40 @@
 		};
 	}
 
-	async function fetchExpensesPage(offset: number) {
+	const nextMonthTotalsRequest = latest();
+	let monthTotals = $state<ReadonlyMap<string, number>>(new Map());
+	let monthTotalsRequestedAt = $state<number | undefined>();
+
+	async function loadMonthTotals(keepShown = false) {
+		const isCurrent = nextMonthTotalsRequest();
+		const requestedAt = Date.now();
+		if (!keepShown) monthTotals = new Map();
+		const {
+			limit: _limit,
+			offset: _offset,
+			sortBy: _by,
+			sortDir: _dir,
+			...filtered
+		} = buildExpenseListParams(0);
+		try {
+			const months = await expenseApi.getMonthlyTotals({ vehicleId, ...filtered });
+			if (isCurrent()) {
+				monthTotals = new Map(months.map(m => [m.month, m.amount]));
+				monthTotalsRequestedAt = requestedAt;
+			}
+		} catch (error) {
+			if (!isCurrent()) return;
+			monthTotals = new Map();
+			logLoadFailure(error, "Couldn't load the month totals");
+		}
+	}
+
+	async function fetchExpensesPage(offset: number, { keepMonthTotals = false } = {}) {
 		isLoadingPage = true;
 		expensesLoadError = null;
 		const requestedAt = Date.now();
 		const params = buildExpenseListParams(offset);
+		if (offset === 0) void loadMonthTotals(keepMonthTotals);
 		try {
 			const result = await expenseApi.getExpensesByVehicle(vehicleId, params);
 			expenses = result.data;
@@ -691,7 +754,8 @@
 		const offset =
 			currentOffset >= remaining ? Math.max(0, currentOffset - pageSize) : currentOffset;
 		await Promise.all([
-			fetchExpensesPage(offset),
+			fetchExpensesPage(offset, { keepMonthTotals: true }),
+			offset === 0 ? undefined : loadMonthTotals(true),
 			loadSummary(),
 			loadFuelEfficiency(),
 			loadOverviewLists()
@@ -1168,38 +1232,6 @@
 
 				<TabsContent value="expenses" class="space-y-6">
 					{#if visitedTabs['expenses']}
-						{#if hasExpenseData}
-							{#await loadSpendCharts()}
-								{@render spendChartPlaceholders(null)}
-							{:then [{ default: ExpenseTrendChart }, { AppBarChart }]}
-								<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-									<ExpenseTrendChart
-										data={expenseTrendData}
-										description={trendDescription}
-										isLoading={isLoadingStats}
-									/>
-									{#if categoryChartData.length > 0 || summary === null}
-										<AppBarChart
-											title={CATEGORY_CHART_TITLE}
-											description={CATEGORY_CHART_DESCRIPTION}
-											data={categoryChartData}
-											x="value"
-											y="label"
-											orientation="horizontal"
-											padding={CATEGORY_PADDING}
-											series={CATEGORY_SERIES}
-											config={CATEGORY_CONFIG}
-											yAxisFormat={v => String(v)}
-											xAxisProps={{ format: formatCurrencyAxis }}
-											tooltipFormat={formatCurrencyTooltip}
-											isLoading={isLoadingStats}
-										/>
-									{/if}
-								</div>
-							{:catch}
-								{@render spendChartPlaceholders(CHARTS_LOAD_ERROR)}
-							{/await}
-						{/if}
 						{#await loadExpensesTab()}
 							{@render tabLoading()}
 						{:then [{ default: ExpenseSearchFilters }, { default: ExpensesTable }]}
@@ -1207,23 +1239,22 @@
 								{searchTerm}
 								bind:filters
 								{expenses}
+								category={expenseCategoryFilter}
+								sort={`${expenseSortBy}-${expenseSortDir}`}
 								onSearchChange={v => (searchTerm = v)}
+								onCategoryChange={handleExpenseCategoryChange}
+								onSortChange={s => {
+									const [by, dir] = s.split('-') as ['date' | 'amount', 'asc' | 'desc'];
+									handleExpenseSortChange(by, dir);
+								}}
 								onClearFilters={clearFilters}
 							/>
 
-							<CardFull.Root>
-								<CardFull.Header class="flex flex-row items-center justify-between gap-2 space-y-0">
-									<CardFull.Title>
-										{#if tabWaiting}
-											All Expenses
-										{:else}
-											All Expenses ({totalCount +
-												pendingTabRows.filter(
-													row => pending.states.get(row.id)?.status !== 'failed'
-												).length -
-												expenses.filter(isDeleteHidden).length})
-										{/if}
-									</CardFull.Title>
+							<section aria-labelledby="vehicle-expenses-heading" class="space-y-3">
+								<div class="flex items-center justify-between gap-3">
+									<h3 class="text-base font-semibold" id="vehicle-expenses-heading">
+										{tabWaiting ? 'Expenses' : tabCountLabel}
+									</h3>
 									{#if totalCount > 0 && isOwner}
 										<Button
 											variant="outline"
@@ -1235,8 +1266,8 @@
 											{isExporting ? 'Exporting…' : 'Export CSV'}
 										</Button>
 									{/if}
-								</CardFull.Header>
-								<CardFull.Content>
+								</div>
+								<div>
 									{#if expensesLoadError && !isLoadingPage}
 										<LoadErrorCard
 											compact
@@ -1287,13 +1318,54 @@
 											onSortChange={handleExpenseSortChange}
 											activeCategory={expenseCategoryFilter}
 											onCategoryChange={handleExpenseCategoryChange}
+											monthTotals={shownMonthTotals}
+											monthHeadingLevel={4}
+											ledger
 										/>
 									{/if}
-								</CardFull.Content>
-							</CardFull.Root>
+								</div>
+							</section>
 						{:catch}
 							{@render tabLoadError()}
 						{/await}
+						{#if hasExpenseData}
+							<ChartGroup
+								title="More detail"
+								description="Spending by month and by category"
+								level={3}
+							>
+								{#await loadSpendCharts()}
+									{@render spendChartPlaceholders(null)}
+								{:then [{ default: ExpenseTrendChart }, { AppBarChart }]}
+									<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+										<ExpenseTrendChart
+											data={expenseTrendData}
+											description={trendDescription}
+											isLoading={isLoadingStats}
+										/>
+										{#if categoryChartData.length > 0 || summary === null}
+											<AppBarChart
+												title={CATEGORY_CHART_TITLE}
+												description={CATEGORY_CHART_DESCRIPTION}
+												data={categoryChartData}
+												x="value"
+												y="label"
+												orientation="horizontal"
+												padding={CATEGORY_PADDING}
+												series={CATEGORY_SERIES}
+												config={CATEGORY_CONFIG}
+												yAxisFormat={v => String(v)}
+												xAxisProps={{ format: formatCurrencyAxis }}
+												tooltipFormat={formatCurrencyTooltip}
+												isLoading={isLoadingStats}
+											/>
+										{/if}
+									</div>
+								{:catch}
+									{@render spendChartPlaceholders(CHARTS_LOAD_ERROR)}
+								{/await}
+							</ChartGroup>
+						{/if}
 					{/if}
 				</TabsContent>
 

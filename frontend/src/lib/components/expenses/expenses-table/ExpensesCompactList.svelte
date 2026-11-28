@@ -33,6 +33,7 @@
 		monthTotals?: ReadonlyMap<string, number> | undefined;
 		pendingStates?: ReadonlyMap<string, PendingRowState> | undefined;
 		ledger?: boolean;
+		monthHeadingLevel?: 2 | 3 | 4;
 	}
 
 	let {
@@ -52,7 +53,8 @@
 		onDeleteGroup,
 		monthTotals,
 		pendingStates,
-		ledger = false
+		ledger = false,
+		monthHeadingLevel = 2
 	}: Props = $props();
 
 	let byMonth = $derived(sortBy === 'date' && !!monthTotals);
@@ -104,7 +106,8 @@
 		{#each sections as section (section.month)}
 			<section>
 				{#if section.month}
-					<h2
+					<svelte:element
+						this={`h${monthHeadingLevel}`}
 						class="sticky top-[calc(4rem+env(safe-area-inset-top))] short:top-0 lg:top-0 z-10 flex items-baseline justify-between gap-3 border-b-2 border-foreground bg-background pt-2 pb-1.5"
 					>
 						<span
@@ -115,7 +118,7 @@
 						<span class="text-base font-semibold tabular-nums">
 							{@render monthTotal(section.month)}
 						</span>
-					</h2>
+					</svelte:element>
 				{/if}
 				<div class="divide-y border-b">
 					{#each section.rows as item (rowKey(item))}

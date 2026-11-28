@@ -548,6 +548,13 @@ describe('ExpensesTable month groups', () => {
 		);
 	});
 
+	test('ledger: month headings take the level the page asks for', () => {
+		useLayout('wide');
+		mountTable({ monthTotals: TOTALS, ledger: true, monthHeadingLevel: 4 });
+		expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
+		expect(screen.getAllByRole('heading', { level: 4 })[0]?.textContent).toMatch(/March 2024/);
+	});
+
 	test('under a month heading a row drops the year, and no detail breaks across lines', () => {
 		useLayout('wide');
 		const { container } = mountTable({ monthTotals: TOTALS, ledger: true });

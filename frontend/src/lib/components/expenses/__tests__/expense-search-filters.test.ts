@@ -1,20 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import ExpenseSearchFilters from '../ExpenseSearchFilters.svelte';
-import type { Expense, ExpenseFilters, Vehicle } from '#lib/types/index.ts';
-
-const CAMRY: Vehicle = {
-	id: 'v1',
-	year: 2020,
-	make: 'Toyota',
-	model: 'Camry',
-	vehicleType: 'gas',
-	trackFuel: true,
-	trackCharging: false,
-	createdAt: '2026-01-01T00:00:00Z',
-	updatedAt: '2026-01-01T00:00:00Z'
-};
-const RAV4: Vehicle = { ...CAMRY, id: 'v2', model: 'RAV4', nickname: 'Family Hauler' };
+import type { Expense, ExpenseFilters } from '#lib/types/index.ts';
 
 function expense(id: string, tags: string[]): Expense {
 	return {
@@ -39,27 +26,27 @@ const EXPENSES = [
 interface RenderOptions {
 	searchTerm?: string;
 	filters?: ExpenseFilters;
-	vehicles?: Vehicle[];
-	showVehicleSelector?: boolean;
-	selectedVehicleId?: string;
+	category?: string;
+	sort?: 'date-desc' | 'date-asc' | 'amount-desc';
 }
 
 function renderFilters(options: RenderOptions = {}) {
 	const onSearchChange = vi.fn();
-	const onVehicleChange = vi.fn();
+	const onCategoryChange = vi.fn();
+	const onSortChange = vi.fn();
 	const onClearFilters = vi.fn();
 	render(ExpenseSearchFilters, {
 		searchTerm: options.searchTerm ?? '',
 		filters: options.filters ?? {},
 		expenses: EXPENSES,
-		vehicles: options.vehicles ?? [],
-		showVehicleSelector: options.showVehicleSelector ?? false,
-		selectedVehicleId: options.selectedVehicleId,
+		category: options.category ?? '',
+		sort: options.sort ?? 'date-desc',
 		onSearchChange,
-		onVehicleChange,
+		onCategoryChange,
+		onSortChange,
 		onClearFilters
 	});
-	return { onSearchChange, onVehicleChange, onClearFilters };
+	return { onSearchChange, onCategoryChange, onSortChange, onClearFilters };
 }
 
 function tagInput(): HTMLInputElement {
@@ -97,8 +84,7 @@ describe('ExpenseSearchFilters: search and clearing', () => {
 
 	test.each<[string, RenderOptions]>([
 		['a search term', { searchTerm: 'oil' }],
-		['a selected vehicle', { selectedVehicleId: 'v1' }],
-		['a category', { filters: { category: 'fuel' } }],
+		['a category', { category: 'fuel' }],
 		['a start date', { filters: { startDate: '2026-01-01' } }],
 		['an end date', { filters: { endDate: '2026-02-01' } }]
 	])('the clear button appears for %s and calls onClearFilters', async (_label, options) => {
@@ -230,48 +216,58 @@ describe('ExpenseSearchFilters: tag picking', () => {
 	});
 });
 
-describe('ExpenseSearchFilters: vehicle selector', () => {
-	test('is hidden unless requested and vehicles exist', () => {
-		renderFilters({ showVehicleSelector: true, vehicles: [] });
-		expect(screen.queryByLabelText('Vehicle filter')).toBeNull();
+describe('ExpenseSearchFilters: category chips and sort', () => {
+	test('one chip per category plus All, with the current one pressed', () => {
+		renderFilters({ category: 'maintenance' });
+		const chips = within(screen.getByRole('group', { name: 'Category' })).getAllByRole('button');
+		expect(chips.map(c => c.textContent?.trim())).toEqual([
+			'All',
+			'Fuel',
+			'Maintenance',
+			'Financial',
+			'Regulatory',
+			'Enhancement',
+			'Misc'
+		]);
+		expect(
+			chips.filter(c => c.getAttribute('aria-pressed') === 'true').map(c => c.textContent?.trim())
+		).toEqual(['Maintenance']);
 	});
 
-	test('shows the selected vehicle name', () => {
-		renderFilters({ showVehicleSelector: true, vehicles: [CAMRY, RAV4], selectedVehicleId: 'v2' });
-
-		expect(screen.getByLabelText('Vehicle filter')).toHaveTextContent('Family Hauler');
+	test('a chip reports its category, and All reports none', async () => {
+		const { onCategoryChange } = renderFilters({ category: 'fuel' });
+		await fireEvent.click(screen.getByRole('button', { name: 'Misc' }));
+		expect(onCategoryChange).toHaveBeenLastCalledWith('misc');
+		await fireEvent.click(screen.getByRole('button', { name: 'All' }));
+		expect(onCategoryChange).toHaveBeenLastCalledWith('');
 	});
 
-	test('falls back to all vehicles for an unknown or missing selection', () => {
-		renderFilters({
-			showVehicleSelector: true,
-			vehicles: [CAMRY],
-			selectedVehicleId: 'gone'
+	test('each category chip is a 40px tap target', () => {
+		renderFilters({ category: '' });
+		expect(screen.getByRole('button', { name: 'All' })).toHaveClass('h-10');
+	});
+
+	test('the sort menu names the current order and reports a new one', async () => {
+		const { onSortChange } = renderFilters({ sort: 'date-desc' });
+		const trigger = screen.getByLabelText('Newest first, sort order');
+		expect(trigger).toHaveTextContent('Newest first');
+		await pickOption(trigger, 'Largest first');
+		expect(onSortChange).toHaveBeenCalledWith('amount-desc');
+	});
+
+	test('sits in a search landmark, with no card around it', () => {
+		const { container } = render(ExpenseSearchFilters, {
+			searchTerm: '',
+			filters: {},
+			expenses: EXPENSES,
+			category: '',
+			sort: 'date-desc',
+			onSearchChange: vi.fn(),
+			onCategoryChange: vi.fn(),
+			onSortChange: vi.fn(),
+			onClearFilters: vi.fn()
 		});
-
-		expect(screen.getByLabelText('Vehicle filter')).toHaveTextContent('All Vehicles');
-	});
-
-	test('picking a vehicle reports its id', async () => {
-		const { onVehicleChange } = renderFilters({
-			showVehicleSelector: true,
-			vehicles: [CAMRY, RAV4]
-		});
-
-		await pickOption(screen.getByLabelText('Vehicle filter'), '2020 Toyota Camry');
-
-		expect(onVehicleChange).toHaveBeenCalledWith('v1');
-	});
-
-	test('picking all vehicles reports undefined', async () => {
-		const { onVehicleChange } = renderFilters({
-			showVehicleSelector: true,
-			vehicles: [CAMRY, RAV4],
-			selectedVehicleId: 'v1'
-		});
-
-		await pickOption(screen.getByLabelText('Vehicle filter'), 'All Vehicles');
-
-		expect(onVehicleChange).toHaveBeenCalledWith(undefined);
+		expect(screen.getByRole('search', { name: 'Find expenses' })).toBeTruthy();
+		expect(container.querySelector('[data-slot="card"]')).toBeNull();
 	});
 });

@@ -78,8 +78,8 @@ test.describe("A new expense shows on its vehicle's page before the page's lists
 
 			await page.getByRole('tab', { name: 'Expenses' }).click();
 			const tab = page.getByRole('tabpanel', { name: 'Expenses' });
-			await expect(tab.getByRole('row', { name: /Car wash on Elm/ })).toBeVisible();
-			await expect(tab.getByText('All Expenses (1)')).toBeVisible();
+			await expect(tab.getByTestId('expense-ledger').getByText('Car wash on Elm')).toBeVisible();
+			await expect(tab.getByRole('heading', { name: '1 expense', exact: true })).toBeVisible();
 
 			lists.release();
 		});
