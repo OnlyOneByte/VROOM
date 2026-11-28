@@ -20,9 +20,9 @@ describe('trips on the same day', () => {
     const vehicleId = await seedVehicle(ctx);
     const day = Math.floor(Date.parse('2024-06-20T12:00:00.000Z') / 1000);
     const rows: [string, number, number][] = [
-      ['t-a', 100, day + 10],
-      ['t-c', 200, day + 20],
       ['t-b', 300, day + 20],
+      ['t-z', 100, day + 10],
+      ['t-a', 200, day + 20],
     ];
     for (const [id, start, createdAt] of rows) {
       await ctx.sql.run(
@@ -39,9 +39,9 @@ describe('trips on the same day', () => {
     };
 
     expect([...(await pageAt(0)), ...(await pageAt(1)), ...(await pageAt(2))]).toEqual([
-      't-c',
       't-b',
       't-a',
+      't-z',
     ]);
   });
 });
