@@ -36,6 +36,7 @@
 	interface ReviewRow {
 		photoId: string;
 		thumbnailUrl: string | null;
+		unread: boolean;
 		include: boolean;
 		amount: string;
 		category: ExpenseCategory;
@@ -58,7 +59,8 @@
 		return {
 			photoId: item.photoId,
 			thumbnailUrl: item.thumbnailUrl,
-			include: true,
+			unread: item.failed === true,
+			include: item.failed !== true,
 			amount: typeof item.draft.amount === 'number' ? String(item.draft.amount) : '',
 			category: item.draft.category ?? 'misc',
 			date: item.draft.date ?? toDateInputValue(new Date()),
@@ -211,6 +213,14 @@
 							</div>
 
 							<div class="grid flex-1 grid-cols-2 gap-2">
+								{#if row.unread}
+									<p
+										class="col-span-2 text-xs text-muted-foreground"
+										data-testid="photos-import-unread"
+									>
+										Couldn't read this receipt. Fill it in to add it, or leave it out.
+									</p>
+								{/if}
 								<div class="space-y-1">
 									<Label class="text-xs text-muted-foreground">Amount</Label>
 									<Input

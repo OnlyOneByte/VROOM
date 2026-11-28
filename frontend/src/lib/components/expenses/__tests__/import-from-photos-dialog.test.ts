@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import type { ConfirmDraftInput, ReceiptDraftItem } from '#lib/services/photos-import-api.ts';
 import type { Vehicle } from '#lib/types/index.ts';
 import { UNEXPECTED_FAILURE_MESSAGE } from '#lib/utils/error-handling.ts';
@@ -193,6 +193,22 @@ describe('ImportFromPhotosDialog: loading drafts', () => {
 		expect(row).toHaveTextContent('Misc');
 		expect(confirmButton()).toHaveTextContent('Add 0 expenses');
 		expect(confirmButton()).toBeDisabled();
+	});
+
+	test('a receipt that could not be read says so and starts left out', async () => {
+		mocks.getReceiptDrafts.mockResolvedValue([
+			draftItem('p1', { draft: {}, failed: true }),
+			draftItem('p2')
+		]);
+		mount();
+
+		await waitFor(() => expect(rows()).toHaveLength(2));
+		const [unread, read] = rows() as HTMLElement[];
+		expect(within(unread as HTMLElement).getByTestId('photos-import-unread')).toHaveTextContent(
+			"Couldn't read this receipt. Fill it in to add it, or leave it out."
+		);
+		expect(within(unread as HTMLElement).getByRole('checkbox')).not.toBeChecked();
+		expect(within(read as HTMLElement).queryByTestId('photos-import-unread')).toBeNull();
 	});
 
 	test('with no vehicles a row asks for one and cannot be added', async () => {
