@@ -1,7 +1,9 @@
 import { Database } from 'bun:sqlite';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { drizzle as bunSqlDrizzle } from 'drizzle-orm/bun-sql';
+import { migrate as migratePostgres } from 'drizzle-orm/bun-sql/migrator';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { ensureServerAdmin } from '../api/signup/store';
@@ -9,23 +11,56 @@ import { CONFIG } from '../config';
 import { syncBuiltInRoles } from '../permissions/grants';
 import { extractErrorMessage } from '../utils/error-handling';
 import { logger } from '../utils/logger';
-import { openAsyncDatabase } from './async-sqlite';
-import type { UPKEEP_QUERIES } from './dialect';
-import { ACTIVE_DIALECT } from './dialect/active';
+import { bunSqlConnection, openAsyncPostgres, type PgConnection } from './async-postgres';
+import { type AsyncAppDatabase, openAsyncDatabase } from './async-sqlite';
+import { rawAll, UPKEEP_QUERIES } from './dialect';
+import { ACTIVE_DIALECT, POSTGRES_URL } from './dialect/active';
 import * as schema from './sqlite/schema';
+
+const POSTGRES_CONNECT_TIMEOUT_SECONDS = 10;
+
+export type DatabaseTarget = { kind: 'sqlite'; path: string } | { kind: 'pg'; url: string };
+
+const SCHEME = /^([a-z][a-z0-9+.-]+):/i;
+
+export function databaseTarget(url: string): DatabaseTarget {
+  const scheme = SCHEME.exec(url)?.[1]?.toLowerCase();
+  if (scheme === undefined) return { kind: 'sqlite', path: url };
+  if (POSTGRES_URL.test(url)) return { kind: 'pg', url };
+  if (scheme === 'sqlite') return { kind: 'sqlite', path: url.replace(/^sqlite:(\/\/)?/i, '') };
+  const unsupported =
+    scheme === 'postgres' || scheme === 'postgresql'
+      ? `DATABASE_URL starts with "${scheme}:" but not "${scheme}://".`
+      : `DATABASE_URL uses the unsupported scheme "${scheme}:".`;
+  throw new Error(
+    `${unsupported} Use a SQLite file path (or sqlite:<path>), or postgres://user:password@host:5432/database.`
+  );
+}
+
+export function describeDatabase(target: DatabaseTarget): string {
+  if (target.kind === 'sqlite') return `SQLite at ${target.path}`;
+  try {
+    const { hostname, port, pathname } = new URL(target.url);
+    return `Postgres at ${hostname}:${port || '5432'}${pathname}`;
+  } catch {
+    return 'Postgres';
+  }
+}
 
 function openDatabase(url: string) {
   if (ACTIVE_DIALECT !== 'sqlite') {
     throw new Error(
-      'DATABASE_URL names a Postgres database, which VROOM cannot connect to yet (#1635). Use a SQLite file path.'
+      'This server runs on Postgres, so the SQLite handle is not available; use appContext().asyncDb.'
     );
   }
-  const dbDir = dirname(url);
+  const target = databaseTarget(url);
+  if (target.kind !== 'sqlite') throw new Error('DATABASE_URL does not name a SQLite file');
+  const dbDir = dirname(target.path);
   if (!existsSync(dbDir)) {
     mkdirSync(dbDir, { recursive: true });
   }
 
-  const sqlite = new Database(url);
+  const sqlite = new Database(target.path);
 
   sqlite.run('PRAGMA journal_mode = WAL');
   sqlite.run('PRAGMA synchronous = NORMAL');
@@ -79,16 +114,70 @@ export function foldUserEmailCase(database: AppDatabase): void {
   if (folded > 0) logger.info(`Lowercased ${folded} user email(s)`);
 }
 
-export async function runMigrations(): Promise<void> {
+export interface PostgresStart {
+  migrate(): Promise<void>;
+  connect(): Promise<PgConnection>;
+}
+
+export function bunSqlStart(url: string): PostgresStart {
+  const client = new Bun.SQL(url, {
+    max: 1,
+    connectionTimeout: POSTGRES_CONNECT_TIMEOUT_SECONDS,
+  });
+  return {
+    migrate: () => migratePostgres(bunSqlDrizzle({ client }), { migrationsFolder: './drizzle-pg' }),
+    async connect() {
+      const reserved = await client.reserve();
+      await reserved.unsafe(`SET statement_timeout = ${CONFIG.database.queryTimeout}`);
+      return bunSqlConnection(reserved);
+    },
+  };
+}
+
+async function finishSetup(asyncDb: AsyncAppDatabase): Promise<void> {
+  await syncBuiltInRoles(asyncDb);
+  const admin = await asyncDb.transaction((tx) => ensureServerAdmin(tx));
+  if (admin) logger.info('Made the oldest eligible account the server admin', { userId: admin });
+}
+
+export function driverReason(error: unknown): string {
+  let root = error;
+  while (root instanceof Error && root.cause instanceof Error) root = root.cause;
+  const code = (root as { code?: unknown }).code;
+  const message = extractErrorMessage(root);
+  return typeof code === 'string' && !message.includes(code) ? `${message} (${code})` : message;
+}
+
+export async function startPostgres(start: PostgresStart, where: string): Promise<void> {
+  let connection: PgConnection;
+  try {
+    await start.migrate();
+    connection = await start.connect();
+  } catch (error) {
+    throw new Error(
+      `Could not connect to ${where}: ${driverReason(error)}. Check DATABASE_URL and that the database server is running and reachable.`
+    );
+  }
+  const { createPostgresAppContext, useAppContext } = await import('../app-context');
+  const context = createPostgresAppContext(openAsyncPostgres(connection).db);
+  useAppContext(context);
+  await finishSetup(context.asyncDb);
+}
+
+export async function runMigrations(
+  postgres: (url: string) => PostgresStart = bunSqlStart
+): Promise<void> {
   try {
     logger.info('Running database migrations...');
-    const db = getDb();
-    migrate(db, { migrationsFolder: './drizzle' });
-    foldUserEmailCase(db);
-    const asyncDb = openAsyncDatabase(db.$client).db;
-    await syncBuiltInRoles(asyncDb);
-    const admin = await asyncDb.transaction((tx) => ensureServerAdmin(tx));
-    if (admin) logger.info('Made the oldest eligible account the server admin', { userId: admin });
+    const target = databaseTarget(CONFIG.database.url);
+    if (target.kind === 'pg') {
+      await startPostgres(postgres(target.url), describeDatabase(target));
+    } else {
+      const db = getDb();
+      migrate(db, { migrationsFolder: './drizzle' });
+      foldUserEmailCase(db);
+      await finishSetup(openAsyncDatabase(db.$client).db);
+    }
     logger.info('Database migrations completed successfully');
   } catch (error) {
     const message = extractErrorMessage(error);
@@ -106,8 +195,16 @@ function checkpointPossible(): boolean {
   return !getDb().$client.inTransaction;
 }
 
-export function checkDatabaseHealth(): boolean {
+export async function checkDatabaseHealth(): Promise<boolean> {
   try {
+    if (ACTIVE_DIALECT === 'pg') {
+      const { appContext } = await import('../app-context');
+      const rows = await rawAll<{ health: number }>(
+        appContext().asyncDb,
+        sql.raw(UPKEEP_QUERIES.health)
+      );
+      return Number(rows[0]?.health) === 1;
+    }
     const result = upkeep('health') as { health: number } | null;
     return result?.health === 1;
   } catch (error) {
@@ -153,7 +250,7 @@ export function forceCheckpointWAL(): void {
 }
 
 export function startWalCheckpoints(intervalMs: number): (() => void) | null {
-  if (!CONFIG.database.appCheckpoints) return null;
+  if (!CONFIG.database.appCheckpoints || ACTIVE_DIALECT !== 'sqlite') return null;
   forceCheckpointWAL();
   const timer = setInterval(checkpointWAL, intervalMs);
   return () => {

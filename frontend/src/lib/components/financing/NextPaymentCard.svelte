@@ -1,10 +1,6 @@
 <script lang="ts">
-	import { Card, CardContent } from '#lib/components/ui/card/index.ts';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Progress } from '#lib/components/ui/progress/index.ts';
-	import { Calendar, CreditCard, ArrowRightLeft } from '@lucide/svelte';
-	import { formatCurrency, formatDateWith } from '#lib/utils/formatters.ts';
+	import { formatCurrency, formatDateWith, formatNumberUpTo } from '#lib/utils/formatters.ts';
 	import {
 		calculateNextPaymentDate,
 		remainingBalance,
@@ -19,7 +15,7 @@
 		lastPayment?: DerivedPaymentEntry;
 		paymentsLoaded?: boolean;
 		recordPaymentHref?: string;
-		progressPercentage?: number;
+		showProgress?: boolean;
 		onChangePayment?: () => void;
 		isOwner?: boolean;
 	}
@@ -29,7 +25,7 @@
 		lastPayment,
 		paymentsLoaded = true,
 		recordPaymentHref,
-		progressPercentage = 0,
+		showProgress = true,
 		onChangePayment,
 		isOwner = true
 	}: Props = $props();
@@ -55,38 +51,8 @@
 		}
 	});
 
-	let urgencyLevel = $derived(
-		daysUntilPayment < 0
-			? 'overdue'
-			: daysUntilPayment <= 3
-				? 'urgent'
-				: daysUntilPayment <= 7
-					? 'warning'
-					: 'normal'
-	);
-
-	let cardBorderClass = $derived(
-		urgencyLevel === 'overdue' || urgencyLevel === 'urgent'
-			? 'border-destructive'
-			: urgencyLevel === 'warning'
-				? 'border-warning'
-				: 'border-chart-2'
-	);
-
-	let badgeVariant = $derived<'default' | 'secondary' | 'destructive' | 'outline'>(
-		urgencyLevel === 'overdue' || urgencyLevel === 'urgent'
-			? 'destructive'
-			: urgencyLevel === 'warning'
-				? 'secondary'
-				: 'default'
-	);
-
 	let formattedDueDate = $derived(
-		formatDateWith(nextPaymentDate, {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
-		})
+		formatDateWith(nextPaymentDate, { month: 'short', day: 'numeric', year: 'numeric' })
 	);
 
 	let countdownText = $derived(
@@ -99,130 +65,125 @@
 					: `Due in ${daysUntilPayment} days`
 	);
 
-	// Percent uses text-foreground: chart colours fail WCAG AA on white.
-	let progressIndicatorClass = $derived(
-		progressPercentage > 75
-			? '[&_[data-slot=progress-indicator]]:bg-chart-2'
-			: progressPercentage >= 50
-				? '[&_[data-slot=progress-indicator]]:bg-chart-3'
-				: '[&_[data-slot=progress-indicator]]:bg-chart-1'
-	);
+	let pressing = $derived(daysUntilPayment <= 3);
+	let isLoan = $derived(financing.financingType === 'loan');
+	let hasRate = $derived(isLoan && !!financing.apr && financing.apr > 0);
+	let balance = $derived(remainingBalance(financing));
+
+	let split = $derived.by(() => {
+		if (!hasRate || financing.paymentFrequency !== 'monthly') return null;
+		const interest = Math.round(balance * ((financing.apr ?? 0) / 100 / 12) * 100) / 100;
+		const principal = Math.max(0, Math.min(balance, financing.paymentAmount - interest));
+		return { principal, interest };
+	});
 
 	let showMinimum = $derived(
 		minimumPayment !== null && financing.paymentAmount > minimumPayment + 0.01
 	);
 
-	let amountPaid = $derived(Math.max(0, financing.originalAmount - remainingBalance(financing)));
+	let terms = $derived(
+		[
+			hasRate ? `${formatNumberUpTo(financing.apr ?? 0, 2)}% APR` : null,
+			financing.paymentFrequency === 'monthly'
+				? null
+				: formatPaymentFrequency(financing.paymentFrequency),
+			financing.termMonths ? `${financing.termMonths} months` : null
+		]
+			.filter(Boolean)
+			.join(' · ')
+	);
+
+	let amountPaid = $derived(Math.max(0, financing.originalAmount - balance));
+	let progressPercentage = $derived(
+		financing.originalAmount > 0 ? Math.min(100, (amountPaid / financing.originalAmount) * 100) : 0
+	);
+	let canPlan = $derived(isOwner && !!onChangePayment && isLoan);
 </script>
 
-<Card class="border-2 {cardBorderClass}" role="region" aria-labelledby="next-payment-heading">
-	<CardContent class="p-4 sm:p-6">
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<div class="space-y-3">
-				<div class="flex items-start justify-between gap-3">
-					<div class="space-y-2 flex-1 min-w-0">
-						<div class="flex flex-col sm:flex-row sm:items-center gap-2">
-							<h3 class="text-base sm:text-lg font-semibold" id="next-payment-heading">
-								Next Payment
-							</h3>
-							<Badge variant={badgeVariant} class="w-fit text-xs" role="status" aria-live="polite">
-								{countdownText}
-							</Badge>
-						</div>
-
-						<div class="flex items-baseline gap-2">
-							<p class="text-2xl sm:text-3xl font-bold" aria-label="Payment amount">
-								{formatCurrency(financing.paymentAmount)}
-							</p>
-							{#if showMinimum}
-								<span class="text-sm font-normal text-muted-foreground">
-									Min: {formatCurrency(minimumPayment ?? 0)}
-								</span>
-							{/if}
-						</div>
-
-						<p class="text-xs sm:text-sm text-muted-foreground">
-							Due on <time datetime={nextPaymentDate.toISOString()}>{formattedDueDate}</time>
-						</p>
-
-						<div class="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-							<span class="font-medium">{formatPaymentFrequency(financing.paymentFrequency)}</span>
-							<span aria-hidden="true">•</span>
-							<span>{financing.financingType === 'loan' ? 'Loan' : 'Lease'} Payment</span>
-							{#if financing.apr && financing.apr > 0}
-								<span aria-hidden="true">•</span>
-								<span>{financing.apr}% APR</span>
-							{/if}
-						</div>
-					</div>
-
-					<div
-						class="rounded-full bg-chart-2/10 p-2 sm:p-3 flex-shrink-0 lg:hidden"
-						aria-hidden="true"
+<section aria-labelledby="next-payment-heading" class="space-y-1">
+	<div class="flex items-baseline justify-between gap-3">
+		<h3 class="text-base font-semibold" id="next-payment-heading">Next payment</h3>
+		{#if isOwner && recordPaymentHref}
+			<Button
+				href={recordPaymentHref}
+				variant="ghost"
+				size="sm"
+				class="-my-1 -mr-2 font-semibold text-accent-ink"
+			>
+				Record payment
+			</Button>
+		{/if}
+	</div>
+	<ul class="divide-y divide-border">
+		<li class="flex items-center justify-between gap-4 py-3">
+			<div class="min-w-0">
+				<p class="font-semibold">
+					<time datetime={nextPaymentDate.toISOString()}>{formattedDueDate}</time>
+					<span
+						class="ml-1 text-sm font-normal {pressing
+							? 'text-destructive'
+							: 'text-muted-foreground'}"
+						role="status"
+						aria-live="polite"
 					>
-						<Calendar class="h-5 w-5 sm:h-6 sm:w-6 text-chart-2" />
-					</div>
-				</div>
-
-				{#if isOwner && (recordPaymentHref || (onChangePayment && financing.financingType === 'loan'))}
-					<div class="flex flex-wrap gap-2">
-						{#if recordPaymentHref}
-							<Button href={recordPaymentHref} class="w-full sm:w-auto">
-								<CreditCard class="h-4 w-4 mr-2" />
-								Record Payment
-							</Button>
-						{/if}
-						{#if onChangePayment && financing.financingType === 'loan'}
-							<Button variant="outline" class="w-full sm:w-auto" onclick={onChangePayment}>
-								<ArrowRightLeft class="h-4 w-4 mr-2" />
-								Change Payment
-							</Button>
-						{/if}
-					</div>
+						{countdownText}
+					</span>
+				</p>
+				{#if split}
+					<p class="text-sm text-muted-foreground">
+						{formatCurrency(split.principal)} principal · {formatCurrency(split.interest)} interest
+					</p>
 				{/if}
 			</div>
-
-			<div class="space-y-4 lg:border-l lg:pl-6 border-border">
-				<div class="space-y-2">
-					<div class="flex justify-between items-center">
-						<span class="text-sm font-medium text-muted-foreground">Payment Progress</span>
-						<!-- text-foreground: chart colours fail WCAG AA on white. -->
-						<span class="text-lg font-bold text-foreground">
-							{Math.round(progressPercentage)}%
-						</span>
-					</div>
-					<div>
-						<Progress
-							value={progressPercentage}
-							max={100}
-							class="h-3 {progressIndicatorClass}"
-							aria-label="Payment progress"
-						/>
-					</div>
-				</div>
-
-				<div class="grid grid-cols-3 gap-3 text-center">
-					<div>
-						<p class="text-xs text-muted-foreground">Original</p>
-						<p class="text-sm sm:text-base font-semibold">
-							{formatCurrency(financing.originalAmount)}
-						</p>
-					</div>
-					<div>
-						<p class="text-xs text-muted-foreground">Principal paid</p>
-						<!-- text-foreground: chart-2 text fails WCAG AA on white. -->
-						<p class="text-sm sm:text-base font-semibold text-foreground">
-							{formatCurrency(amountPaid)}
-						</p>
-					</div>
-					<div>
-						<p class="text-xs text-muted-foreground">Remaining</p>
-						<p class="text-sm sm:text-base font-semibold">
-							{formatCurrency(remainingBalance(financing))}
-						</p>
-					</div>
-				</div>
+			<div class="shrink-0 text-right">
+				<p class="font-semibold tabular-nums" aria-label="Payment amount">
+					{formatCurrency(financing.paymentAmount)}
+				</p>
+				{#if showMinimum}
+					<p class="text-xs font-semibold text-muted-foreground tabular-nums">
+						Min: {formatCurrency(minimumPayment ?? 0)}
+					</p>
+				{/if}
 			</div>
-		</div>
-	</CardContent>
-</Card>
+		</li>
+		<li class="flex items-center justify-between gap-4 py-3">
+			<p class="font-semibold">{isLoan ? 'Loan' : 'Lease'} terms</p>
+			<p class="text-right text-sm text-muted-foreground">{terms}</p>
+		</li>
+		{#if showProgress}
+			<li class="flex items-center justify-between gap-4 py-3">
+				<div class="min-w-0">
+					<p class="font-semibold">Paid so far</p>
+					<p class="text-sm text-muted-foreground">
+						{formatCurrency(amountPaid)} of {formatCurrency(financing.originalAmount)} · {formatCurrency(
+							balance
+						)} left
+					</p>
+				</div>
+				<p
+					class="shrink-0 font-semibold tabular-nums"
+					role="progressbar"
+					aria-label="Payment progress"
+					aria-valuenow={progressPercentage}
+					aria-valuemin={0}
+					aria-valuemax={100}
+				>
+					{Math.round(progressPercentage)}%
+				</p>
+			</li>
+		{/if}
+		{#if canPlan}
+			<li class="flex items-center justify-between gap-4 py-3">
+				<div class="min-w-0">
+					<p class="font-semibold">Paying extra?</p>
+					<p class="text-sm text-muted-foreground">
+						See how a bigger payment changes the payoff date
+					</p>
+				</div>
+				<Button variant="outline" class="shrink-0" onclick={onChangePayment}>
+					Payment planner
+				</Button>
+			</li>
+		{/if}
+	</ul>
+</section>

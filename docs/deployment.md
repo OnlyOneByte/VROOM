@@ -96,7 +96,7 @@ These have defaults, but the defaults only suit localhost.
 | `FRONTEND_PORT` | `3000` | Host port in the example stacks |
 | `ORIGIN` | unset (derived from the request) | Frontend container only. The public origin the server reports, e.g. `https://yourdomain.com`, instead of deriving it from the request headers. Read at startup, so a change needs a container restart, not a rebuild. Leave it unset unless header-derived origins are wrong behind your proxy; an empty value stops the frontend from starting |
 | `HOST` | `127.0.0.1` | Address the backend binds. The default is loopback only, so a direct install is not exposed until you say so; containers need `0.0.0.0` (both Dockerfiles and example stacks set it). The backend exits naming `HOST` if this machine has no such address |
-| `DATABASE_URL` | `./data/vroom.db` | SQLite file. Both Dockerfiles and example stacks set `/app/data/vroom.db` |
+| `DATABASE_URL` | `./data/vroom.db` | SQLite file path (or `sqlite:<path>`). Both Dockerfiles and example stacks set `/app/data/vroom.db`. Opt-in Postgres (#1635, in progress): `postgres://user:password@host:5432/database` runs the Postgres migrations at startup and stops with a clear message if the server can't be reached. Any other scheme refuses to start |
 | `DATA_PATH` | `./data` | Host directory bind-mounted at `/app/data` by `docker-compose.yml`. Must exist |
 | `WAL_CHECKPOINTS` | `on` | `off` stops the backend's own WAL checkpoints (every 15 minutes, at start and at shutdown), so a replication tool such as Litestream can own them. Leave it `on` without one |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |

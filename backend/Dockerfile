@@ -21,10 +21,11 @@ RUN bun install --production --frozen-lockfile && \
 
 # dist/index.js bundles every module except bun:sqlite, node builtins and the OCR engine (which
 # runs its own worker script and model files from node_modules), and startup migrations read
-# ./drizzle, so these and node_modules are the whole runtime. dist/scripts/rotate-provider-keys.js is the
+# ./drizzle (./drizzle-pg on Postgres), so these and node_modules are the whole runtime. dist/scripts/rotate-provider-keys.js is the
 # key rotation command, bundled the same way. Don't copy src/: it can't run without devDependencies.
 COPY --chown=bun:bun --from=builder /app/dist ./dist
 COPY --chown=bun:bun --from=builder /app/drizzle ./drizzle
+COPY --chown=bun:bun --from=builder /app/drizzle-pg ./drizzle-pg
 
 RUN mkdir -p /app/data && chown -R bun:bun /app/data
 
