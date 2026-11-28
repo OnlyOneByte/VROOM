@@ -195,7 +195,7 @@ describe('dashboard data', () => {
 		const items = attentionItems(reminders, [], () => 'Daily Driver', String, NOW);
 
 		expect(items.map(item => [item.title, item.status, item.detail])).toEqual([
-			['Oil change · Daily Driver', 'overdue', 'Reached 45,000 on the odometer']
+			['Oil change · Daily Driver', 'overdue', 'Reached 45,000 mi']
 		]);
 	});
 
@@ -227,6 +227,80 @@ describe('dashboard data', () => {
 			['brakes', 'soon', 'Due in 640 mi'],
 			['metric-close', 'soon', 'Due in 1,400 km']
 		]);
+	});
+
+	test('overdue items come first, then dated ones coming up, then mileage close by, whatever order they arrive in', () => {
+		const reminders = [
+			{
+				reminder: {
+					id: 'brakes',
+					name: 'Brake check',
+					isActive: true,
+					triggerMode: 'mileage',
+					nextDueDate: null,
+					nextDueOdometer: 41000
+				},
+				vehicleIds: ['v1'],
+				mileageDue: false,
+				currentOdometer: 40360
+			},
+			{
+				reminder: {
+					id: 'wash',
+					name: 'Car wash',
+					isActive: true,
+					triggerMode: 'time',
+					nextDueDate: new Date(NOW + DAY).toISOString(),
+					nextDueOdometer: null
+				},
+				vehicleIds: ['v1'],
+				mileageDue: false,
+				currentOdometer: null
+			},
+			{
+				reminder: {
+					id: 'tyres',
+					name: 'Tyre rotation',
+					isActive: true,
+					triggerMode: 'mileage',
+					nextDueDate: null,
+					nextDueOdometer: 40000
+				},
+				vehicleIds: ['v1'],
+				mileageDue: true,
+				currentOdometer: 40360
+			}
+		] as unknown as ReminderWithVehicles[];
+
+		const items = attentionItems(reminders, [], () => undefined, String, NOW);
+
+		expect(items.map(item => [item.title, item.status])).toEqual([
+			['Tyre rotation', 'overdue'],
+			['Car wash', 'soon'],
+			['Brake check', 'soon']
+		]);
+		expect(items[0]?.detail).toBe('Reached 40,000 mi');
+	});
+
+	test('a date-and-mileage reminder whose date is far off still shows when its mileage is close', () => {
+		const reminders = [
+			{
+				reminder: {
+					id: 'service',
+					name: 'Service',
+					isActive: true,
+					triggerMode: 'both',
+					nextDueDate: new Date(NOW + 200 * DAY).toISOString(),
+					nextDueOdometer: 41000
+				},
+				vehicleIds: ['v1'],
+				mileageDue: false,
+				currentOdometer: 40500
+			}
+		] as unknown as ReminderWithVehicles[];
+
+		const items = attentionItems(reminders, [], () => undefined, String, NOW);
+		expect(items.map(item => [item.status, item.detail])).toEqual([['soon', 'Due in 500 mi']]);
 	});
 
 	test('a dated reminder due soon is listed by its date even when its mileage is close too', () => {

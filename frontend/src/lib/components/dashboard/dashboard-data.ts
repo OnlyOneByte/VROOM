@@ -114,11 +114,12 @@ export function attentionItems(
 		if (!reminder.isActive) continue;
 		const names = vehicleIds.map(vehicleName).filter(Boolean).join(', ');
 		const title = names ? `${reminder.name} · ${names}` : reminder.name;
+		const unit = distanceLabel(vehicleIds[0] ?? '');
 		if (mileageDue && reminder.nextDueOdometer !== null) {
 			items.push({
 				id: `reminder-${reminder.id}`,
 				title,
-				detail: `Reached ${formatNumber(reminder.nextDueOdometer, 0)} on the odometer`,
+				detail: `Reached ${formatNumber(reminder.nextDueOdometer, 0)} ${unit}`,
 				status: 'overdue',
 				dueAt: now,
 				href: 'reminders'
@@ -128,7 +129,6 @@ export function attentionItems(
 		const dueAt = reminder.nextDueDate ? new Date(reminder.nextDueDate).getTime() : Infinity;
 		if (dueAt > reminderHorizon) {
 			const target = reminder.nextDueOdometer;
-			const unit = distanceLabel(vehicleIds[0] ?? '');
 			const left =
 				typeof currentOdometer === 'number' && target !== null ? target - currentOdometer : null;
 			if (left !== null && left > 0 && left <= soonDistance(unit)) {
@@ -137,7 +137,7 @@ export function attentionItems(
 					title,
 					detail: `Due in ${formatNumber(left, 0)} ${unit}`,
 					status: 'soon',
-					dueAt: now,
+					dueAt: reminderHorizon,
 					href: 'reminders'
 				});
 			}
@@ -169,7 +169,8 @@ export function attentionItems(
 		});
 	}
 
-	return items.sort((a, b) => a.dueAt - b.dueAt);
+	const rank = (item: AttentionItem) => (item.status === 'overdue' ? 0 : 1);
+	return items.sort((a, b) => rank(a) - rank(b) || a.dueAt - b.dueAt);
 }
 
 export function highestMonth(

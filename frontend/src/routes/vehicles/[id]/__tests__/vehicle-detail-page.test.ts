@@ -1149,7 +1149,7 @@ describe('vehicle detail page Next up and Recent expenses', () => {
 		const card = (await screen.findByRole('heading', { name: 'Next up' })).closest(
 			'[data-slot="card"]'
 		) as HTMLElement;
-		expect(card.textContent).toContain('Reached 40,000 on the odometer');
+		expect(card.textContent).toContain('Reached 40,000 km');
 		expect(card.textContent).toContain('Due in 640 km');
 		expect(card.textContent).not.toContain('Oil change');
 	});
