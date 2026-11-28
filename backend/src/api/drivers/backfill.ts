@@ -1,4 +1,4 @@
-import { and, type Column, desc, eq, isNull } from 'drizzle-orm';
+import { and, type Column, desc, eq, isNull, or } from 'drizzle-orm';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import { firstRow } from '../../db/first-row';
 import {
@@ -161,9 +161,18 @@ async function setDriver(
     match(expenses.paidByDriverId),
     visibleExpenses(hideFinancials)
   );
+  const current = await tx
+    .select({ groupId: expenses.groupId, userId: expenses.userId })
+    .from(expenses)
+    .where(target)
+    .then(firstRow);
+  if (!current) return false;
+  const versionScope = current.groupId
+    ? or(target, and(eq(expenses.groupId, current.groupId), eq(expenses.userId, current.userId)))
+    : target;
   const rows = await tx
     .update(expenses)
-    .set({ paidByDriverId: to, updatedAt: await nextUpdatedAtFor(tx, target) })
+    .set({ paidByDriverId: to, updatedAt: await nextUpdatedAtFor(tx, versionScope) })
     .where(target)
     .returning({ id: expenses.id });
   return rows.length > 0;

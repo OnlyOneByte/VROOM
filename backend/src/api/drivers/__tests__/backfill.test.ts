@@ -165,6 +165,36 @@ describe('backfilling past entries', () => {
     expect((await ctx.authed('POST', `${base}/backfill/preview`, range)).status).toBe(400);
   });
 
+  test('a split leg it fills in moves past the version of its other legs', async () => {
+    await seedCar(ctx, 'bf-car-2');
+    const later = 4102444800;
+    await ctx.sql.run(
+      "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, group_id, group_total, split_method, updated_at) VALUES ('bf-leg-1', ?, ?, 'maintenance', ?, 50, 'bf-group', 100, 'even', ?)",
+      [CAR, ctx.user.id, Math.floor(Date.parse('2024-03-10') / 1000), later - 100]
+    );
+    await ctx.sql.run(
+      "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, group_id, group_total, split_method, updated_at) VALUES ('bf-leg-2', 'bf-car-2', ?, 'maintenance', ?, 50, 'bf-group', 100, 'even', ?)",
+      [ctx.user.id, Math.floor(Date.parse('2024-03-10') / 1000), later]
+    );
+    const guest = await post<{ id: string }>(base, { name: 'Riley' }, 201);
+    await post(
+      `${base}/backfill`,
+      {
+        mode: 'range',
+        driverId: guest.id,
+        from: '2024-03-01T00:00:00.000Z',
+        to: '2024-03-31T23:59:59.000Z',
+      },
+      201
+    );
+
+    expect(await payerOf('bf-leg-1')).toBe(guest.id);
+    const leg = (await ctx.sql.get("SELECT updated_at AS t FROM expenses WHERE id = 'bf-leg-1'")) as {
+      t: number;
+    };
+    expect(leg.t).toBeGreaterThan(later);
+  });
+
   test('"who logged it" credits archived drivers and skips people who never drove the car', async () => {
     await ctx.sql.run(
       "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, created_by) VALUES ('bf-stranger', ?, ?, 1200, 1250, 'personal', ?, ?)",
