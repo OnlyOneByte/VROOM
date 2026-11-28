@@ -72,18 +72,21 @@
 	});
 
 	let meta = $derived.by(() => {
+		const keep = (text: string) => text.replaceAll(' ', '\u00a0');
 		const parts: string[] = [];
 		if (vehicleIds.length > 0) {
-			parts.push(vehicleIds.map(id => vehicleNames.get(id) ?? 'Vehicle').join(', '));
+			parts.push(vehicleIds.map(id => keep(vehicleNames.get(id) ?? 'Vehicle')).join(', '));
 		}
-		if (reminder.nextDueDate !== null) parts.push(formatDate(reminder.nextDueDate));
+		if (reminder.nextDueDate !== null) parts.push(keep(formatDate(reminder.nextDueDate)));
 		else if (reminder.nextDueOdometer !== null && group === 'paused') {
-			parts.push(`at ${formatNumber(reminder.nextDueOdometer, 0)} on the odometer`);
+			parts.push(keep(`at ${formatNumber(reminder.nextDueOdometer, 0)} on the odometer`));
 		}
-		if (reminder.expenseAmount != null) parts.push(`~${formatCurrency(reminder.expenseAmount)}`);
+		if (reminder.expenseAmount != null) {
+			parts.push(keep(`~${formatCurrency(reminder.expenseAmount)}`));
+		}
 		const every = frequencyLabel(reminder);
-		if (every) parts.push(every.toLowerCase());
-		return parts.map(part => part.replaceAll(' ', '\u00a0')).join(' · ');
+		if (every) parts.push(keep(every.toLowerCase()));
+		return parts.join(' · ');
 	});
 
 	let canResume = $derived(group === 'paused' && vehicleIds.length > 0);
@@ -115,7 +118,7 @@
 	<div class="min-w-0 flex-1">
 		<p class="truncate font-semibold">{reminder.name}</p>
 		{#if meta.length > 0}
-			<p class="text-sm text-muted-foreground">{meta}</p>
+			<p class="text-sm wrap-anywhere text-muted-foreground">{meta}</p>
 		{/if}
 		{#if vehicleIds.length === 0 && group === 'paused'}
 			<p class="text-sm text-muted-foreground">No vehicle. Edit to choose one, then resume.</p>

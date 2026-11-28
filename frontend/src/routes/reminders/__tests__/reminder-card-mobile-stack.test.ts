@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const PAGE = readFileSync(join(HERE, '..', '+page.svelte'), 'utf8');
 const ROW = readFileSync(
 	join(HERE, '..', '..', '..', 'lib', 'components', 'reminders', 'ReminderRow.svelte'),
 	'utf8'
@@ -13,6 +14,10 @@ describe('reminder row mobile layout (occlusion guard)', () => {
 	test('the text column shrinks and truncates instead of being pushed under the actions', () => {
 		expect(ROW).toMatch(/class="min-w-0 flex-1"/);
 		expect(ROW).toMatch(/class="truncate font-semibold"/);
+	});
+
+	test('the sections column can shrink below a long row', () => {
+		expect(PAGE).toMatch(/class="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-2"/);
 	});
 
 	test('the status column and the menu button never shrink', () => {
