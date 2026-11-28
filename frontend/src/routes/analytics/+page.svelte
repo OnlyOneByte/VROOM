@@ -23,6 +23,7 @@
 	} from '#lib/components/analytics/analytics-filters.ts';
 	import {
 		cancelPrefetch,
+		chartKind,
 		exploreRequest,
 		parseExplore,
 		prefetchExplore,
@@ -219,6 +220,10 @@
 	onMount(() => {
 		prefetchExplore(exploreRequest(explore, dateRange, vehicleIds));
 		import('#lib/components/analytics/explore/ExploreTab.svelte').catch(() => {});
+		(chartKind(explore) === 'line'
+			? import('#lib/components/analytics/explore/explore-line-chart.ts')
+			: import('#lib/components/analytics/explore/explore-bar-chart.ts')
+		).catch(() => {});
 		void loadVehicles();
 	});
 </script>

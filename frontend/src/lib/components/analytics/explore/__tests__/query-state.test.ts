@@ -8,6 +8,7 @@ import {
 	apiQuery,
 	applyPreset,
 	chartForm,
+	chartKind,
 	describeQuery,
 	metricLabel,
 	normalizeExplore,
@@ -583,5 +584,23 @@ describe('Explore numbers table', () => {
 		const csv = numbersCsv(numbersTable(buckets.slice(0, 1), risky, false), 'Month');
 		expect(csv.split('\r\n')[0]).toBe(`Month,"'=HYPERLINK(""x"")",'@me`);
 		expect(csv.split('\r\n')[1]).toBe('2026-06,-5,1');
+	});
+});
+
+describe('chartKind', () => {
+	test.each([
+		[{}, 'bar'],
+		[{ per: 'none' }, 'bar'],
+		[{ per: 'none', metric: 'mpg' }, 'bar'],
+		[{ split: 'tag' }, 'bar'],
+		[{ split: 'none' }, 'bar'],
+		[{ split: 'vehicle' }, 'bar'],
+		[{ compare: 'cars' }, 'bar'],
+		[{ compare: 'cars', metric: 'mpg' }, 'line'],
+		[{ compare: 'cars', metric: 'costPerDistance' }, 'line'],
+		[{ metric: 'mpg' }, 'line'],
+		[{ compare: 'prevYear' }, 'line']
+	] as const)('%o draws a %s chart', (change, kind) => {
+		expect(chartKind({ ...DEFAULT_EXPLORE, ...change } as ExploreQuery)).toBe(kind);
 	});
 });

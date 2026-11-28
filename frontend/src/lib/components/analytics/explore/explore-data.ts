@@ -19,7 +19,7 @@ import {
 	getVolumeUnitLabel
 } from '#lib/utils/units.ts';
 import type { ChartAnnotations } from '#lib/components/charts/types.ts';
-import { metricInfo, type ExploreQuery } from './query-state';
+import { isAdditive, metricInfo, type ExploreQuery } from './query-state';
 
 export interface ExploreSeries {
 	key: string;
@@ -71,10 +71,7 @@ export function seriesFor(
 	});
 }
 
-export function isAdditive(query: ExploreQuery): boolean {
-	const { metric } = metricInfo(query.metric);
-	return metric === 'cost' || metric === 'count' || metric === 'volume' || metric === 'distance';
-}
+export { isAdditive };
 
 function sum(values: Array<number | null>): number {
 	return values.reduce<number>((total, v) => total + (v ?? 0), 0);

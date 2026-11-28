@@ -15,6 +15,9 @@
 		"/vehicles/[id]/odometer/[entryId]/edit": 65
 	},
 	"firstView": {
-		"/analytics": ["src/lib/components/analytics/explore/ExploreTab.svelte"]
+		"/analytics": [
+			"src/lib/components/analytics/explore/ExploreTab.svelte",
+			"src/lib/components/analytics/explore/explore-bar-chart.ts"
+		]
 	}
 }

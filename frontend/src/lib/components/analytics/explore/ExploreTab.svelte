@@ -3,7 +3,6 @@
 	import { ChartColumn, RotateCcw, SearchX } from '@lucide/svelte';
 	import LoadErrorCard from '#lib/components/common/LoadErrorCard.svelte';
 	import EmptyState from '#lib/components/common/empty-state.svelte';
-	import { AppBarChart, AppLineChart } from '#lib/components/charts/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.ts';
@@ -25,6 +24,7 @@
 		EXPLORE_COMPARES,
 		EXPLORE_INTERVALS,
 		chartForm,
+		chartKind,
 		exploreRequest,
 		queryCache,
 		takePrefetched,
@@ -139,6 +139,25 @@
 		}
 	}
 
+	let barChart = $state<(typeof import('./explore-bar-chart.ts'))['AppBarChart']>();
+	let lineChart = $state<(typeof import('./explore-line-chart.ts'))['AppLineChart']>();
+	let chartsError = $state<{ kind: 'bar' | 'line'; message: string } | null>(null);
+
+	function importChart(kind: 'bar' | 'line'): Promise<unknown> {
+		return kind === 'bar'
+			? import('./explore-bar-chart.ts').then(module => (barChart = module.AppBarChart))
+			: import('./explore-line-chart.ts').then(module => (lineChart = module.AppLineChart));
+	}
+
+	async function loadChart(kind: 'bar' | 'line'): Promise<void> {
+		try {
+			await importChart(kind);
+			if (chartsError?.kind === kind) chartsError = null;
+		} catch (e) {
+			chartsError = { kind, message: userFacingErrorMessage(e) };
+		}
+	}
+
 	let chartReady = $state(false);
 	$effect(() => {
 		if (!response || chartReady) return;
@@ -168,6 +187,23 @@
 	let intervalLabel = $derived(
 		EXPLORE_INTERVALS.find(i => i.value === shown.per)?.label.toLowerCase() ?? 'bucket'
 	);
+	let kind = $derived(chartKind(shown));
+	let chartLoaded = $derived(kind === 'line' ? !!lineChart : !!barChart);
+
+	let chartError = $derived(chartsError?.kind === kind ? chartsError.message : null);
+
+	$effect(() => {
+		if (!chartLoaded && !chartError) untrack(() => loadChart(kind));
+	});
+
+	$effect(() => {
+		if (!chartLoaded) return;
+		const timer = setTimeout(() => {
+			importChart('bar').catch(() => {});
+			importChart('line').catch(() => {});
+		}, 2000);
+		return () => clearTimeout(timer);
+	});
 	let compareLabel = $derived(
 		shown.compare === 'prevYear' ? 'the year before' : 'the period before'
 	);
@@ -591,7 +627,13 @@
 			message={error}
 			onRetry={() => load(request, requestKey, query)}
 		/>
-	{:else if !response || (!chartReady && hasData(response))}
+	{:else if chartError && response && hasData(response)}
+		<LoadErrorCard
+			title="Couldn't load this chart"
+			message={chartError}
+			onRetry={() => loadChart(kind)}
+		/>
+	{:else if !response || (hasData(response) && (!chartReady || !chartLoaded))}
 		<div aria-busy="true" aria-label="Loading the chart">
 			<Skeleton class="h-[300px] w-full" />
 		</div>
@@ -620,6 +662,8 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
+		{@const AppBarChart = barChart!}
+		{@const AppLineChart = lineChart!}
 		{#if error}
 			<LoadErrorCard
 				title="Couldn't update the chart"
