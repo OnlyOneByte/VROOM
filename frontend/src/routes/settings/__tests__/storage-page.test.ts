@@ -242,7 +242,7 @@ describe('Backups and storage page backups', () => {
 		await mount();
 		await backUpNow();
 		expect(toast.warning).toHaveBeenCalledWith(
-			"Backed up to 2 places. Old backups couldn't be removed from Office S3. Its storage key needs permission to list and delete files.",
+			"Backed up to 2 places. Old backups couldn't be removed from Office S3. VROOM needs permission to list and delete files there.",
 			{ id: 'toast-1' }
 		);
 		expect(toast.success).not.toHaveBeenCalled();

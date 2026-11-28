@@ -141,8 +141,7 @@
 			.filter(([, result]) => Object.values(result.capabilities).some(c => c.warning))
 			.map(([id]) => id);
 		if (warned.length === 0) return null;
-		const key = warned.length === 1 ? 'Its storage key needs' : 'Their storage keys need';
-		return `Old backups couldn't be removed from ${names(warned)}. ${key} permission to list and delete files.`;
+		return `Old backups couldn't be removed from ${names(warned)}. VROOM needs permission to list and delete files there.`;
 	}
 
 	function backupProblem(

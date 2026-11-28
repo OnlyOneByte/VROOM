@@ -241,14 +241,19 @@
 						<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
 						<p class="text-xs text-muted-foreground">Store ZIP backups in this storage</p>
 						{#if backupWarning}
-							<p class="text-xs text-warning" data-testid="backup-warning">
-								Old backups weren't removed after the last backup. The storage key needs permission
-								to list and delete files.
+							<p
+								id="backup-warning-{provider.id}"
+								class="text-sm text-warning"
+								data-testid="backup-warning"
+							>
+								Old backups weren't removed after the last backup. VROOM needs permission to list
+								and delete files in this storage.
 							</p>
 						{/if}
 					</div>
 					<Switch
 						id="backup-{provider.id}"
+						aria-describedby={backupWarning ? `backup-warning-${provider.id}` : undefined}
 						checked={backupEnabled}
 						onCheckedChange={checked => onBackupToggle?.(provider.id, checked === true)}
 					/>
