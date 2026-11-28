@@ -98,8 +98,8 @@
 {#if showAmortizationChart}
 	<AppBarChart
 		level={3}
-		title="Amortization Schedule"
-		description="Payment breakdown per month — principal vs interest"
+		title="Payment schedule"
+		description="Principal and interest in each payment"
 		data={amortizationChartData}
 		x="paymentNumber"
 		y={['principal', 'interest']}

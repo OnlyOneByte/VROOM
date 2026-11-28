@@ -160,9 +160,9 @@
 	}
 
 	.dial-caption {
-		font-size: 10px;
+		font-size: 14px;
 		font-weight: 700;
-		letter-spacing: 0.16em;
+		letter-spacing: 0.08em;
 	}
 
 	.dial-value {

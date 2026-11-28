@@ -298,7 +298,7 @@ describe('FinanceTab loan summary', () => {
 		expect(screen.getByText('APR Not Set')).toBeTruthy();
 		expect(screen.queryByText('Principal vs Interest')).toBeNull();
 		expect(screen.queryByText('Total Cost of Loan')).toBeNull();
-		expect(screen.queryByText('Amortization Schedule')).toBeNull();
+		expect(screen.queryByText('Payment schedule')).toBeNull();
 	});
 
 	test('an interest-bearing loan shows no APR warning', async () => {
