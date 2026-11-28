@@ -4,11 +4,12 @@ import {
   createTestApp,
   type DataEnvelope,
   json,
+  ON_POSTGRES,
   SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
 
-const SYNC_STATUS_MAX_STATEMENTS = 11;
+const SYNC_STATUS_MAX_STATEMENTS = ON_POSTGRES ? 9 : 11;
 
 let ctx: TestApp;
 
