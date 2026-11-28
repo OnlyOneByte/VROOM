@@ -163,7 +163,7 @@ jobs:
           kill "$pid"
           wait "$pid" || true
 
-      - name: Boot on Postgres and restore the backup with Replace All
+      - name: Boot on Postgres and restore the backup with Replace everything
         run: |
           DATABASE_URL="$POSTGRES_URL" nohup bun src/index.ts > "$RUNNER_TEMP/postgres.log" 2>&1 &
           pid=$!

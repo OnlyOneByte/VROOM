@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { readFileSync, writeFileSync } from 'node:fs';
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
+import { builtInRoleId } from '../permissions/grants';
 
 export const MOVE_ORIGIN = 'http://127.0.0.1:4173';
 const DAY_SECONDS = 86_400;
@@ -34,6 +35,8 @@ export async function postgresSession(url: string): Promise<string> {
   try {
     await sql`INSERT INTO users (id, email, display_name, created_at, updated_at)
       VALUES (${userId}, ${`move-${userId}@vroom.test`}, 'Moved account', ${now}, ${now})`;
+    await sql`INSERT INTO role_assignments (id, user_id, role_id, scope_id, created_at)
+      VALUES (${newId()}, ${userId}, ${builtInRoleId('member')}, NULL, ${now})`;
     await sql`INSERT INTO sessions (id, user_id, expires_at)
       VALUES (${session}, ${userId}, ${now + DAY_SECONDS})`;
   } finally {
