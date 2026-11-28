@@ -20,7 +20,7 @@ import type {
   StorageRef,
   UploadParams,
 } from './storage-provider';
-import { credentialFailureOf } from './storage-provider';
+import { assertWithinSize, credentialFailureOf, type DownloadOptions } from './storage-provider';
 
 interface S3Credentials {
   accessKeyId: string;
@@ -158,7 +158,7 @@ export class S3CompatProvider implements StorageProvider {
     };
   }
 
-  async download(ref: StorageRef): Promise<Buffer> {
+  async download(ref: StorageRef, options?: DownloadOptions): Promise<Buffer> {
     const response = await this.client.send(
       new GetObjectCommand({
         Bucket: this.bucket,
@@ -170,7 +170,15 @@ export class S3CompatProvider implements StorageProvider {
       throw new Error(`Empty response body for key: ${ref.externalId}`);
     }
 
-    return Buffer.from(await response.Body.transformToByteArray());
+    try {
+      assertWithinSize(response.ContentLength ?? 0, options);
+    } catch (error) {
+      (response.Body as { destroy?: () => void }).destroy?.();
+      throw error;
+    }
+    const buffer = Buffer.from(await response.Body.transformToByteArray());
+    assertWithinSize(buffer.length, options);
+    return buffer;
   }
 
   async delete(ref: StorageRef): Promise<void> {

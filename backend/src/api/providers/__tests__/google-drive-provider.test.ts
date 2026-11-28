@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { SyncErrorCode } from '../../../errors';
+import { PayloadTooLargeError, SyncErrorCode } from '../../../errors';
 import {
   FakeGoogleStore,
   googleApiError,
@@ -105,6 +105,22 @@ describe('GoogleDriveProvider', () => {
       });
       const ref: StorageRef = { providerType: 'google-drive', externalId: up.externalId };
       expect((await provider.download(ref)).equals(Buffer.from([9, 8, 7]))).toBe(true);
+    });
+
+    test('refuses a file over maxBytes before downloading its content', async () => {
+      const up = await provider.upload({
+        fileName: 'big.zip',
+        buffer: Buffer.alloc(64),
+        mimeType: 'application/zip',
+        entityType: 'backup',
+        entityId: 'u-1',
+        pathHint: '',
+      });
+      const ref: StorageRef = { providerType: 'google-drive', externalId: up.externalId };
+      await expect(provider.download(ref, { maxBytes: 32 })).rejects.toBeInstanceOf(
+        PayloadTooLargeError
+      );
+      expect((await provider.download(ref, { maxBytes: 64 })).length).toBe(64);
     });
   });
 

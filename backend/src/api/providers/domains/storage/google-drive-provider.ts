@@ -8,7 +8,7 @@ import type {
   StorageRef,
   UploadParams,
 } from './storage-provider';
-import { credentialFailureOf } from './storage-provider';
+import { assertWithinSize, credentialFailureOf, type DownloadOptions } from './storage-provider';
 
 export class GoogleDriveProvider implements StorageProvider {
   readonly type = 'google-drive';
@@ -36,8 +36,13 @@ export class GoogleDriveProvider implements StorageProvider {
     };
   }
 
-  async download(ref: StorageRef): Promise<Buffer> {
-    return this.driveService.downloadFile(ref.externalId);
+  async download(ref: StorageRef, options?: DownloadOptions): Promise<Buffer> {
+    if (options?.maxBytes !== undefined) {
+      assertWithinSize(await this.driveService.getFileSize(ref.externalId), options);
+    }
+    const buffer = await this.driveService.downloadFile(ref.externalId);
+    assertWithinSize(buffer.length, options);
+    return buffer;
   }
 
   async delete(ref: StorageRef): Promise<void> {

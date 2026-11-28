@@ -554,7 +554,10 @@ class BackupService {
   async downloadBackup(userId: string, providerId: string, fileRef: string): Promise<Buffer> {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
-    return provider.download({ providerType: provider.type, externalId: fileRef });
+    return provider.download(
+      { providerType: provider.type, externalId: fileRef },
+      { maxBytes: CONFIG.backup.maxFileSize }
+    );
   }
 
   createBackup(userId: string): Promise<BackupData> {

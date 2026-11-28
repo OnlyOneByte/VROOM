@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { PayloadTooLargeError } from '../../../errors';
 import { ALLOW_PRIVATE, BLOCK_PRIVATE, EndpointNotAllowedError } from '../../../utils/outbound-url';
 import { S3CompatProvider } from '../domains/storage/s3-compat-provider';
 import type { StorageRef } from '../domains/storage/storage-provider';
@@ -158,6 +159,32 @@ describe('S3CompatProvider', () => {
         Bucket: 'test-bucket',
         Key: 'vroom/vehicle/v-1/photo.jpg',
       });
+    });
+
+    test('refuses an object over maxBytes without reading its body', async () => {
+      const read = mock(() => Promise.resolve(new Uint8Array(64)));
+      const destroy = mock(() => {});
+      mockSend.mockResolvedValueOnce({
+        ContentLength: 64,
+        Body: { transformToByteArray: read, destroy },
+      });
+
+      const ref: StorageRef = { providerType: 's3', externalId: 'Backups/vroom-backup-1.zip' };
+      await expect(provider.download(ref, { maxBytes: 32 })).rejects.toBeInstanceOf(
+        PayloadTooLargeError
+      );
+      expect(read).not.toHaveBeenCalled();
+      expect(destroy).toHaveBeenCalledTimes(1);
+    });
+
+    test('refuses a body over maxBytes when the size header is missing', async () => {
+      mockSend.mockResolvedValueOnce({
+        Body: { transformToByteArray: () => Promise.resolve(new Uint8Array(64)) },
+      });
+      const ref: StorageRef = { providerType: 's3', externalId: 'Backups/vroom-backup-1.zip' };
+      await expect(provider.download(ref, { maxBytes: 32 })).rejects.toBeInstanceOf(
+        PayloadTooLargeError
+      );
     });
 
     test('throws when response body is empty', async () => {

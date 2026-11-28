@@ -164,6 +164,11 @@ export class GoogleDriveService {
     await this.drive.files.delete({ fileId });
   }
 
+  async getFileSize(fileId: string): Promise<number> {
+    const response = await this.drive.files.get({ fileId, fields: 'size' });
+    return Number(response.data.size ?? 0);
+  }
+
   async downloadFile(fileId: string): Promise<Buffer> {
     const response = await this.drive.files.get(
       { fileId, alt: 'media' },
