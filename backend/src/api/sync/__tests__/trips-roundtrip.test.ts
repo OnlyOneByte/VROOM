@@ -22,16 +22,16 @@ interface TripRowDb {
   note: string | null;
 }
 
-function tripRows(): TripRowDb[] {
-  return ctx.sqlite.query('SELECT * FROM trips ORDER BY id').all() as TripRowDb[];
+async function tripRows(): Promise<TripRowDb[]> {
+  return (await ctx.sql.all('SELECT * FROM trips ORDER BY id')) as TripRowDb[];
 }
 
-function seedTrip(
+async function seedTrip(
   ctx: TestApp,
   id: string,
   vehicleId: string,
   opts: Partial<Omit<TripRowDb, 'id' | 'vehicle_id' | 'user_id'>> = {}
-): void {
+): Promise<void> {
   const {
     start_odometer = 1000,
     end_odometer = 1080,
@@ -41,7 +41,7 @@ function seedTrip(
     end_location = null,
     note = null,
   } = opts;
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date,
        start_location, end_location, note)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -64,7 +64,7 @@ describe('backup → restore round-trip preserves trips', () => {
   test('a fully-populated trip survives export + restore with its fields intact', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const tripDateSec = Math.floor(Date.UTC(2024, 5, 20, 13, 30, 0) / 1000);
-    seedTrip(ctx, 'trip-1', vehicleId, {
+    await seedTrip(ctx, 'trip-1', vehicleId, {
       start_odometer: 24000,
       end_odometer: 24135,
       purpose: 'business',
@@ -73,7 +73,7 @@ describe('backup → restore round-trip preserves trips', () => {
       end_location: 'Client site',
       note: 'Q2 review meeting',
     });
-    expect(tripRows()).toHaveLength(1);
+    expect(await tripRows()).toHaveLength(1);
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -84,7 +84,7 @@ describe('backup → restore round-trip preserves trips', () => {
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.imported?.trips, 'restore summary counts the trip').toBe(1);
 
-    const rows = tripRows();
+    const rows = await tripRows();
     expect(rows, 'exactly one trip after restore (no dup, no loss)').toHaveLength(1);
     const row = rows[0];
     expect(row.id).toBe('trip-1');
@@ -101,7 +101,7 @@ describe('backup → restore round-trip preserves trips', () => {
 
   test('a trip with NULL optional fields (no locations/note) round-trips as null, not "" ', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    seedTrip(ctx, 'trip-min', vehicleId, { purpose: 'personal' });
+    await seedTrip(ctx, 'trip-min', vehicleId, { purpose: 'personal' });
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -109,7 +109,7 @@ describe('backup → restore round-trip preserves trips', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
 
     expect(result.success, JSON.stringify(result)).toBe(true);
-    const rows = tripRows();
+    const rows = await tripRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].purpose).toBe('personal');
     expect(rows[0].start_location).toBeNull();
@@ -119,10 +119,10 @@ describe('backup → restore round-trip preserves trips', () => {
 
   test('multiple trips across purposes all survive the round-trip', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    seedTrip(ctx, 't-biz', vehicleId, { purpose: 'business' });
-    seedTrip(ctx, 't-per', vehicleId, { purpose: 'personal' });
-    seedTrip(ctx, 't-com', vehicleId, { purpose: 'commute' });
-    expect(tripRows()).toHaveLength(3);
+    await seedTrip(ctx, 't-biz', vehicleId, { purpose: 'business' });
+    await seedTrip(ctx, 't-per', vehicleId, { purpose: 'personal' });
+    await seedTrip(ctx, 't-com', vehicleId, { purpose: 'commute' });
+    expect(await tripRows()).toHaveLength(3);
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -131,12 +131,12 @@ describe('backup → restore round-trip preserves trips', () => {
 
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.imported?.trips).toBe(3);
-    expect(tripRows().map((r) => r.purpose)).toEqual(['business', 'commute', 'personal']);
+    expect((await tripRows()).map((r) => r.purpose)).toEqual(['business', 'commute', 'personal']);
   });
 
   test('a trip referencing a vehicle absent from the backup is rejected (referential integrity)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    seedTrip(ctx, 'trip-ok', vehicleId);
+    await seedTrip(ctx, 'trip-ok', vehicleId);
 
     const { backupService } = await import('../backup');
 

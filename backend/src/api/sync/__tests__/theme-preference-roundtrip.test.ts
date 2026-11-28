@@ -13,10 +13,10 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function themeRow(): { theme_preference: string } {
-  return ctx.sqlite
-    .query('SELECT theme_preference FROM user_preferences WHERE user_id = ?')
-    .get(ctx.user.id) as { theme_preference: string };
+async function themeRow(): Promise<{ theme_preference: string }> {
+  return (await ctx.sql.get('SELECT theme_preference FROM user_preferences WHERE user_id = ?', [
+    ctx.user.id,
+  ])) as { theme_preference: string };
 }
 
 async function roundTrip(): Promise<void> {
@@ -31,20 +31,20 @@ describe('backup → restore round-trip preserves themePreference', () => {
   test('a non-default theme id survives a full export→restore (not reset to default)', async () => {
     const put = await ctx.authed('PUT', '/api/v1/settings', { themePreference: 'instrument' });
     expect(put.status, await put.text()).toBe(200);
-    expect(themeRow().theme_preference).toBe('instrument');
+    expect((await themeRow()).theme_preference).toBe('instrument');
 
     await roundTrip();
 
-    expect(themeRow().theme_preference).toBe('instrument');
+    expect((await themeRow()).theme_preference).toBe('instrument');
   });
 
   test("the default theme round-trips as 'default' (control — no spurious change)", async () => {
     await ctx.authed('PUT', '/api/v1/settings', { currencyUnit: 'USD' });
-    expect(themeRow().theme_preference).toBe('default');
+    expect((await themeRow()).theme_preference).toBe('default');
 
     await roundTrip();
 
-    expect(themeRow().theme_preference).toBe('default');
+    expect((await themeRow()).theme_preference).toBe('default');
   });
 
   test('a paired sibling pref (currencyUnit) survives alongside the theme (no field dropped)', async () => {

@@ -30,25 +30,25 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function readProviders(): Record<string, ProviderConfigEntry> {
-  const row = ctx.sqlite
-    .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-    .get(ctx.user.id) as { backup_config: string | null } | null;
+async function readProviders(): Promise<Record<string, ProviderConfigEntry>> {
+  const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [
+    ctx.user.id,
+  ])) as { backup_config: string | null } | null;
   const config = row?.backup_config
     ? (JSON.parse(row.backup_config) as { providers?: Record<string, ProviderConfigEntry> })
     : {};
   return config.providers ?? {};
 }
 
-function writeProviders(providers: Record<string, ProviderConfigEntry>): void {
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify({ providers }),
-  ]);
+async function writeProviders(providers: Record<string, ProviderConfigEntry>): Promise<void> {
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [ctx.user.id, JSON.stringify({ providers })]
+  );
 }
 
-function seedProviderRow(id: string, providerType: string): void {
-  ctx.sqlite.run(
+async function seedProviderRow(id: string, providerType: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', ?, 'Fake', ?, ?, 'active')`,
     [
@@ -65,14 +65,11 @@ function seedProviderRow(id: string, providerType: string): void {
   );
 }
 
-function seedDataChange(id: string): void {
-  ctx.sqlite.run('INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)', [
-    id,
-    ctx.user.id,
-    'T',
-    'C',
-    2022,
-  ]);
+async function seedDataChange(id: string): Promise<void> {
+  await ctx.sql.run(
+    'INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, ?, ?, ?)',
+    [id, ctx.user.id, 'T', 'C', 2022]
+  );
 }
 
 function strategyThatEditsConfig(duringRun: () => Promise<void>): BackupStrategy {
@@ -95,15 +92,15 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
       })
     );
     try {
-      seedProviderRow('p1', 'fake-self-disable');
-      writeProviders({ p1: { enabled: true, folderPath: 'B', retentionCount: 5 } });
-      seedDataChange('v-p1');
+      await seedProviderRow('p1', 'fake-self-disable');
+      await writeProviders({ p1: { enabled: true, folderPath: 'B', retentionCount: 5 } });
+      await seedDataChange('v-p1');
 
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = await backupOrchestrator.execute(ctx.user.id, 'U', true);
       expect(result.outcome).toBe('success');
 
-      const providers = readProviders();
+      const providers = await readProviders();
       expect(providers.p1?.enabled, 'the mid-run disable survives the run').toBe(false);
       expect(providers.p1?.lastBackupAt, 'the run still records when it succeeded').toBeTruthy();
       expect(providers.p1?.folderPath).toBe('B');
@@ -117,7 +114,7 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
     register(
       'fake-sibling-remover',
       strategyThatEditsConfig(async () => {
-        ctx.sqlite.run('DELETE FROM user_providers WHERE id = ?', ['p-gone']);
+        await ctx.sql.run('DELETE FROM user_providers WHERE id = ?', ['p-gone']);
         await repos().preferences.mergeJsonField(ctx.user.id, 'backupConfig', {
           providers: { 'p-gone': null },
         });
@@ -129,19 +126,19 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
       },
     });
     try {
-      seedProviderRow('p-keep', 'fake-sibling-remover');
-      seedProviderRow('p-gone', 'fake-doomed');
-      writeProviders({
+      await seedProviderRow('p-keep', 'fake-sibling-remover');
+      await seedProviderRow('p-gone', 'fake-doomed');
+      await writeProviders({
         'p-keep': { enabled: true, folderPath: 'B', retentionCount: 5 },
         'p-gone': { enabled: true, folderPath: 'B', retentionCount: 5 },
       });
-      seedDataChange('v-keep');
+      await seedDataChange('v-keep');
 
       const { backupOrchestrator } = await import('../backup-orchestrator');
       const result = await backupOrchestrator.execute(ctx.user.id, 'U', true);
       expect(result.outcome).toBe('partial');
 
-      const providers = readProviders();
+      const providers = await readProviders();
       expect(Object.keys(providers), 'only the surviving provider remains').toEqual(['p-keep']);
       expect(providers['p-keep']?.lastBackupAt).toBeTruthy();
     } finally {
@@ -160,14 +157,14 @@ describe('a backup run patches backupConfig instead of rewriting it', () => {
       },
     });
     try {
-      seedProviderRow('p-sheets', 'fake-sheets');
-      writeProviders({ 'p-sheets': { enabled: true, folderPath: 'B', retentionCount: 5 } });
-      seedDataChange('v-sheets');
+      await seedProviderRow('p-sheets', 'fake-sheets');
+      await writeProviders({ 'p-sheets': { enabled: true, folderPath: 'B', retentionCount: 5 } });
+      await seedDataChange('v-sheets');
 
       const { backupOrchestrator } = await import('../backup-orchestrator');
       await backupOrchestrator.execute(ctx.user.id, 'U', true);
 
-      const providers = readProviders();
+      const providers = await readProviders();
       expect(providers['p-sheets']?.sheetsSpreadsheetId).toBe('sheet-xyz');
       expect(providers['p-sheets']?.lastBackupAt).toBeTruthy();
     } finally {

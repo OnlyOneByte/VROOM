@@ -22,8 +22,8 @@ let bucket: FakeStorageProvider;
 let createInstance: ReturnType<typeof spyOn>;
 let encrypt: typeof import('../../../utils/encryption').encrypt;
 
-function seedProvider(id: string, providerType: string): void {
-  ctx.sqlite.run(
+async function seedProvider(id: string, providerType: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', ?, 'My Provider', ?, ?, 'active')`,
     [
@@ -45,11 +45,11 @@ function seedProvider(id: string, providerType: string): void {
   );
 }
 
-function setBackupConfig(providers: Record<string, unknown>): void {
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify({ providers }),
-  ]);
+async function setBackupConfig(providers: Record<string, unknown>): Promise<void> {
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [ctx.user.id, JSON.stringify({ providers })]
+  );
 }
 
 const zipOn = { enabled: true, folderPath: 'Backups', retentionCount: 5 };
@@ -61,8 +61,8 @@ beforeEach(async () => {
     async () => bucket
   );
   encrypt = (await import('../../../utils/encryption')).encrypt;
-  seedProvider('p-s3', 's3');
-  setBackupConfig({ 'p-s3': zipOn });
+  await seedProvider('p-s3', 's3');
+  await setBackupConfig({ 'p-s3': zipOn });
   const res = await ctx.authed('POST', '/api/v1/vehicles', {
     make: 'Toyota',
     model: 'Camry',
@@ -87,16 +87,16 @@ async function listedBackups(): Promise<ProviderBackups[]> {
   return (await json<DataEnvelope<ProviderBackups[]>>(res)).data;
 }
 
-function lastBackupDate(): number | null {
-  const row = ctx.sqlite
-    .query('SELECT last_backup_date FROM sync_state WHERE user_id = ?')
-    .get(ctx.user.id) as { last_backup_date: number | null } | null;
+async function lastBackupDate(): Promise<number | null> {
+  const row = (await ctx.sql.get('SELECT last_backup_date FROM sync_state WHERE user_id = ?', [
+    ctx.user.id,
+  ])) as { last_backup_date: number | null } | null;
   return row?.last_backup_date ?? null;
 }
 
 async function waitForBackupDate(): Promise<void> {
   const deadline = Date.now() + 5000;
-  while (!lastBackupDate()) {
+  while (!(await lastBackupDate())) {
     if (Date.now() > deadline) throw new Error('timed out waiting for last_backup_date');
     await Bun.sleep(10);
   }
@@ -142,7 +142,7 @@ describe('ZIP backups to an S3 provider', () => {
         lastModified: '1969-12-31T00:00:00.000Z',
       },
     ]);
-    setBackupConfig({ 'p-s3': { ...zipOn, retentionCount: 1 } });
+    await setBackupConfig({ 'p-s3': { ...zipOn, retentionCount: 1 } });
 
     const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
     expect(res.status).toBe(200);
@@ -153,8 +153,8 @@ describe('ZIP backups to an S3 provider', () => {
   });
 
   test('a stale ZIP setting on a photo-only provider is ignored, so the run still succeeds', async () => {
-    seedProvider('p-photos', 'google-photos');
-    setBackupConfig({ 'p-s3': zipOn, 'p-photos': zipOn });
+    await seedProvider('p-photos', 'google-photos');
+    await setBackupConfig({ 'p-s3': zipOn, 'p-photos': zipOn });
 
     const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
     expect(res.status).toBe(200);
@@ -162,7 +162,7 @@ describe('ZIP backups to an S3 provider', () => {
     expect(body.data.outcome).toBe('success');
     expect(body.data.failedProviders).toEqual([]);
 
-    expect(lastBackupDate()).toBeTruthy();
+    expect(await lastBackupDate()).toBeTruthy();
   });
 });
 

@@ -42,8 +42,8 @@ interface ClaimRowDb {
   description: string | null;
 }
 
-function claimRows(): ClaimRowDb[] {
-  return ctx.sqlite.query('SELECT * FROM insurance_claims').all() as ClaimRowDb[];
+async function claimRows(): Promise<ClaimRowDb[]> {
+  return (await ctx.sql.all('SELECT * FROM insurance_claims')) as ClaimRowDb[];
 }
 
 describe('backup → restore round-trip preserves insurance claims', () => {
@@ -63,7 +63,7 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     const createdBody = await json<DataEnvelope<{ id: string }>>(created);
     expect(created.status, JSON.stringify(createdBody)).toBe(201);
     const claimId = createdBody.data.id;
-    expect(claimRows()).toHaveLength(1);
+    expect(await claimRows()).toHaveLength(1);
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -74,7 +74,7 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.imported?.insuranceClaims, 'restore summary counts the claim').toBe(1);
 
-    const rows = claimRows();
+    const rows = await claimRows();
     expect(rows, 'exactly one claim after restore (no dup, no loss)').toHaveLength(1);
     const row = rows[0];
     expect(row.id).toBe(claimId);
@@ -99,7 +99,7 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     expect(created.status, JSON.stringify(createdBody)).toBe(201);
     const claimId = createdBody.data.id;
 
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
        VALUES ('photo-claim-1', ?, 'insurance_claim', ?, 'damage.jpg', 'image/jpeg', 2048)`,
       [ctx.user.id, claimId]
@@ -112,9 +112,9 @@ describe('backup → restore round-trip preserves insurance claims', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    const photoRows = ctx.sqlite
-      .query("SELECT id, entity_type, entity_id FROM photos WHERE entity_type = 'insurance_claim'")
-      .all() as { id: string; entity_type: string; entity_id: string }[];
+    const photoRows = (await ctx.sql.all(
+      "SELECT id, entity_type, entity_id FROM photos WHERE entity_type = 'insurance_claim'"
+    )) as { id: string; entity_type: string; entity_id: string }[];
     expect(photoRows, 'the claim photo survived restore').toHaveLength(1);
     expect(photoRows[0].id).toBe('photo-claim-1');
     expect(photoRows[0].entity_id).toBe(claimId);
@@ -131,7 +131,7 @@ describe('backup → restore round-trip preserves insurance claims', () => {
       });
       expect(r.status, await r.text()).toBe(201);
     }
-    expect(claimRows()).toHaveLength(3);
+    expect(await claimRows()).toHaveLength(3);
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -140,12 +140,12 @@ describe('backup → restore round-trip preserves insurance claims', () => {
 
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.imported?.insuranceClaims).toBe(3);
-    expect(claimRows()).toHaveLength(3);
-    expect(
-      claimRows()
-        .map((r) => r.claim_type)
-        .sort()
-    ).toEqual(['collision', 'theft', 'weather']);
+    expect(await claimRows()).toHaveLength(3);
+    expect((await claimRows()).map((r) => r.claim_type).sort()).toEqual([
+      'collision',
+      'theft',
+      'weather',
+    ]);
   });
 });
 
@@ -188,7 +188,7 @@ describe('a photo on every upload-accepted entity type survives backup→restore
       ['odometer_entry', odometerId],
     ];
     for (const [i, [entityType, entityId]] of targets.entries()) {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
          VALUES (?, ?, ?, ?, ?, 'image/jpeg', 1024)`,
         [`photo-${i}`, ctx.user.id, entityType, entityId, `pic-${i}.jpg`]
@@ -202,9 +202,10 @@ describe('a photo on every upload-accepted entity type survives backup→restore
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    const rows = ctx.sqlite
-      .query('SELECT entity_type, entity_id FROM photos ORDER BY id')
-      .all() as { entity_type: string; entity_id: string }[];
+    const rows = (await ctx.sql.all('SELECT entity_type, entity_id FROM photos ORDER BY id')) as {
+      entity_type: string;
+      entity_id: string;
+    }[];
     expect(rows).toHaveLength(5);
     const byType = new Map(rows.map((r) => [r.entity_type, r.entity_id]));
     expect(byType.get('vehicle')).toBe(vehicleId);

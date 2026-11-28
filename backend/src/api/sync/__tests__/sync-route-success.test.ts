@@ -13,15 +13,15 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedBackupConfig(config: unknown): void {
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify(config),
-  ]);
+async function seedBackupConfig(config: unknown): Promise<void> {
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [ctx.user.id, JSON.stringify(config)]
+  );
 }
 
-function seedStorageProvider(id: string, displayName = 'My Drive'): string {
-  ctx.sqlite.run(
+async function seedStorageProvider(id: string, displayName = 'My Drive'): Promise<string> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-drive', ?, 'enc', ?, 'active')`,
     [id, ctx.user.id, displayName, JSON.stringify({ accountEmail: 'me@example.com' })]
@@ -51,7 +51,7 @@ describe('GET /api/v1/sync/status — derived flags from backupConfig', () => {
   });
 
   test('a provider with enabled=true → backupEnabled true; sheetsSyncEnabled reflects its own flag', async () => {
-    seedBackupConfig({
+    await seedBackupConfig({
       providers: {
         p1: { enabled: true, folderPath: 'B', retentionCount: 5, sheetsSyncEnabled: false },
       },
@@ -64,7 +64,7 @@ describe('GET /api/v1/sync/status — derived flags from backupConfig', () => {
   });
 
   test('a Sheets-only provider (enabled=false, sheetsSyncEnabled=true) → backupEnabled false, sheets true', async () => {
-    seedBackupConfig({
+    await seedBackupConfig({
       providers: {
         p1: { enabled: false, folderPath: 'B', retentionCount: 5, sheetsSyncEnabled: true },
       },
@@ -83,8 +83,8 @@ interface RestoreProvidersBody {
 
 describe('GET /api/v1/sync/restore/providers — sourceTypes derivation', () => {
   test('a provider with a completed ZIP backup AND a sheets spreadsheet offers both sourceTypes', async () => {
-    const id = seedStorageProvider('prov-both');
-    seedBackupConfig({
+    const id = await seedStorageProvider('prov-both');
+    await seedBackupConfig({
       providers: {
         'prov-both': {
           enabled: true,
@@ -107,8 +107,8 @@ describe('GET /api/v1/sync/restore/providers — sourceTypes derivation', () => 
   });
 
   test('a provider enabled but with NO lastBackupAt (and no sheets) offers NO sourceTypes → skipped', async () => {
-    seedStorageProvider('prov-empty');
-    seedBackupConfig({
+    await seedStorageProvider('prov-empty');
+    await seedBackupConfig({
       providers: {
         'prov-empty': { enabled: true, folderPath: 'B', retentionCount: 5 },
       },
@@ -121,7 +121,7 @@ describe('GET /api/v1/sync/restore/providers — sourceTypes derivation', () => 
   });
 
   test('a provider with no backupConfig entry at all is skipped (continue branch)', async () => {
-    seedStorageProvider('prov-unconfigured');
+    await seedStorageProvider('prov-unconfigured');
     const res = await ctx.authed('GET', '/api/v1/sync/restore/providers');
     const body = await json<RestoreProvidersBody>(res);
     expect(res.status).toBe(200);
@@ -149,7 +149,7 @@ describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
       },
     });
     try {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
          VALUES ('rf', ?, 'storage', 'fake-route-fail', 'Fake', ?, '{}', 'active')`,
         [
@@ -161,8 +161,8 @@ describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
           }),
         ]
       );
-      ctx.sqlite.run(
-        'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
+      await ctx.sql.run(
+        'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
         [
           ctx.user.id,
           JSON.stringify({
@@ -192,13 +192,13 @@ describe('POST /api/v1/sync — honest HTTP status on backup failure', () => {
         return { success: true, capabilities: {} };
       },
     });
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
        VALUES ('ru', ?, 'storage', 'fake-route-unusable', 'Fake', 'not-a-ciphertext', '{}', 'active')`,
       [ctx.user.id]
     );
-    ctx.sqlite.run(
-      'INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)',
+    await ctx.sql.run(
+      'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
       [
         ctx.user.id,
         JSON.stringify({
@@ -256,8 +256,8 @@ describe('GET /api/v1/sync/backups/providers — list backups', () => {
 });
 
 describe('backupService.listAllBackups', () => {
-  function seedProvider(id: string, displayName: string): void {
-    ctx.sqlite.run(
+  async function seedProvider(id: string, displayName: string): Promise<void> {
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES (?, ?, 'storage', 's3', ?, 'enc', 'active')`,
       [id, ctx.user.id, displayName]
@@ -286,9 +286,9 @@ describe('backupService.listAllBackups', () => {
   }
 
   test('loads provider rows in one query however many providers back up', async () => {
-    seedProvider('p-1', 'One');
-    seedProvider('p-2', 'Two');
-    seedProvider('p-3', 'Three');
+    await seedProvider('p-1', 'One');
+    await seedProvider('p-2', 'Two');
+    await seedProvider('p-3', 'Three');
     const one = await listWith(['p-1']);
     const three = await listWith(['p-1', 'p-2', 'p-3']);
     expect(three.statements).toBe(one.statements);
@@ -296,7 +296,7 @@ describe('backupService.listAllBackups', () => {
   });
 
   test('a missing provider row falls back to Unknown and a failing listing gets its own error entry', async () => {
-    seedProvider('p-broken', 'Broken');
+    await seedProvider('p-broken', 'Broken');
     const { results } = await listWith(['p-gone', 'p-broken']);
     expect(results[0]).toMatchObject({
       providerId: 'p-gone',

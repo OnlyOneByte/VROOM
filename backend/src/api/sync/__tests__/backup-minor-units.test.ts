@@ -163,8 +163,8 @@ describe('backup 3.1.0 stores minor units of the backup currency', () => {
   });
 
   test('restoring a backup without preferences into a yen account rescales it', async () => {
-    app().sqlite.run(
-      'INSERT OR REPLACE INTO user_preferences (user_id, currency_unit) VALUES (?, ?)',
+    await app().sql.run(
+      'INSERT INTO user_preferences (user_id, currency_unit) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET currency_unit = excluded.currency_unit',
       [app().user.id, 'JPY']
     );
     const zip = new AdmZip(fixtureZip('USD'));

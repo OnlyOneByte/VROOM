@@ -18,19 +18,19 @@ interface ErrorBody {
   error: { code: string; message: string };
 }
 
-function seedProvider(id: string, userId: string, status = 'active'): void {
-  ctx.sqlite.run(
+async function seedProvider(id: string, userId: string, status = 'active'): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-drive', 'Drive', 'enc', '{}', ?)`,
     [id, userId, status]
   );
 }
 
-function seedBackupConfig(providers: Record<string, unknown>): void {
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify({ providers }),
-  ]);
+async function seedBackupConfig(providers: Record<string, unknown>): Promise<void> {
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [ctx.user.id, JSON.stringify({ providers })]
+  );
 }
 
 async function postFromProvider(body: unknown): Promise<Response> {
@@ -61,7 +61,7 @@ describe('POST /sync/restore/from-provider: provider lookup', () => {
   });
 
   test('a turned-off provider is rejected as not found', async () => {
-    seedProvider('prov-inactive', ctx.user.id, 'disabled');
+    await seedProvider('prov-inactive', ctx.user.id, 'disabled');
     const res = await postFromProvider(sheetsRestore('prov-inactive'));
     const body = await json<ErrorBody>(res);
     expect(res.status).toBe(400);
@@ -69,10 +69,10 @@ describe('POST /sync/restore/from-provider: provider lookup', () => {
   });
 
   test("another user's provider is rejected as not found", async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@example.com', 'Other')"
     );
-    seedProvider('prov-foreign', 'other-user');
+    await seedProvider('prov-foreign', 'other-user');
     const res = await postFromProvider(sheetsRestore('prov-foreign'));
     const body = await json<ErrorBody>(res);
     expect(res.status).toBe(400);
@@ -82,8 +82,10 @@ describe('POST /sync/restore/from-provider: provider lookup', () => {
 
 describe('POST /sync/restore/from-provider: Sheets source precondition', () => {
   test('an active provider with no spreadsheet id is rejected before any Sheets call', async () => {
-    seedProvider('prov-nosheet', ctx.user.id);
-    seedBackupConfig({ 'prov-nosheet': { enabled: true, folderPath: 'B', retentionCount: 5 } });
+    await seedProvider('prov-nosheet', ctx.user.id);
+    await seedBackupConfig({
+      'prov-nosheet': { enabled: true, folderPath: 'B', retentionCount: 5 },
+    });
     const res = await postFromProvider(sheetsRestore('prov-nosheet'));
     const body = await json<ErrorBody>(res);
     expect(res.status).toBe(400);
@@ -91,7 +93,7 @@ describe('POST /sync/restore/from-provider: Sheets source precondition', () => {
   });
 
   test('a user with no backup config at all gets the same spreadsheet error', async () => {
-    seedProvider('prov-noconfig', ctx.user.id);
+    await seedProvider('prov-noconfig', ctx.user.id);
     const res = await postFromProvider(sheetsRestore('prov-noconfig'));
     const body = await json<ErrorBody>(res);
     expect(res.status).toBe(400);

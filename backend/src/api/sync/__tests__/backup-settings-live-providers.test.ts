@@ -23,21 +23,21 @@ async function seedProvider(saved: Record<string, unknown>): Promise<void> {
     userId: ctx.user.id,
     domain: 'storage',
   });
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-drive', 'Drive', ?, '{}', 'active')`,
     [PROVIDER, ctx.user.id, credentials]
   );
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify({ providers: { [PROVIDER]: saved } }),
-  ]);
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [ctx.user.id, JSON.stringify({ providers: { [PROVIDER]: saved } })]
+  );
 }
 
-function savedEntry(): unknown {
-  const row = ctx.sqlite
-    .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-    .get(ctx.user.id) as { backup_config: string | null };
+async function savedEntry(): Promise<unknown> {
+  const row = (await ctx.sql.get('SELECT backup_config FROM user_preferences WHERE user_id = ?', [
+    ctx.user.id,
+  ])) as { backup_config: string | null };
   const config = row.backup_config ? JSON.parse(row.backup_config) : {};
   return config.providers?.[PROVIDER];
 }
@@ -74,7 +74,7 @@ describe('Writers of backup settings leave nothing behind for a provider removed
       expect(res.status).toBe(200);
     });
 
-    expect(savedEntry()).toBeUndefined();
+    expect(await savedEntry()).toBeUndefined();
   });
 
   test('a failed restore from Sheets pausing Sheets backups', async () => {
@@ -94,7 +94,7 @@ describe('Writers of backup settings leave nothing behind for a provider removed
       service.readSheetsAndRestore = read;
     }
 
-    expect(savedEntry()).toBeUndefined();
+    expect(await savedEntry()).toBeUndefined();
   });
 
   test('saving settings', async () => {
@@ -109,7 +109,7 @@ describe('Writers of backup settings leave nothing behind for a provider removed
       expect(res.status).toBe(200);
     });
 
-    expect(savedEntry()).toBeUndefined();
+    expect(await savedEntry()).toBeUndefined();
   });
 
   test('a settings save whose only provider was removed mid-save answers with what is stored', async () => {
@@ -138,7 +138,7 @@ describe('Writers of backup settings leave nothing behind for a provider removed
       preferences.update = update;
     }
 
-    expect(savedEntry()).toBeUndefined();
+    expect(await savedEntry()).toBeUndefined();
     expect(body.data?.backupConfig?.providers?.[PROVIDER]).toBeUndefined();
   });
 });

@@ -22,17 +22,17 @@ async function roundTrip(): Promise<void> {
   expect(result.success, JSON.stringify(result)).toBe(true);
 }
 
-function vehicleNickname(id: string): string | null {
+async function vehicleNickname(id: string): Promise<string | null> {
   return (
-    ctx.sqlite.query('SELECT nickname FROM vehicles WHERE id = ?').get(id) as {
+    (await ctx.sql.get('SELECT nickname FROM vehicles WHERE id = ?', [id])) as {
       nickname: string | null;
     }
   ).nickname;
 }
 
-function expenseDescription(id: string): string | null {
+async function expenseDescription(id: string): Promise<string | null> {
   return (
-    ctx.sqlite.query('SELECT description FROM expenses WHERE id = ?').get(id) as {
+    (await ctx.sql.get('SELECT description FROM expenses WHERE id = ?', [id])) as {
       description: string | null;
     }
   ).description;
@@ -51,13 +51,14 @@ describe('backup → restore round-trip preserves RFC-4180 special characters in
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBeLessThan(300);
     const id = body.data.id;
-    expect(vehicleNickname(id)).toBe(HOSTILE);
+    expect(await vehicleNickname(id)).toBe(HOSTILE);
 
     await roundTrip();
 
-    expect(vehicleNickname(id), 'the special-char nickname must survive export→import intact').toBe(
-      HOSTILE
-    );
+    expect(
+      await vehicleNickname(id),
+      'the special-char nickname must survive export→import intact'
+    ).toBe(HOSTILE);
   });
 
   test('an expense description with the same hostile value survives, and a leading-`=` value is NOT mangled', async () => {
@@ -90,9 +91,9 @@ describe('backup → restore round-trip preserves RFC-4180 special characters in
 
     await roundTrip();
 
-    expect(expenseDescription(eId), 'comma/quote/newline description survives').toBe(HOSTILE);
+    expect(await expenseDescription(eId), 'comma/quote/newline description survives').toBe(HOSTILE);
     expect(
-      expenseDescription(fId),
+      await expenseDescription(fId),
       'a leading-= description round-trips verbatim (NOT neutralized — backup is lossless, not human-facing)'
     ).toBe('=SUM(A1:A9)+1');
   });

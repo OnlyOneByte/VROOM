@@ -30,9 +30,9 @@ async function seedCharges(): Promise<void> {
   }
 }
 
-function chargerTypes(): (string | null)[] {
+async function chargerTypes(): Promise<(string | null)[]> {
   return (
-    ctx.sqlite.query('SELECT charger_type FROM expenses ORDER BY date').all() as {
+    (await ctx.sql.all('SELECT charger_type FROM expenses ORDER BY date')) as {
       charger_type: string | null;
     }[]
   ).map((row) => row.charger_type);
@@ -44,21 +44,21 @@ describe('charger type survives backup and restore', () => {
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
-    ctx.sqlite.run('UPDATE expenses SET charger_type = NULL');
+    await ctx.sql.run('UPDATE expenses SET charger_type = NULL');
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(chargerTypes()).toEqual(['home', 'dc_fast', null]);
+    expect(await chargerTypes()).toEqual(['home', 'dc_fast', null]);
   });
 
   test('restore turns an unknown charger type into none and keeps known ones', async () => {
     await seedCharges();
-    ctx.sqlite.run("UPDATE expenses SET charger_type = 'garage' WHERE charger_type = 'dc_fast'");
+    await ctx.sql.run("UPDATE expenses SET charger_type = 'garage' WHERE charger_type = 'dc_fast'");
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
     const zip = await backupService.exportAsZip(ctx.user.id);
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(chargerTypes()).toEqual(['home', null, null]);
+    expect(await chargerTypes()).toEqual(['home', null, null]);
   });
 
   test('a Google Sheets mirror round-trips it', async () => {
@@ -72,12 +72,12 @@ describe('charger type survives backup and restore', () => {
       makeFakeSheetsClients(new FakeGoogleStore())
     );
     const info = await svc.createOrUpdateVroomSpreadsheet(ctx.user.id, 'VROOM', 'Owner');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES ('prov-sheets', ?, 'storage', 'google-drive', 'Drive', 'x', 'active')`,
       [ctx.user.id]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?)
        ON CONFLICT(user_id) DO UPDATE SET backup_config = excluded.backup_config`,
       [
@@ -85,7 +85,7 @@ describe('charger type survives backup and restore', () => {
         JSON.stringify({ providers: { 'prov-sheets': { sheetsSpreadsheetId: info.id } } }),
       ]
     );
-    ctx.sqlite.run('UPDATE expenses SET charger_type = NULL');
+    await ctx.sql.run('UPDATE expenses SET charger_type = NULL');
 
     const spy = spyOn(sheetsModule, 'createSheetsServiceForProvider').mockResolvedValue(svc);
     try {
@@ -95,6 +95,6 @@ describe('charger type survives backup and restore', () => {
     } finally {
       spy.mockRestore();
     }
-    expect(chargerTypes()).toEqual(['home', 'dc_fast', null]);
+    expect(await chargerTypes()).toEqual(['home', 'dc_fast', null]);
   });
 });
