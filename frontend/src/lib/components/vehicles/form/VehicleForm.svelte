@@ -47,7 +47,7 @@
 		type VehicleCatalog
 	} from '#lib/utils/vehicle-catalog.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
-	import { getLongFormLabel } from '#lib/utils/units.ts';
+	import { getDistanceUnitLabel, getLongFormLabel } from '#lib/utils/units.ts';
 	import {
 		amountPlaceholder,
 		amountStep,
@@ -847,10 +847,10 @@
 								<FormFieldDescription id="initialMileage-hint">
 									{#if isEditMode}
 										Cost per {distanceUnit === 'kilometers' ? 'km' : 'mile'} counts from this reading.
-										{#if todayReading !== null && todayReading !== vehicleForm.initialMileage}
+										{#if todayReading !== null && todayReading !== (vehicle?.initialMileage ?? null)}
 											Today it reads {formatNumber(todayReading, 0)}
-											{distanceUnit === 'kilometers' ? 'km' : 'mi'}; log new readings on the
-											Odometer tab.
+											{getDistanceUnitLabel(distanceUnit, true)}; log new readings on the Odometer
+											tab.
 										{/if}
 									{:else}
 										Used as the starting point for cost per {distanceUnit === 'kilometers'

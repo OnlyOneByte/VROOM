@@ -472,11 +472,29 @@ describe('VehicleForm edit mode', () => {
 		);
 	});
 
-	test('without a newer reading the hint leaves today out', async () => {
+	test('without stats the hint leaves today out', async () => {
 		await renderEdit();
 
 		expect(screen.getByLabelText('Starting odometer')).toBe(input('initialMileage'));
 		expect(screen.queryByText(/Today it reads/)).toBeNull();
+	});
+
+	test('when today reads the same as the start, the hint leaves today out', async () => {
+		getVehicleStats.mockResolvedValue({ currentOdometer: 42000 });
+		await renderEdit();
+		await vi.waitFor(() => expect(getVehicleStats).toHaveBeenCalled());
+
+		expect(screen.queryByText(/Today it reads/)).toBeNull();
+	});
+
+	test("typing today's reading into the field keeps the reminder of what today reads", async () => {
+		getVehicleStats.mockResolvedValue({ currentOdometer: 64360 });
+		await renderEdit();
+		await screen.findByText(/Today it reads 64,360\s+km/);
+
+		await type('initialMileage', '64360');
+
+		expect(screen.getByText(/Today it reads 64,360\s+km/)).toBeTruthy();
 	});
 
 	test('falls back to year make model as the subtitle when the vehicle has no nickname', async () => {
