@@ -2,13 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedInsurancePolicy,
   seedInsuranceTermVehicle,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
 import {
   expenseArb,
@@ -131,7 +131,11 @@ describe('Vehicle count computation', () => {
   });
 });
 
-async function seedVehiclesWithExpenses(db: AnalyticsTestDb, vehicleCount: number, withInsurance: boolean): Promise<void> {
+async function seedVehiclesWithExpenses(
+  db: AnalyticsTestDb,
+  vehicleCount: number,
+  withInsurance: boolean
+): Promise<void> {
   let policyId: string | null = null;
   if (withInsurance) {
     policyId = 'policy-1';
@@ -256,7 +260,10 @@ describe('YTD spending counts only the year the range ends in', () => {
       fuelType: null,
       missedFillup: false,
     });
-    await seedExpense(testDb.sql, expense('last-year', new Date(Date.UTC(2024, 11, 20, 12)), 30000));
+    await seedExpense(
+      testDb.sql,
+      expense('last-year', new Date(Date.UTC(2024, 11, 20, 12)), 30000)
+    );
     await seedExpense(testDb.sql, expense('this-year', new Date(Date.UTC(2025, 0, 10, 12)), 4500));
 
     const trailing = {

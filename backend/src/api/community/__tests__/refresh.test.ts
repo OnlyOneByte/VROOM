@@ -3,17 +3,14 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { CONFIG } from '../../../config';
 import { getColumnNames } from '../../../db/__tests__/migration-helpers';
 import { openAsyncDatabase } from '../../../db/async-sqlite';
+import { sqliteTestSql } from '../../../test-helpers/test-sql';
 import { logger } from '../../../utils/logger';
 import {
   seedExpense,
   seedInsurancePolicy,
   seedUser,
 } from '../../analytics/__tests__/analytics-test-db';
-import {
-  createTestDb,
-  type TestDb,
-} from '../../analytics/__tests__/analytics-test-generators';
-import { sqliteTestSql } from '../../../test-helpers/test-sql';
+import { createTestDb, type TestDb } from '../../analytics/__tests__/analytics-test-generators';
 import {
   COMMUNITY_SCHEMA_VERSION,
   firstRunDelayMs,
@@ -255,7 +252,12 @@ describe('community stats refresh against the database', () => {
 
   test('only fuel and maintenance expenses load as expenses, and premiums come with their term', async () => {
     await seedOwner(db.sqlite, 'in-0', true);
-    await seedInsurancePolicy(sqliteTestSql(db.sqlite), { id: 'pol', userId: 'in-0', company: 'Acme', isActive: true });
+    await seedInsurancePolicy(sqliteTestSql(db.sqlite), {
+      id: 'pol',
+      userId: 'in-0',
+      company: 'Acme',
+      isActive: true,
+    });
     const unix = (days: number) => Math.floor((NOW.getTime() + days * DAY) / 1000);
     db.sqlite.run(
       'INSERT INTO insurance_terms (id, policy_id, start_date, end_date) VALUES (?, ?, ?, ?)',
@@ -275,7 +277,11 @@ describe('community stats refresh against the database', () => {
     db.sqlite.run(
       "UPDATE expenses SET source_type = 'insurance_term', source_id = 'term-1' WHERE id = 'premium'"
     );
-    await seedUser(sqliteTestSql(db.sqlite), { id: 'stranger', email: 'stranger@example.com', displayName: 'S' });
+    await seedUser(sqliteTestSql(db.sqlite), {
+      id: 'stranger',
+      email: 'stranger@example.com',
+      displayName: 'S',
+    });
     await seedInsurancePolicy(sqliteTestSql(db.sqlite), {
       id: 'pol-x',
       userId: 'stranger',

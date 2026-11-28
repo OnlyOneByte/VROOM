@@ -1,10 +1,10 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test';
-import { ON_POSTGRES } from '../../../test-helpers/http-client';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import { openAsyncDatabase } from '../../../db/async-sqlite';
 import * as schema from '../../../db/schema';
+import { ON_POSTGRES } from '../../../test-helpers/http-client';
 import {
   AnalyticsInsightsRepository,
   type Insight,
@@ -15,11 +15,11 @@ import {
 } from '../insights';
 import { AnalyticsQueryRepository } from '../query-repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
 
 const seconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -60,7 +60,10 @@ async function expense(
     missedFillup: false,
   });
   if (extra.description) {
-    await testDb.sql.run('UPDATE expenses SET description = ? WHERE id = ?', [extra.description, id]);
+    await testDb.sql.run('UPDATE expenses SET description = ? WHERE id = ?', [
+      extra.description,
+      id,
+    ]);
   }
   return id;
 }
@@ -89,7 +92,13 @@ async function setUnits(target: 'user' | 'cars', units: object, currency = 'USD'
 const MILES = { distanceUnit: 'miles', volumeUnit: 'gallons_us' };
 const METRIC = { distanceUnit: 'kilometers', volumeUnit: 'liters' };
 
-async function trip(vehicleId: string, iso: string, start: number, distance: number, purpose: string) {
+async function trip(
+  vehicleId: string,
+  iso: string,
+  start: number,
+  distance: number,
+  purpose: string
+) {
   await testDb.sql.run(
     'INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [`t-${n++}`, vehicleId, OWNER.id, start, start + distance, purpose, seconds(iso)]
@@ -113,7 +122,9 @@ describe('record month', () => {
   async function seedMonths() {
     await expense(CAMRY.id, 'maintenance', '2025-02-10T12:00:00Z', 10_000);
     await expense(CAMRY.id, 'maintenance', '2025-03-10T12:00:00Z', 20_000);
-    await expense(CAMRY.id, 'maintenance', '2025-06-03T12:00:00Z', 30_000, { description: 'Brake pads' });
+    await expense(CAMRY.id, 'maintenance', '2025-06-03T12:00:00Z', 30_000, {
+      description: 'Brake pads',
+    });
     await expense(LEAF.id, 'misc', '2025-06-20T12:00:00Z', 5_000);
   }
 
@@ -135,7 +146,9 @@ describe('record month', () => {
 
   test('counts running costs, as the chart does by default', async () => {
     await seedMonths();
-    await expense(CAMRY.id, 'financial', '2025-03-01T12:00:00Z', 120_000, { description: 'Insurance' });
+    await expense(CAMRY.id, 'financial', '2025-03-01T12:00:00Z', 120_000, {
+      description: 'Insurance',
+    });
     const record = find(await insights(), 'recordMonth');
     expect(record?.value).toBe(350);
     expect(record?.sentence).not.toContain('Insurance');
@@ -160,9 +173,15 @@ describe('repair-free streak', () => {
   afterEach(() => setSystemTime());
 
   test('counts days since the last repair, skipping routine work', async () => {
-    await expense(CAMRY.id, 'maintenance', '2025-01-01T00:00:00Z', 40_000, { description: 'Alternator' });
-    await expense(CAMRY.id, 'maintenance', '2025-07-04T00:00:00Z', 30_000, { description: 'Brake pads' });
-    await expense(CAMRY.id, 'maintenance', '2025-10-01T00:00:00Z', 7_000, { description: 'Oil change' });
+    await expense(CAMRY.id, 'maintenance', '2025-01-01T00:00:00Z', 40_000, {
+      description: 'Alternator',
+    });
+    await expense(CAMRY.id, 'maintenance', '2025-07-04T00:00:00Z', 30_000, {
+      description: 'Brake pads',
+    });
+    await expense(CAMRY.id, 'maintenance', '2025-10-01T00:00:00Z', 7_000, {
+      description: 'Oil change',
+    });
     const streak = find(await insights({ end: END }), 'repairFree');
     expect(streak?.value).toBe(150);
     expect(streak?.sentence).toContain('2020 Toyota Camry: no repairs since Jul 4, 2025.');
@@ -171,16 +190,22 @@ describe('repair-free streak', () => {
   });
 
   test('says nothing for a range that ended in the past', async () => {
-    await expense(CAMRY.id, 'maintenance', '2025-01-01T00:00:00Z', 40_000, { description: 'Alternator' });
+    await expense(CAMRY.id, 'maintenance', '2025-01-01T00:00:00Z', 40_000, {
+      description: 'Alternator',
+    });
     expect(
       find(await insights({ end: seconds('2025-09-01T00:00:00Z') }), 'repairFree')
     ).toBeUndefined();
   });
 
   test('says nothing without a repair, or right after one', async () => {
-    await expense(CAMRY.id, 'maintenance', '2025-03-01T00:00:00Z', 7_000, { description: 'Oil change' });
+    await expense(CAMRY.id, 'maintenance', '2025-03-01T00:00:00Z', 7_000, {
+      description: 'Oil change',
+    });
     expect(find(await insights({ end: END }), 'repairFree')).toBeUndefined();
-    await expense(CAMRY.id, 'maintenance', '2025-11-20T00:00:00Z', 30_000, { description: 'Brake pads' });
+    await expense(CAMRY.id, 'maintenance', '2025-11-20T00:00:00Z', 30_000, {
+      description: 'Brake pads',
+    });
     expect(find(await insights({ end: END }), 'repairFree')).toBeUndefined();
   });
 

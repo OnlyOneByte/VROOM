@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
+import { sqliteTestSql } from '../../../test-helpers/test-sql';
 import {
   ChargeUnit,
   DEFAULT_UNIT_PREFERENCES,
@@ -9,14 +10,8 @@ import {
   type UnitPreferences,
   VolumeUnit,
 } from '../../../types';
-import {
-  seedUser,
-} from '../../analytics/__tests__/analytics-test-db';
-import {
-  createTestDb,
-  type TestDb,
-} from '../../analytics/__tests__/analytics-test-generators';
-import { sqliteTestSql } from '../../../test-helpers/test-sql';
+import { seedUser } from '../../analytics/__tests__/analytics-test-db';
+import { createTestDb, type TestDb } from '../../analytics/__tests__/analytics-test-generators';
 
 const distanceUnitArb = fc.constantFrom(DistanceUnit.MILES, DistanceUnit.KILOMETERS);
 const volumeUnitArb = fc.constantFrom(

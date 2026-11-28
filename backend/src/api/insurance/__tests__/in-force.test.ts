@@ -1,15 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { insuranceTerms } from '../../../db/schema';
-import { zonedMidnight } from '../../../utils/time-zone';
-import {
-  seedInsurancePolicy,
-  seedUser,
-} from '../../analytics/__tests__/analytics-test-db';
-import {
-  createTestDb,
-  type TestDb,
-} from '../../analytics/__tests__/analytics-test-generators';
 import { sqliteTestSql } from '../../../test-helpers/test-sql';
+import { zonedMidnight } from '../../../utils/time-zone';
+import { seedInsurancePolicy, seedUser } from '../../analytics/__tests__/analytics-test-db';
+import { createTestDb, type TestDb } from '../../analytics/__tests__/analytics-test-generators';
 import { isTermInForce, termInForceAt } from '../in-force';
 
 const HOUR = 3_600_000;
@@ -47,8 +41,17 @@ function seedTerms(timeZone: string): void {
 
 beforeEach(async () => {
   testDb = createTestDb();
-  await seedUser(sqliteTestSql(testDb.sqlite), { id: 'u1', email: 'u1@test.com', displayName: 'U1' });
-  await seedInsurancePolicy(sqliteTestSql(testDb.sqlite), { id: 'p1', userId: 'u1', company: 'Acme', isActive: true });
+  await seedUser(sqliteTestSql(testDb.sqlite), {
+    id: 'u1',
+    email: 'u1@test.com',
+    displayName: 'U1',
+  });
+  await seedInsurancePolicy(sqliteTestSql(testDb.sqlite), {
+    id: 'p1',
+    userId: 'u1',
+    company: 'Acme',
+    isActive: true,
+  });
 });
 
 afterEach(() => testDb.sqlite.close());

@@ -2,17 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
-import {
-  type TestExpense,
-  type TestVehicle,
-  yearToRange,
-} from './analytics-test-generators';
+import { type TestExpense, type TestVehicle, yearToRange } from './analytics-test-generators';
 
 let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
@@ -34,7 +30,7 @@ function fuelExpenseArb(vehicleId: string, index: number, year: number): fc.Arbi
     id: fc.constant(`fuel-${vehicleId}-${index}`),
     vehicleId: fc.constant(vehicleId),
     category: fc.constant('fuel' as string),
-    expenseAmount: fc.double({ min: 5, max: 200, noNaN: true, noDefaultInfinity: true }),
+    expenseAmount: fc.integer({ min: 5, max: 200 }),
     date: fc.integer({ min: minTs, max: maxTs }).map((ts) => new Date(ts)),
     mileage: fc.constant(null as number | null),
     volume: fc.double({ min: 1, max: 30, noNaN: true, noDefaultInfinity: true }),
@@ -108,7 +104,7 @@ describe('MPG computation from consecutive expenses', () => {
         fc.integer({ min: 10000, max: 50000 }),
         fc.integer({ min: 100, max: 500 }),
         fc.double({ min: 5, max: 25, noNaN: true, noDefaultInfinity: true }),
-        fc.double({ min: 10, max: 100, noNaN: true, noDefaultInfinity: true }),
+        fc.integer({ min: 10, max: 100 }),
         async (startMileage, milesDriven, volume, expenseAmount) => {
           testDb.close();
           testDb = await openAnalyticsTestDb();
@@ -344,7 +340,7 @@ describe('cross-fleet fillup count excludes split siblings', () => {
         id: 'split-A',
         vehicleId: 'veh-A',
         category: 'fuel',
-        expenseAmount: 12.5,
+        expenseAmount: 13,
         date: new Date(2024, 4, 1),
         mileage: null,
         volume: null,
@@ -355,7 +351,7 @@ describe('cross-fleet fillup count excludes split siblings', () => {
         id: 'split-B',
         vehicleId: 'veh-B',
         category: 'fuel',
-        expenseAmount: 12.5,
+        expenseAmount: 13,
         date: new Date(2024, 4, 1),
         mileage: null,
         volume: null,

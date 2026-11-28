@@ -36,7 +36,11 @@ const VEHICLE_ID = 'veh-1';
 
 beforeEach(async () => {
   testDb = createTestDb();
-  await seedUser(sqliteTestSql(testDb.sqlite), { id: USER_ID, email: 'test@test.com', displayName: 'Test' });
+  await seedUser(sqliteTestSql(testDb.sqlite), {
+    id: USER_ID,
+    email: 'test@test.com',
+    displayName: 'Test',
+  });
   await seedVehicle(sqliteTestSql(testDb.sqlite), {
     id: VEHICLE_ID,
     userId: USER_ID,

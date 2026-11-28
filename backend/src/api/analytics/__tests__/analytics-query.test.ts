@@ -1,6 +1,5 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { ON_POSTGRES } from '../../../test-helpers/http-client';
 import type { SQL } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
@@ -9,6 +8,7 @@ import { openAsyncDatabase } from '../../../db/async-sqlite';
 import * as schema from '../../../db/schema';
 import { EXPENSE_CATEGORIES } from '../../../db/types';
 import { ValidationError } from '../../../errors';
+import { ON_POSTGRES } from '../../../test-helpers/http-client';
 import { MAX_SERVICES } from '../annotations';
 import { analyticsQueryToApi } from '../api-transform';
 import {
@@ -21,11 +21,11 @@ import {
 } from '../query-repository';
 import { AnalyticsRepository } from '../repository';
 import {
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  openAnalyticsTestDb,
-  type AnalyticsTestDb,
 } from './analytics-test-db';
 
 const seconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
@@ -53,7 +53,11 @@ function baseQuery(overrides: Partial<AnalyticsQuery> = {}): AnalyticsQuery {
   };
 }
 
-async function setUnits(table: 'vehicles' | 'user_preferences', id: string, units: object): Promise<void> {
+async function setUnits(
+  table: 'vehicles' | 'user_preferences',
+  id: string,
+  units: object
+): Promise<void> {
   const json = JSON.stringify({ chargeUnit: 'kwh', ...units });
   if (table === 'vehicles') {
     await testDb.sql.run('UPDATE vehicles SET unit_preferences = ? WHERE id = ?', [json, id]);
@@ -453,9 +457,7 @@ describe('same-day fill-ups pair by odometer', () => {
       );
       expect(efficiency.totals.value).toBeCloseTo(30, 9);
 
-      const summary = await new AnalyticsRepository(
-        testDb.asyncDb
-      ).getSummary(OWNER.id, RANGE);
+      const summary = await new AnalyticsRepository(testDb.asyncDb).getSummary(OWNER.id, RANGE);
       expect(summary.quickStats.avgEfficiency).toBeCloseTo(30, 9);
     });
   }
@@ -566,7 +568,11 @@ describe('annotations', () => {
 });
 
 describe('units', () => {
-  async function seedTwoFillups(vehicleId: string, startMileage: number, volume: number): Promise<void> {
+  async function seedTwoFillups(
+    vehicleId: string,
+    startMileage: number,
+    volume: number
+  ): Promise<void> {
     for (const [i, offset] of [0, 400].entries()) {
       await seedExpense(testDb.sql, {
         id: `${vehicleId}-fill-${i}`,
@@ -601,7 +607,10 @@ describe('units', () => {
   });
 
   test('a mixed fleet converts each vehicle to the user units', async () => {
-    await setUnits('user_preferences', OWNER.id, { distanceUnit: 'miles', volumeUnit: 'gallons_us' });
+    await setUnits('user_preferences', OWNER.id, {
+      distanceUnit: 'miles',
+      volumeUnit: 'gallons_us',
+    });
     await setUnits('vehicles', CAMRY.id, { distanceUnit: 'kilometers', volumeUnit: 'liters' });
     await setUnits('vehicles', LEAF.id, { distanceUnit: 'miles', volumeUnit: 'gallons_us' });
     await seedTwoFillups(CAMRY.id, 1_000, 37.854_117_84);
@@ -1125,46 +1134,49 @@ describe('bucket items for drill-down', () => {
   });
 });
 
-describe.skipIf(ON_POSTGRES)('bucketed queries read expenses by date range, never the whole history', () => {
-  async function plansFor(run: () => Promise<unknown>): Promise<string[]> {
-    const db = testDb.asyncDb as unknown as {
-      all: (query: SQL) => Promise<unknown[]>;
-    };
-    const original = db.all.bind(db);
-    const queries: SQL[] = [];
-    db.all = (query: SQL) => {
-      queries.push(query);
-      return original(query);
-    };
-    try {
-      await run();
-    } finally {
-      db.all = original;
+describe.skipIf(ON_POSTGRES)(
+  'bucketed queries read expenses by date range, never the whole history',
+  () => {
+    async function plansFor(run: () => Promise<unknown>): Promise<string[]> {
+      const db = testDb.asyncDb as unknown as {
+        all: (query: SQL) => Promise<unknown[]>;
+      };
+      const original = db.all.bind(db);
+      const queries: SQL[] = [];
+      db.all = (query: SQL) => {
+        queries.push(query);
+        return original(query);
+      };
+      try {
+        await run();
+      } finally {
+        db.all = original;
+      }
+      const plans: string[] = [];
+      for (const query of queries) {
+        const { sql: text, params } = new SQLiteSyncDialect().sqlToQuery(query);
+        const rows = await testDb.sql.all<{ detail: string }>(`EXPLAIN QUERY PLAN ${text}`, [
+          ...(params as never[]),
+        ]);
+        plans.push(...rows.map((r) => r.detail));
+      }
+      return plans;
     }
-    const plans: string[] = [];
-    for (const query of queries) {
-      const { sql: text, params } = new SQLiteSyncDialect().sqlToQuery(query);
-      const rows = await testDb.sql.all<{ detail: string }>(`EXPLAIN QUERY PLAN ${text}`, [
-        ...(params as never[]),
-      ]);
-      plans.push(...rows.map((r) => r.detail));
-    }
-    return plans;
-  }
 
-  test.each([
-    ['cost by category', baseQuery({ groupBy: 'category', interval: 'week' })],
-    ['cost by tag', baseQuery({ groupBy: 'tag' })],
-    ['fuel volume', baseQuery({ metric: 'volume', interval: 'week' })],
-    ['distance', baseQuery({ metric: 'distance', interval: 'week' })],
-  ])('%s', async (_name, query) => {
-    await seedFleet();
-    const plans = await plansFor(() => repo.query(OWNER.id, query));
-    const expenseSteps = plans.filter((detail) => /^(SCAN|SEARCH) e\b/.test(detail));
-    expect(expenseSteps.length).toBeGreaterThan(0);
-    for (const step of expenseSteps) expect(step).toMatch(/date>\?/);
-  });
-});
+    test.each([
+      ['cost by category', baseQuery({ groupBy: 'category', interval: 'week' })],
+      ['cost by tag', baseQuery({ groupBy: 'tag' })],
+      ['fuel volume', baseQuery({ metric: 'volume', interval: 'week' })],
+      ['distance', baseQuery({ metric: 'distance', interval: 'week' })],
+    ])('%s', async (_name, query) => {
+      await seedFleet();
+      const plans = await plansFor(() => repo.query(OWNER.id, query));
+      const expenseSteps = plans.filter((detail) => /^(SCAN|SEARCH) e\b/.test(detail));
+      expect(expenseSteps.length).toBeGreaterThan(0);
+      for (const step of expenseSteps) expect(step).toMatch(/date>\?/);
+    });
+  }
+);
 
 describe('bucket boundaries must be whole seconds', () => {
   test('a fractional boundary in a later bucket row is refused, not truncated', async () => {
