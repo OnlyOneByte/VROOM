@@ -125,6 +125,15 @@ describe('one navigation landmark, every item labelled in text', () => {
 		expect(bar).toHaveClass('bg-bar', 'text-bar-fg');
 	});
 
+	it('on a phone, the bottom bar has a top hairline in dark mode', () => {
+		const { container } = render(Navigation);
+
+		expect(container.querySelector('nav.fixed.bottom-0')).toHaveClass(
+			'dark:border-t',
+			'dark:border-border'
+		);
+	});
+
 	it('on a phone, a form hides the bar: the form carries its own Save', () => {
 		currentUrl = new URL('http://localhost/expenses/new');
 		const { container } = render(Navigation);

@@ -22,6 +22,14 @@ describe('Segmented', () => {
 		expect(radios.map(r => r.getAttribute('tabindex'))).toEqual(['-1', '0', '-1']);
 	});
 
+	test('the chosen segment has a strong edge against the track', () => {
+		render(Segmented, { props: { label: 'Letters', value: 'b', options } });
+
+		expect(screen.getByRole('radio', { name: 'Bravo' })).toHaveClass(
+			'data-[state=checked]:shadow-[0_0_0_1px_var(--border-strong)]'
+		);
+	});
+
 	test('reports a new choice once, and none for the current one', async () => {
 		const onValueChange = vi.fn();
 		render(Segmented, { props: { label: 'Letters', value: 'a', options, onValueChange } });

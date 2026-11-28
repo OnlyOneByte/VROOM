@@ -441,7 +441,7 @@
 								? 'border-primary bg-primary text-primary-foreground'
 								: i === currentStep
 									? 'border-primary text-primary'
-									: 'border-border text-muted-foreground'}"
+									: 'border-border-strong text-muted-foreground'}"
 							aria-hidden="true"
 						>
 							{#if step.done}<Check class="size-4" />{:else}{i + 1}{/if}

@@ -298,6 +298,14 @@ describe('ProviderInfoCard last backup time', () => {
 	});
 });
 
+describe('ProviderInfoCard icon square', () => {
+	test('has a hairline edge so it does not blend into the card', async () => {
+		const { container } = await mount();
+		const square = container.querySelector('[aria-hidden="true"].size-11');
+		expect(square).toHaveClass('bg-sunk', 'border', 'border-border');
+	});
+});
+
 describe('ProviderInfoCard details', () => {
 	test('expanding s3 shows endpoint, bucket and region, and collapsing hides them', async () => {
 		await mount({

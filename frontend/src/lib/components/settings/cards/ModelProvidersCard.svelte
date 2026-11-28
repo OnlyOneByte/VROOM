@@ -343,7 +343,7 @@
 					<div class="space-y-3 py-3 first:pt-0" data-testid="{domain}-builtin-row">
 						<div class="flex min-w-0 items-center gap-3">
 							<div
-								class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+								class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
 								aria-hidden="true"
 							>
 								<Icon class="size-5 text-foreground" />
@@ -368,7 +368,7 @@
 						<div class="flex items-center justify-between gap-2">
 							<div class="flex min-w-0 items-center gap-3">
 								<div
-									class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+									class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
 									aria-hidden="true"
 								>
 									<Icon class="size-5 text-foreground" />
