@@ -18,6 +18,7 @@ concurrency:
 jobs:
   refresh:
     name: Refresh backend image (${{ matrix.arch }})
+    if: github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
