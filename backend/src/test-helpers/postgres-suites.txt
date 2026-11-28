@@ -5,6 +5,7 @@ src/__tests__/deployment-examples.test.ts
 src/__tests__/not-found-envelope.test.ts
 src/__tests__/shared-limits.test.ts
 src/__tests__/vehicle-access-routes.test.ts
+src/api/analytics/__tests__/query-totals-dialect.test.ts
 src/api/analytics/__tests__/shared-analytics-read.test.ts
 src/api/analytics/__tests__/summary-route.test.ts
 src/api/analytics/__tests__/vehicle-tco-zero-state.test.ts
