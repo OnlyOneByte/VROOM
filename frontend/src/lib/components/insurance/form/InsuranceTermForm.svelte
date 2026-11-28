@@ -414,7 +414,7 @@
 									}}
 								>
 									<Select.Trigger id="premium-frequency" class="w-full">
-										{premiumFrequency || 'Select frequency'}
+										{premiumFrequency || 'Not specified'}
 									</Select.Trigger>
 									<Select.Content>
 										<Select.Item value="" label="Not specified">Not specified</Select.Item>

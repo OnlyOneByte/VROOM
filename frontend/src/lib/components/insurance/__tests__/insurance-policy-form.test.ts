@@ -229,7 +229,14 @@ describe('InsurancePolicyForm create mode', () => {
 			isActive: true
 		});
 		expect(showSuccess).toHaveBeenCalledWith('Policy created successfully');
-		expect(goto).toHaveBeenCalledWith('/insurance');
+		expect(gotoDynamic).toHaveBeenCalledWith('/insurance');
+	});
+
+	test('creating from a car goes back to that car', async () => {
+		await mount({ returnTo: '/vehicles/v1?tab=insurance' });
+		await fillRequiredCreateFields();
+		await clickCreate();
+		expect(gotoDynamic).toHaveBeenCalledWith('/vehicles/v1?tab=insurance');
 	});
 
 	test('sends every entered term field with numbers and trimmed text as typed', async () => {
@@ -479,7 +486,16 @@ describe('InsurancePolicyForm edit mode', () => {
 		await settle();
 		expect(deletePolicy).toHaveBeenCalledWith('p9');
 		expect(showSuccess).toHaveBeenCalledWith('Policy deleted successfully');
-		expect(goto).toHaveBeenCalledWith('/insurance');
+		expect(gotoDynamic).toHaveBeenCalledWith('/insurance');
+	});
+
+	test('deleting from a car goes back to that car', async () => {
+		await mount({ policyId: 'p9', returnTo: '/vehicles/v1?tab=insurance' });
+		await fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }));
+		await settle();
+		await fireEvent.click(await screen.findByRole('button', { name: /Delete policy/ }));
+		await settle();
+		expect(gotoDynamic).toHaveBeenCalledWith('/vehicles/v1?tab=insurance');
 	});
 
 	test('the delete confirmation pluralises the covered-vehicle count', async () => {
