@@ -107,7 +107,6 @@ export async function validateAndRefreshSession(
 
   logger.info('Session cookie re-issued for an extended session', {
     userId: user.id,
-    sessionId: session.id,
     expiresAt: session.expiresAt.toISOString(),
   });
 
