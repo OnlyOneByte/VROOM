@@ -42,6 +42,37 @@ describe('DatePicker id', () => {
 	});
 });
 
+describe('DatePicker value parsing', () => {
+	test.each(['2026-02-30', '2026-13-01', '26-05-10', 'not a date'])(
+		'%s is not a date, so the placeholder shows and the value is cleared',
+		async value => {
+			let bound: string | undefined = value;
+			render(DatePicker, {
+				props: {
+					get value() {
+						return bound;
+					},
+					set value(next: string | undefined) {
+						bound = next;
+					},
+					id: 'pick',
+					placeholder: 'Pick a date'
+				}
+			});
+			expect(document.getElementById('pick')).toHaveTextContent('Pick a date');
+			await vi.waitFor(() => expect(bound).toBeUndefined());
+		}
+	);
+
+	test.each([
+		['2028-02-29', 'February 29, 2028'],
+		['0999-05-10', 'May 10, 999']
+	])('%s reads as %s', (value, text) => {
+		render(DatePicker, { props: { value, id: 'pick' } });
+		expect(document.getElementById('pick-value')?.textContent).toBe(text);
+	});
+});
+
 describe('DatePicker in a narrow field', () => {
 	test('a short date stands in when the field is narrow, hidden from screen readers', () => {
 		render(DatePicker, { props: { value: '2026-11-25', id: 'trip-date' } });

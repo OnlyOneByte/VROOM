@@ -1,15 +1,32 @@
+<script lang="ts" module>
+	type PickerCalendarComponent = (typeof import('./date-picker-calendar.svelte'))['default'];
+
+	let calendarModule: Promise<PickerCalendarComponent> | undefined;
+	let PickerCalendar = $state<PickerCalendarComponent>();
+
+	function loadCalendar(): Promise<PickerCalendarComponent> {
+		calendarModule ??= import('./date-picker-calendar.svelte').then(
+			module => (PickerCalendar = module.default),
+			error => {
+				calendarModule = undefined;
+				throw error;
+			}
+		);
+		return calendarModule;
+	}
+
+	function prefetchCalendar() {
+		loadCalendar().catch(() => {});
+	}
+</script>
+
 <script lang="ts">
-	import { currentLocale } from '#lib/utils/formatters.ts';
+	import { formatDateWith } from '#lib/utils/formatters.ts';
+	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import { appStore } from '#lib/stores/app.svelte.ts';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
-	import {
-		type DateValue,
-		DateFormatter,
-		getLocalTimeZone,
-		parseDate
-	} from '@internationalized/date';
 	import { cn } from '#lib/utils.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { Calendar } from '#lib/components/ui/calendar/index.js';
 	import * as Popover from '#lib/components/ui/popover/index.js';
 
 	interface Props {
@@ -34,45 +51,36 @@
 		'aria-describedby': ariaDescribedby
 	}: Props = $props();
 
-	const df = new DateFormatter(currentLocale(), {
-		dateStyle: 'long'
-	});
-	const shortDf = new DateFormatter(currentLocale(), {
-		dateStyle: 'medium'
-	});
+	function localDate(text: string | undefined): Date | undefined {
+		const match = text?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+		if (!match) return undefined;
+		const [year, month, day] = match.slice(1).map(Number) as [number, number, number];
+		const date = new Date(`${match[0]}T00:00:00`);
+		return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+			? date
+			: undefined;
+	}
 
-	let calendarValue = $state<DateValue>();
 	let open = $state(false);
+	let selected = $derived(localDate(value));
 
 	$effect(() => {
-		if (!value) {
-			calendarValue = undefined;
-		} else {
-			try {
-				calendarValue = parseDate(value);
-			} catch {
-				calendarValue = undefined;
-			}
-		}
+		if (value && !selected) value = undefined;
 	});
 
 	$effect(() => {
-		if (calendarValue) {
-			const newValue = calendarValue.toString();
-			if (newValue !== value) {
-				value = newValue;
-				open = false;
-			}
-		} else if (value) {
-			value = undefined;
-		}
+		if (!open) return;
+		loadCalendar().catch(error => {
+			open = false;
+			appStore.showError(`Couldn't open the calendar. ${userFacingErrorMessage(error)}`);
+		});
 	});
 
 	let displayValue = $derived(
-		calendarValue ? (label ?? df.format(calendarValue.toDate(getLocalTimeZone()))) : placeholder
+		selected ? (label ?? formatDateWith(selected, { dateStyle: 'long' })) : placeholder
 	);
 	let shortValue = $derived(
-		calendarValue && !label ? shortDf.format(calendarValue.toDate(getLocalTimeZone())) : null
+		selected && !label ? formatDateWith(selected, { dateStyle: 'medium' }) : null
 	);
 
 	let content = $state<HTMLElement | null>(null);
@@ -109,7 +117,7 @@
 </script>
 
 <Popover.Root bind:open>
-	<Popover.Trigger {disabled} {id}>
+	<Popover.Trigger {disabled} {id} onpointerenter={prefetchCalendar} onfocusin={prefetchCalendar}>
 		{#snippet child({ props })}
 			<Button
 				variant="outline"
@@ -135,9 +143,11 @@
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-auto p-0" onOpenAutoFocus={focusDay}>
-		<div bind:this={content} onkeydowncapture={keepSelectedOnEnter}>
-			<Calendar type="single" bind:value={calendarValue as never} />
-		</div>
-	</Popover.Content>
+	{#if PickerCalendar}
+		<Popover.Content class="w-auto p-0" onOpenAutoFocus={focusDay}>
+			<div bind:this={content} onkeydowncapture={keepSelectedOnEnter}>
+				<PickerCalendar bind:value onpick={() => (open = false)} />
+			</div>
+		</Popover.Content>
+	{/if}
 </Popover.Root>
