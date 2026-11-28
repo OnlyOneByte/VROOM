@@ -13,6 +13,7 @@ export interface Trip {
 	endLocation?: string | null;
 	note?: string | null;
 	driverId?: string | null;
+	access?: { edit: boolean; delete: boolean };
 	createdAt: string;
 	updatedAt: string;
 }
