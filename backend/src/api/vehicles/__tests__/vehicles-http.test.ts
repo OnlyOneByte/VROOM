@@ -68,11 +68,11 @@ describe('vehicle update HTTP route — clear-optional-field semantics', () => {
 });
 
 describe('vehicle license-plate uniqueness is per-user, not global', () => {
-  function seedForeignVehicleWithPlate(plate: string): void {
-    ctx.sqlite.run(
+  async function seedForeignVehicleWithPlate(plate: string): Promise<void> {
+    await ctx.sql.run(
       `INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@test.com', 'Other')`
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO vehicles (id, user_id, make, model, year, license_plate)
        VALUES ('foreign-veh', 'other-user', 'Honda', 'Civic', 2020, ?)`,
       [plate]
@@ -80,7 +80,7 @@ describe('vehicle license-plate uniqueness is per-user, not global', () => {
   }
 
   test('CREATE with a plate another tenant owns succeeds', async () => {
-    seedForeignVehicleWithPlate('SHARED-9');
+    await seedForeignVehicleWithPlate('SHARED-9');
 
     const res = await ctx.authed('POST', '/api/v1/vehicles', {
       make: 'Toyota',
@@ -106,7 +106,7 @@ describe('vehicle license-plate uniqueness is per-user, not global', () => {
   });
 
   test('UPDATE to a plate another tenant owns succeeds', async () => {
-    seedForeignVehicleWithPlate('SHARED-9');
+    await seedForeignVehicleWithPlate('SHARED-9');
     const id = await seedFullVehicle();
 
     const res = await ctx.authed('PUT', `/api/v1/vehicles/${id}`, { licensePlate: 'SHARED-9' });

@@ -15,9 +15,9 @@ const CAR = 'slf-car';
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   viewer = await createInvitee(ctx, 'slf-viewer');
-  shareCar(ctx, CAR, viewer, 'viewer');
+  await shareCar(ctx, CAR, viewer, 'viewer');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -34,8 +34,8 @@ describe('the shared car list says whether each share shows financial figures', 
   });
 
   test('a share with financial access says so too, matching the single-car view', async () => {
-    overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
     expect(await sharedAccess()).toMatchObject({ seesFinancials: true });
 
     const one = await viewer.request('GET', `/api/v1/vehicles/${CAR}`);

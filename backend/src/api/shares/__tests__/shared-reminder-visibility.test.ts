@@ -32,13 +32,13 @@ function reminder(id: string, category: string): void {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   reminder(RUNNING, 'maintenance');
   reminder(RESTRICTED, 'financial');
   viewer = await createInvitee(ctx, 'srv-viewer');
   editor = await createInvitee(ctx, 'srv-editor');
-  shareCar(ctx, CAR, viewer, 'viewer');
-  shareCar(ctx, CAR, editor, 'editor');
+  await shareCar(ctx, CAR, viewer, 'viewer');
+  await shareCar(ctx, CAR, editor, 'editor');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -56,8 +56,8 @@ describe('reminders of a shared car follow the share settings', () => {
   });
 
   test('a viewer with that access sees every reminder', async () => {
-    overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
     expect(await listed(viewer.request)).toEqual([RESTRICTED, RUNNING].sort());
   });
 
@@ -107,14 +107,14 @@ describe('reminders of a shared car follow the share settings', () => {
 
   test('a reminder on two shared cars stays hidden until the viewer has access on both', async () => {
     const SECOND = 'srv-second';
-    seedCar(ctx, SECOND);
-    shareCar(ctx, SECOND, viewer, 'viewer');
+    await seedCar(ctx, SECOND);
+    await shareCar(ctx, SECOND, viewer, 'viewer');
     ctx.sqlite.run('INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)', [
       RESTRICTED,
       SECOND,
     ]);
-    overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
     expect(await listed(viewer.request)).toEqual([RUNNING]);
   });
 });

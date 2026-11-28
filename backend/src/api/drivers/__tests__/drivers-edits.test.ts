@@ -24,8 +24,8 @@ interface Driver {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
-  seedCar(ctx, OTHER);
+  await seedCar(ctx, CAR);
+  await seedCar(ctx, OTHER);
   m = await seedMembers(ctx, CAR, 'de');
   await ctx.authed('PUT', sharing, { enabled: true });
 }, SETUP_TIMEOUT_MS);
@@ -90,7 +90,7 @@ describe('changing the driver on an existing entry', () => {
       recordedAt: '2024-04-01',
       driverId: coOwnerDriver,
     });
-    overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
     const editorDriver = await driverOf(m.editor.id);
     expect(
       await status(m.editor.request, 'PUT', `/api/v1/odometer/${id}`, { driverId: editorDriver })

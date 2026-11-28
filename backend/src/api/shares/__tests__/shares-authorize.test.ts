@@ -23,7 +23,7 @@ const CAR = 'sh-car';
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'sh');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
@@ -61,10 +61,10 @@ describe('share management resolves through can() for every role', () => {
   });
 
   test('overrides on vehicle.share.manage take effect', async () => {
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.share.manage', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.share.manage', 'deny');
     expect((await invite(m.coOwner.request, 'e@example.com')).status).toBe(403);
     expect((await m.coOwner.request('DELETE', editorShare())).status).toBe(403);
-    overrideOn(ctx, CAR, m.editor, 'vehicle.share.manage', 'allow');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.share.manage', 'allow');
     expect((await invite(m.editor.request, 'f@example.com')).status).toBe(201);
   });
 
@@ -84,7 +84,7 @@ describe('share management cannot be used to escalate', () => {
     ).map((row) => row.granted_by);
 
   test('a manager grants only what they hold and never changes their own share', async () => {
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.share.manage', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.share.manage', 'allow');
     expect((await m.viewer.request('PUT', shareOf(m.viewer), { level: 'editor' })).status).toBe(
       403
     );
@@ -104,7 +104,7 @@ describe('share management cannot be used to escalate', () => {
   });
 
   test('an owner-set deny limits what a co-owner can hand out', async () => {
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.expense.write', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.expense.write', 'deny');
     const asEditor = await m.coOwner.request('POST', '/api/v1/shares', {
       vehicleId: CAR,
       email: 'i@example.com',
@@ -116,7 +116,7 @@ describe('share management cannot be used to escalate', () => {
 
   test('only the owner removes or changes a co-owner the owner appointed', async () => {
     const other = await createInvitee(ctx, 'sh-co-owner-2');
-    shareCar(ctx, CAR, other, 'viewer');
+    await shareCar(ctx, CAR, other, 'viewer');
     ctx.sqlite.run(
       'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
       [`ra-${other.id}`, other.id, builtInRoleId('co_owner'), CAR, ctx.user.id]
@@ -127,17 +127,17 @@ describe('share management cannot be used to escalate', () => {
   });
 
   test('a manager only changes or removes people whose access they hold themselves', async () => {
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.share.manage', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.share.manage', 'allow');
     expect((await m.viewer.request('PUT', editorShare(), { level: 'viewer' })).status).toBe(403);
     expect((await m.viewer.request('DELETE', editorShare())).status).toBe(403);
 
     const appointed = await createInvitee(ctx, 'sh-co-owner-3');
-    shareCar(ctx, CAR, appointed, 'viewer');
+    await shareCar(ctx, CAR, appointed, 'viewer');
     ctx.sqlite.run(
       'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
       [`ra-${appointed.id}`, appointed.id, builtInRoleId('co_owner'), CAR, m.coOwner.id]
     );
-    overrideOn(ctx, CAR, m.editor, 'vehicle.share.manage', 'allow');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.share.manage', 'allow');
     expect((await m.editor.request('DELETE', shareOf(appointed))).status).toBe(403);
     expect((await m.coOwner.request('DELETE', shareOf(appointed))).status).toBe(200);
   });
@@ -153,7 +153,7 @@ describe('share management cannot be used to escalate', () => {
 
     ctx.sqlite.run('DELETE FROM permission_overrides WHERE user_id = ?', [m.viewer.id]);
     setOverride(m.coOwner.id, 'vehicle.insurance.read');
-    overrideOn(ctx, CAR, m.editor, 'vehicle.share.manage', 'allow');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.share.manage', 'allow');
     expect((await m.editor.request('DELETE', shareOf(m.viewer))).status).toBe(403);
     expect((await m.coOwner.request('DELETE', shareOf(m.viewer))).status).toBe(200);
   });
@@ -183,9 +183,9 @@ describe('share management cannot be used to escalate', () => {
   });
 
   test('another car’s share is not found, and the owner’s email matches in any case', async () => {
-    seedCar(ctx, 'sh-other-car');
+    await seedCar(ctx, 'sh-other-car');
     const outsider = await createInvitee(ctx, 'sh-outsider');
-    shareCar(ctx, 'sh-other-car', outsider, 'viewer');
+    await shareCar(ctx, 'sh-other-car', outsider, 'viewer');
     const foreign = `/api/v1/shares/share-sh-other-car-${outsider.id}`;
     expect((await m.coOwner.request('DELETE', foreign)).status).toBe(404);
     expect((await invite(m.coOwner.request, ctx.user.email.toUpperCase())).status).toBe(400);

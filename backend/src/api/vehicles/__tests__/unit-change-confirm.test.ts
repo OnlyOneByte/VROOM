@@ -21,10 +21,10 @@ interface ErrorEnvelope {
   error: { details?: { requiresUnitChangeConfirmation?: boolean; changedUnits?: string[] } };
 }
 
-function storedDistanceUnit(vehicleId: string): string {
-  const row = ctx.sqlite
-    .query('SELECT unit_preferences FROM vehicles WHERE id = ?')
-    .get(vehicleId) as { unit_preferences: string };
+async function storedDistanceUnit(vehicleId: string): Promise<string> {
+  const row = (await ctx.sql.get('SELECT unit_preferences FROM vehicles WHERE id = ?', [
+    vehicleId,
+  ])) as { unit_preferences: string };
   return JSON.parse(row.unit_preferences).distanceUnit;
 }
 
@@ -57,7 +57,7 @@ describe('PUT /vehicles/:id unit changes', () => {
       requiresUnitChangeConfirmation: true,
       changedUnits: ['distanceUnit'],
     });
-    expect(storedDistanceUnit(vehicleId)).toBe('miles');
+    expect(await storedDistanceUnit(vehicleId)).toBe('miles');
   });
 
   test('applies the change when the client confirms it', async () => {
@@ -66,7 +66,7 @@ describe('PUT /vehicles/:id unit changes', () => {
     const res = await toKilometers(vehicleId, true);
 
     expect(res.status, await res.text()).toBe(200);
-    expect(storedDistanceUnit(vehicleId)).toBe('kilometers');
+    expect(await storedDistanceUnit(vehicleId)).toBe('kilometers');
   });
 
   test('treats a set initial mileage as history', async () => {
@@ -139,7 +139,7 @@ describe('PUT /vehicles/:id unit changes', () => {
     const res = await toKilometers(vehicleId);
 
     expect(res.status, await res.text()).toBe(200);
-    expect(storedDistanceUnit(vehicleId)).toBe('kilometers');
+    expect(await storedDistanceUnit(vehicleId)).toBe('kilometers');
   });
 
   test('a save that resends the same units needs no confirmation', async () => {

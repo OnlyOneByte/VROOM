@@ -15,7 +15,7 @@ const RANGE = 'startDate=1704067200&endDate=1735689600';
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'an');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
@@ -41,7 +41,7 @@ describe('vehicle analytics resolve through can() for every role', () => {
   });
 
   test('a deny on expense read blocks expense analytics but not the vehicle itself', async () => {
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.expense.read', 'deny');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.expense.read', 'deny');
     expect(await status(m.viewer.request, fuel)).toBe(403);
     expect(await status(m.viewer.request, expenses)).toBe(403);
     expect(await status(m.viewer.request, tco)).toBe(403);
@@ -86,7 +86,7 @@ describe('the assistant resolves through can()', () => {
     }
     expect(await fuelStats.run(args, m.viewer.id, Date.now())).toBeTruthy();
     expect(await summary.run(args, m.viewer.id, Date.now())).toBeTruthy();
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.expense.read', 'deny');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.expense.read', 'deny');
     await expect(fuelStats.run(args, m.viewer.id, Date.now())).rejects.toThrow();
     await expect(summary.run(args, m.viewer.id, Date.now())).rejects.toThrow();
     await expect(fuelStats.run(args, m.stranger.id, Date.now())).rejects.toThrow();

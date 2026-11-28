@@ -28,8 +28,8 @@ interface Driver {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
-  seedCar(ctx, OTHER);
+  await seedCar(ctx, CAR);
+  await seedCar(ctx, OTHER);
   m = await seedMembers(ctx, CAR, 'dr');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
@@ -119,7 +119,7 @@ describe('recording who drove or paid', () => {
       await status(m.editor.request, 'POST', '/api/v1/trips', trip({ driverId: coOwnerDriver?.id }))
     ).toBe(201);
 
-    overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
     expect(
       await status(m.editor.request, 'POST', '/api/v1/trips', trip({ driverId: coOwnerDriver?.id }))
     ).toBe(403);
@@ -216,7 +216,7 @@ describe('recording who drove or paid', () => {
       expenseAmount: 40,
     });
     const expense = (await json<DataEnvelope<{ id: string }>>(created)).data;
-    overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
     expect(
       await status(m.editor.request, 'PUT', `/api/v1/expenses/${expense.id}`, { vehicleId: OTHER })
     ).toBe(403);
@@ -273,7 +273,7 @@ describe('recording who drove or paid', () => {
     });
     const expense = (await json<DataEnvelope<{ id: string }>>(created)).data;
     await ctx.authed('PUT', sharing, { enabled: false });
-    overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
+    await overrideOn(ctx, CAR, m.editor, 'vehicle.driver.record', 'deny');
     expect(
       await status(m.editor.request, 'PUT', `/api/v1/expenses/${expense.id}`, { vehicleId: OTHER })
     ).toBe(403);

@@ -46,15 +46,14 @@ async function createEvenSplit(vehicleIds: string[], totalAmount: number): Promi
   return (await json<DataEnvelope<SplitCreateResponse>>(res)).data.groupId;
 }
 
-function legs(
+async function legs(
   groupId: string
-): Array<{ vehicle_id: string; expense_amount: number; group_total: number }> {
-  return ctx.sqlite
-    .query(
-      `SELECT vehicle_id, expense_amount, group_total FROM expenses
-       WHERE group_id = ? ORDER BY vehicle_id`
-    )
-    .all(groupId) as Array<{ vehicle_id: string; expense_amount: number; group_total: number }>;
+): Promise<Array<{ vehicle_id: string; expense_amount: number; group_total: number }>> {
+  return (await ctx.sql.all(
+    `SELECT vehicle_id, expense_amount, group_total FROM expenses
+       WHERE group_id = ? ORDER BY vehicle_id`,
+    [groupId]
+  )) as Array<{ vehicle_id: string; expense_amount: number; group_total: number }>;
 }
 
 describe('vehicle delete and materialized split groups', () => {
@@ -62,7 +61,7 @@ describe('vehicle delete and materialized split groups', () => {
     const [v1, v2] = [await createVehicle('Keeper'), await createVehicle('Doomed')];
     const groupId = await createEvenSplit([v1, v2], 100);
 
-    expect(legs(groupId)).toEqual(
+    expect(await legs(groupId)).toEqual(
       [
         { vehicle_id: v1, expense_amount: 5000, group_total: 10000 },
         { vehicle_id: v2, expense_amount: 5000, group_total: 10000 },
@@ -72,7 +71,7 @@ describe('vehicle delete and materialized split groups', () => {
     const del = await ctx.authed('DELETE', `/api/v1/vehicles/${v2}`);
     expect(del.status).toBe(200);
 
-    const surviving = legs(groupId);
+    const surviving = await legs(groupId);
     expect(surviving).toHaveLength(1);
     expect(surviving[0]).toEqual({ vehicle_id: v1, expense_amount: 5000, group_total: 5000 });
   });
@@ -88,7 +87,9 @@ describe('vehicle delete and materialized split groups', () => {
     });
     expect(edit.status).toBe(200);
 
-    expect(legs(groupId)).toEqual([{ vehicle_id: v1, expense_amount: 5000, group_total: 5000 }]);
+    expect(await legs(groupId)).toEqual([
+      { vehicle_id: v1, expense_amount: 5000, group_total: 5000 },
+    ]);
   });
 
   test('a three-way split keeps the two survivors summing to the new total', async () => {
@@ -99,7 +100,7 @@ describe('vehicle delete and materialized split groups', () => {
 
     expect((await ctx.authed('DELETE', `/api/v1/vehicles/${v3}`)).status).toBe(200);
 
-    const surviving = legs(groupId);
+    const surviving = await legs(groupId);
     expect(surviving).toHaveLength(2);
     const sum = surviving.reduce((acc, row) => acc + row.expense_amount, 0);
     expect(sum).toBe(6000);
@@ -117,10 +118,12 @@ describe('vehicle delete and materialized split groups', () => {
 
     expect((await ctx.authed('DELETE', `/api/v1/vehicles/${v3}`)).status).toBe(200);
 
-    for (const row of legs(untouched)) {
+    for (const row of await legs(untouched)) {
       expect(row.expense_amount).toBe(5000);
       expect(row.group_total).toBe(10000);
     }
-    expect(legs(affected)).toEqual([{ vehicle_id: v1, expense_amount: 3000, group_total: 3000 }]);
+    expect(await legs(affected)).toEqual([
+      { vehicle_id: v1, expense_amount: 3000, group_total: 3000 },
+    ]);
   });
 });

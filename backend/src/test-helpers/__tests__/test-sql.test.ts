@@ -49,5 +49,8 @@ describe('ctx.sql', () => {
         'sql-owner',
       ])
     ).toEqual([{ n: 1 }]);
+    expect(
+      await sql.get('SELECT SUM(year) AS total FROM vehicles WHERE user_id = ?', ['sql-owner'])
+    ).toEqual({ total: 2021 });
   });
 });

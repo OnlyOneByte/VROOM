@@ -29,16 +29,16 @@ async function createTrip(vehicleId: string): Promise<string> {
   return body.data.id;
 }
 
-function tripIds(): string[] {
-  return (ctx.sqlite.query('SELECT id FROM trips ORDER BY id').all() as { id: string }[]).map(
+async function tripIds(): Promise<string[]> {
+  return ((await ctx.sql.all('SELECT id FROM trips ORDER BY id')) as { id: string }[]).map(
     (r) => r.id
   );
 }
 
-function readings(): { odometer: number; source_trip_id: string | null }[] {
-  return ctx.sqlite
-    .query('SELECT odometer, source_trip_id FROM odometer_entries ORDER BY odometer')
-    .all() as { odometer: number; source_trip_id: string | null }[];
+async function readings(): Promise<{ odometer: number; source_trip_id: string | null }[]> {
+  return (await ctx.sql.all(
+    'SELECT odometer, source_trip_id FROM odometer_entries ORDER BY odometer'
+  )) as { odometer: number; source_trip_id: string | null }[];
 }
 
 describe('a trip delete and its reading change commit or roll back together', () => {
@@ -55,8 +55,8 @@ describe('a trip delete and its reading change commit or roll back together', ()
       spy.mockRestore();
     }
 
-    expect(tripIds()).toEqual([tripId]);
-    expect(readings()).toEqual([{ odometer: 1080, source_trip_id: tripId }]);
+    expect(await tripIds()).toEqual([tripId]);
+    expect(await readings()).toEqual([{ odometer: 1080, source_trip_id: tripId }]);
   });
 
   test('a failed hand-over keeps the trip and leaves the reading linked to it', async () => {
@@ -73,8 +73,8 @@ describe('a trip delete and its reading change commit or roll back together', ()
       spy.mockRestore();
     }
 
-    expect(tripIds()).toEqual([first, second].sort());
-    expect(readings()).toEqual([{ odometer: 1080, source_trip_id: first }]);
+    expect(await tripIds()).toEqual([first, second].sort());
+    expect(await readings()).toEqual([{ odometer: 1080, source_trip_id: first }]);
   });
 
   test('a successful delete hands the shared reading to the other trip', async () => {
@@ -85,8 +85,8 @@ describe('a trip delete and its reading change commit or roll back together', ()
     const res = await ctx.authed('DELETE', `/api/v1/trips/${first}`);
 
     expect(res.status).toBe(200);
-    expect(tripIds()).toEqual([second]);
-    expect(readings()).toEqual([{ odometer: 1080, source_trip_id: second }]);
+    expect(await tripIds()).toEqual([second]);
+    expect(await readings()).toEqual([{ odometer: 1080, source_trip_id: second }]);
   });
 });
 

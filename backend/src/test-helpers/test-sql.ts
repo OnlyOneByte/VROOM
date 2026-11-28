@@ -40,6 +40,7 @@ const SQLITE_SHAPED = {
   [types.BOOL]: (value: string) => (value === 't' ? 1 : 0),
   [types.JSON]: (value: string) => value,
   [types.JSONB]: (value: string) => value,
+  [types.NUMERIC]: (value: string) => Number(value),
 };
 
 export function pgliteTestSql(client: PGlite): TestSql {

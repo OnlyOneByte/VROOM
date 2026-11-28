@@ -46,8 +46,8 @@ const remove = (request: RequestFn, id: string) =>
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, SHARED);
-  seedCar(ctx, PRIVATE);
+  await seedCar(ctx, SHARED);
+  await seedCar(ctx, PRIVATE);
   m = await seedMembers(ctx, SHARED, 'rem');
   await reminder('both-cars', [SHARED, PRIVATE]);
   await reminder('editors-reminder', [SHARED], m.editor.id);
@@ -97,13 +97,13 @@ describe('reminders resolve through can() for every role', () => {
   });
 
   test('overrides: a deny hides reminders, an allow lets a viewer edit one', async () => {
-    overrideOn(ctx, SHARED, m.editor, 'vehicle.reminder.read', 'deny');
+    await overrideOn(ctx, SHARED, m.editor, 'vehicle.reminder.read', 'deny');
     expect((await listed(m.editor.request)).status).toBe(403);
     const rename = { name: 'Renamed' };
     expect(
       (await m.viewer.request('PUT', '/api/v1/reminders/editors-reminder', rename)).status
     ).toBe(403);
-    overrideOn(ctx, SHARED, m.viewer, 'vehicle.reminder.write', 'allow');
+    await overrideOn(ctx, SHARED, m.viewer, 'vehicle.reminder.write', 'allow');
     expect(
       (await m.viewer.request('PUT', '/api/v1/reminders/editors-reminder', rename)).status
     ).toBe(200);

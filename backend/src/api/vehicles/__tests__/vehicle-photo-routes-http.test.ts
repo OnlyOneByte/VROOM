@@ -17,13 +17,13 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedPhoto(opts: {
+async function seedPhoto(opts: {
   id: string;
   vehicleId: string;
   isCover?: boolean;
   sortOrder?: number;
-}): void {
-  ctx.sqlite.run(
+}): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size, is_cover, sort_order)
      VALUES (?, ?, 'vehicle', ?, ?, 'image/jpeg', 1024, ?, ?)`,
     [
@@ -42,9 +42,9 @@ interface PhotoRow {
   isCover: boolean;
 }
 
-function coverFlag(photoId: string): number {
+async function coverFlag(photoId: string): Promise<number> {
   return (
-    ctx.sqlite.query('SELECT is_cover FROM photos WHERE id = ?').get(photoId) as {
+    (await ctx.sql.get('SELECT is_cover FROM photos WHERE id = ?', [photoId])) as {
       is_cover: number;
     }
   ).is_cover;
@@ -53,8 +53,8 @@ function coverFlag(photoId: string): number {
 describe('GET /api/v1/vehicles/:vehicleId/photos (list)', () => {
   test('returns the vehicle’s photos in a paginated envelope', async () => {
     const vid = await seedVehicle(ctx, { nickname: 'Listed' });
-    seedPhoto({ id: 'vp1', vehicleId: vid, isCover: true, sortOrder: 0 });
-    seedPhoto({ id: 'vp2', vehicleId: vid, sortOrder: 1 });
+    await seedPhoto({ id: 'vp1', vehicleId: vid, isCover: true, sortOrder: 0 });
+    await seedPhoto({ id: 'vp2', vehicleId: vid, sortOrder: 1 });
 
     const res = await ctx.authed('GET', `/api/v1/vehicles/${vid}/photos`);
     const body = await json<{
@@ -81,27 +81,27 @@ describe('GET /api/v1/vehicles/:vehicleId/photos (list)', () => {
 describe('PUT /api/v1/vehicles/:vehicleId/photos/:photoId/cover (set cover)', () => {
   test('flips the target to cover and clears the previous cover', async () => {
     const vid = await seedVehicle(ctx, { nickname: 'Cover' });
-    seedPhoto({ id: 'c1', vehicleId: vid, isCover: true });
-    seedPhoto({ id: 'c2', vehicleId: vid, isCover: false });
+    await seedPhoto({ id: 'c1', vehicleId: vid, isCover: true });
+    await seedPhoto({ id: 'c2', vehicleId: vid, isCover: false });
 
     const res = await ctx.authed('PUT', `/api/v1/vehicles/${vid}/photos/c2/cover`);
     const body = await json<DataEnvelope<PhotoRow>>(res);
     expect(res.status, JSON.stringify(body)).toBe(200);
     expect(body.data.isCover).toBe(true);
 
-    expect(coverFlag('c2')).toBe(1);
-    expect(coverFlag('c1')).toBe(0);
+    expect(await coverFlag('c2')).toBe(1);
+    expect(await coverFlag('c1')).toBe(0);
   });
 
   test('a photo belonging to another vehicle returns 404 through this vehicle URL', async () => {
     const vid = await seedVehicle(ctx, { nickname: 'Mine' });
     const otherVid = await seedVehicle(ctx, { nickname: 'Other' });
-    seedPhoto({ id: 'mine-1', vehicleId: vid });
-    seedPhoto({ id: 'other-1', vehicleId: otherVid });
+    await seedPhoto({ id: 'mine-1', vehicleId: vid });
+    await seedPhoto({ id: 'other-1', vehicleId: otherVid });
 
     const res = await ctx.authed('PUT', `/api/v1/vehicles/${vid}/photos/other-1/cover`);
     expect(res.status).toBe(404);
-    expect(coverFlag('other-1')).toBe(0);
+    expect(await coverFlag('other-1')).toBe(0);
   });
 
   test('set-cover on a foreign vehicle returns 404', async () => {
