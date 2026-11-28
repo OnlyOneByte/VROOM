@@ -72,11 +72,11 @@ async function callbackWithCookie(query: string, cookie: string | undefined): Pr
   return ctx.app.request(`/api/v1/auth/callback/github?${query}`, { headers });
 }
 
-function sessionUserIdFrom(res: Response): string | undefined {
+async function sessionUserIdFrom(res: Response): Promise<string | undefined> {
   const setCookie = res.headers.get('set-cookie') ?? '';
   const sessionId = setCookie.match(/auth_session=([^;]+)/)?.[1];
   if (!sessionId) return undefined;
-  const row = ctx.sqlite.query('SELECT user_id FROM sessions WHERE id = ?').get(sessionId) as {
+  const row = (await ctx.sql.get('SELECT user_id FROM sessions WHERE id = ?', [sessionId])) as {
     user_id: string;
   } | null;
   return row?.user_id;
@@ -98,17 +98,16 @@ describe('GET /auth/callback/:authProvider — login', () => {
     expect(setCookie).toContain('HttpOnly');
     expect(setCookie).toContain('SameSite=Lax');
 
-    const user = ctx.sqlite
-      .query('SELECT id, display_name FROM users WHERE email = ?')
-      .get('newcomer@example.com') as { id: string; display_name: string } | null;
+    const user = (await ctx.sql.get('SELECT id, display_name FROM users WHERE email = ?', [
+      'newcomer@example.com',
+    ])) as { id: string; display_name: string } | null;
     expect(user?.display_name).toBe('New Comer');
-    const link = ctx.sqlite
-      .query(
-        "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = 'github' AND provider_account_id = ?"
-      )
-      .get('gh-1001') as { user_id: string } | null;
+    const link = (await ctx.sql.get(
+      "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = 'github' AND provider_account_id = ?",
+      ['gh-1001']
+    )) as { user_id: string } | null;
     expect(link?.user_id).toBe(user?.id);
-    expect(sessionUserIdFrom(res)).toBe(user?.id);
+    expect(await sessionUserIdFrom(res)).toBe(user?.id);
   });
 
   test('a known identity logs in its existing user rather than creating another', async () => {
@@ -118,15 +117,15 @@ describe('GET /auth/callback/:authProvider — login', () => {
       displayName: 'Returning',
     });
     const first = await loginRoundTrip();
-    const firstUserId = sessionUserIdFrom(first);
+    const firstUserId = await sessionUserIdFrom(first);
 
     const second = await loginRoundTrip();
 
     expect(second.headers.get('location')).toBe(`${frontendUrl()}/dashboard`);
-    expect(sessionUserIdFrom(second)).toBe(firstUserId);
-    const count = ctx.sqlite
-      .query('SELECT COUNT(*) AS n FROM users WHERE email = ?')
-      .get('returning@example.com') as { n: number };
+    expect(await sessionUserIdFrom(second)).toBe(firstUserId);
+    const count = (await ctx.sql.get('SELECT COUNT(*) AS n FROM users WHERE email = ?', [
+      'returning@example.com',
+    ])) as { n: number };
     expect(count.n).toBe(1);
   });
 
@@ -135,18 +134,18 @@ describe('GET /auth/callback/:authProvider — login', () => {
 
     async function signUp(): Promise<string> {
       providerReturns({ providerAccountId: 'gh-3003', email, displayName: 'Between' });
-      return sessionUserIdFrom(await loginRoundTrip()) as string;
+      return (await sessionUserIdFrom(await loginRoundTrip())) as string;
     }
 
-    function insertShare(share: {
+    async function insertShare(share: {
       id: string;
       vehicleId: string;
       ownerId?: string;
       invitedEmail: string | null;
       sharedWithId?: string;
       status?: string;
-    }): void {
-      ctx.sqlite.run(
+    }): Promise<void> {
+      await ctx.sql.run(
         "INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, invited_email) VALUES (?, ?, ?, ?, 'viewer', ?, ?)",
         [
           share.id,
@@ -159,9 +158,9 @@ describe('GET /auth/callback/:authProvider — login', () => {
       );
     }
 
-    function invitee(id: string): string | null {
+    async function invitee(id: string): Promise<string | null> {
       return (
-        ctx.sqlite.query('SELECT shared_with_id FROM vehicle_shares WHERE id = ?').get(id) as {
+        (await ctx.sql.get('SELECT shared_with_id FROM vehicle_shares WHERE id = ?', [id])) as {
           shared_with_id: string | null;
         }
       ).shared_with_id;
@@ -171,13 +170,13 @@ describe('GET /auth/callback/:authProvider — login', () => {
       const userId = await signUp();
       const first = await seedVehicle(ctx);
       const second = await seedVehicle(ctx, { make: 'Mazda', model: '3' });
-      insertShare({ id: 'share-missed', vehicleId: first, invitedEmail: email });
-      insertShare({
+      await insertShare({ id: 'share-missed', vehicleId: first, invitedEmail: email });
+      await insertShare({
         id: 'share-other',
         vehicleId: first,
         invitedEmail: 'someone-else@example.com',
       });
-      insertShare({
+      await insertShare({
         id: 'share-declined',
         vehicleId: second,
         invitedEmail: email,
@@ -186,38 +185,48 @@ describe('GET /auth/callback/:authProvider — login', () => {
 
       await loginRoundTrip();
 
-      expect(invitee('share-missed')).toBe(userId);
-      expect(invitee('share-other')).toBeNull();
-      expect(invitee('share-declined')).toBeNull();
+      expect(await invitee('share-missed')).toBe(userId);
+      expect(await invitee('share-other')).toBeNull();
+      expect(await invitee('share-declined')).toBeNull();
     });
 
     test('one on a vehicle the account already has an invite for stays put, and the rest still attach', async () => {
       const userId = await signUp();
       const vehicleId = await seedVehicle(ctx);
       const another = await seedVehicle(ctx, { make: 'Mazda', model: '3' });
-      insertShare({ id: 'share-attached', vehicleId, invitedEmail: email, sharedWithId: userId });
-      insertShare({ id: 'share-extra', vehicleId, invitedEmail: email });
-      insertShare({ id: 'share-another', vehicleId: another, invitedEmail: email });
+      await insertShare({
+        id: 'share-attached',
+        vehicleId,
+        invitedEmail: email,
+        sharedWithId: userId,
+      });
+      await insertShare({ id: 'share-extra', vehicleId, invitedEmail: email });
+      await insertShare({ id: 'share-another', vehicleId: another, invitedEmail: email });
 
       const res = await loginRoundTrip();
 
       expect(res.headers.get('location')).toBe(`${frontendUrl()}/dashboard`);
-      expect(sessionUserIdFrom(res)).toBe(userId);
-      expect(invitee('share-extra')).toBeNull();
-      expect(invitee('share-another')).toBe(userId);
+      expect(await sessionUserIdFrom(res)).toBe(userId);
+      expect(await invitee('share-extra')).toBeNull();
+      expect(await invitee('share-another')).toBe(userId);
     });
 
     test('one on a vehicle the account owns never attaches to it', async () => {
       const userId = await signUp();
-      ctx.sqlite.run(
+      await ctx.sql.run(
         "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('own-car', ?, 'Honda', 'Fit', 2020)",
         [userId]
       );
-      insertShare({ id: 'share-self', vehicleId: 'own-car', ownerId: userId, invitedEmail: email });
+      await insertShare({
+        id: 'share-self',
+        vehicleId: 'own-car',
+        ownerId: userId,
+        invitedEmail: email,
+      });
 
       await loginRoundTrip();
 
-      expect(invitee('share-self')).toBeNull();
+      expect(await invitee('share-self')).toBeNull();
     });
   });
 
@@ -227,7 +236,7 @@ describe('GET /auth/callback/:authProvider — login', () => {
     const res = await loginRoundTrip();
 
     expect(res.headers.get('location')).toBe(`${frontendUrl()}/auth?auth_error=no_email`);
-    expect(sessionUserIdFrom(res)).toBeUndefined();
+    expect(await sessionUserIdFrom(res)).toBeUndefined();
   });
 
   test('any other provider failure is provider_unavailable, whatever its message says', async () => {
@@ -280,7 +289,7 @@ describe('GET /auth/callback/:authProvider — browser binding', () => {
     const res = await callbackWithCookie(`code=auth-code&state=${state}`, undefined);
 
     expect(res.headers.get('location')).toBe(`${frontendUrl()}/auth?auth_error=invalid_state`);
-    expect(sessionUserIdFrom(res)).toBeUndefined();
+    expect(await sessionUserIdFrom(res)).toBeUndefined();
   });
 
   test('a state cookie from a different login start is refused', async () => {
@@ -295,7 +304,7 @@ describe('GET /auth/callback/:authProvider — browser binding', () => {
     );
 
     expect(res.headers.get('location')).toBe(`${frontendUrl()}/auth?auth_error=invalid_state`);
-    expect(sessionUserIdFrom(res)).toBeUndefined();
+    expect(await sessionUserIdFrom(res)).toBeUndefined();
   });
 
   test('the callback clears the state cookie', async () => {

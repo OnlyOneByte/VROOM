@@ -76,7 +76,7 @@ describe('connecting Google storage asks only for what the provider needs', () =
   });
 
   test('reconnecting an existing provider asks for the scopes of its own type, whatever the query says', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
        VALUES ('photos-1', ?, 'storage', 'google-photos', 'Photos', 'x', '{}', 'active')`,
       [ctx.user.id]
@@ -116,15 +116,15 @@ describe('connecting Google storage asks only for what the provider needs', () =
 });
 
 describe('an OAuth return re-checks the permission that started it', () => {
-  const denyOnServer = (permission: string) =>
-    ctx.sqlite.run(
+  const denyOnServer = async (permission: string) =>
+    await ctx.sql.run(
       "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect) VALUES (?, ?, 'server', NULL, ?, 'deny')",
       [`po-${permission}`, ctx.user.id, permission]
     );
 
   test('connecting a provider stops when the permission was taken away meanwhile', async () => {
     const url = await connect('&providerType=google-photos');
-    denyOnServer('account.provider.manage');
+    await denyOnServer('account.provider.manage');
     expect((await callback(url)).searchParams.get('provider_error')).toBe('forbidden');
   });
 
@@ -137,7 +137,7 @@ describe('an OAuth return re-checks the permission that started it', () => {
     const start = await ctx.authed('GET', '/api/v1/auth/link/google');
     expect(start.status).toBe(302);
     const state = new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? '';
-    denyOnServer('account.signin.manage');
+    await denyOnServer('account.signin.manage');
     const res = await ctx.authed(
       'GET',
       `/api/v1/auth/callback/link/google?code=c&state=${encodeURIComponent(state)}`
