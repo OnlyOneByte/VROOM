@@ -306,7 +306,7 @@ export function advanceToFirstFutureDue(
 ): Date {
   const now = new Date();
   let nextDue = advanceReminderDueDate(reminder, from, timeZone);
-  while (nextDue <= now) {
+  while (isTimeDue(nextDue, now, timeZone)) {
     const advanced = advanceReminderDueDate(reminder, nextDue, timeZone);
     if (advanced <= nextDue) {
       throw new ValidationError(
@@ -324,13 +324,20 @@ export function nextDueAfterService(
   now: Date,
   timeZone: string | undefined
 ): Date {
-  if (due <= now) return advanceToFirstFutureDue(reminder, due, timeZone);
+  if (isTimeDue(due, now, timeZone)) return advanceToFirstFutureDue(reminder, due, timeZone);
   const periodStart = previousDueBefore(reminder, due, timeZone);
   const alreadyAdvanced =
     periodStart !== null &&
-    (periodStart > now ||
-      (reminder.lastTriggeredAt !== null && reminder.lastTriggeredAt >= periodStart));
+    (!isTimeDue(periodStart, now, timeZone) ||
+      (reminder.lastTriggeredAt !== null &&
+        reminder.lastTriggeredAt >= startOfDayIn(periodStart, timeZone)));
   return alreadyAdvanced ? due : advanceReminderDueDate(reminder, due, timeZone);
+}
+
+export function startOfDayIn(instant: Date, timeZone: string | undefined): Date {
+  return timeZone
+    ? zonedDayWindow(instant, timeZone).dayStart
+    : new Date(instant.getFullYear(), instant.getMonth(), instant.getDate());
 }
 
 function endOfDayIn(now: Date, timeZone: string | undefined): Date {

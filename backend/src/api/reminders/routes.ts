@@ -43,6 +43,7 @@ import {
   nextDueAfterService,
   type ReminderSchedule,
   reminderTriggerService,
+  startOfDayIn,
 } from './trigger-service';
 import {
   assertMergedReminderValid,
@@ -258,7 +259,7 @@ function rescheduledFields(
   if (merged.triggerMode === 'mileage') return {};
   const resumed = update.isActive === true && !existing.isActive;
   if (!resumed && !scheduleChanged(existing, merged)) return {};
-  const nextDueDate = firstDueOnOrAfter(merged, new Date(), timeZone);
+  const nextDueDate = firstDueOnOrAfter(merged, startOfDayIn(new Date(), timeZone), timeZone);
   const ended = merged.endDate != null && nextDueDate > merged.endDate;
   if (ended && resumed) {
     throw new ValidationError('This reminder has passed its end date. Extend it to resume.');

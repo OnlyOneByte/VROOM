@@ -1,13 +1,21 @@
 import type { Reminder } from '#lib/types/reminder.ts';
 import { capitalize } from './formatters';
 
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
+
 function calendarDay(ms: number, timeZone: string | undefined): string {
-	return new Intl.DateTimeFormat('en-CA', {
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit',
-		...(timeZone ? { timeZone } : {})
-	}).format(ms);
+	const key = timeZone ?? '';
+	let format = dayFormats.get(key);
+	if (!format) {
+		format = new Intl.DateTimeFormat('en-CA', {
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			...(timeZone ? { timeZone } : {})
+		});
+		dayFormats.set(key, format);
+	}
+	return format.format(ms);
 }
 
 export function isReminderTimeDue(
