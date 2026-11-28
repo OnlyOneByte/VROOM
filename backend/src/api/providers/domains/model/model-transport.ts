@@ -50,7 +50,8 @@ export async function postModelJson<T>(req: ModelRequest): Promise<T | null> {
       status: res.status,
       detail: detail.slice(0, 200),
     });
-    throw new Error(`${req.domain} provider returned HTTP ${res.status}`);
+    const status = res.status === 400 && /API_KEY_INVALID/.test(detail) ? 401 : res.status;
+    throw new Error(`${req.domain} provider returned HTTP ${status}`);
   }
 
   return (await res.json().catch(() => null)) as T | null;

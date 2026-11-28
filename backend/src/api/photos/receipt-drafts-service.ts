@@ -10,19 +10,23 @@ export interface ReceiptDraftItem {
 }
 
 export interface StageDeps {
-  listReceiptPhotos: (maxItems: number) => Promise<PhotosMediaItem[]>;
+  listReceiptPhotos: (
+    maxItems: number,
+    skip: (photoId: string) => Promise<boolean>
+  ) => Promise<PhotosMediaItem[]>;
   downloadPhoto: (photoId: string) => Promise<Buffer>;
   freshUrl: (photoId: string) => Promise<string | null>;
   parseImage: (bytes: Buffer, mimeType: string) => Promise<ReceiptDraft>;
   isAlreadyImported: (photoId: string) => Promise<boolean>;
+  cachedDraft: (photoId: string) => ReceiptDraft | undefined;
+  rememberDraft: (photoId: string, draft: ReceiptDraft) => void;
 }
 
 export const MAX_RECEIPT_PHOTOS_PER_RUN = 25;
-export const MAX_RECEIPT_PHOTOS_LOOKED_AT = 4 * MAX_RECEIPT_PHOTOS_PER_RUN;
 export const MAX_SCAN_BYTES = 8 * 1024 * 1024;
 const SCANNABLE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-export type ScanStopReason = 'ai_key' | 'ai_rate_limit' | 'photos_access';
+export type ScanStopReason = 'ai_key' | 'ai_rate_limit' | 'photos_access' | 'photos_quota';
 
 export class ReceiptScanStopped extends Error {
   constructor(readonly reason: ScanStopReason) {
@@ -30,13 +34,18 @@ export class ReceiptScanStopped extends Error {
   }
 }
 
-function stopReasonOf(error: unknown): ScanStopReason | null {
-  if (
-    isSyncError(error) &&
-    (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED)
-  ) {
+function photosStopOf(error: unknown): ScanStopReason | null {
+  if (!isSyncError(error)) return null;
+  if (error.code === SyncErrorCode.QUOTA_EXCEEDED) return 'photos_quota';
+  if (error.code === SyncErrorCode.AUTH_INVALID || error.code === SyncErrorCode.PERMISSION_DENIED) {
     return 'photos_access';
   }
+  return null;
+}
+
+function stopReasonOf(error: unknown): ScanStopReason | null {
+  const photosStop = photosStopOf(error);
+  if (photosStop) return photosStop;
   const message = error instanceof Error ? error.message : '';
   if (/HTTP 429\b/.test(message)) return 'ai_rate_limit';
   if (/HTTP 40[13]\b/.test(message)) return 'ai_key';
@@ -47,16 +56,24 @@ export async function stageReceiptDrafts(
   deps: StageDeps,
   maxItems = MAX_RECEIPT_PHOTOS_PER_RUN
 ): Promise<ReceiptDraftItem[]> {
-  const photos = await deps.listReceiptPhotos(Math.max(maxItems, MAX_RECEIPT_PHOTOS_LOOKED_AT));
+  const photos = await listNotImported(deps, maxItems);
   const drafts: ReceiptDraftItem[] = [];
 
-  for (const photo of photos) {
-    if (drafts.length >= maxItems) break;
-    if (await deps.isAlreadyImported(photo.id)) continue;
+  for (const photo of photos.slice(0, maxItems)) {
     drafts.push(await stageOne(deps, photo));
   }
 
   return drafts;
+}
+
+async function listNotImported(deps: StageDeps, maxItems: number): Promise<PhotosMediaItem[]> {
+  try {
+    return await deps.listReceiptPhotos(maxItems, deps.isAlreadyImported);
+  } catch (error) {
+    const stop = photosStopOf(error);
+    if (stop) throw new ReceiptScanStopped(stop);
+    throw error;
+  }
 }
 
 async function stageOne(deps: StageDeps, photo: PhotosMediaItem): Promise<ReceiptDraftItem> {
@@ -64,12 +81,16 @@ async function stageOne(deps: StageDeps, photo: PhotosMediaItem): Promise<Receip
   const unread = { photoId: photo.id, draft: {}, thumbnailUrl, failed: true };
   const mimeType = photo.mimeType ?? 'image/jpeg';
   if (!SCANNABLE_TYPES.has(mimeType)) return unread;
+  const cached = deps.cachedDraft(photo.id);
+  if (cached) return { photoId: photo.id, draft: cached, thumbnailUrl };
 
   try {
     const bytes = await deps.downloadPhoto(photo.id);
     if (bytes.byteLength > MAX_SCAN_BYTES) return unread;
     const draft = await deps.parseImage(bytes, mimeType);
-    return Object.keys(draft).length === 0 ? unread : { photoId: photo.id, draft, thumbnailUrl };
+    if (Object.keys(draft).length === 0) return unread;
+    deps.rememberDraft(photo.id, draft);
+    return { photoId: photo.id, draft, thumbnailUrl };
   } catch (error) {
     const stop = stopReasonOf(error);
     if (stop) throw new ReceiptScanStopped(stop);

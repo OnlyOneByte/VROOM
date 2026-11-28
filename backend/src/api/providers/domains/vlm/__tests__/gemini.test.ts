@@ -104,6 +104,21 @@ describe('GeminiVlmProvider failures', () => {
     await expect(provider.extractReceipt(IMAGE)).rejects.toThrow(/HTTP 429/);
   });
 
+  test('a 400 that says the key is invalid is reported as a rejected key', async () => {
+    const body = JSON.stringify({
+      error: { code: 400, status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] },
+    });
+    stubFetch(() => new Response(body, { status: 400 }));
+    const provider = new GeminiVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
+    await expect(provider.extractReceipt(IMAGE)).rejects.toThrow(/HTTP 401/);
+  });
+
+  test('any other 400 keeps its status', async () => {
+    stubFetch(() => new Response('{"error":{"status":"INVALID_ARGUMENT"}}', { status: 400 }));
+    const provider = new GeminiVlmProvider({ outbound: ALLOW_PRIVATE, apiKey: 'k', model: 'm' });
+    await expect(provider.extractReceipt(IMAGE)).rejects.toThrow(/HTTP 400/);
+  });
+
   test('THROWS on a network/transport failure', async () => {
     stubFetch(() => {
       throw new Error('ECONNREFUSED');
