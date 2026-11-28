@@ -454,7 +454,7 @@
 						{:else}
 							<a
 								href={resolve(step.route)}
-								class="text-sm text-muted-foreground underline-offset-4 hover:underline"
+								class="inline-flex min-h-10 items-center text-sm text-accent-ink underline-offset-4 hover:underline"
 							>
 								{step.label}
 							</a>

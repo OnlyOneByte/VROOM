@@ -265,7 +265,7 @@
 							<CardAction>
 								<a
 									href={resolve(routes.profile)}
-									class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
+									class="-mt-2.5 inline-flex min-h-10 items-center text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
 								>
 									Profile
 								</a>
@@ -316,7 +316,7 @@
 							<CardAction>
 								<a
 									href={resolve(routes.settingsStorage)}
-									class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
+									class="-mt-2.5 inline-flex min-h-10 items-center text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
 									aria-label="Manage backups and storage"
 								>
 									Manage
@@ -335,7 +335,7 @@
 							<CardAction>
 								<a
 									href={resolve(routes.settingsAi)}
-									class="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
+									class="-mt-2.5 inline-flex min-h-10 items-center text-sm font-semibold text-accent-ink underline-offset-4 hover:underline"
 									aria-label="Manage AI helpers"
 								>
 									Manage

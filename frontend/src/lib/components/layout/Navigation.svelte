@@ -173,7 +173,7 @@
 {#snippet avatar()}
 	<a
 		href={resolve(routes.profile)}
-		class="grid size-9 place-items-center rounded-full bg-surface text-[13px] font-semibold text-foreground ring-1 ring-inset ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+		class="grid size-10 place-items-center rounded-full bg-surface text-[13px] font-semibold text-foreground ring-1 ring-inset ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 		title="Profile"
 	>
 		{#if initials}

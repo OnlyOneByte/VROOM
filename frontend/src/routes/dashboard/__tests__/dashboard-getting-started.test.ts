@@ -110,6 +110,18 @@ describe('dashboard getting started', () => {
 		expect(screen.queryByRole('heading', { name: 'Spending' })).toBeNull();
 	});
 
+	test('steps that are not current are 40px links that look like links', async () => {
+		getVehicles.mockResolvedValue([]);
+		render(Page);
+
+		await screen.findByRole('heading', { name: 'Add your first vehicle' });
+		for (const name of ['Log an expense or fill-up', 'See what it costs']) {
+			const link = screen.getByRole('link', { name });
+			expect(link).toHaveClass('inline-flex', 'min-h-10', 'items-center', 'text-accent-ink');
+			expect(link).not.toHaveClass('text-muted-foreground');
+		}
+	});
+
 	test('with a vehicle but no expenses, due reminders and recurring costs still show', async () => {
 		getVehicles.mockResolvedValue([OWNED]);
 		reminders.list = [
