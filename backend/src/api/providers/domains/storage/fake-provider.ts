@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { assertSafeStoragePath } from '../../../../utils/paths';
-import type {
-  StorageFileInfo,
-  StorageProvider,
-  StorageRef,
-  UploadParams,
+import {
+  assertWithinSize,
+  type DownloadOptions,
+  type StorageFileInfo,
+  type StorageProvider,
+  type StorageRef,
+  type UploadParams,
 } from './storage-provider';
 
 interface StoredFile {
@@ -58,10 +60,11 @@ export class FakeStorageProvider implements StorageProvider {
     });
   }
 
-  download(ref: StorageRef): Promise<Buffer> {
+  async download(ref: StorageRef, options?: DownloadOptions): Promise<Buffer> {
     const file = this.files.get(ref.externalId);
-    if (!file) return Promise.reject(new Error(`fake-storage: no file at ${ref.externalId}`));
-    return Promise.resolve(file.buffer);
+    if (!file) throw new Error(`fake-storage: no file at ${ref.externalId}`);
+    assertWithinSize(file.buffer.length, options);
+    return file.buffer;
   }
 
   delete(ref: StorageRef): Promise<void> {
