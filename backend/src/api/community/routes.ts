@@ -167,7 +167,9 @@ routes.get(
         return { metric, status: 'needs_model', unit: null, yours: null, bucket: null };
       }
       const sample = samples.find((candidate) => candidate.metric === metric);
-      if (!sample) return { metric, status: 'no_data', unit: null, yours: null, bucket: null };
+      if (!sample || !bandFor(metric, sample.unit, sample.fields)) {
+        return { metric, status: 'no_data', unit: null, yours: null, bucket: null };
+      }
       const unit = DISPLAY_UNIT[sample.unit];
       const yours = toDisplayUnits(sample.value, sample.unit, vehicle.unitPreferences);
       const row = rowByKey.get(sample.bucketKey);

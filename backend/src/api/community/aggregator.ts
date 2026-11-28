@@ -153,14 +153,18 @@ function efficiency(vehicle: CommunityVehicle): { unit: CommunityUnit; value: nu
   return { unit: electricVehicle ? 'km_per_kwh' : 'km_per_l', value: km / energy };
 }
 
-function distanceKm(vehicle: CommunityVehicle): number {
-  const readings = [
+function readings(vehicle: CommunityVehicle): number[] {
+  return [
     ...vehicle.expenses.flatMap((expense) => (expense.mileage ? [expense.mileage] : [])),
     ...vehicle.odometerReadings,
   ];
-  if (readings.length < 2) return 0;
+}
+
+function distanceKm(vehicle: CommunityVehicle): number {
+  const all = readings(vehicle);
+  if (all.length < 2) return 0;
   return convertDistance(
-    Math.max(...readings) - Math.min(...readings),
+    Math.max(...all) - Math.min(...all),
     vehicle.unitPreferences.distanceUnit,
     DistanceUnit.KILOMETERS
   );
@@ -187,11 +191,19 @@ const isMaintenance = (expense: CommunityExpense) =>
 const isRunningCost = (expense: CommunityExpense) =>
   (expense.category === 'fuel' || expense.category === 'maintenance') && !isInsurance(expense);
 
-function firstFillUpCost(vehicle: CommunityVehicle): number {
-  const fuel = vehicle.expenses.filter((expense) => expense.category === 'fuel');
-  if (fuel.length === 0) return 0;
-  return fuel.reduce((first, expense) => (expense.date < first.date ? expense : first))
-    .expenseAmount;
+function costBeforeWindowDistance(vehicle: CommunityVehicle): number {
+  const all = readings(vehicle);
+  if (all.length === 0) return 0;
+  const lowest = Math.min(...all);
+  return sumCents(
+    vehicle,
+    (expense) =>
+      expense.category === 'fuel' &&
+      !isInsurance(expense) &&
+      expense.mileage !== null &&
+      expense.mileage > 0 &&
+      expense.mileage <= lowest
+  );
 }
 
 export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSample[] {
@@ -221,7 +233,7 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
       metric: 'running_cost',
       bucketKey: `running_cost|${vehicleType}|${vehicleKind}|${currency}|${region ?? '-'}`,
       unit: 'cents_per_km',
-      value: (sumCents(vehicle, isRunningCost) - firstFillUpCost(vehicle)) / km,
+      value: (sumCents(vehicle, isRunningCost) - costBeforeWindowDistance(vehicle)) / km,
       fields: { vehicleType, currency, region },
     });
   }

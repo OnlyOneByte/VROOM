@@ -389,6 +389,23 @@ describe('per-vehicle samples', () => {
     for (const count of [3, 4, 13]) expect(costPerKm(count)).toBeCloseTo(4000 / 500, 6);
   });
 
+  test('a fill-up after an earlier odometer reading still counts toward running cost', () => {
+    const miles = 500 / 1.609344;
+    const fills = fillUps({ count: 3, distance: miles, startMileage: 1000 + miles });
+    const withEarlierReading = vehicle('v', { expenses: fills, odometerReadings: [1000] });
+    const running = vehicleSamples(withEarlierReading, NOW).find(
+      (s) => s.metric === 'running_cost'
+    );
+    expect(running?.value).toBeCloseTo((3 * 4000) / 1500, 6);
+
+    const oneFill = vehicle('one', {
+      expenses: fillUps({ count: 1, startMileage: 1000 + 2 * miles }),
+      odometerReadings: [1000],
+    });
+    const single = vehicleSamples(oneFill, NOW).find((s) => s.metric === 'running_cost');
+    expect(single?.value).toBeCloseTo(4000 / 1000, 6);
+  });
+
   test('a motorcycle and a car with the same powertrain never share a cost or maintenance group', () => {
     const keys = (vehicleKind: string) =>
       vehicleSamples(vehicle(vehicleKind, { vehicleKind }), NOW)

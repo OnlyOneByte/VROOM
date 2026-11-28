@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { repos } from '../../../app-context';
 import { CONFIG } from '../../../config';
 import {
   createTestApp,
@@ -271,6 +272,18 @@ describe('GET /api/v1/community/compare', () => {
     expect(metric(body, 'efficiency')?.status).toBe('needs_model');
     expect(metric(body, 'insurance')?.status).toBe('no_data');
     expect(metric(body, 'running_cost')?.status).toBe('too_few');
+  });
+
+  test('money comparisons in a currency with no range say there is no data, not too few owners', async () => {
+    await repos().preferences.getOrCreate(ctx.user.id);
+    await repos().preferences.update(ctx.user.id, { currencyUnit: 'ARS' });
+    const vehicleId = await seedCivic({});
+    markRefreshed();
+    await optIn();
+
+    const { body } = await compare(vehicleId);
+    expect(metric(body, 'running_cost')?.status).toBe('no_data');
+    expect(metric(body, 'running_cost')?.yours).toBeNull();
   });
 
   test("another user's vehicle is a 404, even for an opted-in caller", async () => {
