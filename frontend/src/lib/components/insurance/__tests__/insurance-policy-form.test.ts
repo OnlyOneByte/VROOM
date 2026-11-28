@@ -135,7 +135,7 @@ describe('InsurancePolicyForm create mode', () => {
 		await mount();
 		expect(screen.getByRole('heading', { name: 'Add a vehicle first' })).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: 'Add Vehicle' })).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /Create policy/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Create Policy/ })).toBeNull();
 		expect(screen.queryByLabelText(/Company/)).toBeNull();
 	});
 
