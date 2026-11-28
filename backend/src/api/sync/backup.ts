@@ -57,7 +57,11 @@ import { joinStoragePath, storagePathSchema } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { storageProviderDescriptor } from '../providers/domains/storage/registry';
-import { credentialCodeOf, isMissingObject } from '../providers/domains/storage/storage-provider';
+import {
+  credentialCodeOf,
+  isMissingBucket,
+  isMissingObject,
+} from '../providers/domains/storage/storage-provider';
 import { hasZipBackup } from './backup-strategy';
 
 interface ValidationResult {
@@ -425,7 +429,7 @@ export function resolveBackupFolderPath(
 
 async function providerReadError(error: unknown, missing: string): Promise<unknown> {
   if (isMissingObject(error)) return new NotFoundError(missing);
-  const failure = credentialCodeOf(error);
+  const failure = isMissingBucket(error) ? 'config' : credentialCodeOf(error);
   if (!failure) return error;
   const { healthFailure } = await import('../providers/provider-status');
   return new AppError(healthFailure(failure).message, 502);

@@ -261,6 +261,16 @@ describe('S3CompatProvider', () => {
       );
       await expect(provider.healthCheck()).rejects.toThrow('is in region eu-west-2');
     });
+
+    test('a region header that is not a region name is left out of the message', async () => {
+      mockSend.mockRejectedValueOnce(
+        Object.assign(new Error('UnknownError'), {
+          $metadata: { httpStatusCode: 301 },
+          $response: { headers: { 'x-amz-bucket-region': 'Go to <a href=x>here</a>' } },
+        })
+      );
+      await expect(provider.healthCheck()).rejects.toThrow('is in a different region');
+    });
   });
 });
 

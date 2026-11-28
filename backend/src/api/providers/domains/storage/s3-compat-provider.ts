@@ -34,6 +34,7 @@ interface S3Config {
 }
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
+const REGION_PATTERN = /^[a-z0-9-]{1,32}$/;
 
 function toFileInfo(key: string, size?: number, lastModified?: Date): StorageFileInfo {
   const timestamp = lastModified?.toISOString() ?? new Date(0).toISOString();
@@ -230,7 +231,8 @@ export class S3CompatProvider implements StorageProvider {
       return `The bucket "${this.bucket}" doesn't exist. Check the bucket name, then test again.`;
     }
     if (status !== 301) return null;
-    const region = shaped.$response?.headers?.['x-amz-bucket-region'];
+    const header = shaped.$response?.headers?.['x-amz-bucket-region'];
+    const region = header && REGION_PATTERN.test(header) ? header : undefined;
     return region
       ? `The bucket "${this.bucket}" is in region ${region}. Set the region to ${region}, then test again.`
       : `The bucket "${this.bucket}" is in a different region. Check the region, then test again.`;

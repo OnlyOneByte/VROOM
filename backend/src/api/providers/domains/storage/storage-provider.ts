@@ -136,8 +136,12 @@ export function credentialCodeOf(error: unknown): 'auth' | 'permission' | null {
 
 const MISSING_OBJECT_NAMES = new Set(['NoSuchKey', 'NotFound']);
 
+export function isMissingBucket(error: unknown): boolean {
+  return (error as { name?: unknown } | null)?.name === 'NoSuchBucket';
+}
+
 export function isMissingObject(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
+  if (typeof error !== 'object' || error === null || isMissingBucket(error)) return false;
   const record = error as Record<string, unknown>;
   return MISSING_OBJECT_NAMES.has(String(record.name)) || statusOf(record) === 404;
 }

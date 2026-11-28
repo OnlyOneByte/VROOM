@@ -71,6 +71,24 @@ describe('reading backups from a storage provider', () => {
     }
   });
 
+  test('a missing bucket is a settings problem, not a missing backup file', async () => {
+    const spy = stubProvider(() =>
+      Object.assign(new Error('The specified bucket does not exist'), {
+        name: 'NoSuchBucket',
+        $metadata: { httpStatusCode: 404 },
+      })
+    );
+    try {
+      const read = backupService.downloadBackup(ctx.user.id, 'p1', 'B/vroom-backup-1.zip');
+      await expect(read).rejects.toMatchObject({
+        statusCode: 502,
+        message: healthFailure('config').message,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   test('listing with a rejected key gives the same message on both listing paths', async () => {
     await seedProvider('p-list');
     const spy = stubProvider(badKey);
