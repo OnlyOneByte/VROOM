@@ -202,11 +202,28 @@
 
 	let fuelEffConfig = $derived(buildChartConfig(fuelEffSeries));
 
+	let loanData = $derived(
+		(financing?.loanBreakdown ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
+	);
+	const loanSeries = [
+		{ key: 'principal', label: 'Principal', color: 'var(--chart-2)' },
+		{ key: 'interest', label: 'Interest', color: 'var(--chart-3)' }
+	];
+	const loanConfig: Chart.ChartConfig = buildChartConfig(loanSeries);
+
+	let premiumData = $derived(
+		(insurance?.monthlyPremiumTrend ?? []).map(d => ({ ...d, date: parseMonthToDate(d.month) }))
+	);
+	const premiumSeries = [{ key: 'premiums', label: 'Premiums', color: 'var(--chart-4)' }];
+	const premiumConfig: Chart.ChartConfig = buildChartConfig(premiumSeries);
+
 	let hasDetail = $derived(
 		trendData.length > 0 ||
 			categoryRows.length > 0 ||
 			(costBarData.length > 0 && hasExpenses) ||
-			fuelEffData.length > 0
+			fuelEffData.length > 0 ||
+			loanData.length > 0 ||
+			premiumData.length > 0
 	);
 </script>
 
@@ -246,10 +263,14 @@
 			distanceUnit={distShortLabel}
 		/>
 
+		<FinancingAnalytics {financing} />
+
+		<InsuranceAnalytics {insurance} />
+
 		{#if hasDetail}
 			<ChartGroup
 				title="More detail"
-				description="Monthly spending, spending by category, totals per car and fuel economy"
+				description="Monthly spending, spending by category, totals per car, fuel economy, loan payments and premiums"
 			>
 				<div class="space-y-4 md:space-y-6">
 					{#if trendData.length > 0}
@@ -329,12 +350,38 @@
 							tooltipFormat={unitTooltip(efficiencyLabel)}
 						/>
 					{/if}
+
+					{#if loanData.length > 0 || premiumData.length > 0}
+						<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+							{#if loanData.length > 0}
+								<AppBarChart
+									level={3}
+									title="Loan payments, next 12 months"
+									description="Each payment split into principal and interest"
+									data={loanData}
+									x="date"
+									y={['principal', 'interest']}
+									seriesLayout="stack"
+									series={loanSeries}
+									config={loanConfig}
+								/>
+							{/if}
+							{#if premiumData.length > 0}
+								<AppLineChart
+									level={3}
+									title="Insurance premiums by month"
+									description="What your active policies cost each month"
+									data={premiumData}
+									x="date"
+									y="premiums"
+									series={premiumSeries}
+									config={premiumConfig}
+								/>
+							{/if}
+						</div>
+					{/if}
 				</div>
 			</ChartGroup>
 		{/if}
-
-		<FinancingAnalytics {financing} />
-
-		<InsuranceAnalytics {insurance} />
 	</div>
 {/if}

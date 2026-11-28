@@ -223,7 +223,7 @@
 			{#snippet title()}No expenses in {selectedYear}{/snippet}
 			{#snippet description()}
 				{vehicleIds
-					? 'The cars you picked have no expenses this year. Pick another year or other cars.'
+					? `The cars you picked have no expenses in ${selectedYear}. Pick another year or other cars.`
 					: 'Pick another year, or log an expense to start this one.'}
 			{/snippet}
 		</EmptyState>

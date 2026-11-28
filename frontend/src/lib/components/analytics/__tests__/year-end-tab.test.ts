@@ -253,7 +253,7 @@ describe('YearEndTab', () => {
 		render(YearEndTab, { props: { vehicleIds: ['civic'] } });
 		await screen.findByRole('heading', { level: 2, name: 'No expenses in 2026' });
 		expect(text()).toContain(
-			'The cars you picked have no expenses this year. Pick another year or other cars.'
+			'The cars you picked have no expenses in 2026. Pick another year or other cars.'
 		);
 	});
 
