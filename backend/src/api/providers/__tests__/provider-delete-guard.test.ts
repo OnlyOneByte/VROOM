@@ -53,7 +53,7 @@ describe('deleting a storage provider that holds the only copy of photos', () =>
     expect(body.error.details.photosOnlyHere).toBe(1);
     expect(body.error.message).toContain('1 photo is stored only in this storage');
     expect(await providerIds()).toEqual(['prov-a', 'prov-b']);
-    expect((await ctx.sql.all('SELECT id FROM photo_refs'))).toEqual([{ id: 'ref-a' }]);
+    expect(await ctx.sql.all('SELECT id FROM photo_refs')).toEqual([{ id: 'ref-a' }]);
   });
 
   test('goes ahead with force=true', async () => {

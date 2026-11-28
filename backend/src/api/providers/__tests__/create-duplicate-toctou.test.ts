@@ -22,7 +22,10 @@ function drivePayload(accountEmail: string) {
 }
 
 async function providerRowCount(): Promise<number> {
-  const row = (await ctx.sql.get(`SELECT COUNT(*) AS n FROM user_providers WHERE user_id = ? AND domain = 'storage'`, [ctx.user.id])) as { n: number };
+  const row = (await ctx.sql.get(
+    `SELECT COUNT(*) AS n FROM user_providers WHERE user_id = ? AND domain = 'storage'`,
+    [ctx.user.id]
+  )) as { n: number };
   return row.n;
 }
 

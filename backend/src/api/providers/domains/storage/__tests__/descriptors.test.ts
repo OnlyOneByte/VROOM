@@ -57,7 +57,9 @@ describe('storage provider descriptors', () => {
 
     expect(res.status).toBe(201);
     expect(
-      (await ctx.sql.get("SELECT provider_type AS type, json_extract(config, '$.accountEmail') AS email FROM user_providers"))
+      await ctx.sql.get(
+        "SELECT provider_type AS type, json_extract(config, '$.accountEmail') AS email FROM user_providers"
+      )
     ).toEqual({ type: 'google-photos', email: 'me@example.com' });
   });
 
@@ -78,6 +80,6 @@ describe('storage provider descriptors', () => {
       expect(res.status, `${connectedFor} -> ${created}`).toBe(400);
       expect(await res.text()).toContain('Connect Google again');
     }
-    expect((await ctx.sql.get('SELECT COUNT(*) AS n FROM user_providers'))).toEqual({ n: 0 });
+    expect(await ctx.sql.get('SELECT COUNT(*) AS n FROM user_providers')).toEqual({ n: 0 });
   });
 });

@@ -114,7 +114,7 @@ describe('provider endpoints when the admin allows private endpoints', () => {
   ])('storage endpoint %s is rejected', async (endpoint) => {
     const res = await ctx.authed('POST', '/api/v1/providers', s3Body(endpoint));
     expect(res.status).toBe(400);
-    expect((await ctx.sql.get('SELECT COUNT(*) AS n FROM user_providers'))).toEqual({ n: 0 });
+    expect(await ctx.sql.get('SELECT COUNT(*) AS n FROM user_providers')).toEqual({ n: 0 });
   });
 
   test('a model base URL on a link-local address is rejected', async () => {

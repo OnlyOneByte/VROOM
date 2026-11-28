@@ -134,7 +134,7 @@ describe('POST /api/v1/providers — create', () => {
         'ValidationError'
       );
     }
-    expect((await ctx.sql.get('SELECT count(*) AS n FROM user_providers'))).toEqual({ n: 0 });
+    expect(await ctx.sql.get('SELECT count(*) AS n FROM user_providers')).toEqual({ n: 0 });
   });
 
   test('rejects an invalid providerType (400 via zValidator)', async () => {
@@ -240,7 +240,9 @@ describe('PUT /api/v1/providers/:id — update', () => {
     expect(JSON.stringify(data)).not.toContain('rotated-secret-9999');
     expect('credentials' in data).toBe(false);
 
-    const row = (await ctx.sql.get('SELECT credentials FROM user_providers WHERE id = ?', [created.id])) as { credentials: string };
+    const row = (await ctx.sql.get('SELECT credentials FROM user_providers WHERE id = ?', [
+      created.id,
+    ])) as { credentials: string };
     expect(row.credentials, 'credentials column present').toBeTruthy();
     expect(row.credentials).not.toContain('rotated-secret-9999');
   });
@@ -379,7 +381,7 @@ describe('provider PUT/DELETE writes are tenant-scoped (foreign row survives)', 
   }
 
   async function providerExists(id: string): Promise<boolean> {
-    const rows = (await ctx.sql.all('SELECT id FROM user_providers WHERE id = ?', [id]));
+    const rows = await ctx.sql.all('SELECT id FROM user_providers WHERE id = ?', [id]);
     return rows.length === 1;
   }
 
@@ -396,7 +398,9 @@ describe('provider PUT/DELETE writes are tenant-scoped (foreign row survives)', 
       displayName: 'hijacked',
     });
     expect(res.status).toBe(404);
-    const row = (await ctx.sql.get('SELECT display_name FROM user_providers WHERE id = ?', ['prov-foreign-put'])) as { display_name: string } | undefined;
+    const row = (await ctx.sql.get('SELECT display_name FROM user_providers WHERE id = ?', [
+      'prov-foreign-put',
+    ])) as { display_name: string } | undefined;
     expect(row?.display_name).toBe('Foreign Provider');
   });
 

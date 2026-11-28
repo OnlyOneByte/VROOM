@@ -66,7 +66,9 @@ describe('provider responses say which secrets are saved, never what they are', 
 
   test('a provider whose stored secret cannot be read reports none saved', async () => {
     const created = await createLlm();
-    await ctx.sql.run("UPDATE user_providers SET credentials = 'garbage' WHERE id = ?", [created.id]);
+    await ctx.sql.run("UPDATE user_providers SET credentials = 'garbage' WHERE id = ?", [
+      created.id,
+    ]);
     const list = (
       await json<DataEnvelope<ProviderResponse[]>>(await ctx.authed('GET', '/api/v1/providers'))
     ).data;

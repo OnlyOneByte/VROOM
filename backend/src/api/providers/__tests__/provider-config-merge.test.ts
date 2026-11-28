@@ -84,7 +84,10 @@ describe('PUT /providers/:id merges `config` instead of replacing it', () => {
   });
 
   test('a key the caller DOES send still wins — merging is not ignoring the payload', async () => {
-    await seedConnectedDrive('drive-3', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
+    await seedConnectedDrive('drive-3', {
+      photoRootPath: 'Photos',
+      accountEmail: 'owner@example.com',
+    });
 
     await ctx.authed('PUT', '/api/v1/providers/drive-3', { config: { photoRootPath: 'Scans' } });
 
@@ -95,7 +98,10 @@ describe('PUT /providers/:id merges `config` instead of replacing it', () => {
   });
 
   test('a server-only key in the payload leaves the stored value unchanged', async () => {
-    await seedConnectedDrive('drive-5', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
+    await seedConnectedDrive('drive-5', {
+      photoRootPath: 'Photos',
+      accountEmail: 'owner@example.com',
+    });
 
     const res = await ctx.authed('PUT', '/api/v1/providers/drive-5', {
       config: { photoRootPath: 'Photos', accountEmail: 'second@example.com' },
@@ -109,7 +115,10 @@ describe('PUT /providers/:id merges `config` instead of replacing it', () => {
   });
 
   test("another user's provider is still 404 and untouched (the merge reads the OWNED row)", async () => {
-    await seedConnectedDrive('drive-4', { photoRootPath: 'Photos', accountEmail: 'owner@example.com' });
+    await seedConnectedDrive('drive-4', {
+      photoRootPath: 'Photos',
+      accountEmail: 'owner@example.com',
+    });
     const other = await createTestApp();
 
     const res = await other.authed('PUT', '/api/v1/providers/drive-4', {

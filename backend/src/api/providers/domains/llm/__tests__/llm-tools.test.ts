@@ -29,7 +29,12 @@ async function seedVehicle(id: string, userId: string): Promise<void> {
     [id, userId]
   );
 }
-async function seedExpense(id: string, vehicleId: string, userId: string, amountCents: number): Promise<void> {
+async function seedExpense(
+  id: string,
+  vehicleId: string,
+  userId: string,
+  amountCents: number
+): Promise<void> {
   await ctx.sql.run(
     `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
      VALUES (?, ?, ?, 'maintenance', 1700000000, ?)`,

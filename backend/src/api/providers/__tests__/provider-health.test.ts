@@ -34,7 +34,10 @@ interface StatusRow {
 }
 
 async function statusOf(id: string): Promise<StatusRow> {
-  return (await ctx.sql.get('SELECT status, last_error_code, last_checked_at, last_sync_at, failure_count FROM user_providers WHERE id = ?', [id])) as StatusRow;
+  return (await ctx.sql.get(
+    'SELECT status, last_error_code, last_checked_at, last_sync_at, failure_count FROM user_providers WHERE id = ?',
+    [id]
+  )) as StatusRow;
 }
 
 async function seedStorage(id: string, status = 'active'): Promise<void> {
@@ -120,7 +123,7 @@ describe('the photo sync worker records what it learns about a provider', () => 
 
   test('a PERMISSION_DENIED download marks the source, not the target, and leaves updated_at alone', async () => {
     const updatedAt = async () =>
-      (await ctx.sql.all('SELECT id, updated_at FROM user_providers ORDER BY id'));
+      await ctx.sql.all('SELECT id, updated_at FROM user_providers ORDER BY id');
     const before = await updatedAt();
     await processBatch(
       deps(
@@ -178,7 +181,9 @@ describe('POST /providers/:id/test works for every capability', () => {
       for (let i = 1; i <= FAILURES_BEFORE_ERROR; i++) {
         const result = await testProvider('s-down');
         expect(result.data).toMatchObject({ ok: false, code: 'unreachable' });
-        expect((await statusOf('s-down')).status).toBe(i < FAILURES_BEFORE_ERROR ? 'active' : 'error');
+        expect((await statusOf('s-down')).status).toBe(
+          i < FAILURES_BEFORE_ERROR ? 'active' : 'error'
+        );
       }
       health.mockResolvedValue(true);
       expect((await testProvider('s-down')).data.ok).toBe(true);
@@ -271,7 +276,10 @@ describe('POST /providers/:id/test works for every capability', () => {
     );
     const res = await ctx.authed('POST', '/api/v1/providers/s-bad/test');
     expect(res.status).toBe(400);
-    expect(await statusOf('s-bad')).toMatchObject({ last_error_code: 'endpoint', failure_count: 1 });
+    expect(await statusOf('s-bad')).toMatchObject({
+      last_error_code: 'endpoint',
+      failure_count: 1,
+    });
   });
 
   test('sign-in providers cannot be tested', async () => {

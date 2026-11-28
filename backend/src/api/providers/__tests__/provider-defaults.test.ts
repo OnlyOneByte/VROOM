@@ -52,7 +52,10 @@ async function setDefaults(defaults: Record<string, string | null>): Promise<Res
 }
 
 async function storedDefaults(userId = ctx.user.id): Promise<Record<string, string | null>> {
-  const row = (await ctx.sql.get('SELECT provider_defaults FROM user_preferences WHERE user_id = ?', [userId])) as { provider_defaults: string | null } | null;
+  const row = (await ctx.sql.get(
+    'SELECT provider_defaults FROM user_preferences WHERE user_id = ?',
+    [userId]
+  )) as { provider_defaults: string | null } | null;
   return JSON.parse(row?.provider_defaults ?? '{}');
 }
 

@@ -66,7 +66,7 @@ describe('photo refs that ran out of retries come back after a reconnect', () =>
     const res = await ctx.authed('POST', '/api/v1/providers/prov-target/backfill');
     expect(res.status).toBeLessThan(300);
     expect(
-      (await ctx.sql.get("SELECT status, retry_count FROM photo_refs WHERE id = 'ref-dead'"))
+      await ctx.sql.get("SELECT status, retry_count FROM photo_refs WHERE id = 'ref-dead'")
     ).toEqual({ status: 'pending', retry_count: 0 });
   });
 });
