@@ -94,7 +94,7 @@ describe('getInsurance — cost-shape handling', () => {
 });
 
 describe('getInsurance — latest-term selection', () => {
-  test('the latest await term (by endDate) wins when a policy has several', async () => {
+  test('the latest term (by endDate) wins when a policy has several', async () => {
     await policy('p1', 'GEICO');
     await term({
       id: 'old',

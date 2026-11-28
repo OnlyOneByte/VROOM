@@ -9,6 +9,7 @@ src/api/analytics/__tests__/analytics-user-timezone.test.ts
 src/api/analytics/__tests__/analytics-vehicle-filter.test.ts
 src/api/analytics/__tests__/fuel-advanced-gas-only.test.ts
 src/api/analytics/__tests__/fuel-stats-calendar-month.test.ts
+src/api/analytics/__tests__/fuel-stats-fleet-distance-pooling.test.ts
 src/api/analytics/__tests__/fuel-stats-monthly-spend.test.ts
 src/api/analytics/__tests__/fuel-stats-previous-window.test.ts
 src/api/analytics/__tests__/insurance-details.test.ts
