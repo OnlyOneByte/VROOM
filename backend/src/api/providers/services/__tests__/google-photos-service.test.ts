@@ -105,8 +105,13 @@ describe('GooglePhotosService — receipt listing', () => {
       Array.from({ length: MAX_RECEIPT_SEARCH_PAGES + 5 }, () => ({})),
       1
     );
-    const listed = await svc.listReceiptPhotos(100, async () => true);
+    let looked = 0;
+    const listed = await svc.listReceiptPhotos(100, async () => {
+      looked++;
+      return true;
+    });
     expect(listed).toEqual([]);
+    expect(looked).toBe(MAX_RECEIPT_SEARCH_PAGES);
   });
 });
 

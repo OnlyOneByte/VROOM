@@ -247,7 +247,7 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
       });
       if (!bytes.ok) {
         throw new SyncError(
-          SyncErrorCode.NETWORK_ERROR,
+          bytes.status === 429 ? SyncErrorCode.QUOTA_EXCEEDED : SyncErrorCode.NETWORK_ERROR,
           `Google Photos download failed: ${bytes.status}`
         );
       }

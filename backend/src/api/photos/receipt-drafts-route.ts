@@ -103,6 +103,8 @@ routes.get(
 
     const photosService = photosServiceBuilder(photosRow);
     const vlmProvider = await getVlmProvider(vlmRow);
+    const vlmVersion = vlmRow.updatedAt?.getTime() ?? 0;
+    const draftKey = (photoId: string) => `${user.id}:${vlmRow.id}:${vlmVersion}:${photoId}`;
     const deps: StageDeps = {
       listReceiptPhotos: (max, skip) => photosService.listReceiptPhotos(max, skip),
       downloadPhoto: (id) => photosService.download(id, { maxBytes: MAX_SCAN_BYTES }),
@@ -111,9 +113,8 @@ routes.get(
         parseExtraction(await vlmProvider.extractReceipt({ data: bytes, mimeType })),
       isAlreadyImported: async (photoId) =>
         (await repos().expenses.findByClientId(`photos:${photoId}`, user.id)) !== null,
-      cachedDraft: (photoId) => cachedReceiptDraft(`${user.id}:${vlmRow.id}:${photoId}`),
-      rememberDraft: (photoId, draft) =>
-        rememberReceiptDraft(`${user.id}:${vlmRow.id}:${photoId}`, draft),
+      cachedDraft: (photoId) => cachedReceiptDraft(draftKey(photoId)),
+      rememberDraft: (photoId, draft) => rememberReceiptDraft(draftKey(photoId), draft),
     };
 
     try {
