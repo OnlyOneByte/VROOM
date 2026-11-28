@@ -29,9 +29,13 @@
 
 	function meta(v: FinancingResponse['vehicleDetails'][number]): string {
 		const left = `${v.monthsRemaining} ${v.monthsRemaining === 1 ? 'payment' : 'payments'} to go`;
-		return v.financingType === 'loan' && v.apr != null
-			? `${formatNumber(v.apr, 1)}% APR · ${left}`
-			: left;
+		return [
+			v.financingType === 'lease' ? 'Lease' : 'Loan',
+			v.financingType === 'loan' && v.apr != null ? `${formatNumber(v.apr, 1)}% APR` : null,
+			left
+		]
+			.filter(Boolean)
+			.join(' · ');
 	}
 </script>
 
@@ -56,9 +60,9 @@
 						<div class="min-w-0">
 							<a
 								href={resolve(paramRoutes.vehicle, { id: v.vehicleId })}
-								class="block truncate rounded-sm font-semibold text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+								class="block rounded-sm font-semibold break-words text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 							>
-								{v.vehicleName} · {v.financingType === 'lease' ? 'Lease' : 'Loan'}
+								{v.vehicleName}
 							</a>
 							<p class="text-sm text-muted-foreground">{meta(v)}</p>
 						</div>

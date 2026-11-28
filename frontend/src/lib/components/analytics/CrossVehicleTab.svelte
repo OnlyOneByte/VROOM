@@ -263,9 +263,11 @@
 			distanceUnit={distShortLabel}
 		/>
 
-		<FinancingAnalytics {financing} />
+		<div class="grid gap-8 md:grid-cols-2 md:gap-10">
+			<FinancingAnalytics {financing} />
 
-		<InsuranceAnalytics {insurance} />
+			<InsuranceAnalytics {insurance} />
+		</div>
 
 		{#if hasDetail}
 			<ChartGroup

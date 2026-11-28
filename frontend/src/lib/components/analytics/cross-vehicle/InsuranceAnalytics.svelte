@@ -11,6 +11,7 @@
 
 	function meta(v: InsuranceResponse['vehicleDetails'][number]): string {
 		return [
+			v.vehicleName,
 			`${whole(v.annualPremium)} a year`,
 			v.deductible != null ? `${whole(v.deductible)} deductible` : null,
 			v.coverageType
@@ -46,7 +47,7 @@
 			{#each insurance.vehicleDetails as v, i (`${v.vehicleId}-${i}`)}
 				<li class="flex items-center justify-between gap-4 py-3">
 					<div class="min-w-0">
-						<p class="truncate font-semibold">{v.carrier} · {v.vehicleName}</p>
+						<p class="font-semibold break-words">{v.carrier}</p>
 						<p class="text-sm text-muted-foreground">{meta(v)}</p>
 					</div>
 					<p class="shrink-0 font-semibold tabular-nums">{formatCurrency(v.monthlyPremium)}/mo</p>

@@ -92,7 +92,7 @@ describe('Loans', () => {
 		);
 		const rows = within(section).getAllByRole('listitem');
 		expect(rows.map(text)).toEqual([
-			'Daily Driver · Loan 4.5% APR · 36 payments to go $372.86/mo $12,503 left'
+			'Daily Driver Loan · 4.5% APR · 36 payments to go $372.86/mo $12,503 left'
 		]);
 		expect(within(rows[0] as HTMLElement).getByRole('link').getAttribute('href')).toBe(
 			'/vehicles/camry'
@@ -125,7 +125,7 @@ describe('Loans', () => {
 		expect(text(section)).toContain('on 2 loans and leases');
 		expect(text(section)).not.toContain('owned outright');
 		const rows = within(section).getAllByRole('listitem').map(text);
-		expect(rows[1]).toBe('RAV4 · Lease 1 payment to go $300.00/mo');
+		expect(rows[1]).toBe('RAV4 Lease · 1 payment to go $300.00/mo');
 	});
 
 	test('with no cars to show (none of yours, or none whose finances you can see), nothing renders', () => {
@@ -147,8 +147,8 @@ describe('Insurance', () => {
 		const section = screen.getByRole('region', { name: 'Insurance' });
 		expect(text(section)).toContain('Insurance is $350.00 a month across 2 cars, $4,200 a year.');
 		expect(within(section).getAllByRole('listitem').map(text)).toEqual([
-			'State Farm · Daily Driver $2,400 a year $200.00/mo',
-			'Geico · Weekend Car $1,800 a year · $500 deductible · Full $150.00/mo'
+			'State Farm Daily Driver · $2,400 a year $200.00/mo',
+			'Geico Weekend Car · $1,800 a year · $500 deductible · Full $150.00/mo'
 		]);
 		expect(text(section)).not.toMatch(/average across fleet|Deductible —|Coverage —/);
 		expect(within(section).getByRole('link', { name: 'All policies' }).getAttribute('href')).toBe(
