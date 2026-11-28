@@ -21,7 +21,7 @@ export async function failWrites(sql: TestSql, rule: FailWrites): Promise<() => 
     };
   }
   await sql.run(
-    `CREATE FUNCTION ${rule.name}() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION '${message}'; END $$ LANGUAGE plpgsql`
+    `CREATE OR REPLACE FUNCTION ${rule.name}() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION USING MESSAGE = '${message}'; END $$ LANGUAGE plpgsql`
   );
   await sql.run(
     `CREATE TRIGGER ${rule.name} BEFORE ${rule.event} ON ${rule.table} FOR EACH ROW WHEN (${when}) EXECUTE FUNCTION ${rule.name}()`
