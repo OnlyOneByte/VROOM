@@ -1,10 +1,10 @@
+import { anthropicMaxTokens, assertAnthropicImageSize } from '../model/anthropic-limits';
 import type { ModelProviderSettings } from '../model/model-registry';
 import { postModelJson, trimBaseUrl } from '../model/model-transport';
 import { RECEIPT_EXTRACTION_PROMPT } from './prompt';
 import type { RawExtraction, ReceiptImage, VlmProvider } from './vlm-provider';
 
 const REQUEST_TIMEOUT_MS = 60_000;
-const MAX_TOKENS = 16_000;
 const ANTHROPIC_VERSION = '2023-06-01';
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 
@@ -29,6 +29,7 @@ export class AnthropicVlmProvider implements VlmProvider {
   }
 
   async extractReceipt(image: ReceiptImage): Promise<RawExtraction> {
+    assertAnthropicImageSize(image.data.byteLength);
     const json = await postModelJson<AnthropicResponse>({
       domain: 'VLM',
       providerType: 'anthropic',
@@ -39,7 +40,7 @@ export class AnthropicVlmProvider implements VlmProvider {
       outbound: this.outbound,
       body: {
         model: this.model,
-        max_tokens: MAX_TOKENS,
+        max_tokens: anthropicMaxTokens(this.model),
         messages: [
           {
             role: 'user',

@@ -85,12 +85,20 @@ describe('POST /api/v1/assistant/chat', () => {
     expect(await res.text()).toMatch(/assistant|provider|Settings/i);
   });
 
-  test('a provider failure returns 502, never a faked reply', async () => {
-    await seedLlmProvider(ctx);
-    stubFailure(429);
-    const res = await ctx.authed('POST', '/api/v1/assistant/chat', { message: 'hi' });
-    expect(res.status).toBe(502);
-  });
+  test.each([
+    [401, 502, "didn't accept its key"],
+    [429, 503, 'limiting requests'],
+    [503, 502, 'could not be reached'],
+  ])(
+    'a provider HTTP %i answers %i saying what went wrong, never a faked reply',
+    async (upstream, status, text) => {
+      await seedLlmProvider(ctx);
+      stubFailure(upstream);
+      const res = await ctx.authed('POST', '/api/v1/assistant/chat', { message: 'hi' });
+      expect(res.status).toBe(status);
+      expect(await res.text()).toContain(text);
+    }
+  );
 
   test('the api key is never echoed in the response', async () => {
     await seedLlmProvider(ctx);

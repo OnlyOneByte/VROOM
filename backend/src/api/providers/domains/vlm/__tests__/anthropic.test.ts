@@ -58,7 +58,7 @@ describe('AnthropicVlmProvider — request shaping', () => {
     expect(captured?.url).toBe('https://api.anthropic.com/v1/messages');
     expect(captured?.body.model).toBe('claude-3-5-sonnet');
     expect(captured?.body).not.toHaveProperty('temperature');
-    expect(captured?.body.max_tokens).toBeGreaterThanOrEqual(16_000);
+    expect(captured?.body.max_tokens).toBe(8192);
 
     const messages = captured?.body.messages as { content: Record<string, unknown>[] }[];
     const parts = messages[0].content;
