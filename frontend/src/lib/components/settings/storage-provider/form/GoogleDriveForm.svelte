@@ -9,6 +9,7 @@
 		isEditMode,
 		providerLabel,
 		providerIcon: ProviderIcon,
+		supportsBackups,
 		oauth,
 		connection = $bindable()
 	}: ProviderFormProps = $props();
@@ -43,7 +44,7 @@
 			<div class="flex items-center gap-3 min-w-0">
 				<CircleCheck class="h-5 w-5 text-chart-2 shrink-0" />
 				<div class="min-w-0">
-					<p class="text-sm font-medium">Google Account Connected</p>
+					<p class="text-sm font-medium">Google account connected</p>
 					<p class="text-sm text-muted-foreground truncate">{connectedEmail}</p>
 				</div>
 			</div>
@@ -73,7 +74,8 @@
 		<div class="rounded-lg border border-border p-4 text-center">
 			<ProviderIcon class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
 			<p class="text-sm text-muted-foreground mb-3">
-				Connect your Google account to use {providerLabel} for photo storage
+				Connect your Google account to use {providerLabel}
+				{supportsBackups ? 'for photos and backups' : 'for photo storage'}
 			</p>
 			<Button variant="outline" onclick={handleConnectGoogle}>
 				<svg class="h-4 w-4 mr-2" viewBox="0 0 24 24">
@@ -94,7 +96,7 @@
 						fill="#EA4335"
 					></path>
 				</svg>
-				Connect Google Account
+				Connect Google account
 			</Button>
 		</div>
 	{/if}
@@ -102,6 +104,6 @@
 
 {#if !isEditMode && !connectedEmail}
 	<p class="text-sm text-muted-foreground mt-3">
-		Connect your Google account first, then return here to add the provider.
+		Connect your Google account first, then return here to add this storage.
 	</p>
 {/if}

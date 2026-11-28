@@ -78,8 +78,8 @@ interface DraftEnvelope {
   };
 }
 
-function expenseCount(): number {
-  return (ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number }).n;
+async function expenseCount(): Promise<number> {
+  return ((await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number }).n;
 }
 
 describe('POST /api/v1/receipts/parse', () => {
@@ -87,13 +87,13 @@ describe('POST /api/v1/receipts/parse', () => {
     await seedVlmProvider();
     stubModel('{"amount": 42.5, "date": "2024-03-15", "category": "fuel", "vendor": "Shell"}');
 
-    const before = expenseCount();
+    const before = await expenseCount();
     const res = await postImage(IMG, 'image/jpeg');
     expect(res.status).toBe(200);
 
     const { draft } = (await json<DataEnvelope<DraftEnvelope>>(res)).data;
     expect(draft).toEqual({ amount: 42.5, date: '2024-03-15', category: 'fuel', vendor: 'Shell' });
-    expect(expenseCount()).toBe(before);
+    expect(await expenseCount()).toBe(before);
   });
 
   test('the fail-closed schema drops bad fields from the model output', async () => {

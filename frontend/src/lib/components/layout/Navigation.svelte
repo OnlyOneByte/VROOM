@@ -173,7 +173,7 @@
 {#snippet avatar()}
 	<a
 		href={resolve(routes.profile)}
-		class="grid size-9 place-items-center rounded-full bg-surface text-[13px] font-semibold text-foreground ring-1 ring-inset ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+		class="grid size-10 place-items-center rounded-full bg-surface text-[13px] font-semibold text-foreground ring-1 ring-inset ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 		title="Profile"
 	>
 		{#if initials}
@@ -299,7 +299,7 @@
 	{#if showBottomBar}
 		<nav
 			aria-label="Main"
-			class="fixed short:static bottom-0 left-0 right-0 z-40 grid grid-cols-5 items-end bg-bar px-1.5 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-bar-fg"
+			class="fixed short:static bottom-0 left-0 right-0 z-40 grid grid-cols-5 items-end bg-bar dark:border-t dark:border-border px-1.5 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-bar-fg"
 		>
 			{#snippet tab(item: typeof home | typeof log | typeof garage)}
 				{@const IconComponent = item.icon}

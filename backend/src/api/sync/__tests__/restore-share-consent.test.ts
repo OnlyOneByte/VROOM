@@ -17,16 +17,16 @@ interface ShareRowDb {
   status: string;
 }
 
-function shareRows(): ShareRowDb[] {
-  return ctx.sqlite.query('SELECT * FROM vehicle_shares ORDER BY id').all() as ShareRowDb[];
+async function shareRows(): Promise<ShareRowDb[]> {
+  return (await ctx.sql.all('SELECT * FROM vehicle_shares ORDER BY id')) as ShareRowDb[];
 }
 
-function shareById(id: string): ShareRowDb | undefined {
-  return shareRows().find((r) => r.id === id);
+async function shareById(id: string): Promise<ShareRowDb | undefined> {
+  return (await shareRows()).find((r) => r.id === id);
 }
 
-function seedUser(id: string): string {
-  ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+async function seedUser(id: string): Promise<string> {
+  await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
     id,
     `${id}@test.com`,
     id,
@@ -34,14 +34,14 @@ function seedUser(id: string): string {
   return id;
 }
 
-function seedShare(
+async function seedShare(
   id: string,
   vehicleId: string,
   sharedWithId: string,
   status: string,
   level = 'viewer'
-): void {
-  ctx.sqlite.run(
+): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, 0, 0)`,
     [id, vehicleId, ctx.user.id, sharedWithId, level, status]
@@ -67,13 +67,13 @@ async function appendCsvRow(
 describe('restore re-derives vehicle_share consent instead of trusting the backup', () => {
   test('a crafted backup row claiming `accepted` for a non-consenting invitee restores as pending', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    const stranger = seedUser('stranger-1');
+    const stranger = await seedUser('stranger-1');
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
 
     const honestZip = await backupService.exportAsZip(ctx.user.id);
-    expect(shareRows()).toHaveLength(0);
+    expect(await shareRows()).toHaveLength(0);
 
     const craftedZip = await appendCsvRow(honestZip, 'vehicle_shares.csv', {
       id: 'forged-share',
@@ -90,20 +90,20 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
     expect(result.success, JSON.stringify(result)).toBe(true);
     expect(result.imported?.vehicleShares).toBe(1);
 
-    const forged = shareById('forged-share');
+    const forged = await shareById('forged-share');
     expect(forged?.status, 'a backup cannot mint an accepted grant').toBe('pending');
   });
 
   test('a declined grant cannot be re-minted as accepted by restoring a backup that predates the decline', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    const invitee = seedUser('decliner-1');
-    seedShare('share-declined', vehicleId, invitee, 'accepted');
+    const invitee = await seedUser('decliner-1');
+    await seedShare('share-declined', vehicleId, invitee, 'accepted');
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
 
     const zip = await backupService.exportAsZip(ctx.user.id);
-    ctx.sqlite.run('UPDATE vehicle_shares SET status = ? WHERE id = ?', [
+    await ctx.sql.run('UPDATE vehicle_shares SET status = ? WHERE id = ?', [
       'declined',
       'share-declined',
     ]);
@@ -112,16 +112,16 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
     expect(result.success, JSON.stringify(result)).toBe(true);
 
     expect(
-      shareById('share-declined')?.status,
+      (await shareById('share-declined'))?.status,
       'the decline is not overwritten by the backup'
     ).toBe('pending');
   });
 
   test('consent is resolved per (vehicle, invitee) pair — a real accept survives while a forged one does not', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Mazda', model: 'CX-5', year: 2023 });
-    const consenting = seedUser('consenting-1');
-    const forgedInvitee = seedUser('forged-invitee-1');
-    seedShare('share-real', vehicleId, consenting, 'accepted', 'editor');
+    const consenting = await seedUser('consenting-1');
+    const forgedInvitee = await seedUser('forged-invitee-1');
+    await seedShare('share-real', vehicleId, consenting, 'accepted', 'editor');
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -144,16 +144,19 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect(shareById('share-real')?.status, 'a genuine accepted grant round-trips intact').toBe(
-      'accepted'
+    expect(
+      (await shareById('share-real'))?.status,
+      'a genuine accepted grant round-trips intact'
+    ).toBe('accepted');
+    expect((await shareById('share-forged'))?.status, 'the forged grant lands pending').toBe(
+      'pending'
     );
-    expect(shareById('share-forged')?.status, 'the forged grant lands pending').toBe('pending');
   });
 
   test('a level outside the route enum is narrowed to viewer rather than stored verbatim', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
-    const invitee = seedUser('odd-level-1');
-    seedShare('share-odd-level', vehicleId, invitee, 'accepted', 'OWNER-PLUS');
+    const invitee = await seedUser('odd-level-1');
+    await seedShare('share-odd-level', vehicleId, invitee, 'accepted', 'OWNER-PLUS');
 
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -161,8 +164,9 @@ describe('restore re-derives vehicle_share consent instead of trusting the backu
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    expect(shareById('share-odd-level')?.level, 'an unknown level is stored as viewer').toBe(
-      'viewer'
-    );
+    expect(
+      (await shareById('share-odd-level'))?.level,
+      'an unknown level is stored as viewer'
+    ).toBe('viewer');
   });
 });

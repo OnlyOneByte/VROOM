@@ -100,7 +100,7 @@
 
 <svelte:head>
 	<title>{provider?.displayName ?? 'Edit storage'} - VROOM Car Tracker</title>
-	<meta name="description" content="Edit photo storage provider settings" />
+	<meta name="description" content="Change how VROOM uses this storage" />
 </svelte:head>
 
 {#snippet header()}
@@ -126,7 +126,7 @@
 			{#if isLoading}
 				<div class="flex items-center justify-center py-12" role="status">
 					<LoaderCircle class="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
-					<span class="sr-only">Loading provider</span>
+					<span class="sr-only">Loading storage</span>
 				</div>
 			{:else}
 				<div class="rounded-lg border bg-card p-6" bind:this={stateCard}>
@@ -134,12 +134,12 @@
 						<div class="mb-4 flex items-center gap-3 text-destructive">
 							<CircleAlert class="h-5 w-5" aria-hidden="true" />
 							<p class="font-medium">
-								{notFound ? 'Provider not found' : "Couldn't load this provider"}
+								{notFound ? 'Storage not found' : "Couldn't load this storage"}
 							</p>
 						</div>
 						<p class="mb-4 text-sm text-muted-foreground">
 							{notFound
-								? 'It may have been removed. Go back to Backups and storage to see your storage providers.'
+								? 'It may have been removed. Go back to Backups and storage to see your storage.'
 								: error}
 						</p>
 					</div>

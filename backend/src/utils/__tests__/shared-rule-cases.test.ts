@@ -56,7 +56,10 @@ describe('unit-factors.cases.json', () => {
 });
 
 describe('reminder-time-due.cases.json', () => {
-  test.each(TIME_DUE_CASES)('due $nextDueDate at $now is $due', ({ nextDueDate, now, due }) => {
-    expect(isTimeDue(new Date(nextDueDate), new Date(now))).toBe(due);
-  });
+  test.each(TIME_DUE_CASES)(
+    'due $nextDueDate at $now in $timeZone is $due',
+    ({ nextDueDate, now, timeZone, due }) => {
+      expect(isTimeDue(new Date(nextDueDate), new Date(now), timeZone)).toBe(due);
+    }
+  );
 });

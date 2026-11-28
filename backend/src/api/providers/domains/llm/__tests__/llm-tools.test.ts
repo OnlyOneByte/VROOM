@@ -16,21 +16,26 @@ const NOW_MS = 1_900_000_000_000;
 beforeEach(async () => {
   ctx = await createTestApp();
   tools = await import('../tools');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO users (id, email, display_name) VALUES (?, 'other-llm@test.com', 'Other Owner')`,
     [OTHER_USER]
   );
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedVehicle(id: string, userId: string): void {
-  ctx.sqlite.run(
+async function seedVehicle(id: string, userId: string): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, ?, 'Toyota', 'Camry', 2022)`,
     [id, userId]
   );
 }
-function seedExpense(id: string, vehicleId: string, userId: string, amountCents: number): void {
-  ctx.sqlite.run(
+async function seedExpense(
+  id: string,
+  vehicleId: string,
+  userId: string,
+  amountCents: number
+): Promise<void> {
+  await ctx.sql.run(
     `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
      VALUES (?, ?, ?, 'maintenance', 1700000000, ?)`,
     [id, vehicleId, userId, amountCents]
@@ -39,8 +44,8 @@ function seedExpense(id: string, vehicleId: string, userId: string, amountCents:
 
 describe('assistant tool layer userId scoping', () => {
   test('listVehicles returns ONLY the session user vehicles, never another user', async () => {
-    seedVehicle('veh-mine', ctx.user.id);
-    seedVehicle('veh-theirs', OTHER_USER);
+    await seedVehicle('veh-mine', ctx.user.id);
+    await seedVehicle('veh-theirs', OTHER_USER);
 
     const mine = (await tools.ASSISTANT_TOOLS.listVehicles.run({}, ctx.user.id, NOW_MS)) as Array<{
       id: string;
@@ -51,10 +56,10 @@ describe('assistant tool layer userId scoping', () => {
   });
 
   test('getExpenseSummary aggregates ONLY the session user expenses', async () => {
-    seedVehicle('veh-mine', ctx.user.id);
-    seedVehicle('veh-theirs', OTHER_USER);
-    seedExpense('exp-mine', 'veh-mine', ctx.user.id, 5000);
-    seedExpense('exp-theirs', 'veh-theirs', OTHER_USER, 999999);
+    await seedVehicle('veh-mine', ctx.user.id);
+    await seedVehicle('veh-theirs', OTHER_USER);
+    await seedExpense('exp-mine', 'veh-mine', ctx.user.id, 5000);
+    await seedExpense('exp-theirs', 'veh-theirs', OTHER_USER, 999999);
 
     const summary = (await tools.ASSISTANT_TOOLS.getExpenseSummary.run(
       { range: 'all' },
@@ -66,7 +71,7 @@ describe('assistant tool layer userId scoping', () => {
   });
 
   test("a model-supplied vehicleId for another user's vehicle is rejected", async () => {
-    seedVehicle('veh-theirs', OTHER_USER);
+    await seedVehicle('veh-theirs', OTHER_USER);
     await expect(
       tools.ASSISTANT_TOOLS.getExpenseSummary.run(
         { range: 'all', vehicleId: 'veh-theirs' },
@@ -77,7 +82,7 @@ describe('assistant tool layer userId scoping', () => {
   });
 
   test("getFuelStats rejects another user's vehicleId", async () => {
-    seedVehicle('veh-theirs', OTHER_USER);
+    await seedVehicle('veh-theirs', OTHER_USER);
     await expect(
       tools.ASSISTANT_TOOLS.getFuelStats.run(
         { range: '30d', vehicleId: 'veh-theirs' },
@@ -88,8 +93,8 @@ describe('assistant tool layer userId scoping', () => {
   });
 
   test('a model-supplied vehicleId the session user owns is allowed', async () => {
-    seedVehicle('veh-mine', ctx.user.id);
-    seedExpense('exp-mine', 'veh-mine', ctx.user.id, 7500);
+    await seedVehicle('veh-mine', ctx.user.id);
+    await seedExpense('exp-mine', 'veh-mine', ctx.user.id, 7500);
     const summary = (await tools.ASSISTANT_TOOLS.getExpenseSummary.run(
       { range: 'all', vehicleId: 'veh-mine' },
       ctx.user.id,
@@ -208,8 +213,8 @@ describe('resolveRange maps range values to unix-second windows', () => {
   });
 
   test('getAnalyticsSummary counts year-to-date spending from local Jan 1 in the given zone', async () => {
-    seedVehicle('veh-nz', ctx.user.id);
-    ctx.sqlite.run(
+    await seedVehicle('veh-nz', ctx.user.id);
+    await ctx.sql.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount)
        VALUES ('jan-1-auckland', 'veh-nz', ?, 'maintenance', ?, 5000)`,
       [ctx.user.id, Math.floor(Date.parse('2024-12-31T11:30:00.000Z') / 1000)]

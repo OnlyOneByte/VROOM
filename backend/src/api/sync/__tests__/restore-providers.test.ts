@@ -13,20 +13,23 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedProvider(id: string, options: { accountEmail?: string; status?: string } = {}): void {
+async function seedProvider(
+  id: string,
+  options: { accountEmail?: string; status?: string } = {}
+): Promise<void> {
   const config = options.accountEmail ? { accountEmail: options.accountEmail } : {};
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, config, status)
      VALUES (?, ?, 'storage', 'google-drive', ?, 'enc', ?, ?)`,
     [id, ctx.user.id, `Drive ${id}`, JSON.stringify(config), options.status ?? 'active']
   );
 }
 
-function seedBackupConfig(providers: Record<string, unknown>): void {
-  ctx.sqlite.run('INSERT OR REPLACE INTO user_preferences (user_id, backup_config) VALUES (?, ?)', [
-    ctx.user.id,
-    JSON.stringify({ providers }),
-  ]);
+async function seedBackupConfig(providers: Record<string, unknown>): Promise<void> {
+  await ctx.sql.run(
+    'INSERT INTO user_preferences (user_id, backup_config) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET backup_config = excluded.backup_config',
+    [ctx.user.id, JSON.stringify({ providers })]
+  );
 }
 
 interface RestoreProvidersBody {
@@ -43,8 +46,8 @@ async function listRestoreProviders(): Promise<RestoreProvidersBody['data']> {
 
 describe('restore provider sourceTypes', () => {
   test('a ZIP backup alone offers only the zip source', async () => {
-    seedProvider('prov-zip', { accountEmail: 'alice@example.com' });
-    seedBackupConfig({
+    await seedProvider('prov-zip', { accountEmail: 'alice@example.com' });
+    await seedBackupConfig({
       'prov-zip': {
         enabled: true,
         folderPath: 'B',
@@ -59,8 +62,8 @@ describe('restore provider sourceTypes', () => {
   });
 
   test('a Sheets mirror alone offers only the sheets source', async () => {
-    seedProvider('prov-sheets');
-    seedBackupConfig({
+    await seedProvider('prov-sheets');
+    await seedBackupConfig({
       'prov-sheets': {
         enabled: false,
         folderPath: 'B',
@@ -75,8 +78,8 @@ describe('restore provider sourceTypes', () => {
   });
 
   test('a Sheets flag with no spreadsheet id offers nothing, so the provider is omitted', async () => {
-    seedProvider('prov-no-sheet');
-    seedBackupConfig({
+    await seedProvider('prov-no-sheet');
+    await seedBackupConfig({
       'prov-no-sheet': {
         enabled: false,
         folderPath: 'B',
@@ -89,8 +92,8 @@ describe('restore provider sourceTypes', () => {
   });
 
   test('a turned-off provider is never listed, even with a complete backup config', async () => {
-    seedProvider('prov-inactive', { status: 'disabled' });
-    seedBackupConfig({
+    await seedProvider('prov-inactive', { status: 'disabled' });
+    await seedBackupConfig({
       'prov-inactive': {
         enabled: true,
         folderPath: 'B',
@@ -103,10 +106,10 @@ describe('restore provider sourceTypes', () => {
   });
 
   test('each provider is evaluated on its own config', async () => {
-    seedProvider('prov-a', { accountEmail: 'a@example.com' });
-    seedProvider('prov-b', { accountEmail: 'b@example.com' });
-    seedProvider('prov-c');
-    seedBackupConfig({
+    await seedProvider('prov-a', { accountEmail: 'a@example.com' });
+    await seedProvider('prov-b', { accountEmail: 'b@example.com' });
+    await seedProvider('prov-c');
+    await seedBackupConfig({
       'prov-a': {
         enabled: true,
         folderPath: 'B',
@@ -130,8 +133,8 @@ describe('restore provider sourceTypes', () => {
   });
 
   test('accountEmail is an empty string when the provider config has none', async () => {
-    seedProvider('prov-noemail');
-    seedBackupConfig({
+    await seedProvider('prov-noemail');
+    await seedBackupConfig({
       'prov-noemail': {
         enabled: true,
         folderPath: 'B',

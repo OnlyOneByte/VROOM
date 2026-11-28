@@ -44,6 +44,7 @@ Examples in [`docs/examples/`](examples/):
 | `docker-compose.yml` | backend, frontend, Cloudflare Tunnel; healthchecks; `DATA_PATH` bind mount |
 | `portainer-stack.yml` | the same three plus Tugtainer (auto-updater, dashboard on loopback only); named volume, no `DATA_PATH` |
 | `docker-compose.litestream.yml` + `litestream.yml` | add-on for `docker-compose.yml`: streams the database to an S3-compatible bucket (see [Continuous backups with Litestream](#continuous-backups-with-litestream)) |
+| `docker-compose.postgres.yml` | add-on for `docker-compose.yml`: runs on Postgres instead of the SQLite file (see [Postgres (opt-in)](#postgres-opt-in)) |
 | `.env.example` | variable template |
 
 ## Environment Variables
@@ -96,9 +97,9 @@ These have defaults, but the defaults only suit localhost.
 | `FRONTEND_PORT` | `3000` | Host port in the example stacks |
 | `ORIGIN` | unset (derived from the request) | Frontend container only. The public origin the server reports, e.g. `https://yourdomain.com`, instead of deriving it from the request headers. Read at startup, so a change needs a container restart, not a rebuild. Leave it unset unless header-derived origins are wrong behind your proxy; an empty value stops the frontend from starting |
 | `HOST` | `127.0.0.1` | Address the backend binds. The default is loopback only, so a direct install is not exposed until you say so; containers need `0.0.0.0` (both Dockerfiles and example stacks set it). The backend exits naming `HOST` if this machine has no such address |
-| `DATABASE_URL` | `./data/vroom.db` | SQLite file path (or `sqlite:<path>`). Both Dockerfiles and example stacks set `/app/data/vroom.db`. Opt-in Postgres (#1635, in progress): `postgres://user:password@host:5432/database` runs the Postgres migrations at startup and stops with a clear message if the server can't be reached. Any other scheme refuses to start |
+| `DATABASE_URL` | `./data/vroom.db` | SQLite file path (or `sqlite:<path>`; surrounding spaces are ignored). Both Dockerfiles and example stacks set `/app/data/vroom.db`. Opt-in Postgres (#1635, in progress): `postgres://user:password@host:5432/database` runs the Postgres migrations at startup and stops with a clear message if the server can't be reached. Any other scheme refuses to start |
 | `DATA_PATH` | `./data` | Host directory bind-mounted at `/app/data` by `docker-compose.yml`. Must exist |
-| `WAL_CHECKPOINTS` | `on` | `off` stops the backend's own WAL checkpoints (every 15 minutes, at start and at shutdown), so a replication tool such as Litestream can own them. Leave it `on` without one |
+| `WAL_CHECKPOINTS` | `on` | `off` stops the backend's own WAL checkpoints (every 15 minutes, at start and at shutdown), so a replication tool such as Litestream can own them. Leave it `on` without one. SQLite only; ignored on Postgres |
 | `LOG_LEVEL` | `info` | `error`, `warn`, `info`, `debug` |
 | `TRUSTED_PROXY_IPS` | empty | Comma-separated proxy IPs or CIDR ranges whose `X-Forwarded-For` is honored. It is read from the right: the nearest address that is not a trusted proxy is the client, so an entry a client added itself is ignored. Left unset behind a reverse proxy, every anonymous request shares one rate-limit bucket keyed on the proxy's IP. An invalid entry stops the backend at startup |
 | `TRUSTED_CLIENT_IP_HEADER` | empty | A header a trusted proxy sets to the client IP, such as `CF-Connecting-IP`. Read only when the request comes from a `TRUSTED_PROXY_IPS` address, and before `X-Forwarded-For` |
@@ -388,6 +389,13 @@ One SQLite file at `DATABASE_URL`, in WAL mode — so the data directory holds `
 plus `vroom.db-wal` and `vroom.db-shm`. The migrations in `backend/drizzle/` are applied
 automatically at startup; there is no manual migration step.
 
+With opt-in Postgres (#1635, in progress) there is no database file: the migrations in
+`backend/drizzle-pg/` run at startup instead. The file backup, Litestream and WAL checkpoint notes
+below apply to SQLite only, and `bun src/db/checkpoint.ts` says so and does nothing. On Postgres,
+the server backup is your Postgres host's own (`pg_dump`, or a managed provider's snapshots and
+point-in-time recovery). The in-app backup ZIP is not a server backup on either database: it
+exports one account's own data, without other accounts, sessions or roles.
+
 **Databases created before `0000_baseline` cannot be upgraded in place.** Their migration history
 no longer matches the journal. To move one forward:
 
@@ -397,10 +405,10 @@ no longer matches the journal. To move one forward:
 3. Start the new build, which creates a fresh schema, and sign in with the same account. The fresh
    database gives you a new internal user id; restore re-owns every row to the signed-in account,
    so a backup made under the old id still applies.
-4. Settings → Storage Providers: reconnect the same storage accounts you used before (the same
-   Google account, or the same S3 endpoint and bucket).
-5. Settings → Storage Providers → **Restore** → **Upload file**: pick the ZIP, check the preview
-   counts, then restore with **Replace All**.
+4. Settings → **Backups and storage**: reconnect the same storage accounts you used before (the
+   same Google account, or the same S3 endpoint and bucket).
+5. Settings → **Backups and storage** → **Restore…** → **Upload file**: pick the ZIP, check the
+   preview counts, then choose **Replace everything**.
 
 Keep the old file until the restore is verified. What happens to links into the old database:
 
@@ -442,7 +450,7 @@ docker compose start backend
 
 Deleting the stale `-wal`/`-shm` matters: left behind, they belong to the replaced database.
 
-In-app restore from a Drive ZIP or Google Sheets lives in Settings → Storage Providers → Restore.
+In-app restore from a Drive ZIP or Google Sheets lives in Settings → Backups and storage → Restore….
 
 ### Continuous backups with Litestream
 
@@ -495,6 +503,70 @@ Both containers run as your own user, so the backend can write the restored file
 and `-shm` files. The drill backend gets no `.env`: without the encryption key it can't decrypt
 anyone's provider credentials, so its sync and backup jobs never reach users' real storage.
 `NODE_ENV=development` lets it start without the key and a sign-in provider.
+
+### Postgres (opt-in)
+
+SQLite stays the default and needs nothing extra. Postgres is for operators who already run one,
+or want a managed database. Set `DATABASE_URL=postgres://user:password@host:5432/database`
+(`postgresql://` works too). At startup the backend connects, runs the migrations in
+`backend/drizzle-pg/`, and stops with `Could not connect to Postgres at host:port/database: …`
+if it can't. That message names the host and database, never the user or password.
+
+With Docker Compose, add `docs/examples/docker-compose.postgres.yml` on top of
+`docker-compose.yml` and set `POSTGRES_PASSWORD` in `.env` (letters and digits only, since it
+is part of the URL):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+```
+
+- **Keep Postgres private.** The example publishes no Postgres port: only containers on the
+  stack's network can reach it. If you need to reach it from the host (for `psql` or a backup
+  job), publish it on loopback only with `"127.0.0.1:5432:5432"`, never a bare `5432:5432`.
+  For a remote machine, use an SSH tunnel rather than a wider publish. A managed Postgres
+  belongs on a private network, not a public endpoint.
+- **Backups.** The SQLite backup, Litestream and WAL notes above don't apply. Back up the server
+  with `pg_dump` or your provider's snapshots and point-in-time recovery:
+
+  ```bash
+  docker compose exec postgres pg_dump -U vroom -Fc vroom > ./backups/vroom-$(date +%Y%m%d).dump
+  ```
+
+  Keep `PROVIDER_ENCRYPTION_KEY` with the backup, as on SQLite.
+
+#### Moving from SQLite
+
+**There is no whole-server move from SQLite to Postgres.** A new Postgres database starts empty.
+What moves is each account's own data, through the in-app backup:
+
+1. On the SQLite instance, each person exports their data: Settings → **Your data** →
+   **Export everything** → **Export** (or the same card on the Profile page). That saves a ZIP of
+   CSV files.
+2. Start the backend on Postgres and have each person sign in, creating their account again.
+3. Each person reconnects the same storage accounts they used before, in Settings → **Backups and
+   storage** (the same Google account, or the same S3 endpoint and bucket).
+4. Each person restores their ZIP: Settings → **Backups and storage** → **Restore…** → **Upload
+   file**, check the preview counts, then choose **Replace everything**.
+
+That brings back a person's vehicles, expenses, odometer, trips, insurance, financing,
+reminders and preferences. Photo files are not in the ZIP: each photo is re-linked only when its
+storage account is reconnected before the restore (step 3), and otherwise stays unlinked, with
+its file still in that storage. These do not move:
+- other people's accounts;
+- sign-in sessions, roles and server settings;
+- sign-up invites;
+- storage-provider connections and AI provider settings, which each person sets up again;
+- shares on someone else's vehicle (re-invite people once they have signed in).
+
+Keep the SQLite file until each restore is checked.
+
+CI runs this move on every change. The optional **Postgres boot and SQLite move** job seeds an
+account on SQLite and exports its ZIP. It then boots on a Postgres service container, restores
+the ZIP with Replace everything, boots again, and checks that every table in the backup has the
+same row count on Postgres. The seeded account has no photos, so the job doesn't cover re-linking
+photos.
+
+Moving back from Postgres to SQLite works the same way, one account at a time.
 
 ## Community stats
 
@@ -564,7 +636,10 @@ list already names `default`, the list wins and `PROVIDER_ENCRYPTION_KEY` is ign
    - in the container: `docker compose exec backend bun dist/scripts/rotate-provider-keys.js`
      (on Portainer, open the backend container's console and run
      `bun dist/scripts/rotate-provider-keys.js`)
-   - from a checkout, in `backend/`: `bun run providers:rotate-key`
+   - from a checkout, in `backend/`: `bun run providers:rotate-key`. Use a checkout of the
+     version the server runs: on Postgres the script opens the database the way the server does,
+     including its startup migrations, so a newer checkout would migrate the database under the
+     running server.
 
    It works in batches of 100 rows, one transaction each, and prints how many rows it
    re-encrypted, how many were already on the current key and how many had no secret. It exits

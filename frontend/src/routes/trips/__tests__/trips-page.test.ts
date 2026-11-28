@@ -288,6 +288,16 @@ describe('trips page list', () => {
 		expect(cardText('t1')).toContain('Client visit');
 	});
 
+	test('a long note wraps and is clamped instead of widening the row', async () => {
+		const note = `https://example.com/${'a'.repeat(200)}`;
+		list.mockResolvedValue(tripPage([trip({ note })]));
+		render(Page);
+		await settle();
+
+		const paragraph = screen.getByText(note);
+		expect(paragraph).toHaveClass('break-words', 'line-clamp-2');
+	});
+
 	test('a truncation note appears when the API holds more trips than were fetched', async () => {
 		list.mockResolvedValue(tripPage([trip()], 250));
 		render(Page);

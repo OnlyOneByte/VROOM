@@ -143,7 +143,7 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     expect(after.map((n) => n.due_odometer)).toEqual([35000, 40200]);
   });
 
-  test('a `both` reminder overdue on BOTH axes fires two distinct notifications (time + mileage, no collision)', async () => {
+  test('a `both` reminder overdue on BOTH axes fires on the date and re-arms the mileage side, so one service fires once', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Subaru', model: 'Outback', year: 2020 });
     await addOdometerReading(ctx, vehicleId, 36000);
 
@@ -170,9 +170,11 @@ describe('mileage-reminder trigger (whichever-comes-first, odometer axis)', () =
     )) as NotifRow[];
 
     const mileage = all.filter((n) => n.due_odometer !== null);
-    expect(mileage).toHaveLength(1);
-    expect(mileage[0]?.due_odometer).toBe(35000);
-    expect(mileage[0]?.due_date).toBeNull();
+    expect(mileage).toHaveLength(0);
+    const row = (await ctx.sql.get('SELECT next_due_odometer AS n FROM reminders WHERE id = ?', [
+      'rm-both',
+    ])) as { n: number };
+    expect(row.n, '36000 + 5000').toBe(41000);
 
     const time = all.filter((n) => n.due_date !== null);
     expect(time.length).toBeGreaterThanOrEqual(1);

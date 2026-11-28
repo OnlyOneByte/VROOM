@@ -29,7 +29,7 @@ describe('PhotoFolderSection rows on phones', () => {
 		const rows = await screen.findAllByTestId('photo-folder-row');
 		expect(rows).toHaveLength(4);
 		hasClass(rows[0]?.parentElement, 'space-y-2');
-		hasClass(screen.getByText('Disable All').parentElement, 'min-h-10');
+		hasClass(screen.getByText('Disable all').parentElement, 'min-h-10');
 		for (const row of rows) {
 			hasClass(row, 'flex-wrap');
 			hasClass(row, 'gap-y-2');
@@ -43,6 +43,28 @@ describe('PhotoFolderSection rows on phones', () => {
 	});
 });
 
+describe('PhotoFolderSection status note', () => {
+	test('"(some categories disabled)" wraps with its label, not back to the chevron', () => {
+		render(PhotoFolderSection, {
+			props: {
+				photoRootPath: 'photos',
+				categorySettings: {
+					...categorySettings,
+					odometer_readings: { enabled: false, folderPath: '/Odometer' }
+				},
+				providerRootPath: 'VROOM',
+				onUpdate: vi.fn()
+			}
+		});
+		const note = screen.getByText('(some categories disabled)');
+		const label = note.parentElement;
+		expect(label).toContainElement(screen.getByText('Category paths & sync settings'));
+		expect(label?.tagName).toBe('SPAN');
+		hasClass(note, 'whitespace-nowrap');
+		expect(note.closest('button')?.className).not.toMatch(/(^|\s)flex-wrap(\s|$)/);
+	});
+});
+
 describe('PhotoFolderSection accessible names', () => {
 	test('every checkbox is named by its visible label, and every path input names its category', async () => {
 		const onUpdate = vi.fn();
@@ -51,18 +73,18 @@ describe('PhotoFolderSection accessible names', () => {
 		});
 		await fireEvent.click(screen.getByText('Category paths & sync settings'));
 
-		expect(await screen.findByRole('checkbox', { name: 'Disable All' })).toBeInTheDocument();
+		expect(await screen.findByRole('checkbox', { name: 'Disable all' })).toBeInTheDocument();
 		for (const name of [
-			'Vehicle Photos',
-			'Expense Receipts',
-			'Insurance Docs',
-			'Odometer Readings'
+			'Vehicle photos',
+			'Expense receipts',
+			'Insurance docs',
+			'Odometer readings'
 		]) {
 			expect(screen.getByRole('checkbox', { name })).toBeInTheDocument();
 			expect(screen.getByRole('textbox', { name: `${name} folder path` })).toBeInTheDocument();
 		}
 
-		await fireEvent.click(screen.getByText('Vehicle Photos'));
+		await fireEvent.click(screen.getByText('Vehicle photos'));
 		expect(onUpdate).toHaveBeenCalledWith(
 			expect.objectContaining({ vehicle_photos: { enabled: false, folderPath: '/Vehicle' } })
 		);

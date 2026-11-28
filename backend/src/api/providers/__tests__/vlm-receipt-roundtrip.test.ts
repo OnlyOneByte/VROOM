@@ -99,8 +99,8 @@ async function getExpense(id: string): Promise<ExpenseApiRow> {
   return (await json<DataEnvelope<ExpenseApiRow>>(res)).data;
 }
 
-function expenseCount(): number {
-  return (ctx.sqlite.query('SELECT COUNT(*) as n FROM expenses').get() as { n: number }).n;
+async function expenseCount(): Promise<number> {
+  return ((await ctx.sql.get('SELECT COUNT(*) as n FROM expenses')) as { n: number }).n;
 }
 
 describe('VLM receipt-parsing round-trip: parse, draft, then confirm via POST /expenses', () => {
@@ -111,7 +111,7 @@ describe('VLM receipt-parsing round-trip: parse, draft, then confirm via POST /e
       '{"amount": 47.83, "date": "2026-03-12", "odometer": 84231, "category": "fuel", "vendor": "Shell Station"}'
     );
 
-    const before = expenseCount();
+    const before = await expenseCount();
     const draft = await parseReceipt();
     expect(draft).toEqual({
       amount: 47.83,
@@ -120,10 +120,10 @@ describe('VLM receipt-parsing round-trip: parse, draft, then confirm via POST /e
       category: 'fuel',
       vendor: 'Shell Station',
     });
-    expect(expenseCount()).toBe(before);
+    expect(await expenseCount()).toBe(before);
 
     const id = await confirmDraftAsExpense(draft, vehicleId);
-    expect(expenseCount()).toBe(before + 1);
+    expect(await expenseCount()).toBe(before + 1);
 
     const row = await getExpense(id);
     expect(row.vehicleId).toBe(vehicleId);

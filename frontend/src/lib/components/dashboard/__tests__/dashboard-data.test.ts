@@ -166,6 +166,39 @@ describe('dashboard data', () => {
 		expect(items[0]?.detail).toMatch(/^Ended /);
 	});
 
+	test('a mileage reminder that has reached its milestone needs attention', () => {
+		const reminders = [
+			{
+				reminder: {
+					id: 'm1',
+					name: 'Oil change',
+					isActive: true,
+					nextDueDate: null,
+					nextDueOdometer: 45000
+				},
+				vehicleIds: ['v1'],
+				mileageDue: true
+			},
+			{
+				reminder: {
+					id: 'm2',
+					name: 'Tyres',
+					isActive: true,
+					nextDueDate: null,
+					nextDueOdometer: 60000
+				},
+				vehicleIds: ['v1'],
+				mileageDue: false
+			}
+		] as unknown as ReminderWithVehicles[];
+
+		const items = attentionItems(reminders, [], () => 'Daily Driver', String, NOW);
+
+		expect(items.map(item => [item.title, item.status, item.detail])).toEqual([
+			['Oil change · Daily Driver', 'overdue', 'Reached 45,000 on the odometer']
+		]);
+	});
+
 	test('the insight names the highest month, and nothing when every month is zero', () => {
 		const aug = new Date(2026, 7, 1);
 		expect(

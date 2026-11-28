@@ -358,9 +358,13 @@ routes.delete(
     await validateInsuranceOwnership(id, user.id);
 
     // Premium expenses link to terms by text, not FK, so they must be deleted explicitly.
-    await deleteTermExpenses(termId, user.id);
-
-    const policy = await repos().insurancePolicies.deleteTerm(id, termId, user.id);
+    let policy:
+      | Awaited<ReturnType<ReturnType<typeof repos>['insurancePolicies']['deleteTerm']>>
+      | undefined;
+    await deleteTermExpenses(termId, user.id, async () => {
+      policy = await repos().insurancePolicies.deleteTerm(id, termId, user.id);
+    });
+    if (!policy) throw new NotFoundError('Term');
     return c.json({
       success: true,
       data: policyToApi(policy, await ownScale(c)),

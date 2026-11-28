@@ -31,7 +31,7 @@
 	let confirmLabel = $derived(
 		chosenIds.length === 0
 			? 'Back up now'
-			: `Back up to ${chosenIds.length} provider${chosenIds.length === 1 ? '' : 's'}`
+			: `Back up to ${chosenIds.length} place${chosenIds.length === 1 ? '' : 's'}`
 	);
 </script>
 
@@ -43,7 +43,7 @@
 				{#if providers.length > 0}
 					Choose where this backup goes. Your saved backup settings stay as they are.
 				{:else}
-					Connect a storage provider that can hold backups first.
+					Add storage that can hold backups first.
 				{/if}
 			</Dialog.Description>
 		</Dialog.Header>

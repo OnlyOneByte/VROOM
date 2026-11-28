@@ -124,7 +124,7 @@ export function useGoogleOAuth(getOptions: () => GoogleOAuthOptions): GoogleOAut
 		if (providerError) {
 			const errorMessages: Record<string, string> = {
 				cancelled: 'Google account connection was cancelled.',
-				forbidden: "You don't have permission to connect providers.",
+				forbidden: "You don't have permission to connect storage.",
 				exchange_failed: "Couldn't connect your Google account. Try again.",
 				no_refresh_token: 'Google did not grant offline access. Please try again.',
 				missing_scope:

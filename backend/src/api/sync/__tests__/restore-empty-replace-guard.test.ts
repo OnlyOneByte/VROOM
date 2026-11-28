@@ -14,8 +14,8 @@ interface VehicleRowDb {
   make: string;
 }
 
-function vehicleRows(): VehicleRowDb[] {
-  return ctx.sqlite.query('SELECT id, make FROM vehicles').all() as VehicleRowDb[];
+async function vehicleRows(): Promise<VehicleRowDb[]> {
+  return (await ctx.sql.all('SELECT id, make FROM vehicles')) as VehicleRowDb[];
 }
 
 describe('restore refuses an empty-backup replace', () => {
@@ -26,13 +26,13 @@ describe('restore refuses an empty-backup replace', () => {
     const emptyZip = await backupService.exportAsZip(ctx.user.id);
 
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'X', year: 2021 });
-    expect(vehicleRows()).toHaveLength(1);
+    expect(await vehicleRows()).toHaveLength(1);
 
     await expect(
       restoreService.restoreFromBackup(ctx.user.id, emptyZip, 'replace')
     ).rejects.toThrow(/empty backup/i);
 
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows, 'existing data must survive a rejected empty replace').toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].make).toBe('Honda');
@@ -47,7 +47,7 @@ describe('restore refuses an empty-backup replace', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, emptyZip, 'preview');
     expect(result.success).toBe(true);
     expect(result.preview?.vehicles).toBe(0);
-    expect(vehicleRows()).toHaveLength(1);
+    expect(await vehicleRows()).toHaveLength(1);
   });
 
   test('merge of an empty backup is unaffected (never deletes; nothing to insert)', async () => {
@@ -58,7 +58,7 @@ describe('restore refuses an empty-backup replace', () => {
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, emptyZip, 'merge');
     expect(result.success).toBe(true);
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
   });
@@ -72,7 +72,7 @@ describe('restore refuses an empty-backup replace', () => {
 
     const result = await restoreService.restoreFromBackup(ctx.user.id, fullZip, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
-    const rows = vehicleRows();
+    const rows = await vehicleRows();
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(vehicleId);
     expect(rows[0].make).toBe('Subaru');

@@ -1,7 +1,14 @@
 import { and, eq } from 'drizzle-orm';
 import type { AsyncHandle } from '../../db/async-sqlite';
 import { firstRow } from '../../db/first-row';
-import { permissionOverrides, roleAssignments, roles, users, vehicles } from '../../db/schema';
+import {
+  permissionOverrides,
+  roleAssignments,
+  roles,
+  users,
+  vehicleShares,
+  vehicles,
+} from '../../db/schema';
 import {
   isVehicleMember,
   type perPersonVehicleGrants,
@@ -13,8 +20,7 @@ export type LiveVehicleGrants = Awaited<ReturnType<typeof perPersonVehicleGrants
 
 export type DroppedGrantReason =
   | 'vehicle_not_restored'
-  | 'no_accepted_share'
-  | 'account_inactive'
+  | 'person_not_active'
   | 'granted_by_non_member'
   | 'role_not_assignable'
   | 'permission_not_grantable';
@@ -22,7 +28,6 @@ export type DroppedGrantReason =
 export interface DroppedGrant {
   kind: 'role' | 'override';
   vehicleId: string;
-  userId: string;
   reason: DroppedGrantReason;
 }
 
@@ -44,6 +49,22 @@ async function carCheck(
   return car ? null : 'vehicle_not_restored';
 }
 
+async function denyCheck(
+  tx: AsyncHandle,
+  ownerId: string,
+  vehicleId: string,
+  userId: string
+): Promise<DroppedGrantReason | null> {
+  const noCar = await carCheck(tx, ownerId, vehicleId);
+  if (noCar) return noCar;
+  const share = await tx
+    .select({ id: vehicleShares.id })
+    .from(vehicleShares)
+    .where(and(eq(vehicleShares.vehicleId, vehicleId), eq(vehicleShares.sharedWithId, userId)))
+    .then(firstRow);
+  return share ? null : 'person_not_active';
+}
+
 async function personCheck(
   tx: AsyncHandle,
   ownerId: string,
@@ -53,13 +74,13 @@ async function personCheck(
 ): Promise<DroppedGrantReason | null> {
   const noCar = await carCheck(tx, ownerId, vehicleId);
   if (noCar) return noCar;
-  if (!(await isVehicleMember(tx, vehicleId, userId))) return 'no_accepted_share';
+  if (!(await isVehicleMember(tx, vehicleId, userId))) return 'person_not_active';
   const person = await tx
     .select({ disabledAt: users.disabledAt, pendingApprovalAt: users.pendingApprovalAt })
     .from(users)
     .where(eq(users.id, userId))
     .then(firstRow);
-  if (!person || person.disabledAt || person.pendingApprovalAt) return 'account_inactive';
+  if (!person || person.disabledAt || person.pendingApprovalAt) return 'person_not_active';
   if (grantor !== ownerId && !(grantor && (await isVehicleMember(tx, vehicleId, grantor)))) {
     return 'granted_by_non_member';
   }
@@ -116,7 +137,7 @@ async function reapplyOverride(
   const allow = row.effect === 'allow';
   const reason = allow
     ? await personCheck(tx, ownerId, row.scopeId, row.userId, row.setBy)
-    : await carCheck(tx, ownerId, row.scopeId);
+    : await denyCheck(tx, ownerId, row.scopeId, row.userId);
   if (reason) return reason;
   if (allow && (row.scope !== 'vehicle' || !grantablePermission(row.permission))) {
     return 'permission_not_grantable';
@@ -142,14 +163,10 @@ export async function reapplyVehicleGrants(
   live: LiveVehicleGrants
 ): Promise<RegrantReport> {
   const report: RegrantReport = { reapplied: 0, dropped: [] };
-  const record = (
-    kind: DroppedGrant['kind'],
-    row: { scopeId: string; userId: string },
-    outcome: Outcome
-  ) => {
+  const record = (kind: DroppedGrant['kind'], row: { scopeId: string }, outcome: Outcome) => {
     if (outcome === 'reapplied') report.reapplied++;
     else if (outcome !== 'unchanged') {
-      report.dropped.push({ kind, vehicleId: row.scopeId, userId: row.userId, reason: outcome });
+      report.dropped.push({ kind, vehicleId: row.scopeId, reason: outcome });
     }
   };
   for (const row of live.assignments) {

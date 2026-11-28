@@ -96,11 +96,17 @@ export interface RestoreResult {
 		dropped: Array<{
 			kind: 'role' | 'override';
 			vehicleId: string;
-			userId: string;
-			reason: string;
+			reason: RestoreDroppedReason;
 		}>;
 	};
 }
+
+export type RestoreDroppedReason =
+	| 'vehicle_not_restored'
+	| 'person_not_active'
+	| 'granted_by_non_member'
+	| 'role_not_assignable'
+	| 'permission_not_grantable';
 
 export interface UserSettings {
 	id: string;

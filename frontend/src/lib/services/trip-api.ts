@@ -22,7 +22,13 @@ interface CreateTripRequest {
 	driverId?: string | null;
 }
 
-type UpdateTripRequest = Partial<Omit<CreateTripRequest, 'vehicleId'>>;
+type UpdateTripRequest = Partial<
+	Omit<CreateTripRequest, 'vehicleId' | 'startLocation' | 'endLocation' | 'note'>
+> & {
+	startLocation?: string | null;
+	endLocation?: string | null;
+	note?: string | null;
+};
 
 export const tripApi = {
 	async list(filters?: TripListFilters): Promise<PaginatedResponse<Trip>> {

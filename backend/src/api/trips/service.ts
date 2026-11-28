@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import { appContext, repos } from '../../app-context';
-import type { AsyncAppDatabase } from '../../db/async-sqlite';
+import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import { type Trip, trips } from '../../db/schema';
 import { NotFoundError, ValidationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -136,59 +136,82 @@ export async function updateTrip(
       .where(and(eq(trips.id, id), eq(trips.userId, userId)))
       .returning();
     if (!row) throw new NotFoundError('Trip');
-    if (!resync) return { updated: row, removedEntryIds: [] };
-    const otherAtOld = await repos().trips.findOtherAtOdometerKey(
-      {
-        excludeTripId: id,
-        vehicleId,
-        userId,
-        endOdometer: existing.endOdometer,
-        tripDate: existing.tripDate,
-        timeZone,
-      },
-      tx
-    );
-    const oldKey = {
-      tripId: id,
-      vehicleId,
-      userId,
-      odometer: existing.endOdometer,
-      recordedAt: existing.tripDate,
-      timeZone,
-    };
-    const movedId = otherAtOld
-      ? null
-      : await repos().odometer.moveLinkedTripEntry(
-          oldKey,
-          { odometer: end, recordedAt: tripDate },
-          tx
-        );
-    if (movedId) {
-      await assertOdometerInOrder(tx, check && { ...check, excludeId: movedId });
-      return { updated: row, removedEntryIds: [] };
+    const removedEntryIds = resync
+      ? await resyncLinkedEntry(tx, row, { userId, existing, end, tripDate, timeZone, check })
+      : [];
+    if (data.driverId !== undefined && data.driverId !== existing.driverId) {
+      await repos().odometer.setTripEntryDriver(id, userId, existing.driverId, row.driverId, tx);
     }
-    let removed: string[] = [];
-    if (otherAtOld) await repos().odometer.handOverLinkedTripEntry(oldKey, otherAtOld, tx);
-    else removed = await repos().odometer.deleteLinkedTripEntry(oldKey, tx);
-    await assertOdometerInOrder(tx, check);
-    await repos().odometer.createFromTrip(
-      {
-        tripId: id,
-        vehicleId,
-        userId,
-        odometer: end,
-        recordedAt: tripDate,
-        timeZone,
-        driverId: row.driverId,
-        createdBy: existing.createdBy,
-      },
-      tx
-    );
-    return { updated: row, removedEntryIds: removed };
+    return { updated: row, removedEntryIds };
   });
 
   if (resync) await afterOdometerChange(userId, { tripId: id, vehicleId }, removedEntryIds, 'edit');
   return updated;
+}
+
+interface ResyncArgs {
+  userId: string;
+  existing: Trip;
+  end: number;
+  tripDate: Date;
+  timeZone: string | undefined;
+  check: Awaited<ReturnType<typeof readingCheck>> | null;
+}
+
+async function resyncLinkedEntry(
+  tx: AsyncHandle,
+  row: Trip,
+  { userId, existing, end, tripDate, timeZone, check }: ResyncArgs
+): Promise<string[]> {
+  const { id, vehicleId } = existing;
+  const otherAtOld = await repos().trips.findOtherAtOdometerKey(
+    {
+      excludeTripId: id,
+      vehicleId,
+      userId,
+      endOdometer: existing.endOdometer,
+      tripDate: existing.tripDate,
+      timeZone,
+    },
+    tx
+  );
+  const oldKey = {
+    tripId: id,
+    vehicleId,
+    userId,
+    odometer: existing.endOdometer,
+    recordedAt: existing.tripDate,
+    timeZone,
+  };
+  const movedId = otherAtOld
+    ? null
+    : await repos().odometer.moveLinkedTripEntry(
+        oldKey,
+        { odometer: end, recordedAt: tripDate },
+        tx
+      );
+  if (movedId) {
+    await assertOdometerInOrder(tx, check && { ...check, excludeId: movedId });
+    return [];
+  }
+  let removed: string[] = [];
+  if (otherAtOld) await repos().odometer.handOverLinkedTripEntry(oldKey, otherAtOld, tx);
+  else removed = await repos().odometer.deleteLinkedTripEntry(oldKey, tx);
+  await assertOdometerInOrder(tx, check);
+  await repos().odometer.createFromTrip(
+    {
+      tripId: id,
+      vehicleId,
+      userId,
+      odometer: end,
+      recordedAt: tripDate,
+      timeZone,
+      driverId: row.driverId,
+      createdBy: existing.createdBy,
+    },
+    tx
+  );
+  return removed;
 }
 
 export async function deleteTrip(

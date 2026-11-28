@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { repos } from '../../../app-context';
+import { appContext, repos } from '../../../app-context';
 import {
   createTestApp,
   type DataEnvelope,
@@ -76,5 +76,21 @@ describe('reminder-trigger idempotency (CAS on nextDueDate)', () => {
       reminderId,
     ])) as { next_due_date: number };
     expect(advanced.next_due_date).toBe(Math.floor(newDate.getTime() / 1000));
+  });
+
+  test('a switched-off reminder cannot be claimed from an earlier read', async () => {
+    const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
+    const reminderId = await createOverdueExpenseReminder(vehicleId);
+    const before = (await ctx.sql.get('SELECT next_due_date FROM reminders WHERE id = ?', [
+      reminderId,
+    ])) as { next_due_date: number };
+    await ctx.sql.run('UPDATE reminders SET is_active = FALSE WHERE id = ?', [reminderId]);
+
+    const expected = new Date(before.next_due_date * 1000);
+    const claimed = await appContext().asyncDb.transaction((tx) =>
+      repos().reminders.claimPeriod(tx, reminderId, expected, new Date(), new Date())
+    );
+
+    expect(claimed).toBeNull();
   });
 });

@@ -31,6 +31,7 @@ const BASELINE: Record<string, number> = {
   'db/async-sqlite.ts · builder .all()/.get()/.run()': 1,
   'db/connection.ts · builder .all()/.get()/.run()': 2,
   'db/connection.ts · PRAGMA': 7,
+  'db/postgres-move-smoke.ts · builder .all()/.get()/.run()': 1,
   'utils/chunk.ts · SQLITE_': 5,
 };
 

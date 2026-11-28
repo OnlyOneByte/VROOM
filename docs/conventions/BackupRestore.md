@@ -94,8 +94,14 @@ every amount.
    before the wipe and re-applies them after the insert (`restore-grants.ts`). A role or an allow
    override comes back only if the car came back, the person still holds an accepted share and is
    active, the grantor is the owner or a member, and the role or permission is still grantable. A
-   deny override comes back whenever its car does, because dropping it would widen access. Every
-   grant that doesn't come back is listed in the result's `grants.dropped`.
+   deny override comes back whenever its car does and the person still has a share on it, accepted
+   or pending, because dropping it would widen access. A deny on someone with no share left is
+   cleaned up, as ending a membership does. Every grant that doesn't come back is listed in the
+   result's `grants.dropped`, and the restore dialog lists them by car with a plain reason and no
+   person's name. Each entry carries only its kind, car and reason, never a person's id. A person
+   who is no longer on the car and one whose account isn't active share one reason,
+   `person_not_active`, so the result says no more about an account than the dialog does. The
+   dialog can't be closed while a restore is running.
 
 All validation runs before the replace-mode wipe; it is the only thing between a corrupt download and
 an emptied account. Download, unzip, decryption and parsing all happen before the transaction opens;

@@ -109,6 +109,31 @@ describe('ReminderRow status', () => {
 	});
 });
 
+describe('ReminderRow meta line on a narrow screen', () => {
+	test('it can wrap between cars, and each car name stays whole', () => {
+		render(ReminderRow, {
+			props: {
+				item: item({}, ['v1', 'v2']),
+				group: 'upcoming',
+				vehicleNames: new Map([
+					['v1', 'Daily Driver'],
+					['v2', 'Weekend Car']
+				]),
+				servicing: false,
+				now: NOW,
+				onEdit: vi.fn(),
+				onDelete: vi.fn(),
+				onToggleActive: vi.fn(),
+				onMarkServiced: vi.fn(),
+				onViewExpenses: vi.fn()
+			}
+		});
+
+		const text = screen.getByTestId('reminder-card-r1').textContent ?? '';
+		expect(text).toContain('Daily\u00a0Driver, Weekend\u00a0Car · ');
+	});
+});
+
 describe('ReminderRow in the demo', () => {
 	test('the actions menu keeps Edit but has no Delete', async () => {
 		const signOut = signInAsDemo();

@@ -3,7 +3,7 @@ import { CONFIG } from '../../config';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import type { NewReminder, Reminder, ReminderNotification } from '../../db/schema';
 import { reminderNotifications, reminders, reminderVehicles } from '../../db/schema';
-import { DatabaseError, isUniqueConstraintError, NotFoundError } from '../../errors';
+import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 import { absoluteTotalAfterPrune, pruneVehicleFromSplitConfig } from './split-config-helpers';
@@ -188,12 +188,10 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       const [created] = await this.db
         .insert(reminderNotifications)
         .values({ reminderId, userId, dueDate: null, dueOdometer, isRead: false })
+        .onConflictDoNothing()
         .returning();
       return created ?? null;
     } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        return null;
-      }
       throw new DatabaseError('Failed to create mileage notification', error);
     }
   }
@@ -268,7 +266,13 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     const [claimed] = await tx
       .update(reminders)
       .set({ nextDueDate, lastTriggeredAt, updatedAt: new Date() })
-      .where(and(eq(reminders.id, id), eq(reminders.nextDueDate, expectedCurrentDueDate)))
+      .where(
+        and(
+          eq(reminders.id, id),
+          eq(reminders.nextDueDate, expectedCurrentDueDate),
+          eq(reminders.isActive, true)
+        )
+      )
       .returning();
     return claimed ?? null;
   }
@@ -339,6 +343,34 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
       }
       return changed;
     });
+  }
+
+  async stillDueAt(id: string, userId: string, dueOdometer: number): Promise<boolean> {
+    const rows = await this.db
+      .update(reminders)
+      .set({ updatedAt: new Date() })
+      .where(
+        and(
+          eq(reminders.id, id),
+          eq(reminders.userId, userId),
+          eq(reminders.nextDueOdometer, dueOdometer),
+          eq(reminders.isActive, true)
+        )
+      )
+      .returning({ id: reminders.id });
+    return rows.length > 0;
+  }
+
+  async rearmMileage(
+    id: string,
+    userId: string,
+    lastServiceOdometer: number,
+    nextDueOdometer: number
+  ): Promise<void> {
+    await this.db
+      .update(reminders)
+      .set({ lastServiceOdometer, nextDueOdometer, updatedAt: new Date() })
+      .where(and(eq(reminders.id, id), eq(reminders.userId, userId)));
   }
 
   async markServiced(

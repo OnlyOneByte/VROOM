@@ -165,6 +165,27 @@ export class OdometerRepository extends BaseRepository<OdometerEntry, NewOdomete
     return removed.map((row) => row.id);
   }
 
+  async setTripEntryDriver(
+    tripId: string,
+    userId: string,
+    fromDriverId: string | null,
+    toDriverId: string | null,
+    db: AsyncHandle = this.db
+  ): Promise<void> {
+    await db
+      .update(odometerEntries)
+      .set({ driverId: toDriverId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(odometerEntries.sourceTripId, tripId),
+          eq(odometerEntries.userId, userId),
+          fromDriverId === null
+            ? isNull(odometerEntries.driverId)
+            : eq(odometerEntries.driverId, fromDriverId)
+        )
+      );
+  }
+
   async moveLinkedTripEntry(
     from: LinkedTripEntryKey,
     to: { odometer: number; recordedAt: Date },

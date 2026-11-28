@@ -38,7 +38,7 @@ function renderDialog() {
 
 async function openSheetsPreview() {
 	const onRestore = renderDialog();
-	await fireEvent.click(await screen.findByText('Restore from provider'));
+	await fireEvent.click(await screen.findByText('Restore from storage'));
 	await screen.findByText('How to restore');
 	return onRestore;
 }
@@ -88,7 +88,10 @@ describe('RestoreDialog merge', () => {
 		const onRestore = await openSheetsPreview();
 		await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
 		restoreFromProvider.mockRejectedValueOnce(
-			new ApiError('Some people have their own roles. Remove those changes first.', 409)
+			new ApiError(
+				'This backup contains records that conflict with existing data, so nothing was restored.',
+				409
+			)
 		);
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Replace everything' }));

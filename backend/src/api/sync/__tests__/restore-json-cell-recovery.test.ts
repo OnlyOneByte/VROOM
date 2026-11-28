@@ -29,16 +29,16 @@ function patchColumn(zipBuffer: Buffer, filename: string, column: string, rawCel
   return zip.toBuffer();
 }
 
-function vehiclePrefsCell(vehicleId: string): string {
-  const row = ctx.sqlite
-    .query('SELECT unit_preferences FROM vehicles WHERE id = ?')
-    .get(vehicleId) as { unit_preferences: string } | null;
+async function vehiclePrefsCell(vehicleId: string): Promise<string> {
+  const row = (await ctx.sql.get('SELECT unit_preferences FROM vehicles WHERE id = ?', [
+    vehicleId,
+  ])) as { unit_preferences: string } | null;
   if (!row) throw new Error(`vehicle ${vehicleId} not found`);
   return row.unit_preferences;
 }
 
-function expenseCount(): number {
-  const row = ctx.sqlite.query('SELECT COUNT(*) AS n FROM expenses').get() as { n: number };
+async function expenseCount(): Promise<number> {
+  const row = (await ctx.sql.get('SELECT COUNT(*) AS n FROM expenses')) as { n: number };
   return row.n;
 }
 
@@ -51,9 +51,9 @@ async function seedAndExport(): Promise<{ vehicleId: string; zip: Buffer }> {
       unitPreferences: { distanceUnit: 'kilometers', volumeUnit: 'liters', chargeUnit: 'kwh' },
     },
   });
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount, missed_fillup)
-     VALUES ('exp-json-cell', ?, ?, 'fuel', 1700000000, 5500, 0)`,
+     VALUES ('exp-json-cell', ?, ?, 'fuel', 1700000000, 5500, FALSE)`,
     [vehicleId, ctx.user.id]
   );
   const { backupService } = await import('../backup');
@@ -76,8 +76,8 @@ describe('a backup whose unit_preferences cell is not valid JSON', () => {
     const result = await restoreService.restoreFromBackup(ctx.user.id, broken, 'replace');
     expect(result.success, JSON.stringify(result)).toBe(true);
 
-    expect(expenseCount(), 'the unrelated expense was recovered, not discarded').toBe(1);
-    const prefs = parseUnitPreferences(JSON.parse(vehiclePrefsCell(vehicleId)));
+    expect(await expenseCount(), 'the unrelated expense was recovered, not discarded').toBe(1);
+    const prefs = parseUnitPreferences(JSON.parse(await vehiclePrefsCell(vehicleId)));
     expect(prefs, 'the unparseable cell landed as a VALID prefs object').not.toBeNull();
     expect(prefs).toEqual(DEFAULT_UNIT_PREFERENCES);
   });
@@ -88,7 +88,7 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
     const { vehicleId, zip } = await seedAndExport();
     const { restoreService } = await import('../restore');
     const { parseUnitPreferences } = await import('../../../types');
-    const goodPrefsBefore = vehiclePrefsCell(vehicleId);
+    const goodPrefsBefore = await vehiclePrefsCell(vehicleId);
 
     const badShape = patchColumn(
       zip,
@@ -113,10 +113,12 @@ describe('a backup whose unit_preferences cell parses but is not valid unit pref
     expect(message).toContain('unitPreferences');
     expect(message, 'the offending row is named').toContain(vehicleId);
 
-    expect(vehiclePrefsCell(vehicleId), 'the stored prefs are untouched').toBe(goodPrefsBefore);
-    expect(expenseCount(), 'the existing expense is untouched').toBe(1);
+    expect(await vehiclePrefsCell(vehicleId), 'the stored prefs are untouched').toBe(
+      goodPrefsBefore
+    );
+    expect(await expenseCount(), 'the existing expense is untouched').toBe(1);
     expect(
-      parseUnitPreferences(JSON.parse(vehiclePrefsCell(vehicleId))),
+      parseUnitPreferences(JSON.parse(await vehiclePrefsCell(vehicleId))),
       'every stored vehicle still has prefs the analytics layer can read'
     ).not.toBeNull();
 

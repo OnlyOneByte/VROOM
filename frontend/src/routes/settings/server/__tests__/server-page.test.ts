@@ -59,25 +59,37 @@ describe('Server settings page', () => {
 		expect(api.getSettings).not.toHaveBeenCalled();
 	});
 
-	test('Save Mode shows only once a new mode is chosen, and saves nothing until pressed', async () => {
+	test('the three parts are ruled sections with plain headings, like the other Settings pages', async () => {
 		render(ServerPage);
 		await screen.findByTestId('signup-mode-approval');
-		expect(screen.queryByRole('button', { name: 'Save Mode' })).toBeNull();
+		for (const name of ['Who can join', 'Waiting for approval', 'Invites']) {
+			const region = screen.getByRole('region', { name });
+			expect(region).toHaveAttribute('data-variant', 'section');
+			const heading = within(region).getByRole('heading', { level: 2, name });
+			expect(heading.parentElement?.querySelector('svg')).toBeNull();
+		}
+	});
+
+	test('Save mode shows only once a new mode is chosen, and saves nothing until pressed', async () => {
+		render(ServerPage);
+		await screen.findByTestId('signup-mode-approval');
+		expect(screen.getByRole('heading', { name: 'Who can join' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Save mode' })).toBeNull();
 		await fireEvent.click(screen.getByTestId('signup-mode-approval'));
 		expect(api.updateSettings).not.toHaveBeenCalled();
-		await fireEvent.click(await screen.findByRole('button', { name: 'Save Mode' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Save mode' }));
 		await waitFor(() => expect(api.updateSettings).toHaveBeenCalledWith({ mode: 'approval' }));
 		expect(showSuccess).toHaveBeenCalledWith('Sign-up mode saved');
 	});
 
-	test('Save Domains shows only while the list differs, and Enter on an unchanged list saves nothing', async () => {
+	test('Save domains shows only while the list differs, and Enter on an unchanged list saves nothing', async () => {
 		render(ServerPage);
-		const input = await screen.findByLabelText('Allowed email domains (Optional)');
-		expect(screen.queryByRole('button', { name: 'Save Domains' })).toBeNull();
+		const input = await screen.findByLabelText('Allowed email domains (optional)');
+		expect(screen.queryByRole('button', { name: 'Save domains' })).toBeNull();
 		await fireEvent.submit(input.closest('form') as HTMLFormElement);
 		expect(api.updateSettings).not.toHaveBeenCalled();
 		await fireEvent.input(input, { target: { value: 'example.com' } });
-		expect(screen.getByRole('button', { name: 'Save Domains' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Save domains' })).toBeInTheDocument();
 	});
 
 	test('a list that fails to load offers Retry', async () => {
