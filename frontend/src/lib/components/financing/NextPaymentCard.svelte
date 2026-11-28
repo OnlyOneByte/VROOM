@@ -132,6 +132,10 @@
 					<p class="text-sm text-muted-foreground">
 						{formatCurrency(split.principal)} principal · {formatCurrency(split.interest)} interest
 					</p>
+				{:else if split && financing.paymentAmount >= split.interest}
+					<p class="text-sm text-destructive">
+						Covers only this month's {formatCurrency(split.interest)} interest
+					</p>
 				{:else if split}
 					<p class="text-sm text-destructive">
 						Doesn't cover this month's {formatCurrency(split.interest)} interest

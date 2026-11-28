@@ -127,6 +127,15 @@ describe('Next payment amounts', () => {
 		expect(rows()[0]).not.toContain('principal');
 	});
 
+	test('a payment of exactly the month’s interest says it covers only the interest', () => {
+		mount({
+			financing: makeLoan({ apr: 36, paymentAmount: 450, computedBalance: 15_000 }),
+			showProgress: false
+		});
+		expect(rows()[0]).toContain("Covers only this month's $450.00 interest");
+		expect(rows()[0]).not.toContain('principal');
+	});
+
 	test('the countdown is plain text, not a live region, and the amount has no replacing label', () => {
 		const { container } = mount();
 		expect(screen.queryByRole('status')).toBeNull();

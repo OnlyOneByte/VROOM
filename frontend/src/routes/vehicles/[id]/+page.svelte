@@ -45,6 +45,7 @@
 	import {
 		fitsFirstPage,
 		matchesFilters,
+		withPendingByMonth,
 		withRowsInBreakdowns,
 		withoutRowsInBreakdowns,
 		type ListedPage
@@ -322,7 +323,9 @@
 		match: expense => expense.vehicleId === vehicleId,
 		refresh: () =>
 			Promise.all([
-				hasLoadedExpensesTab ? fetchExpensesPage(currentOffset) : undefined,
+				hasLoadedExpensesTab
+					? fetchExpensesPage(currentOffset, { keepMonthTotals: true })
+					: undefined,
 				loadSummary(),
 				loadOverviewLists()
 			]),
@@ -373,6 +376,30 @@
 			pendingTabRows.filter(row => pending.states.get(row.id)?.status !== 'failed').length -
 			expenses.filter(isDeleteHidden).length;
 		return `${formatNumber(count, 0)} ${count === 1 ? 'expense' : 'expenses'}`;
+	});
+	const inTab = (row: Expense) => backOnThisCar(row) && matchesFilters(row, tabFilters);
+	const matchesSearch = (row: Expense) => matchesFilters(row, { search: searchTerm });
+	const searchUnknown = (was: Expense, now: Expense) => {
+		if (!searchTerm.trim()) return false;
+		if (inTab(was)) return !listedIds.has(was.id) && !matchesSearch(was);
+		return inTab(now) && !matchesSearch(now);
+	};
+	let shownMonthTotals = $derived.by(() => {
+		const edits = summaryEdits(monthTotalsRequestedAt, expenses);
+		const kept = edits.before.flatMap((was, i) => {
+			const now = edits.after[i];
+			return now && !searchUnknown(was, now) ? [{ was, now }] : [];
+		});
+		const saving = pending.saving.filter(row =>
+			matchesFilters(row, { ...tabFilters, search: searchTerm })
+		);
+		const removed = [
+			...expenses.filter(isDeleteHidden),
+			...kept.map(({ was }) => was).filter(inTab)
+		];
+		const added = kept.map(({ now }) => now).filter(inTab);
+		const withSaving = withPendingByMonth(monthTotals, saving);
+		return withPendingByMonth(withPendingByMonth(withSaving, removed, -1), added);
 	});
 
 	let firstExpense = $derived(
@@ -642,9 +669,12 @@
 
 	const nextMonthTotalsRequest = latest();
 	let monthTotals = $state<ReadonlyMap<string, number>>(new Map());
+	let monthTotalsRequestedAt = $state<number | undefined>();
 
-	async function loadMonthTotals() {
+	async function loadMonthTotals(keepShown = false) {
 		const isCurrent = nextMonthTotalsRequest();
+		const requestedAt = Date.now();
+		if (!keepShown) monthTotals = new Map();
 		const {
 			limit: _limit,
 			offset: _offset,
@@ -654,7 +684,10 @@
 		} = buildExpenseListParams(0);
 		try {
 			const months = await expenseApi.getMonthlyTotals({ vehicleId, ...filtered });
-			if (isCurrent()) monthTotals = new Map(months.map(m => [m.month, m.amount]));
+			if (isCurrent()) {
+				monthTotals = new Map(months.map(m => [m.month, m.amount]));
+				monthTotalsRequestedAt = requestedAt;
+			}
 		} catch (error) {
 			if (!isCurrent()) return;
 			monthTotals = new Map();
@@ -662,12 +695,12 @@
 		}
 	}
 
-	async function fetchExpensesPage(offset: number) {
+	async function fetchExpensesPage(offset: number, { keepMonthTotals = false } = {}) {
 		isLoadingPage = true;
 		expensesLoadError = null;
 		const requestedAt = Date.now();
 		const params = buildExpenseListParams(offset);
-		if (offset === 0) void loadMonthTotals();
+		if (offset === 0) void loadMonthTotals(keepMonthTotals);
 		try {
 			const result = await expenseApi.getExpensesByVehicle(vehicleId, params);
 			expenses = result.data;
@@ -721,8 +754,8 @@
 		const offset =
 			currentOffset >= remaining ? Math.max(0, currentOffset - pageSize) : currentOffset;
 		await Promise.all([
-			fetchExpensesPage(offset),
-			loadMonthTotals(),
+			fetchExpensesPage(offset, { keepMonthTotals: true }),
+			offset === 0 ? undefined : loadMonthTotals(true),
 			loadSummary(),
 			loadFuelEfficiency(),
 			loadOverviewLists()
@@ -1207,7 +1240,7 @@
 								bind:filters
 								{expenses}
 								category={expenseCategoryFilter}
-								sort={`${expenseSortBy}-${expenseSortDir}` as 'date-desc'}
+								sort={`${expenseSortBy}-${expenseSortDir}`}
 								onSearchChange={v => (searchTerm = v)}
 								onCategoryChange={handleExpenseCategoryChange}
 								onSortChange={s => {
@@ -1285,7 +1318,8 @@
 											onSortChange={handleExpenseSortChange}
 											activeCategory={expenseCategoryFilter}
 											onCategoryChange={handleExpenseCategoryChange}
-											{monthTotals}
+											monthTotals={shownMonthTotals}
+											monthHeadingLevel={4}
 											ledger
 										/>
 									{/if}

@@ -904,6 +904,55 @@ describe('vehicle detail page tabs', () => {
 			})
 		);
 		expect(lastListParams()).toMatchObject({ category: 'maintenance', offset: 0 });
+		expect(captured['table']?.['monthHeadingLevel']).toBe(4);
+
+		await fireEvent.input(screen.getByRole('textbox', { name: 'Search expenses' }), {
+			target: { value: 'costco' }
+		});
+		await vi.waitFor(() =>
+			expect(getMonthlyTotals).toHaveBeenLastCalledWith({
+				vehicleId: 'v1',
+				category: 'maintenance',
+				search: 'costco'
+			})
+		);
+	});
+
+	test('month totals follow an unsaved edit and a queued expense, as the rows do', async () => {
+		getMonthlyTotals.mockResolvedValue([{ month: '2024-03', amount: 100 }]);
+		const total = () => (captured['table']?.['monthTotals'] as Map<string, number>).get('2024-03');
+		try {
+			await mount();
+			await openTab('Expenses');
+			await vi.waitFor(() => expect(total()).toBe(100));
+
+			scheduleEdit(EXPENSE, { ...EXPENSE, amount: 60 }, {
+				vehicleId: 'v1',
+				amount: 60
+			} as never);
+			await settle();
+			expect(total()).toBe(114.5);
+
+			offlineExpenseQueue.current = [
+				{
+					id: 'offline-q',
+					clientId: 'c-q',
+					vehicleId: 'v1',
+					tags: [],
+					category: 'misc',
+					amount: 20,
+					date: '2024-03-20T12:00:00.000Z',
+					timestamp: 1,
+					synced: false,
+					version: '3.0'
+				}
+			];
+			await settle();
+			expect(total()).toBe(134.5);
+		} finally {
+			offlineExpenseQueue.current = [];
+			resetPendingEdits();
+		}
 	});
 
 	test('an expenses load failure shows the error and Retry refetches the same page', async () => {

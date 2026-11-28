@@ -10,7 +10,7 @@
 	import { COMMON_MESSAGES } from '#lib/constants/messages.ts';
 	import type { Expense, ExpenseFilters } from '#lib/types/index.ts';
 
-	type Sort = 'date-desc' | 'date-asc' | 'amount-desc';
+	type Sort = `${'date' | 'amount'}-${'asc' | 'desc'}`;
 
 	interface Props {
 		searchTerm: string;
@@ -39,7 +39,8 @@
 	const SORTS: Record<Sort, string> = {
 		'date-desc': 'Newest first',
 		'date-asc': 'Oldest first',
-		'amount-desc': 'Largest first'
+		'amount-desc': 'Largest first',
+		'amount-asc': 'Smallest first'
 	};
 
 	let selectedTags = $derived(filters.tags ?? []);
