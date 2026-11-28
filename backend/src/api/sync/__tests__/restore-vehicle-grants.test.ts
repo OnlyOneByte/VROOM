@@ -141,8 +141,8 @@ describe('a full restore keeps the per-person grants of current members, from li
   test('someone who left and someone whose account is not active are reported the same way', async () => {
     await addMember('left-2');
     await addMember('off-2');
-    override('left-2', 'vehicle.trip.write');
-    override('off-2', 'vehicle.trip.write');
+    await override('left-2', 'vehicle.trip.write');
+    await override('off-2', 'vehicle.trip.write');
     const zip = new AdmZip(await exportZip());
     const shares = zip.getEntry('vehicle_shares.csv')?.getData().toString('utf-8') ?? '';
     zip.updateFile(
@@ -155,7 +155,7 @@ describe('a full restore keeps the per-person grants of current members, from li
         'utf-8'
       )
     );
-    ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', ['off-2']);
+    await ctx.sql.run('UPDATE users SET disabled_at = 1 WHERE id = ?', ['off-2']);
 
     const result = await restore(zip.toBuffer());
 
@@ -163,8 +163,8 @@ describe('a full restore keeps the per-person grants of current members, from li
       { kind: 'override', vehicleId, reason: 'person_not_active' },
       { kind: 'override', vehicleId, reason: 'person_not_active' },
     ]);
-    expect(grantsOf('left-2').overrides).toEqual([]);
-    expect(grantsOf('off-2').overrides).toEqual([]);
+    expect((await grantsOf('left-2')).overrides).toEqual([]);
+    expect((await grantsOf('off-2')).overrides).toEqual([]);
     expect(JSON.stringify(result.grants)).not.toMatch(/left-2|off-2/);
   });
 

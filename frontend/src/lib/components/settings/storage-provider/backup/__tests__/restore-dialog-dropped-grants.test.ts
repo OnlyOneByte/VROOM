@@ -124,7 +124,7 @@ describe('RestoreDialog after a full restore', () => {
 				onClose: vi.fn()
 			}
 		});
-		await fireEvent.click(await screen.findByText('Restore from provider'));
+		await fireEvent.click(await screen.findByText('Restore from storage'));
 		await screen.findByText('How to restore');
 		await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
 		let finish: (result: RestoreResult) => void = () => {};
@@ -160,7 +160,7 @@ describe('RestoreDialog after a full restore', () => {
 				onClose: vi.fn()
 			}
 		});
-		await fireEvent.click(await screen.findByText('Restore from provider'));
+		await fireEvent.click(await screen.findByText('Restore from storage'));
 		await screen.findByText('How to restore');
 		await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
 		restoreFromProvider.mockRejectedValueOnce(new Error('offline'));
