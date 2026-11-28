@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { signInAsDemo } from '../../../../test-utils/demo-user';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import { scaleTime } from 'd3-scale';
 import type { OdometerHistoryEntry, PaginatedResponse, UnitPreferences } from '#lib/types/index.ts';
@@ -26,14 +25,7 @@ const getHistory =
 	>();
 const getChartHistory =
 	vi.fn<(vehicleId: string) => Promise<PaginatedResponse<OdometerHistoryEntry>>>();
-const deleteEntry = vi.fn<(entryId: string) => Promise<void>>();
 const CHART_LIMIT = 100;
-
-vi.mock('#lib/services/odometer-api.ts', () => ({
-	odometerApi: {
-		delete: (entryId: string) => deleteEntry(entryId)
-	}
-}));
 
 vi.mock('#lib/services/odometer-history-api.ts', () => ({
 	odometerHistoryApi: {
@@ -90,7 +82,6 @@ beforeEach(() => {
 	chartProps = null;
 	getHistory.mockResolvedValue(page([]));
 	getChartHistory.mockResolvedValue(page([]));
-	deleteEntry.mockResolvedValue();
 });
 
 afterEach(() => {
@@ -104,7 +95,7 @@ describe('OdometerTab load states', () => {
 		await settle();
 
 		expect(container.querySelector('.animate-spin')).not.toBeNull();
-		expect(getHistory).toHaveBeenCalledWith('v1', { limit: 20, offset: 0 });
+		expect(getHistory).toHaveBeenCalledWith('v1', { limit: 21, offset: 0 });
 	});
 
 	test('an empty history shows the empty state with an Add reading link for writers', async () => {
@@ -139,8 +130,8 @@ describe('OdometerTab load states', () => {
 		await settle();
 
 		expect(getHistory).toHaveBeenCalledTimes(2);
-		expect(getHistory).toHaveBeenLastCalledWith('v1', { limit: 20, offset: 0 });
-		expect(screen.getByText('Readings (1)')).toBeInTheDocument();
+		expect(getHistory).toHaveBeenLastCalledWith('v1', { limit: 21, offset: 0 });
+		expect(screen.getByText('1 reading')).toBeInTheDocument();
 	});
 
 	test('a non-Error failure falls back to the generic message', async () => {
@@ -161,7 +152,7 @@ describe('OdometerTab entry list', () => {
 		mount();
 		await settle();
 
-		expect(screen.getByText('Readings (1)')).toBeInTheDocument();
+		expect(screen.getByText('1 reading')).toBeInTheDocument();
 		expect(screen.getByText(/45,210\s+mi/)).toBeInTheDocument();
 		expect(screen.getByText('Mar 15, 2026')).toBeInTheDocument();
 		expect(screen.getByText('Oil change visit')).toBeInTheDocument();
@@ -175,17 +166,19 @@ describe('OdometerTab entry list', () => {
 		expect(screen.getByText(/72,000\s+km/)).toBeInTheDocument();
 	});
 
-	test('writers get Add reading, edit and delete actions with an edit link back to the vehicle', async () => {
+	test('writers get Add reading and a row that opens the reading, with no row buttons', async () => {
 		getHistory.mockResolvedValue(page([entry({ sourceId: 'o7' })]));
 		mount();
 		await settle();
 
 		expect(screen.getByRole('link', { name: 'Add reading' })).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Edit reading' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: /45,000\s+mi/ })).toHaveAttribute(
 			'href',
 			'/vehicles/v1/odometer/o7/edit?returnTo=/vehicles/v1'
 		);
-		expect(screen.getByRole('button', { name: 'Delete reading' })).toBeInTheDocument();
+		expect(
+			within(screen.getByRole('region', { name: '1 reading' })).queryAllByRole('button')
+		).toHaveLength(0);
 	});
 
 	test('read-only viewers see readings without any write actions', async () => {
@@ -193,10 +186,41 @@ describe('OdometerTab entry list', () => {
 		mount({ canWrite: false });
 		await settle();
 
-		expect(screen.getByText('Readings (1)')).toBeInTheDocument();
-		expect(screen.queryByRole('link', { name: 'Add reading' })).toBeNull();
-		expect(screen.queryByRole('link', { name: 'Edit reading' })).toBeNull();
-		expect(screen.queryByRole('button', { name: 'Delete reading' })).toBeNull();
+		expect(screen.getByText('1 reading')).toBeInTheDocument();
+		expect(screen.queryAllByRole('link')).toHaveLength(0);
+	});
+
+	test('the latest reading is the newest one, and each row shows the distance since the one before it', async () => {
+		history([
+			entry({ sourceId: 'c', odometer: 40360, recordedAt: '2026-11-13T12:00:00.000Z' }),
+			entry({ sourceId: 'b', odometer: 40040, recordedAt: '2026-11-03T12:00:00.000Z' }),
+			entry({ sourceId: 'a', odometer: 39720, recordedAt: '2026-10-24T12:00:00.000Z' })
+		]);
+		mount();
+		await settle();
+
+		expect(screen.getByText('Latest reading').nextElementSibling).toHaveTextContent(/40,360\s+mi/);
+		const rows = within(screen.getByRole('region', { name: '3 readings' })).getAllByRole(
+			'listitem'
+		);
+		expect(rows.map(row => row.textContent?.match(/\+[\d,]+/)?.[0] ?? null)).toEqual([
+			'+320',
+			'+320',
+			null
+		]);
+	});
+
+	test('rows carry no source badge, and only expense rows say where they came from', async () => {
+		history([
+			entry({ sourceId: 'm', odometer: 40360 }),
+			entry({ source: 'expense', sourceId: 'e', odometer: 40040 })
+		]);
+		mount();
+		await settle();
+
+		expect(screen.queryByText('manual')).toBeNull();
+		expect(screen.queryByText('expense')).toBeNull();
+		expect(screen.getAllByText(/from an expense/)).toHaveLength(1);
 	});
 
 	test('a single reading does not draw the mileage chart', async () => {
@@ -235,8 +259,8 @@ describe('OdometerTab expense mileage', () => {
 		await settle();
 
 		expect(screen.queryByText('No odometer readings yet')).toBeNull();
-		expect(screen.getByText('Readings (2)')).toBeInTheDocument();
-		expect(screen.getAllByText('expense')).toHaveLength(2);
+		expect(screen.getByText('2 readings')).toBeInTheDocument();
+		expect(screen.getAllByText(/from an expense/)).toHaveLength(2);
 		const data = chartProps?.['data'] as { odometer: number }[];
 		expect(data.map(d => d.odometer)).toEqual([29800, 30120]);
 	});
@@ -246,12 +270,10 @@ describe('OdometerTab expense mileage', () => {
 		mount();
 		await settle();
 
-		expect(screen.getByRole('link', { name: 'Open expense' })).toHaveAttribute(
+		expect(screen.getByRole('link', { name: /30,120\s+mi/ })).toHaveAttribute(
 			'href',
 			'/expenses/e2/edit?returnTo=/vehicles/v1'
 		);
-		expect(screen.queryByRole('link', { name: 'Edit reading' })).toBeNull();
-		expect(screen.queryByRole('button', { name: 'Delete reading' })).toBeNull();
 	});
 
 	test('read-only viewers get no expense link', async () => {
@@ -259,7 +281,7 @@ describe('OdometerTab expense mileage', () => {
 		mount({ canWrite: false });
 		await settle();
 
-		expect(screen.queryByRole('link', { name: 'Open expense' })).toBeNull();
+		expect(screen.queryAllByRole('link')).toHaveLength(0);
 	});
 
 	test('the chart y axis fits the readings instead of starting at 0', async () => {
@@ -362,14 +384,32 @@ describe('OdometerTab pagination', () => {
 		await fireEvent.click(screen.getByRole('button', { name: /Next/ }));
 		await settle();
 
-		expect(getHistory).toHaveBeenLastCalledWith('v1', { limit: 20, offset: 20 });
+		expect(getHistory).toHaveBeenLastCalledWith('v1', { limit: 21, offset: 20 });
 		expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
 
 		await fireEvent.click(screen.getByRole('button', { name: /Previous/ }));
 		await settle();
 
-		expect(getHistory).toHaveBeenLastCalledWith('v1', { limit: 20, offset: 0 });
+		expect(getHistory).toHaveBeenLastCalledWith('v1', { limit: 21, offset: 0 });
+		expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
+	});
+
+	test("a page lists 20 readings, and its last row's distance comes from the next older reading", async () => {
+		const newestFirst = Array.from({ length: 21 }, (_, i) =>
+			entry({ sourceId: `d${i}`, odometer: 50000 - i * 300 })
+		);
+		getHistory.mockResolvedValue(page(newestFirst, 25, 0));
+		mount();
+		await settle();
+
+		const rows = within(screen.getByRole('region', { name: '25 readings' })).getAllByRole(
+			'listitem'
+		);
+		expect(rows).toHaveLength(20);
+		expect(rows[19]).toHaveTextContent(/44,300\s+mi/);
+		expect(rows[19]).toHaveTextContent(/\+300\s+mi/);
+		expect(screen.queryByText(/44,000\s+mi/)).toBeNull();
 		expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
 	});
 
@@ -383,87 +423,10 @@ describe('OdometerTab pagination', () => {
 		await settle();
 
 		expect(container.querySelector('.animate-spin')).not.toBeNull();
-		expect(screen.queryByText(/1,000/)).toBeNull();
+		expect(
+			within(screen.getByRole('region', { name: /readings/ })).queryByText(/1,000/)
+		).toBeNull();
 		expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
-	});
-});
-
-describe('OdometerTab delete', () => {
-	async function openDeleteFor(value: number) {
-		getHistory.mockResolvedValue(page([entry({ sourceId: 'o9', odometer: value })]));
-		mount();
-		await settle();
-		await fireEvent.click(screen.getByRole('button', { name: 'Delete reading' }));
-		await settle();
-		return screen.getByRole('dialog');
-	}
-
-	test('the confirmation names the reading being deleted', async () => {
-		const dialog = await openDeleteFor(45210);
-
-		expect(within(dialog).getByText(/45,210 mi/)).toBeInTheDocument();
-		expect(within(dialog).getByText(/This action cannot be undone/)).toBeInTheDocument();
-	});
-
-	test('Cancel closes the dialog without deleting', async () => {
-		const dialog = await openDeleteFor(45210);
-
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-		await settle();
-
-		expect(deleteEntry).not.toHaveBeenCalled();
-		expect(screen.queryByRole('dialog')).toBeNull();
-	});
-
-	test('confirming deletes the entry and reloads the current page', async () => {
-		const dialog = await openDeleteFor(45210);
-		getHistory.mockResolvedValue(page([]));
-
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-		await settle();
-
-		expect(deleteEntry).toHaveBeenCalledWith('o9');
-		expect(getHistory).toHaveBeenCalledTimes(2);
-		expect(screen.queryByRole('dialog')).toBeNull();
-		expect(screen.getByText('No odometer readings yet')).toBeInTheDocument();
-	});
-
-	test('a failed delete keeps the dialog open and shows the error', async () => {
-		deleteEntry.mockRejectedValueOnce(new Error('Reading is linked to a trip'));
-		const dialog = await openDeleteFor(45210);
-
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-		await settle();
-
-		expect(screen.getByRole('dialog')).toBeInTheDocument();
-		expect(
-			screen.getByText("Couldn't delete the reading. Reading is linked to a trip.")
-		).toBeInTheDocument();
-		expect(getHistory).toHaveBeenCalledTimes(1);
-	});
-
-	test('a non-Error delete failure shows the generic message', async () => {
-		deleteEntry.mockRejectedValueOnce('boom');
-		const dialog = await openDeleteFor(45210);
-
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-		await settle();
-
-		expect(
-			screen.getByText(`Couldn't delete the reading. ${UNEXPECTED_FAILURE_MESSAGE}`)
-		).toBeInTheDocument();
-	});
-
-	test('the Delete button is disabled while the delete is in flight', async () => {
-		deleteEntry.mockReturnValueOnce(new Promise(() => {}));
-		const dialog = await openDeleteFor(45210);
-
-		await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-		await settle();
-
-		expect(
-			within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })
-		).toBeDisabled();
 	});
 });
 
@@ -527,7 +490,7 @@ describe('OdometerTab chart range', () => {
 		mount();
 		await settle();
 
-		expect(screen.getByText('Readings (3)')).toBeInTheDocument();
+		expect(screen.getByText('3 readings')).toBeInTheDocument();
 		expect(chartProps?.['error']).toBe('Server unavailable.');
 		expect(chartProps?.['data']).toEqual([]);
 	});
@@ -563,60 +526,5 @@ describe('OdometerTab chart range', () => {
 
 		expect(chartProps?.['error']).toBe('Server unavailable.');
 		expect(chartProps?.['description']).toBe('Odometer readings plotted by date');
-	});
-
-	test('a chart that loads after a failure clears the error', async () => {
-		getHistory.mockResolvedValue(page(dated(3)));
-		getChartHistory.mockRejectedValueOnce(new Error('Server unavailable'));
-		getChartHistory.mockResolvedValue(page(dated(2)));
-		mount();
-		await settle();
-
-		await fireEvent.click(
-			screen.getAllByRole('button', { name: 'Delete reading' })[0] as HTMLElement
-		);
-		await settle();
-		await fireEvent.click(
-			within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })
-		);
-		await settle();
-
-		expect(chartProps?.['error']).toBeNull();
-		expect((chartProps?.['data'] as unknown[]).length).toBe(2);
-	});
-
-	test('deleting a reading reloads the chart', async () => {
-		history(dated(3));
-		mount();
-		await settle();
-		getChartHistory.mockResolvedValue(page(dated(2)));
-
-		await fireEvent.click(
-			screen.getAllByRole('button', { name: 'Delete reading' })[0] as HTMLElement
-		);
-		await settle();
-		await fireEvent.click(
-			within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })
-		);
-		await settle();
-
-		expect(getChartHistory).toHaveBeenCalledTimes(2);
-		expect((chartProps?.['data'] as unknown[]).length).toBe(2);
-	});
-});
-
-describe('OdometerTab in the demo', () => {
-	test('a reading keeps Edit but has no Delete', async () => {
-		getHistory.mockResolvedValue(page([entry({ sourceId: 'o7' })]));
-		const signOut = signInAsDemo();
-		try {
-			mount();
-			await settle();
-
-			expect(screen.getByRole('link', { name: 'Edit reading' })).toBeInTheDocument();
-			expect(screen.queryByRole('button', { name: 'Delete reading' })).toBeNull();
-		} finally {
-			signOut();
-		}
 	});
 });

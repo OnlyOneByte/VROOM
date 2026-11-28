@@ -16,10 +16,10 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-async function createTrip(vehicleId: string): Promise<string> {
+async function createTrip(vehicleId: string, startOdometer = 1000): Promise<string> {
   const res = await ctx.authed('POST', '/api/v1/trips', {
     vehicleId,
-    startOdometer: 1000,
+    startOdometer,
     endOdometer: 1080,
     purpose: 'business',
     tripDate: '2026-05-01T12:00:00.000Z',
@@ -62,7 +62,7 @@ describe('a trip delete and its reading change commit or roll back together', ()
   test('a failed hand-over keeps the trip and leaves the reading linked to it', async () => {
     const vehicleId = await seedVehicle(ctx);
     const first = await createTrip(vehicleId);
-    const second = await createTrip(vehicleId);
+    const second = await createTrip(vehicleId, 1080);
     const spy = spyOn(repos().odometer, 'handOverLinkedTripEntry').mockImplementation(() => {
       throw new Error('disk I/O error');
     });
@@ -80,7 +80,7 @@ describe('a trip delete and its reading change commit or roll back together', ()
   test('a successful delete hands the shared reading to the other trip', async () => {
     const vehicleId = await seedVehicle(ctx);
     const first = await createTrip(vehicleId);
-    const second = await createTrip(vehicleId);
+    const second = await createTrip(vehicleId, 1080);
 
     const res = await ctx.authed('DELETE', `/api/v1/trips/${first}`);
 
@@ -104,7 +104,7 @@ describe('the shared-reading lookup runs inside the reading change transaction',
   test('on delete', async () => {
     const vehicleId = await seedVehicle(ctx);
     const first = await createTrip(vehicleId);
-    await createTrip(vehicleId);
+    await createTrip(vehicleId, 1080);
     const lookup = spyInTransaction();
     try {
       const res = await ctx.authed('DELETE', `/api/v1/trips/${first}`);
@@ -118,7 +118,7 @@ describe('the shared-reading lookup runs inside the reading change transaction',
   test('on an end mileage edit', async () => {
     const vehicleId = await seedVehicle(ctx);
     const first = await createTrip(vehicleId);
-    await createTrip(vehicleId);
+    await createTrip(vehicleId, 1080);
     const lookup = spyInTransaction();
     try {
       const res = await ctx.authed('PUT', `/api/v1/trips/${first}`, { endOdometer: 1100 });

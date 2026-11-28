@@ -144,7 +144,7 @@ interface A11yRoute {
 const signInControl = (page: Page) =>
 	page.getByRole('button', { name: /Sign In|Continue with/i }).first();
 const pageHeading = (name: string) => (page: Page) => page.getByRole('heading', { name }).first();
-const expiredPolicy = (page: Page) => page.getByText('Policy #SF-1001').first();
+const expiredPolicy = (page: Page) => page.getByText(/#SF-1001/).first();
 
 const A11Y_ROUTES: Record<string, A11yRoute> = {
 	'/': { anonymous: true, debt: [], ready: pageHeading('What your car really costs.') },

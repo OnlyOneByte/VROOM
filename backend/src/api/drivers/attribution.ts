@@ -95,3 +95,16 @@ export function hideDriverFields<T extends object>(
   for (const field of fields) delete copy[field];
   return copy as T;
 }
+
+export function memberView<T extends object>(
+  c: Context,
+  vehicleId: string,
+  value: T,
+  fields?: readonly DriverField[]
+): T {
+  const shown = hideDriverFields(c, vehicleId, value, fields) as Record<string, unknown>;
+  if (shown['userId'] === c.get('user').id) return shown as T;
+  if (!('userId' in shown) && !('createdBy' in shown)) return shown as T;
+  const { userId: _userId, createdBy: _createdBy, ...rest } = shown;
+  return rest as T;
+}

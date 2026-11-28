@@ -179,5 +179,7 @@ export async function reapplyVehicleGrants(
     const scoped = { ...row, scopeId: row.scopeId };
     record('override', scoped, await reapplyOverride(tx, ownerId, scoped));
   }
+  const key = (d: DroppedGrant) => `${d.vehicleId}\u0000${d.kind}\u0000${d.reason}`;
+  report.dropped.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
   return report;
 }

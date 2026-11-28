@@ -324,6 +324,15 @@ describe('FinanceTab loan summary', () => {
 		expect(screen.queryByText('APR not set')).toBeNull();
 	});
 
+	test('the next payment and the payment schedule share one two-column row on wide screens', async () => {
+		mount(makeVehicle(makeLoan()));
+		await screen.findByText(/2 payments recorded/);
+		const grid = screen.getByTestId('finance-next-payment-grid');
+		expect(grid).toHaveClass('lg:grid-cols-2');
+		expect(within(grid).getByRole('region', { name: 'Next payment' })).toBeTruthy();
+		expect(within(grid).getByText('Payment schedule')).toBeTruthy();
+	});
+
 	test('invalid financing amounts show an error instead of the summary', async () => {
 		mount(makeVehicle(makeLoan({ originalAmount: 0 })));
 		expect(screen.getByText('Invalid financing data')).toBeTruthy();

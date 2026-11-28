@@ -23,7 +23,7 @@ import {
   zValidator,
 } from '../../utils/validation';
 import { requireVehicleAccess, seesFinancials } from '../../utils/vehicle-access';
-import { attributedDriver, hideDriverFields } from '../drivers/attribution';
+import { attributedDriver, memberView } from '../drivers/attribution';
 import { assertOdometerInOrder } from '../expenses/repository';
 import type { OdometerCheck } from '../expenses/validation';
 import { deleteWithPhotos } from '../photos/photo-service';
@@ -91,7 +91,7 @@ routes.get(
       offset
     );
 
-    const rows = data.map((entry) => hideDriverFields(c, vehicleId, entry));
+    const rows = data.map((entry) => memberView(c, vehicleId, entry));
     return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
   }
 );
@@ -120,7 +120,7 @@ routes.get(
       }).allow,
     });
 
-    const rows = data.map((row) => hideDriverFields(c, vehicleId, row));
+    const rows = data.map((row) => memberView(c, vehicleId, row));
     return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
   }
 );
@@ -135,7 +135,7 @@ routes.get(
     const entry = await repos().odometer.findById(id);
     if (!entry) throw new NotFoundError('Odometer entry');
 
-    return c.json({ success: true, data: hideDriverFields(c, entry.vehicleId, entry) });
+    return c.json({ success: true, data: memberView(c, entry.vehicleId, entry) });
   }
 );
 
@@ -170,7 +170,7 @@ routes.post(
     return c.json(
       {
         success: true,
-        data: hideDriverFields(c, vehicleId, entry),
+        data: memberView(c, vehicleId, entry),
         message: 'Odometer reading created',
       },
       201
@@ -210,7 +210,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: hideDriverFields(c, updated.vehicleId, updated),
+      data: memberView(c, updated.vehicleId, updated),
       message: 'Odometer reading updated',
     });
   }

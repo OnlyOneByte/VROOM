@@ -82,6 +82,7 @@ function trip(overrides: Partial<Trip> = {}): Trip {
 		startLocation: null,
 		endLocation: null,
 		note: null,
+		access: { edit: true, delete: true },
 		createdAt: '2026-11-10T12:00:00.000Z',
 		updatedAt: '2026-11-10T12:00:00.000Z',
 		...overrides
@@ -428,7 +429,7 @@ describe('trips on cars shared with you', () => {
 		...CAMRY,
 		id: 'v9',
 		nickname: 'Family van',
-		sharedAccess: { level: 'viewer', sharedBy: 'Sam', seesFinancials: false }
+		sharedAccess: { level: 'viewer', sharedBy: 'Sam', seesFinancials: false, writesTrips: false }
 	} as Vehicle;
 
 	test('the page loads shared cars along with your own', async () => {
@@ -440,7 +441,9 @@ describe('trips on cars shared with you', () => {
 
 	test('a trip on a car you can only view has no Edit or Delete, and the form leaves that car out', async () => {
 		getVehicles.mockResolvedValue([CAMRY, SHARED_VIEW]);
-		list.mockResolvedValue(tripPage([trip({ id: 't9', vehicleId: 'v9' })]));
+		list.mockResolvedValue(
+			tripPage([trip({ id: 't9', vehicleId: 'v9', access: { edit: false, delete: false } })])
+		);
 		render(Page);
 		await settle();
 
@@ -458,5 +461,28 @@ describe('trips on cars shared with you', () => {
 		await settle();
 
 		expect(screen.queryByRole('button', { name: /Log trip/ })).toBeNull();
+	});
+
+	test('buttons follow what you may do with each trip, not your share level', async () => {
+		const viewerWhoLogs = {
+			...SHARED_VIEW,
+			sharedAccess: { level: 'viewer', sharedBy: 'Sam', writesTrips: true }
+		} as Vehicle;
+		getVehicles.mockResolvedValue([viewerWhoLogs]);
+		list.mockResolvedValue(
+			tripPage([
+				trip({ id: 't9', vehicleId: 'v9', access: { edit: true, delete: false } }),
+				trip({ id: 't8', vehicleId: 'v9', access: { edit: true, delete: true } })
+			])
+		);
+		render(Page);
+		await settle();
+
+		const others = within(screen.getByTestId('trip-card-t9'));
+		expect(others.getByRole('button', { name: 'Edit trip' })).toBeInTheDocument();
+		expect(others.queryByRole('button', { name: 'Delete trip' })).toBeNull();
+		const mine = within(screen.getByTestId('trip-card-t8'));
+		expect(mine.getByRole('button', { name: 'Delete trip' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Log trip/ })).toBeInTheDocument();
 	});
 });

@@ -48,7 +48,7 @@ import {
   seesFinancials,
   writesFinancials,
 } from '../../utils/vehicle-access';
-import { assertMayClearDriver, attributedDriver, hideDriverFields } from '../drivers/attribution';
+import { assertMayClearDriver, attributedDriver, memberView } from '../drivers/attribution';
 import { deleteWithPhotos } from '../photos/photo-service';
 import { reminderTriggerService } from '../reminders/trigger-service';
 import {
@@ -450,9 +450,7 @@ routes.post(
       {
         success: true,
         data: {
-          siblings: siblings.map((leg) =>
-            hideDriverFields(c, leg.vehicleId, expenseToApi(leg, scale))
-          ),
+          siblings: siblings.map((leg) => memberView(c, leg.vehicleId, expenseToApi(leg, scale))),
           groupId: first.groupId,
           groupTotal: first.groupTotal / scale,
           splitMethod: first.splitMethod,
@@ -521,9 +519,7 @@ routes.put(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map((leg) =>
-          hideDriverFields(c, leg.vehicleId, expenseToApi(leg, scale))
-        ),
+        siblings: siblings.map((leg) => memberView(c, leg.vehicleId, expenseToApi(leg, scale))),
         groupId: first.groupId,
         groupTotal: first.groupTotal / scale,
         splitMethod: first.splitMethod,
@@ -558,9 +554,7 @@ routes.get(
     return c.json({
       success: true,
       data: {
-        siblings: siblings.map((leg) =>
-          hideDriverFields(c, leg.vehicleId, expenseToApi(leg, scale))
-        ),
+        siblings: siblings.map((leg) => memberView(c, leg.vehicleId, expenseToApi(leg, scale))),
         groupId: first.groupId,
         groupTotal: first.groupTotal / scale,
         splitMethod: first.splitMethod,
@@ -932,7 +926,7 @@ routes.post('/', zValidator('json', createExpenseSchema), authorize(fromBodyVehi
   return c.json(
     {
       success: true,
-      data: hideDriverFields(
+      data: memberView(
         c,
         createdExpense.vehicleId,
         expenseToApi(createdExpense, await repos().preferences.moneyScale(ownerId))
@@ -970,7 +964,7 @@ routes.get('/', zValidator('query', expenseQuerySchema), authorize(fromQueryVehi
 
   const rows = data.map((expense) =>
     query.vehicleId
-      ? hideDriverFields(c, expense.vehicleId, expenseToApi(expense, scale))
+      ? memberView(c, expense.vehicleId, expenseToApi(expense, scale))
       : expenseToApi(expense, scale)
   );
   return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
@@ -1019,7 +1013,7 @@ routes.get(
     assertMaySeeExpense(seesFinancials(access), expense);
     return c.json({
       success: true,
-      data: hideDriverFields(
+      data: memberView(
         c,
         expense.vehicleId,
         expenseToApi(expense, await repos().preferences.moneyScale(expense.userId))
@@ -1132,7 +1126,7 @@ routes.put(
 
     return c.json({
       success: true,
-      data: hideDriverFields(
+      data: memberView(
         c,
         updatedExpense.vehicleId,
         expenseToApi(updatedExpense, await repos().preferences.moneyScale(updatedExpense.userId))

@@ -74,10 +74,10 @@ describe('insurance action buttons', () => {
 		expectTouchSized(settings);
 	});
 
-	test('Add Policy on the vehicle page is 40px tall on mobile', async () => {
+	test('Add policy on the vehicle page is 40px tall on mobile', async () => {
 		render(InsuranceTab, { props: { vehicleId: 'v1' } });
 		await settle();
 
-		expect(screen.getByRole('button', { name: 'Add Policy' }).className).toContain('h-10');
+		expect(screen.getByRole('button', { name: 'Add policy' }).className).toContain('h-10');
 	});
 });
