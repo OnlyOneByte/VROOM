@@ -186,10 +186,11 @@ describe('a resumed or rescheduled reminder whose end date has passed', () => {
     );
   }
 
-  test('is switched off on resume', async () => {
+  test('refuses a resume and stays off', async () => {
     const id = await createReminder({ frequency: 'weekly', endDate: '2025-01-01T12:00:00.000Z' });
     await put(id, { isActive: false });
-    await put(id, { isActive: true });
+    const res = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { isActive: true });
+    expect(res.status).toBe(400);
     expect(await isActive(id)).toBe(false);
   });
 
