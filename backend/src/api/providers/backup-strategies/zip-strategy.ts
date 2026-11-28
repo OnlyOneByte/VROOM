@@ -1,5 +1,5 @@
 import { logger } from '../../../utils/logger';
-import { backupService, resolveBackupFolderPath } from '../../sync/backup';
+import { backupFilePrefix, backupService, resolveBackupFolderPath } from '../../sync/backup';
 import type {
   BackupCapabilityResult,
   BackupStrategy,
@@ -24,7 +24,7 @@ export async function uploadZipBackup(
     const provider = await createProvider();
     const folderPath = resolveBackupFolderPath(context.providerRow, context.providerConfig);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `vroom-backup-${timestamp}.zip`;
+    const fileName = `${backupFilePrefix(context.userId)}${timestamp}.zip`;
 
     const ref = await provider.upload({
       fileName,
