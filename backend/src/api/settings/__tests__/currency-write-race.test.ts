@@ -19,9 +19,9 @@ const expenseBody = () => ({
   expenseAmount: 30,
 });
 
-function storedAmounts(): number[] {
+async function storedAmounts(): Promise<number[]> {
   return (
-    ctx.sqlite.query('SELECT expense_amount AS a FROM expenses ORDER BY created_at').all() as {
+    (await ctx.sql.all('SELECT expense_amount AS a FROM expenses ORDER BY created_at')) as {
       a: number;
     }[]
   ).map((row) => row.a);
@@ -52,14 +52,14 @@ describe('a currency change landing between a write reading the scale and saving
       try {
         const raced = await ctx.authed('POST', '/api/v1/expenses', expenseBody());
         expect(raced.status).toBe(409);
-        expect(storedAmounts()).toEqual([]);
+        expect(await storedAmounts()).toEqual([]);
       } finally {
         spy.mockRestore();
       }
 
       const retried = await ctx.authed('POST', '/api/v1/expenses', expenseBody());
       expect(retried.status).toBe(201);
-      expect(storedAmounts()).toEqual([30]);
+      expect(await storedAmounts()).toEqual([30]);
     },
     RACE_TIMEOUT_MS
   );
@@ -67,7 +67,7 @@ describe('a currency change landing between a write reading the scale and saving
   test('without a currency change in between, the write saves at the current scale', async () => {
     const res = await ctx.authed('POST', '/api/v1/expenses', expenseBody());
     expect(res.status).toBe(201);
-    expect(storedAmounts()).toEqual([3000]);
+    expect(await storedAmounts()).toEqual([3000]);
   });
 
   test(
@@ -96,7 +96,7 @@ describe('a currency change landing between a write reading the scale and saving
       } finally {
         spy.mockRestore();
       }
-      const amounts = new Set(storedAmounts());
+      const amounts = new Set(await storedAmounts());
       expect(amounts).toEqual(new Set([100]));
     },
     RACE_TIMEOUT_MS

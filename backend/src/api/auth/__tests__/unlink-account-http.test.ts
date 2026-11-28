@@ -7,13 +7,13 @@ beforeEach(async () => {
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
-function seedAuthProvider(
+async function seedAuthProvider(
   id: string,
   userId: string,
   providerType: string,
   accountId: string
-): string {
-  ctx.sqlite.run(
+): Promise<string> {
+  await ctx.sql.run(
     `INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status)
      VALUES (?, ?, 'auth', ?, ?, ?, '', 'active')`,
     [id, userId, providerType, accountId, `${providerType} account`]
@@ -21,52 +21,54 @@ function seedAuthProvider(
   return id;
 }
 
-function authProviderCount(userId: string): number {
-  const row = ctx.sqlite
-    .query(`SELECT COUNT(*) AS n FROM user_providers WHERE user_id = ? AND domain = 'auth'`)
-    .get(userId) as { n: number };
+async function authProviderCount(userId: string): Promise<number> {
+  const row = (await ctx.sql.get(
+    `SELECT COUNT(*) AS n FROM user_providers WHERE user_id = ? AND domain = 'auth'`,
+    [userId]
+  )) as { n: number };
   return row.n;
 }
 
 describe('DELETE /auth/accounts/:id — unlink an auth provider', () => {
   test('refuses to unlink the last sign-in method (400 LAST_ACCOUNT, row preserved)', async () => {
-    const onlyId = seedAuthProvider('ap-only', ctx.user.id, 'google', 'g-1');
+    const onlyId = await seedAuthProvider('ap-only', ctx.user.id, 'google', 'g-1');
     const res = await ctx.authed('DELETE', `/api/v1/auth/accounts/${onlyId}`);
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: { code?: string } };
     expect(body.error?.code).toBe('LAST_ACCOUNT');
-    expect(authProviderCount(ctx.user.id)).toBe(1);
+    expect(await authProviderCount(ctx.user.id)).toBe(1);
   });
 
   test('unlinks one of TWO providers (204) and leaves the other intact', async () => {
-    seedAuthProvider('ap-google', ctx.user.id, 'google', 'g-1');
-    const githubId = seedAuthProvider('ap-github', ctx.user.id, 'github', 'gh-1');
+    await seedAuthProvider('ap-google', ctx.user.id, 'google', 'g-1');
+    const githubId = await seedAuthProvider('ap-github', ctx.user.id, 'github', 'gh-1');
     const res = await ctx.authed('DELETE', `/api/v1/auth/accounts/${githubId}`);
     expect(res.status).toBe(204);
-    expect(authProviderCount(ctx.user.id)).toBe(1);
-    const remaining = ctx.sqlite
-      .query(`SELECT id FROM user_providers WHERE user_id = ? AND domain = 'auth'`)
-      .all(ctx.user.id) as Array<{ id: string }>;
+    expect(await authProviderCount(ctx.user.id)).toBe(1);
+    const remaining = (await ctx.sql.all(
+      `SELECT id FROM user_providers WHERE user_id = ? AND domain = 'auth'`,
+      [ctx.user.id]
+    )) as Array<{ id: string }>;
     expect(remaining.map((r) => r.id)).toEqual(['ap-google']);
   });
 
   test("cannot unlink ANOTHER user's auth account (404, no cross-tenant deletion)", async () => {
-    ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+    await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
       'other-user',
       'other@example.com',
       'Other',
     ]);
-    const foreignId = seedAuthProvider('ap-foreign', 'other-user', 'google', 'g-foreign');
-    seedAuthProvider('ap-mine', ctx.user.id, 'google', 'g-mine');
+    const foreignId = await seedAuthProvider('ap-foreign', 'other-user', 'google', 'g-foreign');
+    await seedAuthProvider('ap-mine', ctx.user.id, 'google', 'g-mine');
 
     const res = await ctx.authed('DELETE', `/api/v1/auth/accounts/${foreignId}`);
     expect(res.status).toBe(404);
-    expect(authProviderCount('other-user')).toBe(1);
+    expect(await authProviderCount('other-user')).toBe(1);
   });
 
   test('a non-auth provider row is not unlinkable via this route (404)', async () => {
-    seedAuthProvider('ap-auth', ctx.user.id, 'google', 'g-1');
-    ctx.sqlite.run(
+    await seedAuthProvider('ap-auth', ctx.user.id, 'google', 'g-1');
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, status)
        VALUES ('sp-1', ?, 'storage', 'google-drive', 'gd-1', 'Drive', '', 'active')`,
       [ctx.user.id]
@@ -74,7 +76,7 @@ describe('DELETE /auth/accounts/:id — unlink an auth provider', () => {
     const res = await ctx.authed('DELETE', '/api/v1/auth/accounts/sp-1');
     expect(res.status).toBe(404);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe('NotFoundError');
-    const sp = ctx.sqlite.query(`SELECT id FROM user_providers WHERE id = 'sp-1'`).get();
+    const sp = await ctx.sql.get(`SELECT id FROM user_providers WHERE id = 'sp-1'`);
     expect(sp).not.toBeNull();
   });
 });

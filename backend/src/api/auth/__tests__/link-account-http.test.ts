@@ -86,12 +86,14 @@ async function linkRoundTrip(provider: ProviderId = 'github'): Promise<Response>
   return finishLink(await startLink(provider));
 }
 
-function linkedOwner(provider: ProviderId, providerAccountId: string): string | undefined {
-  const row = ctx.sqlite
-    .query(
-      "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = ? AND provider_account_id = ?"
-    )
-    .get(provider, providerAccountId) as { user_id: string } | null;
+async function linkedOwner(
+  provider: ProviderId,
+  providerAccountId: string
+): Promise<string | undefined> {
+  const row = (await ctx.sql.get(
+    "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = ? AND provider_account_id = ?",
+    [provider, providerAccountId]
+  )) as { user_id: string } | null;
   return row?.user_id;
 }
 
@@ -108,7 +110,7 @@ describe('linking a second sign-in account from Profile', () => {
     const res = await linkRoundTrip('github');
 
     expect(res.headers.get('location')).toBe(profile('success=linked'));
-    expect(linkedOwner('github', 'gh-second')).toBe(ctx.user.id);
+    expect(await linkedOwner('github', 'gh-second')).toBe(ctx.user.id);
     expect(exchanges.github).toHaveBeenCalledWith('auth-code', undefined, 'link');
   });
 
@@ -124,7 +126,7 @@ describe('linking a second sign-in account from Profile', () => {
     const res = await finishLink(providerReturn);
 
     expect(res.headers.get('location')).toBe(profile('success=linked'));
-    expect(linkedOwner('google', 'google-second')).toBe(ctx.user.id);
+    expect(await linkedOwner('google', 'google-second')).toBe(ctx.user.id);
     expect(exchanges.google).toHaveBeenCalledWith('auth-code', expect.any(String), 'link');
   });
 
@@ -140,7 +142,7 @@ describe('linking a second sign-in account from Profile', () => {
     const res = await finishLink(providerReturn, other.cookie);
 
     expect(res.headers.get('location')).toBe(profile('link_error=session_mismatch'));
-    expect(linkedOwner('github', 'gh-started-by-owner')).toBeUndefined();
+    expect(await linkedOwner('github', 'gh-started-by-owner')).toBeUndefined();
     expect(exchanges.github).not.toHaveBeenCalled();
   });
 
@@ -152,22 +154,22 @@ describe('linking a second sign-in account from Profile', () => {
     });
     const first = await linkRoundTrip();
     expect(first.headers.get('location')).toBe(profile('success=linked'));
-    expect(linkedOwner('github', 'gh-same')).toBe(ctx.user.id);
+    expect(await linkedOwner('github', 'gh-same')).toBe(ctx.user.id);
 
     const again = await linkRoundTrip();
 
     expect(again.headers.get('location')).toBe(profile('link_error=already_linked'));
-    const rows = ctx.sqlite
-      .query("SELECT COUNT(*) AS n FROM user_providers WHERE provider_account_id = 'gh-same'")
-      .get() as { n: number };
+    const rows = (await ctx.sql.get(
+      "SELECT COUNT(*) AS n FROM user_providers WHERE provider_account_id = 'gh-same'"
+    )) as { n: number };
     expect(rows.n).toBe(1);
   });
 
   test('an identity bound to another user is refused and stays with that user', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO users (id, email, display_name) VALUES ('other-user', 'other@example.com', 'O')"
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, provider_account_id, display_name, credentials, config)
        VALUES ('up-other', 'other-user', 'auth', 'github', 'gh-taken', 'GitHub', '', '{}')`
     );
@@ -180,6 +182,6 @@ describe('linking a second sign-in account from Profile', () => {
     const res = await linkRoundTrip();
 
     expect(res.headers.get('location')).toBe(profile('link_error=account_conflict'));
-    expect(linkedOwner('github', 'gh-taken')).toBe('other-user');
+    expect(await linkedOwner('github', 'gh-taken')).toBe('other-user');
   });
 });

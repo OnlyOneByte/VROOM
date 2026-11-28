@@ -103,9 +103,9 @@ describe('a deployment with only OIDC configured', () => {
     expect(done.status).toBe(302);
     expect(done.headers.get('location')).toBe(`${config.frontend.url}/dashboard`);
     expect(issuer.tokenRequests[0]?.get('code_verifier')).toBeTruthy();
-    const user = ctx.sqlite
-      .query("SELECT display_name FROM users WHERE email = 'pat@example.com'")
-      .get() as { display_name: string } | null;
+    const user = (await ctx.sql.get(
+      "SELECT display_name FROM users WHERE email = 'pat@example.com'"
+    )) as { display_name: string } | null;
     expect(user?.display_name).toBe('Pat');
   });
 
@@ -158,11 +158,10 @@ describe('a deployment with only OIDC configured', () => {
     });
 
     expect(done.headers.get('location')).toBe(`${config.frontend.url}/profile?success=linked`);
-    const linked = ctx.sqlite
-      .query(
-        "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = 'oidc' AND provider_account_id = ?"
-      )
-      .get(`${issuer.issuer}|idp-user-1`) as { user_id: string } | null;
+    const linked = (await ctx.sql.get(
+      "SELECT user_id FROM user_providers WHERE domain = 'auth' AND provider_type = 'oidc' AND provider_account_id = ?",
+      [`${issuer.issuer}|idp-user-1`]
+    )) as { user_id: string } | null;
     expect(linked?.user_id).toBe(ctx.user.id);
   });
 
@@ -187,9 +186,9 @@ describe('a deployment with only OIDC configured', () => {
     } finally {
       other.stop();
     }
-    const owners = ctx.sqlite
-      .query("SELECT COUNT(DISTINCT user_id) AS n FROM user_providers WHERE provider_type = 'oidc'")
-      .get() as { n: number };
+    const owners = (await ctx.sql.get(
+      "SELECT COUNT(DISTINCT user_id) AS n FROM user_providers WHERE provider_type = 'oidc'"
+    )) as { n: number };
     expect(owners.n).toBe(2);
   });
 
