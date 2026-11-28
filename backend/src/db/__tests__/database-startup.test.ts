@@ -72,6 +72,28 @@ describe('DATABASE_URL', () => {
     expect(kind === 'refused' || kind === dialectFromUrl(url)).toBe(true);
   });
 
+  test.each([
+    ['  postgres://db/vroom\n', 'pg'],
+    ['\t./data/vroom.db  ', 'sqlite'],
+  ])('%p is trimmed before it is read, and both checks agree', (url, kind) => {
+    expect(databaseTarget(url).kind).toBe(kind as 'pg' | 'sqlite');
+    expect(dialectFromUrl(url)).toBe(kind as 'pg' | 'sqlite');
+  });
+
+  test('a padded SQLite path opens the path without the padding', () => {
+    expect(databaseTarget('  ./data/vroom.db \n')).toEqual({
+      kind: 'sqlite',
+      path: './data/vroom.db',
+    });
+  });
+
+  test('a cause chain that loops back on itself still gives a reason', () => {
+    const first = new Error('first');
+    const second = new Error('second', { cause: first });
+    Object.assign(first, { cause: second });
+    expect(['first', 'second']).toContain(driverReason(first));
+  });
+
   test('the reason shown is the driver error under any wrapping, with its code', () => {
     const driver = Object.assign(new Error('Connection closed'), {
       code: 'ERR_POSTGRES_CONNECTION_CLOSED',
