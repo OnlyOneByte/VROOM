@@ -43,6 +43,7 @@ beforeEach(async () => {
   const claim = await ctx.authed('POST', `/api/v1/insurance/${policyId}/claims`, {
     claimDate: '2026-03-01',
     claimType: 'collision',
+    vehicleId: CAR,
   });
   const claimId = (await json<DataEnvelope<{ id: string }>>(claim)).data.id;
 
@@ -84,13 +85,9 @@ describe('photo rows on a shared car', () => {
     }
   });
 
-  test('a co-owner can read every list but claims, so the check above saw rows of each type', async () => {
+  test('a co-owner can read every list, so the check above saw rows of each type', async () => {
     for (const path of listPaths) {
       const { status, rows } = await listed(m.coOwner.request, path);
-      if (path.includes('/insurance_claim/')) {
-        expect(status, path).toBe(404);
-        continue;
-      }
       expect(status, path).toBe(200);
       expect(rows.length, path).toBe(2);
     }
