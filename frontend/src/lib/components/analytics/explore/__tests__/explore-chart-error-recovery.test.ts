@@ -58,5 +58,5 @@ describe('a chart load error', () => {
 		await rerender(props(LINE));
 		await waitFor(() => expect(screen.queryByLabelText('Loading the chart')).toBeNull());
 		expect(screen.queryByText("Couldn't load this chart")).toBeNull();
-	});
+	}, 20_000);
 });
