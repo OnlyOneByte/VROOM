@@ -270,17 +270,37 @@ describe('TagInput: errors', () => {
 });
 
 describe('TagInput: focus', () => {
-	test('the bordered box shows a ring while the input has focus', () => {
+	test('the box looks and focuses like every other input', () => {
 		const input = renderTagInput();
-		const box = input.closest('.border');
+		const box = input.closest('.min-h-11\\.5');
 
 		for (const cls of [
-			'focus-within:ring-2',
-			'focus-within:ring-ring',
-			'focus-within:ring-offset-2',
-			'ring-offset-background'
+			'bg-surface',
+			'border-[1.5px]',
+			'border-border-strong',
+			'rounded-[var(--r-md)]',
+			'focus-within:border-foreground',
+			'focus-within:ring-[3px]',
+			'focus-within:ring-ring/50'
 		]) {
-			expect(box?.className).toContain(cls);
+			expect(box?.classList).toContain(cls);
+		}
+		expect(box?.classList).not.toContain('bg-background');
+	});
+
+	test('an error keeps a 2px red border with a red ring, even while the field has focus', () => {
+		const input = renderTagInput([], { error: 'Too many tags', touched: true });
+		const box = input.closest('.min-h-11\\.5');
+
+		for (const cls of ['border-2', 'border-destructive', 'focus-within:ring-destructive/20']) {
+			expect(box?.classList).toContain(cls);
+		}
+		for (const cls of [
+			'border-[1.5px]',
+			'focus-within:border-foreground',
+			'focus-within:ring-ring/50'
+		]) {
+			expect(box?.classList).not.toContain(cls);
 		}
 	});
 });

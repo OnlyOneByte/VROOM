@@ -6,6 +6,7 @@ import { changeTracker, rateLimiter, requireAuth } from '../../middleware';
 import { authorize, ownAccount } from '../../permissions/authorize';
 import { buildPaginatedResponse } from '../../utils/pagination';
 import { commonSchemas, zValidator } from '../../utils/validation';
+import { withoutOwnerIds } from '../drivers/attribution';
 import {
   fromPhotoEntity,
   parseUploadedPhoto,
@@ -65,7 +66,8 @@ routes.get(
     const { limit, offset } = c.req.valid('query');
     const user = c.get('user');
     const result = await listPhotosForEntity(entityType, entityId, user.id, { limit, offset });
-    return c.json(buildPaginatedResponse(result.data, result.totalCount, limit, offset));
+    const rows = result.data.map((photo) => withoutOwnerIds(c, photo));
+    return c.json(buildPaginatedResponse(rows, result.totalCount, limit, offset));
   }
 );
 
@@ -83,7 +85,7 @@ routes.post('/:entityType/:entityId', photoUploadLimiter, authorize(fromPhotoEnt
   const file = await parseUploadedPhoto(c);
 
   const photo = await uploadPhotoForEntity(entityType, entityId, user.id, file);
-  return c.json({ success: true, data: photo }, 201);
+  return c.json({ success: true, data: withoutOwnerIds(c, photo) }, 201);
 });
 
 routes.get('/:entityType/:entityId/:photoId/thumbnail', authorize(fromPhotoEntity), async (c) => {

@@ -509,6 +509,22 @@ describe('ExpenseForm quick add', () => {
 		expect(categoryButton('Misc').getAttribute('aria-checked')).toBe('true');
 	});
 
+	test('on a phone the vehicle and Split share their own row; the rest wraps with the normal gap', async () => {
+		await renderCreate();
+
+		const row = await screen.findByTestId('quick-vehicle-row');
+		expect(row).toHaveClass('basis-full', 'gap-2', 'sm:contents');
+		expect(row.parentElement).toHaveClass('flex-wrap', 'gap-2');
+		expect(row.parentElement?.className).not.toMatch(/gap-y-0/);
+		expect(row.querySelector('#vehicle')).not.toBeNull();
+		expect(within(row).getByRole('button', { name: 'Split cost across vehicles' })).toBeTruthy();
+		expect(row.querySelector('#date')).toBeNull();
+
+		await fireEvent.click(categoryButton('Fuel'));
+		expect(screen.queryByTestId('quick-vehicle-row')).toBeNull();
+		expect(document.getElementById('vehicle')).not.toBeNull();
+	});
+
 	test('a category in the URL wins over the remembered one', async () => {
 		await saveMisc();
 

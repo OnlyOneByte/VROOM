@@ -244,6 +244,48 @@ describe('BackupOrchestrator.execute() outcome', () => {
     }
   });
 
+  test('an upload whose old-backup cleanup fails still counts as backed up, with a warning', async () => {
+    const { backupStrategyRegistry } = await import('../backup-strategy-registry');
+    const { ZipBackupStrategy, RETENTION_WARNING } = await import(
+      '../../providers/backup-strategies/zip-strategy'
+    );
+    const { getStorageProviderRegistry } = await import('../../providers/domains/storage/registry');
+    const { backupService } = await import('../backup');
+    backupStrategyRegistry.register('fake-zip-cleanup', new ZipBackupStrategy());
+    const upload = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockResolvedValue({
+      upload: async () => ({ externalId: 'ref-1' }),
+    } as never);
+    const zip = spyOn(backupService, 'exportAsZip').mockResolvedValue(Buffer.from('zip'));
+    const cleanup = spyOn(backupService, 'enforceRetention').mockRejectedValue(
+      new Error('AccessDenied: list not allowed')
+    );
+    try {
+      await seedEnabledProvider(ctx, 'pz', 'fake-zip-cleanup');
+      const { backupOrchestrator } = await import('../backup-orchestrator');
+      const result = (await backupOrchestrator.execute(
+        ctx.user.id,
+        'U',
+        true
+      )) as OrchestratorResult & {
+        results: Record<string, { capabilities: Record<string, { warning?: string }> }>;
+      };
+
+      expect(result.outcome).toBe('success');
+      expect(result.failedProviders).toEqual([]);
+      expect(result.results.pz?.capabilities.zip?.warning).toBe(RETENTION_WARNING);
+
+      const sync = (await ctx.sql.get('SELECT last_sync_date FROM sync_state WHERE user_id = ?', [
+        ctx.user.id,
+      ])) as { last_sync_date: string | null } | null;
+      expect(sync?.last_sync_date ?? null).not.toBeNull();
+    } finally {
+      upload.mockRestore();
+      zip.mockRestore();
+      cleanup.mockRestore();
+      unregister('fake-zip-cleanup');
+    }
+  });
+
   test('a backup refused for its credentials marks the provider as needing reconnect', async () => {
     const { backupStrategyRegistry } = await import('../backup-strategy-registry');
     backupStrategyRegistry.register('fake-revoked', {

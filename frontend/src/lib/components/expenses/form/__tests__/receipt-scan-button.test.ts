@@ -99,6 +99,18 @@ describe('ReceiptScanButton: privacy disclosure', () => {
 	});
 });
 
+describe('ReceiptScanButton: label', () => {
+	test('a phone shows "Scan" with a scan icon, and the button is still named "Scan receipt"', () => {
+		mount();
+		expect(screen.getByRole('button', { name: 'Scan receipt' })).toBe(scanButton());
+		const visible = [...scanButton().querySelectorAll('span')].find(
+			span => !span.classList.contains('max-sm:sr-only')
+		);
+		expect(visible?.firstChild?.textContent).toBe('Scan');
+		expect(scanButton().querySelector('svg')?.getAttribute('class')).toContain('lucide-scan-text');
+	});
+});
+
 describe('ReceiptScanButton: scanning', () => {
 	test('only accepts images and prefers the rear camera', () => {
 		mount();

@@ -10,6 +10,9 @@ import { storageProviderRegistry } from '../domains/storage/registry';
 import { credentialCodeOf, type StorageProvider } from '../domains/storage/storage-provider';
 import { healthFailure } from '../provider-status';
 
+export const RETENTION_WARNING =
+  "Backed up, but old backups couldn't be removed. The storage key needs permission to list and delete files.";
+
 export async function uploadZipBackup(
   context: BackupStrategyContext,
   createProvider: () => StorageProvider | Promise<StorageProvider>
@@ -34,13 +37,21 @@ export async function uploadZipBackup(
       rawPath: folderPath,
     });
 
-    const deletedOldBackups = await backupService.enforceRetention(
-      context.userId,
-      context.providerId
-    );
+    let deletedOldBackups = 0;
+    let warning: string | undefined;
+    try {
+      deletedOldBackups = await backupService.enforceRetention(context.userId, context.providerId);
+    } catch (error) {
+      logger.warn('Old backup cleanup failed for provider', {
+        providerId: context.providerId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      warning = RETENTION_WARNING;
+    }
 
     return {
       success: true,
+      ...(warning && { warning }),
       metadata: {
         fileRef: ref.externalId,
         fileName,

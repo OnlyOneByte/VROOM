@@ -5,6 +5,7 @@ import {
   GoogleDriveStrategy,
   type GoogleDriveStrategyDeps,
 } from '../backup-strategies/google-drive-strategy';
+import { RETENTION_WARNING } from '../backup-strategies/zip-strategy';
 import type { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
 import { healthFailure } from '../provider-status';
 import type { GoogleSheetsService } from '../services/google-sheets-service';
@@ -76,6 +77,26 @@ describe('GoogleDriveStrategy', () => {
     expect(result.capabilities.sheets).toBeUndefined();
     expect(mockUpload).toHaveBeenCalledTimes(1);
     expect(mockEnforceRetention).toHaveBeenCalledTimes(1);
+  });
+
+  test('a failed cleanup of old backups keeps the upload a success, with a warning', async () => {
+    backupService.enforceRetention = mock(() =>
+      Promise.reject(new Error('AccessDenied: list not allowed'))
+    ) as typeof backupService.enforceRetention;
+
+    const result = await strategy.execute(createContext());
+
+    expect(result.success).toBe(true);
+    expect(result.capabilities.zip?.success).toBe(true);
+    expect(result.capabilities.zip?.warning).toBe(RETENTION_WARNING);
+    expect(result.capabilities.zip?.metadata?.fileRef).toBe('file-ref-123');
+    expect(result.capabilities.zip?.metadata?.deletedOldBackups).toBe(0);
+    expect(mockUpload).toHaveBeenCalledTimes(1);
+  });
+
+  test('a successful cleanup carries no warning', async () => {
+    const result = await strategy.execute(createContext());
+    expect(result.capabilities.zip?.warning).toBeUndefined();
   });
 
   test('a revoked sign-in fails the ZIP upload as an auth failure with the reconnect message', async () => {

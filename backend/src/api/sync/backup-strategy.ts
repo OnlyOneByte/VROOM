@@ -16,6 +16,7 @@ export interface BackupCapabilityResult {
   success: boolean;
   message?: string;
   failure?: 'auth' | 'permission';
+  warning?: string;
   metadata?: Record<string, unknown>;
 }
 

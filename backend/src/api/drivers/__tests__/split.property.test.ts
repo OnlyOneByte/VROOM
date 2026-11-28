@@ -71,7 +71,7 @@ describe('split rules', () => {
     );
   });
 
-  test('split evenly or by fixed shares, nothing is unassigned and a refund is shared as a refund', () => {
+  test('with every driver active, split evenly or by fixed shares, nothing is unassigned and a refund is shared as a refund', () => {
     const shared = fc.constantFrom<GroupRule>(
       { kind: 'equal' },
       { kind: 'fixed', shares: { a: 70, b: 20, c: 10 } }
