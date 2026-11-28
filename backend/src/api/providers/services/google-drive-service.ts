@@ -1,6 +1,7 @@
 import { type drive_v3, google } from 'googleapis';
 import { CONFIG } from '../../../config';
 import { SyncError, SyncErrorCode } from '../../../errors';
+import { OPERATION_TIMEOUTS } from '../../../utils/timeout';
 
 interface DriveFolder {
   id: string;
@@ -43,7 +44,11 @@ export class GoogleDriveService {
       refresh_token: refreshToken,
     });
 
-    this.drive = google.drive({ version: 'v3', auth: oauth2Client });
+    this.drive = google.drive({
+      version: 'v3',
+      auth: oauth2Client,
+      timeout: OPERATION_TIMEOUTS.DOWNLOAD,
+    });
   }
 
   async findFolder(name: string, parentId?: string): Promise<DriveFolder | null> {

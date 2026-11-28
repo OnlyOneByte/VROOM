@@ -28,7 +28,7 @@ import {
 } from '../../../utils/outbound-url';
 import { resolveModelSettings } from '../domains/model/model-registry';
 import { postModelJson } from '../domains/model/model-transport';
-import { s3RequestHandlerFor } from '../domains/storage/s3-compat-provider';
+import { s3RequestHandlerFor, s3RequestTimeoutMs } from '../domains/storage/s3-compat-provider';
 import { healthCodeOf } from '../provider-status';
 
 let ctx: TestApp;
@@ -736,5 +736,38 @@ describe('with ADMIN_EMAILS set, only admins reach private targets', () => {
     } finally {
       endpoints.privateProviderEndpoints = before;
     }
+  });
+});
+
+describe('S3 request deadlines', () => {
+  test('every request gets a deadline, longer for a large upload', () => {
+    expect(s3RequestTimeoutMs(0)).toBe(5 * 60_000);
+    expect(s3RequestTimeoutMs(10 * 1024 * 1024)).toBe(5 * 60_000);
+    const backup = s3RequestTimeoutMs(50 * 1024 * 1024);
+    expect(backup).toBeGreaterThan(5 * 60_000);
+    expect(backup).toBeLessThan(10 * 60_000);
+  });
+
+  test('the request is sent with an abort signal that follows the caller', async () => {
+    outboundResolver.lookup = async () => ['93.184.215.14'];
+    let signal: AbortSignal | undefined;
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      return new Response(null, { status: 200 });
+    }) as typeof fetch;
+    const caller = new AbortController();
+    const handler = s3RequestHandlerFor(await privateEndpointPolicy()) as unknown as {
+      handle: (request: unknown, options: { abortSignal: AbortSignal }) => Promise<unknown>;
+    };
+
+    await handler.handle(
+      { protocol: 'https:', hostname: 'files.example.com', path: '/k', method: 'GET', headers: {} },
+      { abortSignal: caller.signal }
+    );
+
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(false);
+    caller.abort();
+    expect(signal?.aborted).toBe(true);
   });
 });

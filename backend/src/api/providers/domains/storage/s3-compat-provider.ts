@@ -14,6 +14,7 @@ import { ValidationError } from '../../../../errors';
 import { logger } from '../../../../utils/logger';
 import { fetchOutbound, type PrivateEndpointPolicy } from '../../../../utils/outbound-url';
 import { assertSafeStoragePath } from '../../../../utils/paths';
+import { OPERATION_TIMEOUTS } from '../../../../utils/timeout';
 import type {
   StorageFileInfo,
   StorageProvider,
@@ -88,18 +89,38 @@ async function requestBody(body: unknown): Promise<RequestInit['body'] | undefin
   return body as RequestInit['body'];
 }
 
+const SLOWEST_UPLOAD_BYTES_PER_MS = 100;
+
+export function s3RequestTimeoutMs(bodyBytes: number): number {
+  return Math.max(OPERATION_TIMEOUTS.DOWNLOAD, 60_000 + bodyBytes / SLOWEST_UPLOAD_BYTES_PER_MS);
+}
+
+function bodyLength(body: RequestInit['body'] | undefined): number {
+  if (body instanceof Uint8Array) return body.byteLength;
+  return typeof body === 'string' ? Buffer.byteLength(body) : 0;
+}
+
+function withRequestTimeout(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
 export function s3RequestHandlerFor(policy: PrivateEndpointPolicy) {
   return {
     async handle(request: S3WireRequest, options?: { abortSignal?: unknown }) {
       const port = request.port ? `:${request.port}` : '';
       const url = `${request.protocol}//${request.hostname}${port}${request.path}${buildQuery(request.query)}`;
+      const body = await requestBody(request.body);
       const res = await fetchOutbound(
         url,
         {
           method: request.method,
           headers: request.headers,
-          signal: options?.abortSignal as AbortSignal | undefined,
-          body: await requestBody(request.body),
+          signal: withRequestTimeout(
+            options?.abortSignal as AbortSignal | undefined,
+            s3RequestTimeoutMs(bodyLength(body))
+          ),
+          body,
         },
         'S3 endpoint',
         policy
