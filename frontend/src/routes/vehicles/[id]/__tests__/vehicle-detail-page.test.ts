@@ -59,7 +59,9 @@ vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => capture('media
 vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => captureWithMarker('insurance'));
 
 const getExpensesByVehicle = vi.fn();
-const getMonthlyTotals = vi.fn((..._args: unknown[]) => Promise.resolve([]));
+const getMonthlyTotals = vi.fn((..._args: unknown[]) =>
+	Promise.resolve([] as Array<{ month: string; amount: number }>)
+);
 const updateExpense = vi.fn((..._args: unknown[]) => new Promise(() => {}));
 const getExpenseSummary = vi.fn();
 const downloadExpensesCsv = vi.fn();

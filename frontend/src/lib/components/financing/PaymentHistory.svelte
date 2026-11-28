@@ -41,13 +41,10 @@
 		<ul class="divide-y divide-border" aria-labelledby="payment-history-heading">
 			{#each shown as payment (payment.expense.id)}
 				{@const date = formatDate(new Date(payment.expense.date))}
-				<li
-					class="flex items-center justify-between gap-4 py-3"
-					aria-label="Payment {payment.paymentNumber} on {date}"
-				>
+				<li class="flex items-center justify-between gap-4 py-3">
 					<div class="min-w-0">
 						<p class="font-semibold">
-							<span aria-label="Payment number {payment.paymentNumber}">
+							<span data-testid="payment-number">
 								#{payment.paymentNumber}
 							</span>
 							· <time datetime={new Date(payment.expense.date).toISOString()}>{date}</time>
@@ -63,7 +60,7 @@
 						{/if}
 					</div>
 					<div class="shrink-0 text-right">
-						<p class="font-semibold tabular-nums" aria-label="Payment amount">
+						<p class="font-semibold tabular-nums" data-testid="payment-amount">
 							{formatCurrency(payment.expense.amount)}
 						</p>
 						<p class="text-xs font-semibold text-muted-foreground tabular-nums">
@@ -74,7 +71,12 @@
 			{/each}
 		</ul>
 		{#if hidden > 0 || showAll}
-			<Button variant="ghost" class="-ml-3" onclick={() => (showAll = !showAll)}>
+			<Button
+				variant="ghost"
+				class="-ml-3"
+				aria-expanded={showAll}
+				onclick={() => (showAll = !showAll)}
+			>
 				{showAll ? 'Show fewer' : `Show all ${sortedPayments.length}`}
 			</Button>
 		{/if}

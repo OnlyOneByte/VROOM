@@ -123,20 +123,23 @@
 						class="ml-1 text-sm font-normal {pressing
 							? 'text-destructive'
 							: 'text-muted-foreground'}"
-						role="status"
-						aria-live="polite"
+						data-testid="payment-countdown"
 					>
 						{countdownText}
 					</span>
 				</p>
-				{#if split}
+				{#if split && split.principal > 0}
 					<p class="text-sm text-muted-foreground">
 						{formatCurrency(split.principal)} principal · {formatCurrency(split.interest)} interest
+					</p>
+				{:else if split}
+					<p class="text-sm text-destructive">
+						Doesn't cover this month's {formatCurrency(split.interest)} interest
 					</p>
 				{/if}
 			</div>
 			<div class="shrink-0 text-right">
-				<p class="font-semibold tabular-nums" aria-label="Payment amount">
+				<p class="font-semibold tabular-nums" data-testid="payment-amount">
 					{formatCurrency(financing.paymentAmount)}
 				</p>
 				{#if showMinimum}

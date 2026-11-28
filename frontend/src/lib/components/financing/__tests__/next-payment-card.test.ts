@@ -43,7 +43,7 @@ function mount(
 }
 
 function countdown(): HTMLElement {
-	return screen.getByRole('status');
+	return screen.getByTestId('payment-countdown');
 }
 
 function rows(): string[] {
@@ -113,12 +113,25 @@ describe('Next payment amounts', () => {
 			'Jul 10, 2025 Due in 25 days $325.00 principal · $75.00 interest $400.00 Min: $386.66',
 			'Loan terms 6% APR · 60 months'
 		]);
-		expect(screen.getByLabelText('Payment amount').textContent?.trim()).toBe('$400.00');
+		expect(screen.getByTestId('payment-amount').textContent?.trim()).toBe('$400.00');
 	});
 
 	test('paying exactly the minimum shows no minimum', () => {
 		mount({ financing: makeLoan({ paymentAmount: 386.66 }) });
 		expect(screen.queryByText(/Min:/)).toBeNull();
+	});
+
+	test('a payment smaller than the month’s interest says so, rather than $0 principal', () => {
+		mount({ financing: makeLoan({ apr: 36, paymentAmount: 400 }), showProgress: false });
+		expect(rows()[0]).toContain("Doesn't cover this month's $450.00 interest");
+		expect(rows()[0]).not.toContain('principal');
+	});
+
+	test('the countdown is plain text, not a live region, and the amount has no replacing label', () => {
+		const { container } = mount();
+		expect(screen.queryByRole('status')).toBeNull();
+		expect(container.querySelector('[aria-live]')).toBeNull();
+		expect(screen.getByTestId('payment-amount').getAttribute('aria-label')).toBeNull();
 	});
 
 	test('a zero-APR loan has no minimum, no split and no APR', () => {
@@ -159,7 +172,7 @@ describe('Next payment amounts', () => {
 	test('formats amounts in the user currency', () => {
 		store.currencyUnit = 'EUR';
 		mount();
-		expect(screen.getByLabelText('Payment amount').textContent?.trim()).toBe('€400.00');
+		expect(screen.getByTestId('payment-amount').textContent?.trim()).toBe('€400.00');
 		expect(screen.getByText('Min: €386.66')).toBeTruthy();
 		expect(screen.queryByText(/\$/)).toBeNull();
 	});
