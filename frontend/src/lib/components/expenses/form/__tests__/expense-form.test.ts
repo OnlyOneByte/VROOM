@@ -687,6 +687,25 @@ describe('ExpenseForm edit mode', () => {
 		expect(notificationMessages()).toEqual([]);
 	});
 
+	test("a whole amount opens with the currency's decimals, and saving it unchanged sends the same number", async () => {
+		updateExpense.mockResolvedValue({ ...EXISTING, amount: 60 });
+		await renderEdit({ ...EXISTING, amount: 60 });
+
+		await vi.waitFor(() => expect(field('amount').value).toBe('60.00'));
+		await save();
+
+		await vi.waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(1));
+		expect(updateExpense.mock.calls[0]?.[1]).toMatchObject({ amount: 60 });
+		resetPendingEdits();
+	});
+
+	test('a car whose owner counts in yen opens its amount with no decimals', async () => {
+		getVehicles.mockResolvedValue([{ ...CAMRY, ownerCurrency: 'JPY' } as Vehicle, LEAF]);
+		await renderEdit({ ...EXISTING, amount: 1200 });
+
+		await vi.waitFor(() => expect(field('amount').value).toBe('1200'));
+	});
+
 	test('saving sends the edited expense to updateExpense and returns', async () => {
 		updateExpense.mockResolvedValue({ ...EXISTING, amount: 85 });
 		await renderEdit(EXISTING, '/vehicles/v1');
@@ -718,7 +737,7 @@ describe('ExpenseForm edit mode', () => {
 
 		await renderEdit();
 
-		await vi.waitFor(() => expect(field('amount').value).toBe('85'));
+		await vi.waitFor(() => expect(field('amount').value).toBe('85.00'));
 		resetPendingEdits();
 	});
 
@@ -826,7 +845,7 @@ describe('ExpenseForm receipt scanning', () => {
 			vendor: 'Jiffy Lube'
 		});
 
-		await vi.waitFor(() => expect(field('amount').value).toBe('64.2'));
+		await vi.waitFor(() => expect(field('amount').value).toBe('64.20'));
 		expect(field('description').value).toBe('Jiffy Lube');
 		expect(categoryButton('Maintenance').getAttribute('aria-checked')).toBe('true');
 		expect(screen.getByText('1 file queued. Will upload on save.')).toBeTruthy();
