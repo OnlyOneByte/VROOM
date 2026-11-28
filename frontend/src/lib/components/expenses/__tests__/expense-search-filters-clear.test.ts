@@ -24,7 +24,11 @@ function renderFilters() {
 		searchTerm: '',
 		filters: {},
 		expenses: EXPENSES,
+		category: '',
+		sort: 'date-desc',
 		onSearchChange: vi.fn(),
+		onCategoryChange: vi.fn(),
+		onSortChange: vi.fn(),
 		onClearFilters: vi.fn()
 	});
 }

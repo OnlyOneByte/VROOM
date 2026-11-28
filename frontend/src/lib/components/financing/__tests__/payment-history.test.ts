@@ -51,12 +51,11 @@ describe('Payment history', () => {
 			makeEntry({ paymentNumber: 2, expense: { id: 'b', date: localNoon(2025, 2, 10) } })
 		]);
 		expect(screen.getByText('3 payments recorded')).toBeTruthy();
-		expect(rows().map(r => within(r).getByLabelText(/^Payment number/).textContent)).toEqual([
+		expect(rows().map(r => within(r).getByTestId('payment-number').textContent)).toEqual([
 			'#3',
 			'#2',
 			'#1'
 		]);
-		expect(screen.getByLabelText('Payment 3 on Apr 10, 2025')).toBeTruthy();
 	});
 
 	test('one row per payment: number, date, split, amount and what was left', () => {
@@ -92,7 +91,7 @@ describe('Payment history', () => {
 	test('formats amounts in the user currency', () => {
 		store.currencyUnit = 'EUR';
 		mount([makeEntry({ remainingBalance: 19_700 })]);
-		expect(screen.getByLabelText('Payment amount').textContent?.trim()).toBe('€400.00');
+		expect(screen.getByTestId('payment-amount').textContent?.trim()).toBe('€400.00');
 		expect(screen.getByText('€19,700.00')).toBeTruthy();
 		expect(screen.queryByText(/\$/)).toBeNull();
 	});
@@ -121,14 +120,29 @@ describe('Payment history length', () => {
 	test('shows the latest 6 in the page, with no scroll box, and "Show all" lists the rest', async () => {
 		const { container } = mount(monthlyEntries(24));
 		expect(rows()).toHaveLength(6);
-		expect(within(rows()[0]!).getByLabelText(/^Payment number/).textContent).toBe('#24');
+		expect(within(rows()[0]!).getByTestId('payment-number').textContent).toBe('#24');
 		expect(
 			container.querySelector('[class*="overflow-y-auto"], [data-slot="scroll-area"]')
 		).toBeNull();
-		await fireEvent.click(screen.getByRole('button', { name: 'Show all 24' }));
+		const toggle = screen.getByRole('button', { name: 'Show all 24' });
+		expect(toggle.getAttribute('aria-expanded')).toBe('false');
+		await fireEvent.click(toggle);
 		expect(rows()).toHaveLength(24);
+		expect(screen.getByRole('button', { name: 'Show fewer' }).getAttribute('aria-expanded')).toBe(
+			'true'
+		);
 		await fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }));
 		expect(rows()).toHaveLength(6);
+	});
+
+	test('rows carry no label that would replace what a screen reader reads', () => {
+		mount(monthlyEntries(2));
+		for (const row of rows()) {
+			expect(row.getAttribute('aria-label')).toBeNull();
+			expect(
+				row.querySelectorAll('p[aria-label]:not([role]), span[aria-label]:not([role])')
+			).toHaveLength(0);
+		}
 	});
 
 	test('6 or fewer payments show with no toggle', () => {

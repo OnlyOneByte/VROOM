@@ -42,6 +42,8 @@
 	let totalCount = $state(0);
 
 	let distLabel = $derived(getDistanceUnitLabel(settingsStore.unitPreferences.distanceUnit, true));
+	let loggable = $derived(vehicles.filter(v => v.sharedAccess?.level !== 'viewer'));
+	let editable = $derived(new Set(loggable.map(v => v.id)));
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 	let vehicleDistLabels = $derived(
 		new Map(
@@ -106,7 +108,7 @@
 		try {
 			const [tripPage, vehicleList, tripSummary] = await Promise.all([
 				tripApi.list({ limit: 100 }),
-				vehicleApi.getVehicles(),
+				vehicleApi.getVehicles({ includeShared: true }),
 				tripApi.getSummary()
 			]);
 			trips = tripPage.data;
@@ -213,10 +215,12 @@
 			</p>
 		</div>
 		<div class="flex shrink-0 items-center gap-2">
-			<Button variant="ghost" size="icon" aria-label="Edit trip" onclick={() => openEdit(trip)}>
-				<Pencil class="h-4 w-4" />
-			</Button>
-			{#if authStore.user?.demo !== true}
+			{#if editable.has(trip.vehicleId)}
+				<Button variant="ghost" size="icon" aria-label="Edit trip" onclick={() => openEdit(trip)}>
+					<Pencil class="h-4 w-4" />
+				</Button>
+			{/if}
+			{#if authStore.user?.demo !== true && editable.has(trip.vehicleId)}
 				<Button
 					variant="ghost"
 					size="icon"
@@ -234,7 +238,7 @@
 <div class="mx-auto max-w-5xl space-y-6">
 	<PageHeader title="Trips" description="Track mileage and trips across your vehicles">
 		{#snippet actions()}
-			{#if !isLoading && !loadError && trips.length > 0 && vehicles.length > 0}
+			{#if !isLoading && !loadError && trips.length > 0 && loggable.length > 0}
 				<Button size="lg" onclick={openCreate}>
 					<Plus class="mr-2 h-4 w-4" />
 					Log Trip
@@ -271,10 +275,12 @@
 				build a mileage-reimbursement report and feed your vehicle's odometer history.
 			{/snippet}
 			{#snippet action()}
-				<Button size="lg" onclick={openCreate}>
-					<Plus class="mr-2 h-4 w-4" />
-					Log Trip
-				</Button>
+				{#if loggable.length > 0}
+					<Button size="lg" onclick={openCreate}>
+						<Plus class="mr-2 h-4 w-4" />
+						Log Trip
+					</Button>
+				{/if}
 			{/snippet}
 		</EmptyState>
 	{:else}
@@ -306,7 +312,7 @@
 		</Card.Root>
 	{/if}
 
-	<TripForm bind:open={formOpen} {vehicles} trip={editingTrip} onSaved={load} />
+	<TripForm bind:open={formOpen} vehicles={loggable} trip={editingTrip} onSaved={load} />
 
 	<ConfirmDialog
 		bind:open={deleteOpen}

@@ -22,7 +22,7 @@ vi.mock('#lib/components/trips/TripForm.svelte', () => ({
 const list = vi.fn<(filters?: TripListFilters) => Promise<PaginatedResponse<Trip>>>();
 const getSummary = vi.fn<() => Promise<TripSummary>>();
 const deleteTrip = vi.fn<(id: string, keepOdometer?: boolean) => Promise<void>>();
-const getVehicles = vi.fn<() => Promise<Vehicle[]>>();
+const getVehicles = vi.fn<(opts?: { includeShared?: boolean }) => Promise<Vehicle[]>>();
 
 vi.mock('#lib/services/trip-api.ts', () => ({
 	tripApi: {
@@ -33,7 +33,7 @@ vi.mock('#lib/services/trip-api.ts', () => ({
 }));
 
 vi.mock('#lib/services/vehicle-api.ts', () => ({
-	vehicleApi: { getVehicles: () => getVehicles() }
+	vehicleApi: { getVehicles: (opts?: { includeShared?: boolean }) => getVehicles(opts) }
 }));
 
 import Page from '../+page.svelte';
@@ -420,5 +420,43 @@ describe('trips page in the demo', () => {
 		} finally {
 			signOut();
 		}
+	});
+});
+
+describe('trips on cars shared with you', () => {
+	const SHARED_VIEW = {
+		...CAMRY,
+		id: 'v9',
+		nickname: 'Family van',
+		sharedAccess: { level: 'viewer', sharedBy: 'Sam', seesFinancials: false }
+	} as Vehicle;
+
+	test('the page loads shared cars along with your own', async () => {
+		render(Page);
+		await settle();
+
+		expect(getVehicles).toHaveBeenCalledWith({ includeShared: true });
+	});
+
+	test('a trip on a car you can only view has no Edit or Delete, and the form leaves that car out', async () => {
+		getVehicles.mockResolvedValue([CAMRY, SHARED_VIEW]);
+		list.mockResolvedValue(tripPage([trip({ id: 't9', vehicleId: 'v9' })]));
+		render(Page);
+		await settle();
+
+		const card = within(screen.getByTestId('trip-card-t9'));
+		expect(cardText('t9')).toContain('Family van');
+		expect(card.queryByRole('button', { name: 'Edit trip' })).toBeNull();
+		expect(card.queryByRole('button', { name: 'Delete trip' })).toBeNull();
+		expect((formProps['vehicles'] as Vehicle[]).map(v => v.id)).toEqual(['v1']);
+	});
+
+	test('with only view access there is nothing to log a trip on', async () => {
+		getVehicles.mockResolvedValue([SHARED_VIEW]);
+		list.mockResolvedValue(tripPage([trip({ id: 't9', vehicleId: 'v9' })]));
+		render(Page);
+		await settle();
+
+		expect(screen.queryByRole('button', { name: /Log Trip/ })).toBeNull();
 	});
 });

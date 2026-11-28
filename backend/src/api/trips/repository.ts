@@ -1,15 +1,23 @@
-import { and, asc, count, desc, eq, gt, gte, lt, ne } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, inArray, lt, ne, or, type SQL } from 'drizzle-orm';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
+import { sqlFalse } from '../../db/dialect';
 import { firstRow } from '../../db/first-row';
 import type { NewTrip, Trip } from '../../db/schema';
 import { trips, vehicles } from '../../db/schema';
 import { DEFAULT_UNIT_PREFERENCES, type DistanceUnit, parseUnitPreferences } from '../../types';
 import { BaseRepository } from '../../utils/repository';
-import { ownedVehiclesScope } from '../../utils/vehicle-access';
+import { ownedVehiclesScope, type ReadableVehicle } from '../../utils/vehicle-access';
 import { localDayWindow } from '../odometer/repository';
 
 export function tripDistance(trip: Pick<Trip, 'startOdometer' | 'endOdometer'>): number {
   return Math.max(0, trip.endOdometer - trip.startOdometer);
+}
+
+function readableTripsScope(readable: readonly ReadableVehicle[]): SQL {
+  if (readable.length === 0) return sqlFalse();
+  return or(
+    ...readable.map((v) => and(eq(trips.vehicleId, v.vehicleId), eq(trips.userId, v.ownerId)))
+  ) as SQL;
 }
 
 interface TripFilters {
@@ -99,11 +107,49 @@ export class TripRepository extends BaseRepository<Trip, NewTrip> {
       .orderBy(desc(trips.tripDate));
   }
 
-  async findVehicleDistanceUnits(userId: string): Promise<Map<string, DistanceUnit>> {
+  async findReadable(readable: readonly ReadableVehicle[]): Promise<Trip[]> {
+    return this.db
+      .select()
+      .from(trips)
+      .where(readableTripsScope(readable))
+      .orderBy(desc(trips.tripDate));
+  }
+
+  async findReadablePaginated(
+    readable: readonly ReadableVehicle[],
+    limit: number,
+    offset: number,
+    purpose?: string
+  ): Promise<{ data: Trip[]; totalCount: number }> {
+    const where = and(
+      readableTripsScope(readable),
+      purpose ? eq(trips.purpose, purpose) : undefined
+    );
+    const data = await this.db
+      .select()
+      .from(trips)
+      .where(where)
+      .orderBy(desc(trips.tripDate))
+      .limit(limit)
+      .offset(offset);
+    const [result] = await this.db.select({ count: count() }).from(trips).where(where);
+    return { data, totalCount: result?.count ?? 0 };
+  }
+
+  async findVehicleDistanceUnits(
+    userId: string,
+    vehicleIds?: readonly string[]
+  ): Promise<Map<string, DistanceUnit>> {
     const rows = await this.db
       .select({ id: vehicles.id, unitPreferences: vehicles.unitPreferences })
       .from(vehicles)
-      .where(ownedVehiclesScope(userId));
+      .where(
+        vehicleIds
+          ? vehicleIds.length
+            ? inArray(vehicles.id, [...vehicleIds])
+            : sqlFalse()
+          : ownedVehiclesScope(userId)
+      );
     return new Map(
       rows.map((row) => [
         row.id,
