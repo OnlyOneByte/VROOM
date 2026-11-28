@@ -3,7 +3,7 @@ import { CONFIG } from '../../config';
 import type { AsyncAppDatabase, AsyncHandle } from '../../db/async-sqlite';
 import type { NewReminder, Reminder, ReminderNotification } from '../../db/schema';
 import { reminderNotifications, reminders, reminderVehicles } from '../../db/schema';
-import { DatabaseError, isUniqueConstraintError, NotFoundError } from '../../errors';
+import { DatabaseError, NotFoundError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { BaseRepository } from '../../utils/repository';
 import { absoluteTotalAfterPrune, pruneVehicleFromSplitConfig } from './split-config-helpers';
@@ -192,9 +192,6 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
         .returning();
       return created ?? null;
     } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        return null;
-      }
       throw new DatabaseError('Failed to create mileage notification', error);
     }
   }
