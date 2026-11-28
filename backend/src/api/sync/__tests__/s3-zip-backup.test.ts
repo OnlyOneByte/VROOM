@@ -7,7 +7,10 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 import { GoogleDriveStrategy } from '../../providers/backup-strategies/google-drive-strategy';
-import { ZipBackupStrategy } from '../../providers/backup-strategies/zip-strategy';
+import {
+  RETENTION_WARNING,
+  ZipBackupStrategy,
+} from '../../providers/backup-strategies/zip-strategy';
 import { FakeStorageProvider } from '../../providers/domains/storage/fake-provider';
 import {
   getStorageProviderRegistry,
@@ -150,6 +153,25 @@ describe('ZIP backups to an S3 provider', () => {
     const names = (await bucket.list('VROOM/Backups')).map((f) => f.name);
     expect(names).toHaveLength(1);
     expect(names[0]).not.toBe('vroom-backup-old.zip');
+  });
+
+  test('a key that can upload but not list still counts the backup, with a cleanup warning', async () => {
+    spyOn(bucket, 'list').mockRejectedValue(new Error('AccessDenied: ListBucket'));
+
+    const res = await ctx.authed('POST', '/api/v1/sync', { syncTypes: ['backup'], force: true });
+    expect(res.status).toBe(200);
+    const body =
+      await json<
+        DataEnvelope<{
+          outcome: string;
+          failedProviders: string[];
+          results: Record<string, { success: boolean; warning?: string }>;
+        }>
+      >(res);
+    expect(body.data.outcome).toBe('success');
+    expect(body.data.failedProviders).toEqual([]);
+    expect(body.data.results['p-s3']).toMatchObject({ success: true, warning: RETENTION_WARNING });
+    expect(await lastBackupDate()).toBeTruthy();
   });
 
   test('a stale ZIP setting on a photo-only provider is ignored, so the run still succeeds', async () => {

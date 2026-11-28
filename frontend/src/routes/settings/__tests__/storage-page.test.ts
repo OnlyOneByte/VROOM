@@ -228,6 +228,24 @@ describe('Backups and storage page backups', () => {
 		expect(toast.success).toHaveBeenCalledWith('Backed up to 2 places', { id: 'toast-1' });
 	});
 
+	test('a successful run that could not clean up old backups says so once', async () => {
+		const warning = "Older backups couldn't be cleaned up.";
+		const result = orchestratorResult('success', { p1: true, p2: true });
+		settingsStoreFake.executeSync.mockResolvedValue({
+			...result,
+			results: {
+				p1: { ...result.results.p1, warning },
+				p2: { ...result.results.p2, warning }
+			}
+		});
+		await mount();
+		await backUpNow();
+		expect(toast.warning).toHaveBeenCalledWith(`Backed up to 2 places. ${warning}`, {
+			id: 'toast-1'
+		});
+		expect(toast.success).not.toHaveBeenCalled();
+	});
+
 	test('a partial run names the failed provider and says the rest succeeded', async () => {
 		getProviders.mockResolvedValue([
 			{ id: 'p1', displayName: 'Family Drive' } as UserProviderInfo,

@@ -9,6 +9,23 @@ import type {
 import { storageProviderRegistry } from '../domains/storage/registry';
 import type { StorageProvider } from '../domains/storage/storage-provider';
 
+export const RETENTION_WARNING =
+  "Older backups couldn't be cleaned up. Give the storage key permission to list and delete files.";
+
+async function enforceRetentionSafely(
+  context: BackupStrategyContext
+): Promise<{ deleted: number; warning?: string }> {
+  try {
+    return { deleted: await backupService.enforceRetention(context.userId, context.providerId) };
+  } catch (error) {
+    logger.warn('Backup retention failed for provider', {
+      providerId: context.providerId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { deleted: 0, warning: RETENTION_WARNING };
+  }
+}
+
 export async function uploadZipBackup(
   context: BackupStrategyContext,
   createProvider: () => StorageProvider | Promise<StorageProvider>
@@ -33,17 +50,15 @@ export async function uploadZipBackup(
       rawPath: folderPath,
     });
 
-    const deletedOldBackups = await backupService.enforceRetention(
-      context.userId,
-      context.providerId
-    );
+    const retention = await enforceRetentionSafely(context);
 
     return {
       success: true,
+      ...(retention.warning ? { warning: retention.warning } : {}),
       metadata: {
         fileRef: ref.externalId,
         fileName,
-        deletedOldBackups,
+        deletedOldBackups: retention.deleted,
       },
     };
   } catch (error) {
@@ -70,6 +85,11 @@ export class ZipBackupStrategy implements BackupStrategy {
     const zip = await uploadZipBackup(context, () =>
       storageProviderRegistry.createProviderInstance(context.providerRow)
     );
-    return { success: zip.success, message: zip.message, capabilities: { zip } };
+    return {
+      success: zip.success,
+      message: zip.message,
+      ...(zip.warning ? { warning: zip.warning } : {}),
+      capabilities: { zip },
+    };
   }
 }

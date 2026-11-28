@@ -168,8 +168,16 @@
 		try {
 			const data = await settingsStore.executeSync(['backup'], true, providerIds);
 			const providers = (count: number) => `${count} place${count === 1 ? '' : 's'}`;
+			const warnings = [
+				...new Set(Object.values(data.results).flatMap(r => (r.warning ? [r.warning] : [])))
+			];
 
-			if (data.outcome === 'success') {
+			if (data.outcome === 'success' && warnings.length > 0) {
+				toast.warning(
+					`Backed up to ${providers(Object.keys(data.results).length)}. ${warnings.join(' ')}`,
+					{ id: toastId }
+				);
+			} else if (data.outcome === 'success') {
 				toast.success(`Backed up to ${providers(Object.keys(data.results).length)}`, {
 					id: toastId
 				});

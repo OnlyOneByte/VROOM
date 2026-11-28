@@ -75,6 +75,7 @@ export interface BackupOrchestratorResult {
 		{
 			success: boolean;
 			message?: string;
+			warning?: string;
 			unusable?: boolean;
 			capabilities: Record<
 				string,

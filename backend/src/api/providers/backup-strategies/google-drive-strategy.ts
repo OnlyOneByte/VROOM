@@ -45,9 +45,11 @@ export class GoogleDriveStrategy implements BackupStrategy {
     // A partial success advances the sync anchor, so any failed capability must fail the run.
     const attempted = Object.values(capabilities);
     const failed = attempted.filter((c) => !c.success);
+    const warnings = attempted.flatMap((c) => (c.warning ? [c.warning] : []));
     return {
       success: failed.length === 0,
       message: failed.length > 0 ? failed.map((c) => c.message).join('; ') : undefined,
+      ...(warnings.length > 0 ? { warning: warnings.join(' ') } : {}),
       capabilities,
     };
   }
