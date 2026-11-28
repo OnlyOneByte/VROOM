@@ -2,6 +2,7 @@ import type { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import { CONFIG } from '../../../config';
 import { SyncError, SyncErrorCode } from '../../../errors';
+import { OPERATION_TIMEOUTS } from '../../../utils/timeout';
 import { credentialFailureOf } from '../domains/storage/storage-provider';
 
 const PHOTOS_API = 'https://photoslibrary.googleapis.com';
@@ -127,7 +128,11 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
     const token = await accessToken();
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Bearer ${token}`);
-    const res = await fetch(url, { ...init, headers });
+    const res = await fetch(url, {
+      ...init,
+      headers,
+      signal: AbortSignal.timeout(OPERATION_TIMEOUTS.DOWNLOAD),
+    });
     if (!res.ok) {
       throw new SyncError(
         res.status === 401 || res.status === 403
@@ -143,6 +148,7 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
     async uploadBytes(buffer, mimeType, fileName) {
       const token = await accessToken();
       const res = await fetch(`${PHOTOS_API}/v1/uploads`, {
+        signal: AbortSignal.timeout(OPERATION_TIMEOUTS.DOWNLOAD),
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -203,7 +209,9 @@ function createRealPhotosClient(refreshToken: string): PhotosClient {
         throw new SyncError(SyncErrorCode.NETWORK_ERROR, 'Media item has no baseUrl');
       }
       // Google Photos '=d' suffix returns the original bytes, not a resized rendition.
-      const bytes = await fetch(`${item.baseUrl}=d`);
+      const bytes = await fetch(`${item.baseUrl}=d`, {
+        signal: AbortSignal.timeout(OPERATION_TIMEOUTS.DOWNLOAD),
+      });
       if (!bytes.ok) {
         throw new SyncError(
           SyncErrorCode.NETWORK_ERROR,

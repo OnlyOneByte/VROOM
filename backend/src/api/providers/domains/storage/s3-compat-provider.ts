@@ -14,6 +14,7 @@ import { ValidationError } from '../../../../errors';
 import { logger } from '../../../../utils/logger';
 import { fetchOutbound, type PrivateEndpointPolicy } from '../../../../utils/outbound-url';
 import { assertSafeStoragePath } from '../../../../utils/paths';
+import { OPERATION_TIMEOUTS } from '../../../../utils/timeout';
 import type {
   StorageFileInfo,
   StorageProvider,
@@ -87,6 +88,13 @@ async function requestBody(body: unknown): Promise<RequestInit['body'] | undefin
   return body as RequestInit['body'];
 }
 
+export const S3_REQUEST_TIMEOUT_MS = OPERATION_TIMEOUTS.DOWNLOAD;
+
+function withRequestTimeout(signal: AbortSignal | undefined): AbortSignal {
+  const timeout = AbortSignal.timeout(S3_REQUEST_TIMEOUT_MS);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
 export function s3RequestHandlerFor(policy: PrivateEndpointPolicy) {
   return {
     async handle(request: S3WireRequest, options?: { abortSignal?: unknown }) {
@@ -97,7 +105,7 @@ export function s3RequestHandlerFor(policy: PrivateEndpointPolicy) {
         {
           method: request.method,
           headers: request.headers,
-          signal: options?.abortSignal as AbortSignal | undefined,
+          signal: withRequestTimeout(options?.abortSignal as AbortSignal | undefined),
           body: await requestBody(request.body),
         },
         'S3 endpoint',
