@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { scaleBand, scaleLinear, scaleTime } from 'd3-scale';
+import { getTrendLineProps } from '../chart-curves';
 import {
 	distinctYTicks,
 	dayXAxisProps,
@@ -14,7 +15,6 @@ import {
 	unitTooltip,
 	formatDecimalAxis,
 	fitBandTickLabel,
-	getTrendLineProps,
 	insetTimeTicks,
 	isolatedValueRows,
 	getXTickCount,

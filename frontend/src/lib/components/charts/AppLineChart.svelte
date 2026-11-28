@@ -13,12 +13,10 @@
 		CHART_PADDING,
 		TIME_X_PADDING,
 		insetTimeTicks,
-		getTrendLineProps,
 		monthlyXAxisProps,
-		SINGLE_POINT_PROPS,
-		SMOOTH_CURVE,
 		isolatedValueRows
 	} from '#lib/utils/chart-formatters.ts';
+	import { getTrendLineProps, SINGLE_POINT_PROPS, SMOOTH_CURVE } from '#lib/utils/chart-curves.ts';
 	import type { Snippet } from 'svelte';
 	import type { ChartState, TextProps } from 'layerchart';
 	import EdgeTickLabel from './EdgeTickLabel.svelte';
