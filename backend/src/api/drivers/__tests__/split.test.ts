@@ -21,6 +21,7 @@ interface Balances {
   transfers: { fromDriverId: string; toDriverId: string; amount: number }[];
   total: number | null;
   unassigned: number | null;
+  unpaid: number | null;
 }
 
 let owner = '';
@@ -37,7 +38,7 @@ async function expense(
   id: string,
   category: string,
   cents: number,
-  payer: string,
+  payer: string | null,
   source?: string
 ) {
   await ctx.sql.run(
@@ -81,6 +82,31 @@ describe('split rules and balances', () => {
       expect.objectContaining({ fromDriverId: editor, toDriverId: owner, amount: 20 }),
     ]);
     expect(data.total).toBe(200);
+  });
+
+  test('a cost with no payer is left out of the shares, so what each driver owes is what the settle-up moves', async () => {
+    await expense('sp-wash', 'misc', 4000, null);
+    const data = await balances();
+    const of = (id: string) => data.drivers.find((d) => d.driverId === id);
+
+    expect(data.unpaid).toBe(40);
+    expect(of(owner)).toMatchObject({ owed: 180, paid: 200, balance: -20 });
+    expect(of(editor)).toMatchObject({ owed: 20, paid: 0, balance: 20 });
+    expect(data.drivers.reduce((sum, d) => sum + d.balance, 0)).toBe(0);
+    expect(data.transfers).toEqual([
+      expect.objectContaining({ fromDriverId: editor, toDriverId: owner, amount: 20 }),
+    ]);
+    expect(data.total).toBe(240);
+  });
+
+  test('when no cost has a payer yet, nobody owes anything and the whole amount is reported as unpaid', async () => {
+    await ctx.sql.run('DELETE FROM expenses WHERE vehicle_id = ?', [CAR]);
+    await expense('sp-old-fuel', 'fuel', 5000, null);
+    const data = await balances();
+
+    expect(data.unpaid).toBe(50);
+    expect(data.drivers.every((d) => d.balance === 0)).toBe(true);
+    expect(data.transfers).toEqual([]);
   });
 
   test('fixed ownership shares move the premium, and someone who cannot see it does not', async () => {

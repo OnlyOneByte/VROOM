@@ -58,6 +58,16 @@
 				: `Is owed ${money(-balance)}`;
 	let unassigned = $derived(data?.unassigned ?? 0);
 	let unpaid = $derived(data?.unpaid ?? 0);
+	let pending = $derived(
+		[
+			Math.abs(unassigned) > 0.005
+				? `${money(unassigned)} of costs isn't shared out to anyone yet`
+				: '',
+			Math.abs(unpaid) > 0.005 ? `${money(unpaid)} of costs has no payer recorded` : ''
+		]
+			.filter(Boolean)
+			.join(', and ')
+	);
 	let colorOf = $derived(new Map((data?.drivers ?? []).map(d => [d.driverId, d])));
 
 	async function copyText() {
@@ -97,7 +107,11 @@
 					</Button>
 				</div>
 			{:else if data && data.drivers.length === 0}
-				<p class="text-sm text-muted-foreground">No shared costs in this period yet.</p>
+				<p class="text-sm text-muted-foreground">
+					{pending
+						? `${pending}. Fill in drivers to include it.`
+						: 'No shared costs in this period yet.'}
+				</p>
 			{:else if data}
 				<ul class="divide-y text-sm" aria-label="What each driver owes and paid">
 					{#each data.drivers as driver (driver.driverId)}
@@ -148,17 +162,8 @@
 					{/if}
 				</div>
 
-				{#if unassigned > 0.005 || unpaid > 0.005}
-					<p class="text-xs text-muted-foreground">
-						{[
-							unassigned > 0.005
-								? `${money(unassigned)} of costs isn't shared out to anyone yet`
-								: '',
-							unpaid > 0.005 ? `${money(unpaid)} of costs has no payer recorded` : ''
-						]
-							.filter(Boolean)
-							.join(', and ')}. Fill in drivers to include it.
-					</p>
+				{#if pending}
+					<p class="text-xs text-muted-foreground">{pending}. Fill in drivers to include it.</p>
 				{/if}
 				<p class="text-xs text-muted-foreground">
 					At most one payment per driver settles it up. VROOM doesn't move any money.

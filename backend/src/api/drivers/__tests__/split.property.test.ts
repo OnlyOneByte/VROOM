@@ -52,12 +52,21 @@ describe('split rules', () => {
     );
   });
 
-  test('what drivers owe plus what is unassigned is exactly the group total', () => {
+  test('under every rule, what drivers owe plus unassigned plus costs with no payer is exactly the group total', () => {
     fc.assert(
       fc.property(rule, input, (r, i) => {
         const { owed, unassigned } = splitGroup(r, i);
-        const unpaid = r.kind === 'payer' ? (i.paidBy.get(null) ?? 0) : 0;
-        return sumOf(owed) + unassigned + unpaid === i.total;
+        return sumOf(owed) + unassigned + (i.paidBy.get(null) ?? 0) === i.total;
+      })
+    );
+  });
+
+  test('with nothing unassigned, what drivers owe is exactly what they paid, under every rule', () => {
+    fc.assert(
+      fc.property(rule, input, (r, i) => {
+        const { owed, unassigned } = splitGroup(r, i);
+        const paid = i.total - (i.paidBy.get(null) ?? 0);
+        return unassigned !== 0 || sumOf(owed) === paid;
       })
     );
   });

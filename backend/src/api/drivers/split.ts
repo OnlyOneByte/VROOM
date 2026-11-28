@@ -125,10 +125,11 @@ export function splitGroup(
     );
     return { owed, unassigned: 0 };
   }
-  const shares = allocate(input.total, weightsFor(rule, input));
+  const withPayer = input.total - (input.paidBy.get(null) ?? 0);
+  const shares = allocate(withPayer, weightsFor(rule, input));
   const allocated = [...shares.values()].reduce((a, b) => a + b, 0);
   const owed = new Map([...shares].filter(([id]) => id !== UNASSIGNED));
-  const unassigned = (shares.get(UNASSIGNED) ?? 0) + (input.total - allocated);
+  const unassigned = (shares.get(UNASSIGNED) ?? 0) + (withPayer - allocated);
   return { owed, unassigned };
 }
 
