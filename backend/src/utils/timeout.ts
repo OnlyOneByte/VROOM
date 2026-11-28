@@ -1,4 +1,18 @@
+import type { Server } from 'bun';
+import type { Context } from 'hono';
 import { SyncError, SyncErrorCode } from '../errors';
+
+export const SERVER_IDLE_TIMEOUT_SECONDS = 10;
+
+export async function withoutIdleTimeout<T>(c: Context, run: () => Promise<T>): Promise<T> {
+  const server = c.env as Pick<Server<unknown>, 'timeout'> | undefined;
+  server?.timeout?.(c.req.raw, 0);
+  try {
+    return await run();
+  } finally {
+    server?.timeout?.(c.req.raw, SERVER_IDLE_TIMEOUT_SECONDS);
+  }
+}
 
 export async function withTimeout<T>(
   promise: Promise<T>,
