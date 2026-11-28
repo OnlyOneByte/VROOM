@@ -88,10 +88,19 @@ async function requestBody(body: unknown): Promise<RequestInit['body'] | undefin
   return body as RequestInit['body'];
 }
 
-export const S3_REQUEST_TIMEOUT_MS = OPERATION_TIMEOUTS.DOWNLOAD;
+const SLOWEST_UPLOAD_BYTES_PER_MS = 100;
 
-function withRequestTimeout(signal: AbortSignal | undefined): AbortSignal {
-  const timeout = AbortSignal.timeout(S3_REQUEST_TIMEOUT_MS);
+export function s3RequestTimeoutMs(bodyBytes: number): number {
+  return Math.max(OPERATION_TIMEOUTS.DOWNLOAD, 60_000 + bodyBytes / SLOWEST_UPLOAD_BYTES_PER_MS);
+}
+
+function bodyLength(body: RequestInit['body'] | undefined): number {
+  if (body instanceof Uint8Array) return body.byteLength;
+  return typeof body === 'string' ? Buffer.byteLength(body) : 0;
+}
+
+function withRequestTimeout(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
@@ -100,13 +109,17 @@ export function s3RequestHandlerFor(policy: PrivateEndpointPolicy) {
     async handle(request: S3WireRequest, options?: { abortSignal?: unknown }) {
       const port = request.port ? `:${request.port}` : '';
       const url = `${request.protocol}//${request.hostname}${port}${request.path}${buildQuery(request.query)}`;
+      const body = await requestBody(request.body);
       const res = await fetchOutbound(
         url,
         {
           method: request.method,
           headers: request.headers,
-          signal: withRequestTimeout(options?.abortSignal as AbortSignal | undefined),
-          body: await requestBody(request.body),
+          signal: withRequestTimeout(
+            options?.abortSignal as AbortSignal | undefined,
+            s3RequestTimeoutMs(bodyLength(body))
+          ),
+          body,
         },
         'S3 endpoint',
         policy

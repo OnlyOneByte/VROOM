@@ -54,7 +54,9 @@ describe('photo sync batches', () => {
       upload: () => {
         uploads.push(id);
         return id === 'slow'
-          ? Promise.reject(new SyncError(SyncErrorCode.NETWORK_ERROR, 'upload timed out'))
+          ? Bun.sleep(50).then(() =>
+              Promise.reject(new SyncError(SyncErrorCode.NETWORK_ERROR, 'upload timed out'))
+            )
           : Promise.resolve({ providerType: 'fake', externalId: 'x', externalUrl: 'https://x' });
       },
     });
@@ -77,6 +79,7 @@ describe('photo sync batches', () => {
 
     await processBatch(deps);
 
+    expect([...statuses.keys()]).toEqual(['fast-1', 'slow-1']);
     expect(statuses.get('fast-1')).toBe('active');
     expect(statuses.get('slow-1')).toBe('failed');
     expect(uploads.filter((id) => id === 'slow')).toHaveLength(1);
