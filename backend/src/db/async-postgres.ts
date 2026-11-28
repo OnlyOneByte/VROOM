@@ -3,6 +3,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import type { ReservedSQL } from 'bun';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import {
+  type AsyncAppDatabase,
   insideAny,
   lateQuery,
   OPENING,
@@ -316,3 +317,7 @@ export function openAsyncPostgres(connection: PgConnection) {
 }
 
 export type AsyncPgDatabase = ReturnType<typeof openAsyncPostgres>['db'];
+
+export function portableDatabase(db: AsyncPgDatabase): AsyncAppDatabase {
+  return db as unknown as AsyncAppDatabase;
+}
