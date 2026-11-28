@@ -241,7 +241,10 @@
 						<Label for="backup-{provider.id}" class="text-sm">ZIP backup</Label>
 						<p class="text-xs text-muted-foreground">Store ZIP backups in this storage</p>
 						{#if backupWarning}
-							<p class="text-xs text-warning" data-testid="backup-warning">{backupWarning}</p>
+							<p class="text-xs text-warning" data-testid="backup-warning">
+								Old backups weren't removed after the last backup. The storage key needs permission
+								to list and delete files.
+							</p>
 						{/if}
 					</div>
 					<Switch

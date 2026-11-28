@@ -298,7 +298,9 @@ describe('ProviderInfoCard backup cleanup warning', () => {
 		await mount({ lastBackupAt: '2026-05-10T00:00:00.000Z', backupWarning: warning });
 		const badge = screen.getByText("Couldn't remove old backups");
 		expect(badge.parentElement).toBe(screen.getByText('Last backup 12 hours ago').parentElement);
-		expect(screen.getByTestId('backup-warning')).toHaveTextContent(warning);
+		expect(screen.getByTestId('backup-warning')).toHaveTextContent(
+			"Old backups weren't removed after the last backup. The storage key needs permission to list and delete files."
+		);
 	});
 
 	test('no warning, no badge and no message', async () => {
