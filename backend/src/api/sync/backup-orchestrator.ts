@@ -276,10 +276,11 @@ export class BackupOrchestrator {
 
         const { providerId, result } = outcome.value;
         results[providerId] = result;
-        if (result.success || result.unusable) {
+        const failure = Object.values(result.capabilities).find((c) => c.failure)?.failure;
+        if (result.success || result.unusable || failure) {
           await recordProviderHealth(
             providerId,
-            result.success ? { ok: true, message: 'Connected' } : healthFailure('auth'),
+            result.success ? { ok: true, message: 'Connected' } : healthFailure(failure ?? 'auth'),
             { synced: result.success }
           ).catch((error) => {
             logger.warn('Could not record provider health after a backup', {

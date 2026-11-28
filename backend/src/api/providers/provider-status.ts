@@ -7,7 +7,7 @@ import { EndpointNotAllowedError } from '../../utils/outbound-url';
 import { LLM_PROVIDERS } from './domains/llm/registry';
 import { resolveModelSettings } from './domains/model/model-registry';
 import { getStorageProviderRegistry } from './domains/storage/registry';
-import { credentialFailureOf } from './domains/storage/storage-provider';
+import { credentialFailureOf, ProviderConfigError } from './domains/storage/storage-provider';
 
 export type HealthCode = 'auth' | 'permission' | 'unreachable' | 'config' | 'endpoint';
 
@@ -72,7 +72,7 @@ export function healthCodeOf(error: unknown): HealthCode {
   }
   if (isSyncError(error)) return 'unreachable';
   if (error instanceof EndpointNotAllowedError) return 'endpoint';
-  if (error instanceof ValidationError) return 'config';
+  if (error instanceof ValidationError || error instanceof ProviderConfigError) return 'config';
   const message = error instanceof Error ? error.message : '';
   if (/HTTP 401\b/.test(message)) return 'auth';
   if (/HTTP 403\b/.test(message)) return 'permission';
@@ -110,6 +110,9 @@ export async function checkProviderHealth(row: UserProvider): Promise<HealthResu
     return await runCheck(row);
   } catch (error) {
     if (error instanceof ValidationError) throw error;
+    if (error instanceof ProviderConfigError) {
+      return { ok: false, code: 'config', message: error.message };
+    }
     return healthFailure(healthCodeOf(error));
   }
 }

@@ -8,7 +8,7 @@ import type {
 } from '../../sync/backup-strategy';
 import { GoogleDriveProvider } from '../domains/storage/google-drive-provider';
 import { GoogleSheetsService } from '../services/google-sheets-service';
-import { uploadZipBackup } from './zip-strategy';
+import { capabilityFailure, uploadZipBackup } from './zip-strategy';
 
 // bun mock.module leaks across test files, so tests inject fakes instead.
 export interface GoogleDriveStrategyDeps {
@@ -77,10 +77,7 @@ export class GoogleDriveStrategy implements BackupStrategy {
         providerId: context.providerId,
         error: error instanceof Error ? error.message : String(error),
       });
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Sheets sync failed',
-      };
+      return capabilityFailure(error, 'Sheets sync failed');
     }
   }
 }
