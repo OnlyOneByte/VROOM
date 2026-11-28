@@ -152,7 +152,7 @@
 {:else}
 	<div class="grid gap-8 lg:grid-cols-2">
 		<section aria-labelledby="vehicle-policies-heading" class="space-y-3">
-			<div class="flex items-center justify-between gap-3">
+			<div class="flex min-h-10 items-center justify-between gap-3">
 				<h2 class="text-base font-semibold" id="vehicle-policies-heading">Policies</h2>
 				{#if !readOnly}
 					<Button variant="outline" onclick={handleAddPolicy}>
@@ -215,7 +215,9 @@
 		</section>
 
 		<section aria-labelledby="vehicle-claims-heading" class="space-y-3">
-			<h2 class="text-base font-semibold" id="vehicle-claims-heading">Claims</h2>
+			<h2 class="flex min-h-10 items-center text-base font-semibold" id="vehicle-claims-heading">
+				Claims
+			</h2>
 			{#if claimsError}
 				<LoadErrorCard
 					compact
