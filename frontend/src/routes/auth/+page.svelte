@@ -61,16 +61,20 @@
 	let optionsCard = $state<HTMLElement | null>(null);
 	let signupInfo = $state<PublicSignupInfo | null>(null);
 
+	// "Get started" on the landing page links here with ?start, for someone who has no account yet.
+	const isFirstVisit = $derived(page.url.searchParams.has('start'));
+
 	const newHereLine = $derived.by(() => {
 		if (!signupInfo) return null;
 		const allowedEmail = signupInfo.domainRestricted ? ' with an allowed email' : '';
+		const newHere = isFirstVisit ? '' : 'New here? ';
 		switch (signupInfo.mode) {
 			case 'open':
-				return `New here? Signing in${allowedEmail} creates your garage.`;
+				return `${newHere}Signing in${allowedEmail} creates your garage.`;
 			case 'approval':
-				return `New here? Sign in${allowedEmail} to ask for an account. An admin approves it first, unless they invited you.`;
+				return `${newHere}Sign in${allowedEmail} to ask for an account. An admin approves it first, unless they invited you.`;
 			case 'invite':
-				return 'New here? You need an invite, from this server’s admin or from someone who wants to share a vehicle with you.';
+				return `${newHere}You need an invite, from this server’s admin or from someone who wants to share a vehicle with you.`;
 			case 'closed':
 				return 'This server isn’t taking new accounts.';
 		}
@@ -147,14 +151,18 @@
 			</div>
 		{/if}
 
-		<p class="text-[13px] font-medium text-muted-foreground">Sign in</p>
+		<p class="text-[13px] font-medium text-muted-foreground">
+			{isFirstVisit ? 'Get started' : 'Sign in'}
+		</p>
 		<h1
 			class="font-(family-name:--font-fig) text-5xl leading-[0.9] font-bold uppercase sm:text-[64px]"
 		>
-			Welcome back
+			{isFirstVisit ? 'Let’s go' : 'Welcome back'}
 		</h1>
 		<p class="text-muted-foreground">
-			Use the account you signed up with. VROOM never sees your password.
+			{isFirstVisit
+				? 'Pick how to sign in. There’s no separate sign-up, and VROOM never sees your password.'
+				: 'Use the account you signed up with. VROOM never sees your password.'}
 		</p>
 
 		<div bind:this={optionsCard} class="mt-3 grid gap-3">

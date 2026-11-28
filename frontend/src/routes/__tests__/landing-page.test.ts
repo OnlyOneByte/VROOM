@@ -47,7 +47,10 @@ describe('landing page', () => {
 		expect(
 			screen.getByRole('img', { name: /^Example: true cost per mile, all in: 58¢/ })
 		).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute('href', '/auth');
+		expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+			'href',
+			'/auth?start'
+		);
 	});
 
 	test('names three things VROOM does', () => {
