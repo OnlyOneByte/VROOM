@@ -271,10 +271,7 @@
 									(optional)
 								</span>
 							</Label>
-							<MoneyInput
-								id="residualValue"
-								bind:value={financingForm.residualValue}
-							/>
+							<MoneyInput id="residualValue" bind:value={financingForm.residualValue} />
 						</div>
 						<div class="space-y-2">
 							<Label for="mileageLimit">
@@ -294,10 +291,7 @@
 								Fee per extra {distanceShort}
 								<span class="font-normal text-muted-foreground">(optional)</span>
 							</Label>
-							<MoneyInput
-								id="excessMileageFee"
-								bind:value={financingForm.excessMileageFee}
-							/>
+							<MoneyInput id="excessMileageFee" bind:value={financingForm.excessMileageFee} />
 						</div>
 					{/if}
 				</div>

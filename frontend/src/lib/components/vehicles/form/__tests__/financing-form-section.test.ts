@@ -194,7 +194,9 @@ describe('FinancingFormSection ownership', () => {
 
 describe('FinancingFormSection amount inputs follow the currency', () => {
 	const currencyPrefix = (id: string) =>
-		document.getElementById(id)?.parentElement?.querySelector('[aria-hidden="true"]')
+		document
+			.getElementById(id)
+			?.parentElement?.querySelector('[aria-hidden="true"]')
 			?.textContent?.trim();
 	const amountIds = ['originalAmount', 'paymentAmount', 'residualValue', 'excessMileageFee'];
 

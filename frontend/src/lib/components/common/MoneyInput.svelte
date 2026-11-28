@@ -1,14 +1,26 @@
 <script lang="ts">
-	import type { HTMLInputAttributes } from 'svelte/elements';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { amountStep, getCurrencySymbol } from '#lib/utils/formatters.ts';
 
-	type Props = Omit<HTMLInputAttributes, 'type' | 'value' | 'step'> & {
+	interface Props {
+		id: string;
 		value?: number | null | undefined;
 		currency?: string;
-	};
+		min?: string;
+		required?: boolean;
+		'aria-invalid'?: boolean;
+		'aria-describedby'?: string | undefined;
+	}
 
-	let { value = $bindable(), currency, min = '0', ...restProps }: Props = $props();
+	let {
+		id,
+		value = $bindable(),
+		currency,
+		min = '0',
+		required,
+		'aria-invalid': ariaInvalid,
+		'aria-describedby': ariaDescribedby
+	}: Props = $props();
 
 	let symbol = $derived(getCurrencySymbol(currency));
 	let empty = $derived(value === null || value === undefined || (value as unknown) === '');
@@ -24,13 +36,16 @@
 		{symbol}
 	</span>
 	<Input
+		{id}
 		type="number"
 		inputmode="decimal"
 		step={amountStep(currency)}
 		{min}
+		{required}
 		bind:value
+		aria-invalid={ariaInvalid}
+		aria-describedby={ariaDescribedby}
 		style="padding-left: calc(1.125rem + {symbol.length}ch)"
 		class="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-		{...restProps}
 	/>
 </div>
