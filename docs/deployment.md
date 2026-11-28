@@ -405,10 +405,10 @@ no longer matches the journal. To move one forward:
 3. Start the new build, which creates a fresh schema, and sign in with the same account. The fresh
    database gives you a new internal user id; restore re-owns every row to the signed-in account,
    so a backup made under the old id still applies.
-4. Settings → Storage Providers: reconnect the same storage accounts you used before (the same
-   Google account, or the same S3 endpoint and bucket).
-5. Settings → Storage Providers → **Restore** → **Upload file**: pick the ZIP, check the preview
-   counts, then restore with **Replace All**.
+4. Settings → **Backups and storage**: reconnect the same storage accounts you used before (the
+   same Google account, or the same S3 endpoint and bucket).
+5. Settings → **Backups and storage** → **Restore…** → **Upload file**: pick the ZIP, check the
+   preview counts, then choose **Replace everything**.
 
 Keep the old file until the restore is verified. What happens to links into the old database:
 
@@ -450,7 +450,7 @@ docker compose start backend
 
 Deleting the stale `-wal`/`-shm` matters: left behind, they belong to the replaced database.
 
-In-app restore from a Drive ZIP or Google Sheets lives in Settings → Storage Providers → Restore.
+In-app restore from a Drive ZIP or Google Sheets lives in Settings → Backups and storage → Restore….
 
 ### Continuous backups with Litestream
 
@@ -539,21 +539,32 @@ docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
 **There is no whole-server move from SQLite to Postgres.** A new Postgres database starts empty.
 What moves is each account's own data, through the in-app backup:
 
-1. On the SQLite instance, each person downloads their backup ZIP (Settings → Storage
-   Providers → **Download Backup**).
+1. On the SQLite instance, each person exports their data: Settings → **Your data** →
+   **Export everything** → **Export** (or the same card on the Profile page). That saves a ZIP of
+   CSV files.
 2. Start the backend on Postgres and have each person sign in, creating their account again.
-3. Each person restores their ZIP with **Replace All** (Settings → Storage Providers →
-   **Restore** → **Upload file**).
+3. Each person reconnects the same storage accounts they used before, in Settings → **Backups and
+   storage** (the same Google account, or the same S3 endpoint and bucket).
+4. Each person restores their ZIP: Settings → **Backups and storage** → **Restore…** → **Upload
+   file**, check the preview counts, then choose **Replace everything**.
 
 That brings back a person's vehicles, expenses, odometer, trips, insurance, financing,
-reminders, preferences and photo links. These do not move: other people's accounts, sign-in
-sessions, roles and server settings, sign-up invites, and shares on someone else's vehicle
-(re-invite people once they have signed in). Keep the SQLite file until each restore is checked.
+reminders and preferences. Photo files are not in the ZIP: each photo is re-linked only when its
+storage account is reconnected before the restore (step 3), and otherwise stays unlinked, with
+its file still in that storage. These do not move:
+- other people's accounts;
+- sign-in sessions, roles and server settings;
+- sign-up invites;
+- storage-provider connections and AI provider settings, which each person sets up again;
+- shares on someone else's vehicle (re-invite people once they have signed in).
 
-CI runs exactly this move on every change. The optional **Postgres boot and SQLite move** job
-seeds an account on SQLite and exports its ZIP. It then boots on a Postgres service container,
-restores the ZIP with Replace All, boots again, and checks that every table in the backup has the
-same row count on Postgres.
+Keep the SQLite file until each restore is checked.
+
+CI runs this move on every change. The optional **Postgres boot and SQLite move** job seeds an
+account on SQLite and exports its ZIP. It then boots on a Postgres service container, restores
+the ZIP with Replace everything, boots again, and checks that every table in the backup has the
+same row count on Postgres. The seeded account has no photos, so the job doesn't cover re-linking
+photos.
 
 Moving back from Postgres to SQLite works the same way, one account at a time.
 

@@ -130,7 +130,6 @@ jobs:
       CORS_ORIGINS: http://127.0.0.1:4173
       DISABLE_RATE_LIMIT: "true"
       LOG_LEVEL: warn
-      SQLITE_URL: ${{ runner.temp }}/move.db
       POSTGRES_URL: postgres://vroom:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/vroom
 
     steps:
@@ -155,9 +154,9 @@ jobs:
 
       - name: Seed an account on SQLite and export its backup
         run: |
-          DATABASE_URL="$SQLITE_URL" bun run db:seed
-          session=$(DATABASE_URL="$SQLITE_URL" bun src/db/postgres-move-smoke.ts session-sqlite "$SQLITE_URL")
-          DATABASE_URL="$SQLITE_URL" nohup bun src/index.ts > "$RUNNER_TEMP/sqlite.log" 2>&1 &
+          DATABASE_URL="$RUNNER_TEMP/move.db" bun run db:seed
+          session=$(DATABASE_URL="$RUNNER_TEMP/move.db" bun src/db/postgres-move-smoke.ts session-sqlite "$RUNNER_TEMP/move.db")
+          DATABASE_URL="$RUNNER_TEMP/move.db" nohup bun src/index.ts > "$RUNNER_TEMP/sqlite.log" 2>&1 &
           pid=$!
           curl --retry 30 --retry-delay 1 --retry-all-errors -fsS http://127.0.0.1:3001/health
           bun src/db/postgres-move-smoke.ts export http://127.0.0.1:3001 "$session" "$RUNNER_TEMP/sqlite.zip"
