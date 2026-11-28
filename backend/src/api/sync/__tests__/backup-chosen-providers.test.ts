@@ -293,11 +293,11 @@ describe('A one-off backup keeps the saved settings usable and the sync anchor h
 });
 
 describe('A one-off backup does not undo changes made while it ran', () => {
-  async function registerDuring(change: () => void): Promise<void> {
+  async function registerDuring(change: () => void | Promise<void>): Promise<void> {
     const { backupStrategyRegistry } = await import('../backup-strategy-registry');
     backupStrategyRegistry.register(FAKE_TYPE, {
       async execute(): Promise<BackupStrategyResult> {
-        change();
+        await change();
         return { success: true, capabilities: { zip: { success: true } } };
       },
     });
