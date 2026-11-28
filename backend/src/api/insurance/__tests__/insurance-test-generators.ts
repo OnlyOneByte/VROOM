@@ -49,3 +49,14 @@ export const validTermInputArb = fc
     endDate: new Date(startMs + gapMs),
     ...rest,
   }));
+
+export function inSequence<T extends { startDate: Date; endDate: Date }>(terms: T[]): T[] {
+  let cursor: Date | null = null;
+  return terms.map((term) => {
+    const length = term.endDate.getTime() - term.startDate.getTime();
+    const startDate = cursor && term.startDate < cursor ? cursor : term.startDate;
+    const endDate = new Date(startDate.getTime() + length);
+    cursor = endDate;
+    return { ...term, startDate, endDate };
+  });
+}
