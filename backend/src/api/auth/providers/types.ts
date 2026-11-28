@@ -10,6 +10,8 @@ export interface OAuthUserInfo {
   avatarUrl?: string;
 }
 
+export const IDP_TIMEOUT_MS = 10_000;
+
 export type OAuthFlow = 'login' | 'link';
 
 export interface OAuthProviderConfig {

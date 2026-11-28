@@ -1,6 +1,11 @@
 import { Google } from 'arctic';
 import { CONFIG } from '../../../config';
-import { NoVerifiedEmailError, type OAuthFlow, type OAuthProviderConfig } from './types';
+import {
+  IDP_TIMEOUT_MS,
+  NoVerifiedEmailError,
+  type OAuthFlow,
+  type OAuthProviderConfig,
+} from './types';
 
 // Google requires the token exchange to repeat the authorize step's redirect URI.
 function createGoogleClient(redirectUri: string): Google {
@@ -60,6 +65,7 @@ export const googleAuthProvider: OAuthProviderConfig = {
   fetchUserInfo: async (accessToken) => {
     const res = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(IDP_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error('Failed to fetch Google user info');
     const data = (await res.json()) as {

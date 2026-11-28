@@ -36,6 +36,10 @@
 			title: 'That sign-in option isn’t supported',
 			body: 'Pick one of the options below.'
 		},
+		provider_error: {
+			title: 'The sign-in provider refused the request',
+			body: 'This is usually a setup problem on this server. Try again later, or ask its admin to check the sign-in settings.'
+		},
 		cancelled: {
 			title: 'Sign-in was cancelled',
 			body: 'The provider didn’t finish signing you in. Try again, or pick another option.'

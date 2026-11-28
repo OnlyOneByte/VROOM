@@ -216,4 +216,13 @@ describe('a deployment with only OIDC configured', () => {
     const res = await ctx.anon('GET', '/api/v1/auth/providers');
     expect((await json<{ data: unknown[] }>(res)).data).toEqual([]);
   });
+
+  test('a partial OIDC setup names the missing setting once', async () => {
+    const { missingOidcSettings } = await import('../providers/oidc');
+    config.auth.oidc.clientSecret = '';
+    expect(missingOidcSettings()).toEqual(['OIDC_CLIENT_SECRET']);
+    config.auth.oidc.issuer = '';
+    config.auth.oidc.clientId = '';
+    expect(missingOidcSettings()).toEqual([]);
+  });
 });

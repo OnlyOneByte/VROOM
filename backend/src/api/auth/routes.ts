@@ -19,6 +19,7 @@ import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { storePending } from '../../utils/pending-credentials';
 import { readJsonBody } from '../../utils/request-body';
+import { withTimeout } from '../../utils/timeout';
 import { attachPendingInvites } from '../shares/repository';
 import { decideSignup } from '../signup/policy';
 import {
@@ -39,7 +40,7 @@ import {
 } from './providers/google';
 import { ensureOidcDiscovered } from './providers/oidc';
 import { getEnabledProvider, getEnabledProviders, getProvider } from './providers/registry';
-import { NoVerifiedEmailError, type OAuthFlow } from './providers/types';
+import { IDP_TIMEOUT_MS, NoVerifiedEmailError, type OAuthFlow } from './providers/types';
 import {
   clearSessionCookie,
   consumeOAuthState,
@@ -255,7 +256,11 @@ async function exchangeAuthTokens(
   flow: OAuthFlow
 ) {
   const cv = providerConfig.supportsPKCE ? codeVerifier : undefined;
-  const tokens = await providerConfig.validateAuthorizationCode(code, cv, flow);
+  const tokens = await withTimeout(
+    providerConfig.validateAuthorizationCode(code, cv, flow),
+    IDP_TIMEOUT_MS,
+    'Sign-in token exchange'
+  );
   const userInfo = await providerConfig.fetchUserInfo(tokens.accessToken);
   return userInfo;
 }
@@ -300,7 +305,6 @@ export async function updateExistingUserProfile(
         'Skipped email backfill due to UNIQUE conflict — another user already has this email',
         {
           userId,
-          attemptedEmail: userInfo.email,
         }
       );
       await db
@@ -454,6 +458,16 @@ async function holdsOnOwnAccount(userId: string, permission: PermissionId): Prom
   return (await resolverFor(userId, [account])).can(permission, account).allow;
 }
 
+export function noCodeReason(url: URL, authProviderId: string): 'cancelled' | 'provider_error' {
+  const error = url.searchParams.get('error');
+  if (!error || error === 'access_denied') return 'cancelled';
+  logger.warn('Sign-in provider returned an error', {
+    provider: authProviderId,
+    error: error.replace(/[^\w.-]/g, '').slice(0, 64),
+  });
+  return 'provider_error';
+}
+
 // Register before the generic /callback/:authProvider route, which would shadow it.
 routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
   const authProviderId = c.req.param('authProvider') ?? '';
@@ -464,7 +478,7 @@ routes.get('/callback/link/:authProvider', authRateLimiter, async (c) => {
 
   if (!code) {
     if (stateParam) oauthStateStore.delete(stateParam);
-    return c.redirect(profileRedirect('link_error=cancelled'));
+    return c.redirect(profileRedirect(`link_error=${noCodeReason(url, authProviderId)}`));
   }
 
   const stateResult = validateLinkState(stateParam);
@@ -557,7 +571,7 @@ routes.get('/callback/:authProvider', authRateLimiter, async (c) => {
 
   if (!code) {
     if (stateParam) oauthStateStore.delete(stateParam);
-    return c.redirect(authRedirect('auth_error=cancelled'));
+    return c.redirect(authRedirect(`auth_error=${noCodeReason(url, authProviderId)}`));
   }
 
   const stateResult = validateLoginState(stateParam, stateCookie);
@@ -860,6 +874,7 @@ async function exchangeProviderTokens(code: string, codeVerifier: string) {
 async function fetchGoogleEmail(accessToken: string): Promise<string | null> {
   const resp = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(IDP_TIMEOUT_MS),
   });
   if (!resp.ok) return null;
   const data = (await resp.json()) as { email: string; email_verified?: boolean };

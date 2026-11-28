@@ -44,6 +44,8 @@
 		account_conflict: 'This account is already linked to a different user.',
 		already_linked: 'This account is already linked to your profile.',
 		cancelled: 'Linking was cancelled.',
+		provider_error:
+			'The sign-in provider refused the request. Try again later, or ask the admin to check the sign-in settings.',
 		invalid_state: 'The linking session expired. Please try again.',
 		session_mismatch:
 			'You were signed in as someone else when linking finished. Sign in again and retry.',

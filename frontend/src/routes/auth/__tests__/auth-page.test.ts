@@ -86,8 +86,9 @@ describe('sign-in page', () => {
 	test.each([
 		['signup_closed', 'This server isn’t taking new accounts'],
 		['signup_invite_required', 'This server is invite only'],
-		['signup_domain_not_allowed', 'only takes accounts from certain email domains']
-	])('a refused sign-up (%s) says why', async (code, message) => {
+		['signup_domain_not_allowed', 'only takes accounts from certain email domains'],
+		['provider_error', 'The sign-in provider refused the request']
+	])('a refused sign-in (%s) says why', async (code, message) => {
 		authApi.getProviders.mockResolvedValue([]);
 		page.url = new URL(`https://app.example/auth?auth_error=${code}`);
 		render(AuthPage);
