@@ -76,11 +76,12 @@ describe('share management resolves through can() for every role', () => {
 
 describe('share management cannot be used to escalate', () => {
   const shareOf = (member: { id: string }) => `/api/v1/shares/share-${CAR}-${member.id}`;
-  const grantedBy = (userId: string) =>
+  const grantedBy = async (userId: string) =>
     (
-      ctx.sqlite
-        .query('SELECT granted_by FROM role_assignments WHERE user_id = ? AND scope_id = ?')
-        .all(userId, CAR) as { granted_by: string }[]
+      (await ctx.sql.all(
+        'SELECT granted_by FROM role_assignments WHERE user_id = ? AND scope_id = ?',
+        [userId, CAR]
+      )) as { granted_by: string }[]
     ).map((row) => row.granted_by);
 
   test('a manager grants only what they hold and never changes their own share', async () => {
@@ -117,7 +118,7 @@ describe('share management cannot be used to escalate', () => {
   test('only the owner removes or changes a co-owner the owner appointed', async () => {
     const other = await createInvitee(ctx, 'sh-co-owner-2');
     await shareCar(ctx, CAR, other, 'viewer');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
       [`ra-${other.id}`, other.id, builtInRoleId('co_owner'), CAR, ctx.user.id]
     );
@@ -133,7 +134,7 @@ describe('share management cannot be used to escalate', () => {
 
     const appointed = await createInvitee(ctx, 'sh-co-owner-3');
     await shareCar(ctx, CAR, appointed, 'viewer');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
       [`ra-${appointed.id}`, appointed.id, builtInRoleId('co_owner'), CAR, m.coOwner.id]
     );
@@ -143,23 +144,23 @@ describe('share management cannot be used to escalate', () => {
   });
 
   test('revoking someone needs the rank to remove their overrides', async () => {
-    const setOverride = (by: string, permission: string) =>
-      ctx.sqlite.run(
+    const setOverride = async (by: string, permission: string) =>
+      await ctx.sql.run(
         "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect, set_by) VALUES (?, ?, 'vehicle', ?, ?, 'allow', ?)",
         [`po-${by}-${permission}`, m.viewer.id, CAR, permission, by]
       );
-    setOverride(ctx.user.id, 'vehicle.financing.read');
+    await setOverride(ctx.user.id, 'vehicle.financing.read');
     expect((await m.coOwner.request('DELETE', shareOf(m.viewer))).status).toBe(403);
 
-    ctx.sqlite.run('DELETE FROM permission_overrides WHERE user_id = ?', [m.viewer.id]);
-    setOverride(m.coOwner.id, 'vehicle.insurance.read');
+    await ctx.sql.run('DELETE FROM permission_overrides WHERE user_id = ?', [m.viewer.id]);
+    await setOverride(m.coOwner.id, 'vehicle.insurance.read');
     await overrideOn(ctx, CAR, m.editor, 'vehicle.share.manage', 'allow');
     expect((await m.editor.request('DELETE', shareOf(m.viewer))).status).toBe(403);
     expect((await m.coOwner.request('DELETE', shareOf(m.viewer))).status).toBe(200);
   });
 
   test('owner-set overrides limit revoking, not level changes or the owner', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect, set_by) VALUES ('po-owner-switch', ?, 'vehicle', ?, 'vehicle.financing.read', 'allow', ?)",
       [m.viewer.id, CAR, ctx.user.id]
     );
@@ -179,7 +180,7 @@ describe('share management cannot be used to escalate', () => {
 
   test('roles granted through a share stay set by the owner', async () => {
     expect((await m.coOwner.request('PUT', editorShare(), { level: 'viewer' })).status).toBe(200);
-    expect(grantedBy(m.editor.id)).toEqual([ctx.user.id]);
+    expect(await grantedBy(m.editor.id)).toEqual([ctx.user.id]);
   });
 
   test('another car’s share is not found, and the owner’s email matches in any case', async () => {

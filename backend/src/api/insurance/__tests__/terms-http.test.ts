@@ -113,25 +113,26 @@ describe('insurance term update clears optional fields', () => {
 });
 
 describe('insurance term writes reject a foreign vehicleId', () => {
-  function seedForeignVehicle(id: string): void {
-    ctx.sqlite.run(
+  async function seedForeignVehicle(id: string): Promise<void> {
+    await ctx.sql.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-84', 'f84@test.com', 'Foreign 84')`
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO vehicles (id, user_id, make, model, year) VALUES (?, 'u-foreign-84', 'Mazda', '3', 2020)`,
       [id]
     );
   }
 
-  function junctionCountFor(vehicleId: string): number {
-    const rows = ctx.sqlite
-      .query('SELECT COUNT(*) AS n FROM insurance_term_vehicles WHERE vehicle_id = ?')
-      .all(vehicleId) as { n: number }[];
+  async function junctionCountFor(vehicleId: string): Promise<number> {
+    const rows = (await ctx.sql.all(
+      'SELECT COUNT(*) AS n FROM insurance_term_vehicles WHERE vehicle_id = ?',
+      [vehicleId]
+    )) as { n: number }[];
     return rows[0]?.n ?? 0;
   }
 
   test('POST /insurance with a foreign vehicleId → 404, no junction row planted', async () => {
-    seedForeignVehicle('veh-foreign-create');
+    await seedForeignVehicle('veh-foreign-create');
     const res = await ctx.authed('POST', '/api/v1/insurance', {
       company: 'Acme Mutual',
       terms: [
@@ -143,13 +144,13 @@ describe('insurance term writes reject a foreign vehicleId', () => {
       ],
     });
     expect(res.status).toBe(404);
-    expect(junctionCountFor('veh-foreign-create')).toBe(0);
+    expect(await junctionCountFor('veh-foreign-create')).toBe(0);
   });
 
   test('POST /insurance/:id/terms with a foreign vehicleId → 404, no junction row planted', async () => {
     const ownVehicle = await seedVehicle(ctx);
     const { policyId } = await seedPolicyWithTerm(ownVehicle);
-    seedForeignVehicle('veh-foreign-addterm');
+    await seedForeignVehicle('veh-foreign-addterm');
 
     const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/terms`, {
       startDate: '2025-01-01T00:00:00.000Z',
@@ -157,20 +158,20 @@ describe('insurance term writes reject a foreign vehicleId', () => {
       vehicleCoverage: { vehicleIds: ['veh-foreign-addterm'] },
     });
     expect(res.status).toBe(404);
-    expect(junctionCountFor('veh-foreign-addterm')).toBe(0);
+    expect(await junctionCountFor('veh-foreign-addterm')).toBe(0);
   });
 
   test('PUT /insurance/:id/terms/:termId re-pointing coverage to a foreign vehicleId → 404, original coverage intact', async () => {
     const ownVehicle = await seedVehicle(ctx);
     const { policyId, termId } = await seedPolicyWithTerm(ownVehicle);
-    seedForeignVehicle('veh-foreign-updateterm');
+    await seedForeignVehicle('veh-foreign-updateterm');
 
     const res = await ctx.authed('PUT', `/api/v1/insurance/${policyId}/terms/${termId}`, {
       vehicleCoverage: { vehicleIds: ['veh-foreign-updateterm'] },
     });
     expect(res.status).toBe(404);
-    expect(junctionCountFor('veh-foreign-updateterm')).toBe(0);
-    expect(junctionCountFor(ownVehicle)).toBe(1);
+    expect(await junctionCountFor('veh-foreign-updateterm')).toBe(0);
+    expect(await junctionCountFor(ownVehicle)).toBe(1);
   });
 
   test('a term write with an owned vehicleId still succeeds', async () => {
@@ -184,17 +185,16 @@ describe('insurance term writes reject a foreign vehicleId', () => {
       vehicleCoverage: { vehicleIds: [second] },
     });
     expect(res.status).toBe(201);
-    expect(junctionCountFor(second)).toBe(1);
+    expect(await junctionCountFor(second)).toBe(1);
   });
 });
 
 describe('a term cost update replaces its premium expense', () => {
-  function premiumExpenses(termId: string): { count: number; total: number } {
-    const rows = ctx.sqlite
-      .query(
-        "SELECT expense_amount AS amt FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?"
-      )
-      .all(termId) as { amt: number }[];
+  async function premiumExpenses(termId: string): Promise<{ count: number; total: number }> {
+    const rows = (await ctx.sql.all(
+      "SELECT expense_amount AS amt FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?",
+      [termId]
+    )) as { amt: number }[];
     const total = rows.reduce((s, r) => s + (r.amt ?? 0), 0);
     return { count: rows.length, total: Math.round(total * 100) / 100 };
   }
@@ -218,7 +218,7 @@ describe('a term cost update replaces its premium expense', () => {
     const policyId = body.data.id;
     const termId = body.data.terms[0].id;
 
-    const before = premiumExpenses(termId);
+    const before = await premiumExpenses(termId);
     expect(before.count).toBe(2);
     expect(before.total).toBe(120000);
 
@@ -228,7 +228,7 @@ describe('a term cost update replaces its premium expense', () => {
     });
     expect(upd.status, await upd.text()).toBeLessThan(300);
 
-    const after = premiumExpenses(termId);
+    const after = await premiumExpenses(termId);
     expect(after.count).toBe(2);
     expect(after.total).toBe(180000);
   });
@@ -242,13 +242,12 @@ describe("a monthly-priced term's premium is capped like an expense", () => {
     monthlyCost,
     vehicleCoverage: { vehicleIds: [vehicleId] },
   });
-  const premiumCount = (termId: string) =>
+  const premiumCount = async (termId: string) =>
     (
-      ctx.sqlite
-        .query(
-          "SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?"
-        )
-        .get(termId) as { n: number }
+      (await ctx.sql.get(
+        "SELECT COUNT(*) AS n FROM expenses WHERE source_type = 'insurance_term' AND source_id = ?",
+        [termId]
+      )) as { n: number }
     ).n;
 
   test('creating a policy or adding a term over the cap is rejected and saves nothing', async () => {
@@ -300,6 +299,6 @@ describe("a monthly-priced term's premium is capped like an expense", () => {
       DataEnvelope<PolicyRow & { terms: Array<TermRow & { monthlyCost: number }> }>
     >(await ctx.authed('GET', `/api/v1/insurance/${data.id}`));
     expect(after.data.terms[0].monthlyCost).toBe(100);
-    expect(premiumCount(termId)).toBe(1);
+    expect(await premiumCount(termId)).toBe(1);
   });
 });
