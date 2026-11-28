@@ -47,15 +47,32 @@ describe('an average is shown only when its noise is at most a quarter of it', (
   test.each([
     ['efficiency', 'km_per_l', 12, 35, false],
     ['efficiency', 'km_per_l', 12, 40, true],
-    ['running_cost', 'cents_per_km', 9, 175, false],
-    ['running_cost', 'cents_per_km', 9, 180, true],
-    ['maintenance', 'cents_per_year', 60_000, 265, false],
-    ['maintenance', 'cents_per_year', 60_000, 270, true],
-    ['insurance', 'cents_per_year', 120_000, 130, false],
-    ['insurance', 'cents_per_year', 120_000, 135, true],
+    ['running_cost', 'cents_per_km', 9, 25, false],
+    ['running_cost', 'cents_per_km', 9, 26, true],
+    ['maintenance', 'cents_per_year', 60_000, 31, false],
+    ['maintenance', 'cents_per_year', 60_000, 32, true],
+    ['insurance', 'cents_per_year', 120_000, 37, false],
+    ['insurance', 'cents_per_year', 120_000, 38, true],
     ['efficiency', 'km_per_l', 0, 1000, false],
   ] as const)('%s at mean %d with %d owners: %p', (metric, unit, mean, nPublished, expected) => {
-    expect(usefulEnough({ mean, nPublished }, metric, unit)).toBe(expected);
+    expect(usefulEnough({ mean, nPublished, currency: 'USD' }, metric, unit)).toBe(expected);
+  });
+
+  test('the same real cost needs the same number of owners in rupees as in dollars', () => {
+    for (const [currency, mean] of [
+      ['USD', 7.6],
+      ['INR', 7.6 * 84],
+    ] as const) {
+      const row = (nPublished: number) => ({ mean, nPublished, currency });
+      expect(usefulEnough(row(30), 'running_cost', 'cents_per_km')).toBe(false);
+      expect(usefulEnough(row(31), 'running_cost', 'cents_per_km')).toBe(true);
+    }
+  });
+
+  test('a money average in a currency with no range is never shown', () => {
+    expect(
+      usefulEnough({ mean: 50, nPublished: 1000, currency: 'ARS' }, 'running_cost', 'cents_per_km')
+    ).toBe(false);
   });
 
   test("a rated model's narrow band is useful from a small group", () => {
