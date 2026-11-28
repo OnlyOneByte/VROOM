@@ -121,7 +121,13 @@ export const oidcAuthProvider: OAuthProviderConfig = {
       preferred_username?: unknown;
       picture?: unknown;
     };
-    if (data.email_verified !== true || typeof data.email !== 'string') {
+    const verified = data.email_verified === true || data.email_verified === 'true';
+    if (!verified || typeof data.email !== 'string') {
+      logger.warn('OIDC sign-in refused: the user info has no verified email', {
+        provider: CONFIG.auth.oidc.displayName,
+        email: typeof data.email === 'string' ? 'present' : 'missing',
+        emailVerified: data.email_verified === undefined ? 'missing' : String(data.email_verified),
+      });
       throw new NoVerifiedEmailError(CONFIG.auth.oidc.displayName);
     }
     if (typeof data.sub !== 'string' || data.sub === '') {

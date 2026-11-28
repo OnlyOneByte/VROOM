@@ -6,6 +6,7 @@ import {
   SETUP_TIMEOUT_MS,
   type TestApp,
 } from '../../../test-helpers/http-client';
+import { logger } from '../../../utils/logger';
 
 type MutableConfig = {
   disableRateLimit: boolean;
@@ -108,14 +109,36 @@ describe('a deployment with only OIDC configured', () => {
     expect(user?.display_name).toBe('Pat');
   });
 
-  test('refuses an account whose email the issuer has not verified', async () => {
-    issuer.user = { ...issuer.user, email_verified: false };
+  async function signInLocation(): Promise<string | null> {
     const start = await ctx.app.request('/api/v1/auth/login/oidc');
     const stateCookie = (start.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
     const done = await ctx.app.request(providerReturn(start.headers.get('location')), {
       headers: { Cookie: stateCookie },
     });
-    expect(done.headers.get('location')).toBe(`${config.frontend.url}/auth?auth_error=no_email`);
+    return done.headers.get('location');
+  }
+
+  test.each([
+    ['false', false],
+    ['the string "false"', 'false'],
+    ['missing', undefined],
+  ])('refuses an account whose email_verified is %s, and logs why', async (_, emailVerified) => {
+    issuer.user = { ...issuer.user, email_verified: emailVerified };
+    const warn = spyOn(logger, 'warn').mockImplementation(() => {});
+    try {
+      expect(await signInLocation()).toBe(`${config.frontend.url}/auth?auth_error=no_email`);
+      const logged = JSON.stringify(warn.mock.calls);
+      expect(logged).toContain('no verified email');
+      expect(logged).toContain(emailVerified === undefined ? 'missing' : 'false');
+      expect(logged).not.toContain('pat@example.com');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('accepts email_verified sent as the string "true", as some issuers do', async () => {
+    issuer.user = { ...issuer.user, email_verified: 'true' };
+    expect(await signInLocation()).toBe(`${config.frontend.url}/dashboard`);
   });
 
   test('links OIDC to a signed-in account through the link callback', async () => {
