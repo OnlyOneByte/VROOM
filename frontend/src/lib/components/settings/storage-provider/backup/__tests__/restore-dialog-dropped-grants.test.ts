@@ -33,16 +33,20 @@ const RestoreDialog = (await import('../RestoreDialog.svelte')).default;
 
 async function replaceRestore(result: RestoreResult) {
 	const onRestore = vi.fn();
-	render(RestoreDialog, {
+	const view = render(RestoreDialog, {
 		props: { open: true, backupProviders: [], sheetsSyncEnabled: true, onRestore, onClose: vi.fn() }
 	});
+	await runReplace(onRestore, result);
+	return view;
+}
+
+async function runReplace(onRestore: ReturnType<typeof vi.fn>, result: RestoreResult) {
 	await fireEvent.click(await screen.findByText('Restore from provider'));
 	await screen.findByText('How to restore');
 	await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
 	restoreFromProvider.mockResolvedValueOnce(result);
 	await fireEvent.click(screen.getByRole('button', { name: 'Replace everything' }));
 	await vi.waitFor(() => expect(onRestore).toHaveBeenCalledWith(result));
-	return onRestore;
 }
 
 const dropped = (
@@ -71,6 +75,7 @@ describe('RestoreDialog after a full restore', () => {
 				dropped: [
 					dropped('car-1', 'no_accepted_share', 'role'),
 					dropped('car-1', 'no_accepted_share'),
+					dropped('car-1', 'role_not_assignable', 'role'),
 					dropped('car-2', 'member_not_active'),
 					dropped('gone-car', 'vehicle_not_restored')
 				]
@@ -82,17 +87,36 @@ describe('RestoreDialog after a full restore', () => {
 		await list.findByText('Blue');
 		const items = list
 			.getAllByRole('listitem')
-			.map(item => item.textContent?.replace(/\s+/g, ' ').trim());
+			.map(item =>
+				[...item.children].map(line => line.textContent?.replace(/\s+/g, ' ').trim()).join(' | ')
+			);
 		expect(items).toEqual([
-			'Blue 2 sharing settings: the person no longer has this car shared with them.',
-			"2015 Ford Focus 1 sharing setting: the member isn't active on this car.",
-			"A car not in this backup 1 sharing setting: the car isn't in this backup."
+			"Blue | 2 sharing settings: the person no longer has this car shared with them. | 1 sharing setting: that role isn't available any more.",
+			"2015 Ford Focus | 1 sharing setting: the member isn't active on this car.",
+			"A car not in this backup | 1 sharing setting: the car isn't in this backup."
 		]);
 		expect(screen.getByTestId('restore-dropped-grants')).not.toHaveTextContent(/person-/);
 		expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+		await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Done' })).toHaveFocus());
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 		await vi.waitFor(() => expect(screen.queryByText('Restore finished')).toBeNull());
+	});
+
+	test('after Done, opening the dialog again starts from the beginning', async () => {
+		const view = await replaceRestore({
+			success: true,
+			imported: { vehicles: 1 },
+			grants: { reapplied: 0, dropped: [dropped('car-1', 'no_accepted_share')] }
+		});
+		await fireEvent.click(await screen.findByRole('button', { name: 'Done' }));
+		await vi.waitFor(() => expect(screen.queryByText('Restore finished')).toBeNull());
+
+		await view.rerender({ open: true });
+
+		expect(await screen.findByText('Restore Data')).toBeInTheDocument();
+		expect(screen.queryByTestId('restore-dropped-grants')).toBeNull();
+		expect(screen.getByText('Restore from provider')).toBeInTheDocument();
 	});
 
 	test('when every grant came back the dialog just closes', async () => {

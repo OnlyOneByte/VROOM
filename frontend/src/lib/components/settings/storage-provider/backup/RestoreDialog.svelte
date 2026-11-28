@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { formatBytes, formatDateWith } from '#lib/utils/formatters.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
@@ -88,10 +89,13 @@
 	let error = $state<string | null>(null);
 	let droppedGrants = $state<DroppedGrant[]>([]);
 	let carNames = $state<Record<string, string>>({});
+	let carNamesRequest = 0;
+	let doneButton = $state<HTMLButtonElement | null>(null);
 
 	function resetState() {
 		droppedGrants = [];
 		carNames = {};
+		carNamesRequest++;
 		step = 1;
 		flowType = null;
 		providerSubStep = 'pick-provider';
@@ -256,12 +260,14 @@
 			onRestore(result);
 			const dropped = result.grants?.dropped ?? [];
 			if (dropped.length === 0) {
-				open = false;
+				close();
 				return;
 			}
 			droppedGrants = dropped;
 			step = 4;
 			void loadCarNames();
+			await tick();
+			doneButton?.focus();
 		} catch (err) {
 			error = `Couldn't restore. ${userFacingErrorMessage(err)}`;
 			mergeInstead = restoreMode === 'replace' && err instanceof ApiError && err.statusCode === 409;
@@ -271,31 +277,38 @@
 		}
 	}
 
-	async function loadCarNames() {
-		try {
-			const cars = await vehicleApi.getVehicles();
-			carNames = Object.fromEntries(cars.map(car => [car.id, getVehicleDisplayName(car)]));
-		} catch {
-			carNames = {};
-		}
+	function close() {
+		open = false;
+		resetState();
+		onClose();
 	}
 
-	let droppedLines = $derived.by(() => {
-		const lines: Record<string, { car: string; reason: string; count: number }> = {};
+	async function loadCarNames() {
+		const request = ++carNamesRequest;
+		let names: Record<string, string>;
+		try {
+			const cars = await vehicleApi.getVehicles();
+			names = Object.fromEntries(cars.map(car => [car.id, getVehicleDisplayName(car)]));
+		} catch {
+			names = {};
+		}
+		if (request === carNamesRequest) carNames = names;
+	}
+
+	let droppedCars = $derived.by(() => {
+		const cars: Record<string, { car: string; reasons: Record<string, number> }> = {};
 		for (const grant of droppedGrants) {
-			const key = `${grant.vehicleId} ${grant.reason}`;
-			const line = lines[key];
-			if (line) line.count++;
-			else {
-				const car =
+			const entry = (cars[grant.vehicleId] ??= {
+				car:
 					grant.reason === 'vehicle_not_restored'
 						? 'A car not in this backup'
-						: (carNames[grant.vehicleId] ?? 'One of your cars');
-				const reason = DROPPED_REASONS[grant.reason] ?? 'it no longer applies';
-				lines[key] = { car, reason, count: 1 };
-			}
+						: (carNames[grant.vehicleId] ?? 'One of your cars'),
+				reasons: {}
+			});
+			const reason = DROPPED_REASONS[grant.reason] ?? 'it no longer applies';
+			entry.reasons[reason] = (entry.reasons[reason] ?? 0) + 1;
 		}
-		return Object.entries(lines);
+		return Object.entries(cars);
 	});
 
 	function mergeInsteadOfReplace() {
@@ -638,17 +651,19 @@
 						Access someone had on a car comes back only while it still fits that car. These didn't:
 					</p>
 					<ul class="space-y-2">
-						{#each droppedLines as [key, line] (key)}
+						{#each droppedCars as [vehicleId, entry] (vehicleId)}
 							<li class="rounded-(--r-md) border bg-surface p-3 text-sm">
-								<div class="font-medium text-foreground">{line.car}</div>
-								<div class="text-muted-foreground">
-									{line.count === 1 ? '1 sharing setting' : `${line.count} sharing settings`}: {line.reason}.
-								</div>
+								<div class="font-medium text-foreground">{entry.car}</div>
+								{#each Object.entries(entry.reasons) as [reason, count] (reason)}
+									<div class="text-muted-foreground">
+										{count === 1 ? '1 sharing setting' : `${count} sharing settings`}: {reason}.
+									</div>
+								{/each}
 							</li>
 						{/each}
 					</ul>
 					<p class="text-sm text-muted-foreground">
-						You can set them again from the car's sharing settings.
+						To give someone access again, use the sharing settings on that car.
 					</p>
 				</div>
 			{/if}
@@ -662,9 +677,9 @@
 			{/if}
 			<div class="flex-1"></div>
 			{#if step === 4}
-				<Button onclick={() => (open = false)}>Done</Button>
+				<Button bind:ref={doneButton} onclick={close}>Done</Button>
 			{:else}
-				<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
+				<Button variant="outline" onclick={close}>Cancel</Button>
 			{/if}
 			{#if step === 3 && restorePreview}
 				<Button disabled={isProcessing} onclick={handleRestore}>
