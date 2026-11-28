@@ -33,7 +33,7 @@ import {
   requireVehicleAccess,
   requireVehiclesAccess,
 } from '../../utils/vehicle-access';
-import { memberView } from '../drivers/attribution';
+import { memberView, withoutOwnerIds } from '../drivers/attribution';
 import { expenseSplitService } from '../expenses/split-service';
 import { withMileageDue } from './mileage-due';
 import { recurringCostSummary } from './reminder-cost';
@@ -358,9 +358,12 @@ routes.post(
         await repos().reminders.deactivate(id, ownerId);
         return c.json({
           success: true,
-          data: reminderToApi(
-            { ...reminder, isActive: false },
-            await repos().preferences.moneyScale(ownerId)
+          data: withoutOwnerIds(
+            c,
+            reminderToApi(
+              { ...reminder, isActive: false },
+              await repos().preferences.moneyScale(ownerId)
+            )
           ),
         });
       }
@@ -370,7 +373,10 @@ routes.post(
     const updated = await repos().reminders.markServiced(id, ownerId, fields);
     return c.json({
       success: true,
-      data: reminderToApi(updated, await repos().preferences.moneyScale(ownerId)),
+      data: withoutOwnerIds(
+        c,
+        reminderToApi(updated, await repos().preferences.moneyScale(ownerId))
+      ),
     });
   }
 );
@@ -426,12 +432,16 @@ routes.post(
     return c.json(
       {
         success: true,
-        data: reminderWithVehiclesToApi(result, scale),
+        data: memberReminder(c, reminderWithVehiclesToApi(result, scale)),
       },
       201
     );
   }
 );
+
+function memberReminder<T extends { reminder: object }>(c: Context, row: T): T {
+  return { ...row, reminder: withoutOwnerIds(c, row.reminder) };
+}
 
 routes.get('/', authorize(fromQueryVehicle), async (c) => {
   const user = c.get('user');
@@ -467,7 +477,10 @@ routes.get('/', authorize(fromQueryVehicle), async (c) => {
   const scale = await repos().preferences.moneyScale(listUserId);
   const fullVehicleIds = new Map(reminders.map((row) => [row.reminder.id, row.vehicleIds]));
   const withDue = await withMileageDue(visible, fullVehicleIds, user.id);
-  return c.json({ success: true, data: withDue.map((r) => reminderWithVehiclesToApi(r, scale)) });
+  return c.json({
+    success: true,
+    data: withDue.map((r) => memberReminder(c, reminderWithVehiclesToApi(r, scale))),
+  });
 });
 
 routes.get(
@@ -578,7 +591,10 @@ routes.put(
 
     return c.json({
       success: true,
-      data: reminderWithVehiclesToApi(result, await repos().preferences.moneyScale(ownerId)),
+      data: memberReminder(
+        c,
+        reminderWithVehiclesToApi(result, await repos().preferences.moneyScale(ownerId))
+      ),
     });
   }
 );
