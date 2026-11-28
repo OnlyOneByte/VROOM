@@ -1,25 +1,24 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { openAsyncDatabase } from '../../../db/async-sqlite';
 import { AnalyticsRepository } from '../repository';
 import {
-  createTestDb,
+  type AnalyticsTestDb,
+  openAnalyticsTestDb,
   seedExpense,
   seedUser,
   seedVehicle,
-  type TestDb,
-  type TestExpense,
-} from './analytics-test-generators';
+} from './analytics-test-db';
+import type { TestExpense } from './analytics-test-generators';
 
-let testDb: TestDb;
+let testDb: AnalyticsTestDb;
 let repo: AnalyticsRepository;
 
-beforeEach(() => {
-  testDb = createTestDb();
-  repo = new AnalyticsRepository(openAsyncDatabase(testDb.drizzle.$client).db);
+beforeEach(async () => {
+  testDb = await openAnalyticsTestDb();
+  repo = new AnalyticsRepository(testDb.asyncDb);
 });
 
 afterEach(() => {
-  testDb.sqlite.close();
+  testDb.close();
 });
 
 const USER = { id: 'user-1', email: 'cal@test.com', displayName: 'Cal' };
@@ -52,12 +51,12 @@ describe('fuel-stats This/Last Month are calendar months (year-scoped)', () => {
     const curMonth = now.getUTCMonth();
     const curYear = now.getUTCFullYear();
 
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEHICLE);
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEHICLE);
 
-    seedExpense(testDb.sqlite, fillup('cur', curYear, curMonth, 10));
-    seedExpense(testDb.sqlite, fillup('prev-yr', curYear - 1, curMonth, 99));
-    seedExpense(testDb.sqlite, fillup('two-yr', curYear - 2, curMonth, 99));
+    await seedExpense(testDb.sql, fillup('cur', curYear, curMonth, 10));
+    await seedExpense(testDb.sql, fillup('prev-yr', curYear - 1, curMonth, 99));
+    await seedExpense(testDb.sql, fillup('two-yr', curYear - 2, curMonth, 99));
 
     const stats = await repo.getFuelStats(USER.id, rangeFrom(curYear - 3));
 
@@ -74,11 +73,11 @@ describe('fuel-stats This/Last Month are calendar months (year-scoped)', () => {
     const prevMonth = curMonth === 0 ? 11 : curMonth - 1;
     const prevMonthYear = curMonth === 0 ? curYear - 1 : curYear;
 
-    seedUser(testDb.sqlite, USER);
-    seedVehicle(testDb.sqlite, VEHICLE);
+    await seedUser(testDb.sql, USER);
+    await seedVehicle(testDb.sql, VEHICLE);
 
-    seedExpense(testDb.sqlite, fillup('last', prevMonthYear, prevMonth, 7));
-    seedExpense(testDb.sqlite, fillup('wrong-yr', prevMonthYear - 1, prevMonth, 99));
+    await seedExpense(testDb.sql, fillup('last', prevMonthYear, prevMonth, 7));
+    await seedExpense(testDb.sql, fillup('wrong-yr', prevMonthYear - 1, prevMonth, 99));
 
     const stats = await repo.getFuelStats(USER.id, rangeFrom(prevMonthYear - 2));
 
