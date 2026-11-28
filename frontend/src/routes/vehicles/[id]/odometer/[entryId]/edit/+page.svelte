@@ -22,7 +22,12 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
 	import { isOdometerOrderError, odometerApi } from '#lib/services/odometer-api.ts';
-	import { dateOnlyToISO, formatNumber, toDateInputValue } from '#lib/utils/formatters.ts';
+	import {
+		dateOnlyToISO,
+		formatDate,
+		formatNumber,
+		toDateInputValue
+	} from '#lib/utils/formatters.ts';
 	import FormLayout from '#lib/components/common/form-layout.svelte';
 	import ExpensePhotoSection from '#lib/components/expenses/form/ExpensePhotoSection.svelte';
 	import type { PageData } from './$types';
@@ -30,7 +35,10 @@
 	let { data }: { data: PageData } = $props();
 	let vehicleId = $derived(data.vehicleId);
 	let entryId = $derived(data.entryId);
-	let returnTo = $derived(page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}`);
+	let returnTo = $derived(
+		page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}?tab=odometer`
+	);
+	let saved = $state<{ odometer: number; recordedAt: string } | null>(null);
 
 	let odometer = $state<string | number | null>('');
 	let date = $state('');
@@ -88,6 +96,7 @@
 				return;
 			}
 
+			saved = { odometer: entry.odometer, recordedAt: entry.recordedAt };
 			odometer = String(entry.odometer);
 			date = toDateInputValue(entry.recordedAt);
 			note = entry.note ?? '';
@@ -324,7 +333,12 @@
 		<Dialog.Header>
 			<Dialog.Title>Delete reading</Dialog.Title>
 			<Dialog.Description>
-				Are you sure you want to delete this odometer reading? This action cannot be undone.
+				{#if saved}
+					Delete the {formatNumber(saved.odometer, 0)} reading from {formatDate(saved.recordedAt)}?
+				{:else}
+					Delete this odometer reading?
+				{/if}
+				This can't be undone.
 			</Dialog.Description>
 		</Dialog.Header>
 		{#if deleteError}

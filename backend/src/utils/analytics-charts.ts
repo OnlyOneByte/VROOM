@@ -255,11 +255,11 @@ export function effectiveMonthlyPremium(term: {
   monthlyCost: number | null;
   totalCost: number | null;
 }): number {
-  if (term.monthlyCost != null) return term.monthlyCost;
-  if (term.totalCost == null) return 0;
-
-  if (!term.startDate || !term.endDate) return 0;
-  return term.totalCost / termBillingMonths(term.startDate, term.endDate);
+  if (term.totalCost != null && term.totalCost > 0 && term.startDate && term.endDate) {
+    return term.totalCost / termBillingMonths(term.startDate, term.endDate);
+  }
+  if (term.monthlyCost != null && term.monthlyCost > 0) return term.monthlyCost;
+  return 0;
 }
 
 interface AmortizationLoan {

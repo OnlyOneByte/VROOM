@@ -281,15 +281,15 @@ describe('analytics routes (real HTTP stack)', () => {
 
   test('a 0%-APR active loan still appears in loanBreakdown with a principal series', async () => {
     const vehicleId = await seedVehicle(ctx, { nickname: 'Promo Lease' });
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO vehicle_financing
          (id, vehicle_id, financing_type, provider, original_amount, apr, term_months, start_date, payment_amount, is_active)
-       VALUES ('fin-0apr', ?, 'loan', 'Dealer 0% Promo', 12000, 0, 24, ?, 500, 1)`,
+       VALUES ('fin-0apr', ?, 'loan', 'Dealer 0% Promo', 12000, 0, 24, ?, 500, TRUE)`,
       [vehicleId, Math.floor(new Date('2024-01-01').getTime() / 1000)]
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO expenses (id, vehicle_id, user_id, category, expense_amount, date, source_type, source_id, missed_fillup)
-       VALUES ('pay-0apr', ?, ?, 'financial', 500, ?, 'financing', 'fin-0apr', 0)`,
+       VALUES ('pay-0apr', ?, ?, 'financial', 500, ?, 'financing', 'fin-0apr', FALSE)`,
       [vehicleId, ctx.user.id, Math.floor(new Date('2024-02-01').getTime() / 1000)]
     );
 

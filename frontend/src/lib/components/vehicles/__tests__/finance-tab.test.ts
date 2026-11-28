@@ -347,6 +347,12 @@ describe('FinanceTab loan summary', () => {
 		expect(screen.queryByRole('region', { name: 'Next payment' })).toBeNull();
 		expect(screen.queryByText('Payments made')).toBeNull();
 	});
+
+	test('with neither a next payment nor a schedule to draw, the two-column row is not there at all', async () => {
+		mount(makeVehicle(makeLease({ paymentAmount: 0 })));
+		await screen.findByText(/payments? recorded|No payments/);
+		expect(screen.queryByTestId('finance-next-payment-grid')).toBeNull();
+	});
 });
 
 describe('FinanceTab lease', () => {

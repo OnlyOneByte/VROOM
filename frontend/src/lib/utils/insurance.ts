@@ -112,6 +112,28 @@ export function getLatestTerm(terms: InsuranceTerm[]): InsuranceTerm | undefined
 	return latest;
 }
 
+export function splitTermsByToday(
+	terms: InsuranceTerm[],
+	now: Date = new Date()
+): {
+	shown: InsuranceTerm | undefined;
+	startsLater: boolean;
+	upcoming: InsuranceTerm | undefined;
+	others: InsuranceTerm[];
+} {
+	const started = (t: InsuranceTerm) => getDaysRemaining(t.startDate, now) <= 0;
+	const byStart = (a: InsuranceTerm, b: InsuranceTerm) => a.startDate.localeCompare(b.startDate);
+	const inForce = sortTermsByEndDateDesc(terms.filter(t => started(t) && !hasTermEnded(t, now)))[0];
+	const future = terms.filter(t => !started(t)).sort(byStart);
+	const shown = inForce ?? future[0] ?? getLatestTerm(terms);
+	return {
+		shown,
+		startsLater: shown !== undefined && !started(shown),
+		upcoming: future.find(t => t.id !== shown?.id),
+		others: terms.filter(t => t.id !== shown?.id).sort((a, b) => byStart(b, a))
+	};
+}
+
 export function prefillFromPreviousTerm(
 	term: InsuranceTerm
 ): Omit<InsuranceTerm, 'id' | 'policyId' | 'startDate' | 'endDate' | 'createdAt' | 'updatedAt'> {

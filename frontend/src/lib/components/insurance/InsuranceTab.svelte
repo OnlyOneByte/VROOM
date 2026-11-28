@@ -14,9 +14,8 @@
 	import {
 		CLAIM_STATUS_LABELS,
 		getDaysRemaining,
-		getLatestTerm,
 		groupPoliciesByActive,
-		sortTermsByEndDateDesc
+		splitTermsByToday
 	} from '#lib/utils/insurance.ts';
 	import { cn } from '#lib/utils.js';
 	import type { InsuranceClaim, InsurancePolicy, InsuranceTerm } from '#lib/types/index.ts';
@@ -34,20 +33,18 @@
 	let error = $state<string | null>(null);
 	let claimsError = $state<string | null>(null);
 	let claimsLoading = $state(true);
-	let showPastTerms = $state(false);
+	let showOtherTerms = $state(false);
 
-	let returnTo = $derived(resolve(paramRoutes.vehicle, { id: vehicleId }));
+	let returnTo = $derived(`${resolve(paramRoutes.vehicle, { id: vehicleId })}?tab=insurance`);
 	let ordered = $derived.by(() => {
 		const { active, inactive } = groupPoliciesByActive(policies);
 		return [...active, ...inactive];
 	});
-	let pastTerms = $derived(
-		ordered.flatMap(policy => {
-			const latest = getLatestTerm(policy.terms);
-			return sortTermsByEndDateDesc(policy.terms)
-				.filter(t => t.id !== latest?.id)
-				.map(term => ({ policy, term }));
-		})
+	let termsByPolicy = $derived(new Map(policies.map(p => [p.id, splitTermsByToday(p.terms)])));
+	let otherTerms = $derived(
+		ordered.flatMap(policy =>
+			(termsByPolicy.get(policy.id)?.others ?? []).map(term => ({ policy, term }))
+		)
 	);
 
 	onMount(async () => {
@@ -118,6 +115,11 @@
 		]
 			.filter(Boolean)
 			.join(' · ');
+	}
+
+	function termState(term: InsuranceTerm): string {
+		if (getDaysRemaining(term.startDate) > 0) return 'Upcoming';
+		return getDaysRemaining(term.endDate) < 0 ? 'Ended' : 'In force';
 	}
 
 	function renewalText(term: InsuranceTerm): string {
@@ -192,11 +194,12 @@
 			</div>
 			<ul class="divide-y border-y">
 				{#each ordered as policy (policy.id)}
-					{@const term = getLatestTerm(policy.terms)}
+					{@const split = termsByPolicy.get(policy.id)}
+					{@const term = split?.shown}
 					{@const cost = costText(term)}
 					{@const days = term ? getDaysRemaining(term.endDate) : null}
 					{@const coverage = coverageText(term)}
-					<li class="flex">
+					<li class="flex flex-col">
 						<svelte:element
 							this={readOnly ? 'div' : 'a'}
 							href={readOnly ? undefined : policyHref(policy)}
@@ -214,39 +217,48 @@
 								{#if coverage}
 									<span class="block text-sm text-muted-foreground">{coverage}</span>
 								{/if}
-								{#if policy.notes?.trim()}
-									<span class="block text-sm break-words text-muted-foreground">
-										{policy.notes}
-									</span>
-								{/if}
 							</span>
-							<span class="shrink-0 text-right">
+							<span class="max-w-[40%] shrink-0 text-right">
 								{#if cost}
-									<span class="block font-semibold tabular-nums">{cost}</span>
+									<span class="block font-semibold whitespace-nowrap tabular-nums">{cost}</span>
 								{/if}
 								{#if term && days !== null && policy.isActive}
-									<span class={cn('block text-sm', statusTone(days))}>{renewalText(term)}</span>
+									{#if split?.startsLater}
+										<span class="block text-sm text-muted-foreground">
+											Starts <span class="whitespace-nowrap">{formatDate(term.startDate)}</span>
+										</span>
+									{:else if split?.upcoming && days >= 0}
+										<span class="block text-sm text-muted-foreground">
+											Next term from
+											<span class="whitespace-nowrap">{formatDate(split.upcoming.startDate)}</span>
+										</span>
+									{:else}
+										<span class={cn('block text-sm', statusTone(days))}>{renewalText(term)}</span>
+									{/if}
 								{/if}
 							</span>
 						</svelte:element>
+						{#if policy.notes?.trim()}
+							<p class="-mt-1 pb-3 text-sm break-words text-muted-foreground">{policy.notes}</p>
+						{/if}
 					</li>
 				{/each}
 			</ul>
-			{#if pastTerms.length > 0}
+			{#if otherTerms.length > 0}
 				<Button
 					variant="ghost"
 					class="-ml-3"
-					aria-expanded={showPastTerms}
-					aria-controls="vehicle-past-terms"
-					onclick={() => (showPastTerms = !showPastTerms)}
+					aria-expanded={showOtherTerms}
+					aria-controls="vehicle-other-terms"
+					onclick={() => (showOtherTerms = !showOtherTerms)}
 				>
-					{showPastTerms
-						? 'Hide past terms'
-						: `Show ${pastTerms.length} past ${pastTerms.length === 1 ? 'term' : 'terms'}`}
+					{showOtherTerms
+						? 'Hide other terms'
+						: `Show ${otherTerms.length} other ${otherTerms.length === 1 ? 'term' : 'terms'}`}
 				</Button>
-				{#if showPastTerms}
-					<ul class="divide-y border-y" id="vehicle-past-terms" aria-label="Past terms">
-						{#each pastTerms as { policy, term } (term.id)}
+				{#if showOtherTerms}
+					<ul class="divide-y border-y" id="vehicle-other-terms" aria-label="Other terms">
+						{#each otherTerms as { policy, term } (term.id)}
 							{@const cost = costText(term)}
 							<li class="flex items-center justify-between gap-4 py-3">
 								<span class="min-w-0">
@@ -254,7 +266,7 @@
 										{policy.company}
 									</span>
 									<span class="block text-sm text-muted-foreground">
-										{policyMeta({ ...policy, isActive: true }, term)}
+										{policyMeta({ ...policy, isActive: true }, term)} · {termState(term)}
 									</span>
 								</span>
 								{#if cost}

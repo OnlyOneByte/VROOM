@@ -10,7 +10,7 @@ import * as schema from '../../../db/schema';
 import { insuranceTerms, insuranceTermVehicles } from '../../../db/schema';
 import { DatabaseError, NotFoundError } from '../../../errors';
 import { InsurancePolicyRepository } from '../repository';
-import { companyNameArb, validTermInputArb } from './insurance-test-generators';
+import { companyNameArb, inSequence, validTermInputArb } from './insurance-test-generators';
 
 let sqliteDb: Database;
 let db: AppDatabase;
@@ -128,7 +128,8 @@ describe('insurance term CRUD round-trip', () => {
         userVehicleIdsArb,
         validTermInputArb,
         validTermInputArb,
-        async (company, vehicleIds, baseTerm, newTerm) => {
+        async (company, vehicleIds, firstTerm, secondTerm) => {
+          const [baseTerm, newTerm] = inSequence([firstTerm, secondTerm]);
           const created = await repo.create(
             {
               company,
@@ -200,7 +201,8 @@ describe('insurance term CRUD round-trip', () => {
         userVehicleIdsArb,
         validTermInputArb,
         validTermInputArb,
-        async (company, vehicleIds, term1, term2) => {
+        async (company, vehicleIds, firstTerm, secondTerm) => {
+          const [term1, term2] = inSequence([firstTerm, secondTerm]);
           const created = await repo.create(
             {
               company,
@@ -314,7 +316,7 @@ describe('insurance term-vehicle junction FK cascade', () => {
           const created = await repo.create(
             {
               company,
-              terms: terms.map((t) => ({ ...t, vehicleCoverage: { vehicleIds } })),
+              terms: inSequence(terms).map((t) => ({ ...t, vehicleCoverage: { vehicleIds } })),
               isActive: true,
             },
             USER_ID
