@@ -16,6 +16,7 @@
 		group: ReminderRowGroup;
 		vehicleNames: Map<string, string>;
 		servicing: boolean;
+		distanceLabel?: string;
 		now?: number;
 		onEdit: (_item: ReminderWithVehicles) => void;
 		onDelete: (_item: ReminderWithVehicles) => void;
@@ -29,6 +30,7 @@
 		group,
 		vehicleNames,
 		servicing,
+		distanceLabel = 'mi',
 		now = Date.now(),
 		onEdit,
 		onDelete,
@@ -39,6 +41,7 @@
 
 	const DAY_MS = 86_400_000;
 	const SOON_DAYS = 30;
+	const SOON_DISTANCE = 1000;
 
 	let menuOpen = $state(false);
 
@@ -66,7 +69,18 @@
 			return { text: `In ${formatNumber(daysLeft, 0)} days`, tone };
 		}
 		if (reminder.nextDueOdometer !== null) {
-			return { text: `At ${formatNumber(reminder.nextDueOdometer, 0)}`, tone: 'muted' };
+			const current = item.currentOdometer;
+			if (typeof current !== 'number') {
+				return {
+					text: `At ${formatNumber(reminder.nextDueOdometer, 0)} ${distanceLabel}`,
+					tone: 'muted'
+				};
+			}
+			const left = Math.max(0, reminder.nextDueOdometer - current);
+			return {
+				text: `In ${formatNumber(left, 0)} ${distanceLabel}`,
+				tone: left <= SOON_DISTANCE ? 'warning' : 'muted'
+			};
 		}
 		return { text: 'Scheduled', tone: 'muted' };
 	});
@@ -136,7 +150,7 @@
 		>
 			{status.text}
 		</p>
-		{#if group !== 'paused' && mileage}
+		{#if group === 'due' && mileage}
 			<Button
 				variant="link"
 				class="h-10 px-0"
@@ -169,6 +183,17 @@
 				<Pencil />
 				Edit
 			</Button>
+			{#if group === 'upcoming' && mileage}
+				<Button
+					variant="ghost"
+					class="h-10 w-full justify-start"
+					disabled={servicing}
+					onclick={() => choose(onMarkServiced)}
+				>
+					<Gauge />
+					Mark serviced
+				</Button>
+			{/if}
 			{#if reminder.type === 'expense'}
 				<Button
 					variant="ghost"

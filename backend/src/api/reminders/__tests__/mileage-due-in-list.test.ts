@@ -60,6 +60,24 @@ describe('reminder list: mileage milestone reached', () => {
     expect(due.get('rem-two-cars')).toBe(false);
   });
 
+  test('each single-car mileage reminder carries the reading it was compared with', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    const otherId = await seedVehicle(ctx);
+    await seedMileageReminder(ctx, 'rem-ahead', vehicleId, 43000);
+    await seedMileageReminder(ctx, 'rem-time', vehicleId, 43000);
+    await ctx.sql.run("UPDATE reminders SET trigger_mode = 'time' WHERE id = 'rem-time'");
+    await seedMileageReminder(ctx, 'rem-unread', otherId, 43000);
+    await addOdometerReading(ctx, vehicleId, 40360);
+
+    const res = await ctx.authed('GET', '/api/v1/reminders');
+    const body = await json<DataEnvelope<(Row & { currentOdometer: number | null })[]>>(res);
+    const reading = new Map(body.data.map((row) => [row.reminder.id, row.currentOdometer]));
+
+    expect(reading.get('rem-ahead')).toBe(40360);
+    expect(reading.get('rem-time')).toBeNull();
+    expect(reading.get('rem-unread')).toBeNull();
+  });
+
   test('a car with no reading is not due', async () => {
     const vehicleId = await seedVehicle(ctx);
     await seedMileageReminder(ctx, 'rem-none', vehicleId, 10000);

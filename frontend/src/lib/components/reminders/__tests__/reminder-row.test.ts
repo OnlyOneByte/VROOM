@@ -80,14 +80,55 @@ describe('ReminderRow status', () => {
 		expect(screen.getByText('In 68 days')).toHaveClass('text-muted-foreground');
 	});
 
-	test('an odometer-only reminder names the reading and offers Mark serviced', () => {
-		renderRow(
-			item({ triggerMode: 'mileage', nextDueDate: null, nextDueOdometer: 40000 }),
-			'upcoming'
-		);
-		expect(screen.getByText('At 40,000')).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Mark serviced' })).toBeInTheDocument();
+	const odometerOnly = (currentOdometer?: number | null) => ({
+		...item({ triggerMode: 'mileage', nextDueDate: null, nextDueOdometer: 43000 }),
+		currentOdometer
+	});
+
+	test('an upcoming odometer reminder says how far is left, muted while it is still far', () => {
+		renderRow(odometerOnly(40360), 'upcoming');
+		expect(screen.getByText('In 2,640 mi')).toHaveClass('text-muted-foreground');
 		expect(rowText()).not.toContain('on the odometer');
+	});
+
+	test('within 1,000 of the reading it turns to the warning colour, in the car’s unit', () => {
+		render(ReminderRow, {
+			props: {
+				item: odometerOnly(42200),
+				group: 'upcoming',
+				vehicleNames: new Map(),
+				servicing: false,
+				distanceLabel: 'km',
+				now: NOW,
+				onEdit: vi.fn(),
+				onDelete: vi.fn(),
+				onToggleActive: vi.fn(),
+				onMarkServiced: vi.fn(),
+				onViewExpenses: vi.fn()
+			}
+		});
+		expect(screen.getByText('In 800 km')).toHaveClass('text-warning');
+	});
+
+	test('with no reading yet it names the target reading', () => {
+		renderRow(odometerOnly(null), 'upcoming');
+		expect(screen.getByText('At 43,000 mi')).toHaveClass('text-muted-foreground');
+	});
+
+	test('before it is due, Mark serviced waits in the actions menu', async () => {
+		const handlers = renderRow(odometerOnly(40360), 'upcoming');
+		expect(screen.queryByRole('button', { name: 'Mark serviced' })).toBeNull();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'More actions for Oil change' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Mark serviced' }));
+		expect(handlers.onMarkServiced).toHaveBeenCalledTimes(1);
+	});
+
+	test('once due, Mark serviced is offered in the row', () => {
+		const handlers = renderRow(odometerOnly(43100), 'due');
+		expect(screen.getByText('Due now')).toHaveClass('text-warning');
+		screen.getByRole('button', { name: 'Mark serviced' }).click();
+		expect(handlers.onMarkServiced).toHaveBeenCalledTimes(1);
 	});
 
 	test('a paused reminder with a vehicle offers Resume; one without a vehicle explains why not', () => {
