@@ -2,6 +2,7 @@ import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
 import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
+import { csvDelimiter } from '../../utils/csv-delimiter';
 import { alwaysAvailable, type ProviderDescriptor } from '../providers/descriptor';
 import { fuelioFormat } from './fuelio-import';
 import {
@@ -122,7 +123,12 @@ export function sampleHeaders(sample: string): string[] {
   const line = sample.split(/\r?\n/).find((l) => l.trim() !== '');
   if (!line) return [];
   try {
-    const rows = parse(line, { bom: true, relax_quotes: true, trim: true }) as string[][];
+    const rows = parse(line, {
+      bom: true,
+      delimiter: csvDelimiter(line),
+      relax_quotes: true,
+      trim: true,
+    }) as string[][];
     return rows[0] ?? [];
   } catch {
     return [];

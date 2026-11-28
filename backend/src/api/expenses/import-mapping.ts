@@ -2,6 +2,7 @@ import { parse } from 'csv-parse/sync';
 import { z } from 'zod';
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
+import { csvDelimiter } from '../../utils/csv-delimiter';
 import { convertDistance, convertVolume } from '../../utils/unit-conversions';
 import { buildImportDate } from './local-date';
 
@@ -191,11 +192,18 @@ export function normalizeForeignDate(
   else [year, month, day] = nums;
   if (year < 100) year += 2000;
 
-  const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map((t) => Number.parseInt(t, 10) || 0);
+  const time = clockTime(timePart);
+  if (time === null) return s;
 
   // new Date("YYYY-MM-DD") would shift the day; buildImportDate keeps the calendar day.
-  const dt = buildImportDate(year, month, day, timeZone, timePart ? [hh, mm, ss] : undefined);
+  const dt = buildImportDate(year, month, day, timeZone, time);
   return dt ? dt.toISOString() : s;
+}
+
+function clockTime(timePart: string): [number, number, number] | null | undefined {
+  if (!timePart) return undefined;
+  const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map((t) => Number.parseInt(t, 10) || 0);
+  return hh <= 23 && mm <= 59 && ss <= 59 ? [hh, mm, ss] : null;
 }
 
 function mapCategory(
@@ -303,6 +311,7 @@ export function applyMapping(
   try {
     records = parse(foreignCsv, {
       bom: true,
+      delimiter: csvDelimiter(foreignCsv),
       columns: true,
       skip_empty_lines: true,
       trim: true,

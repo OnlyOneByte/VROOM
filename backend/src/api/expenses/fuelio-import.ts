@@ -1,6 +1,7 @@
 import { parse } from 'csv-parse/sync';
 import type { ExpenseCategory } from '../../db/types';
 import { DistanceUnit, VolumeUnit } from '../../types';
+import { csvDelimiter } from '../../utils/csv-delimiter';
 import {
   CSV_ACCEPT,
   CsvMappingError,
@@ -66,7 +67,7 @@ function splitSections(text: string): Record<string, string> {
   const blocks: Record<string, string[]> = {};
   let current: string | null = null;
   for (const line of text.split(/\r?\n/)) {
-    const marker = /^\s*"?##\s*([A-Za-z]+)"?,*\s*$/.exec(line);
+    const marker = /^\s*"?##\s*([A-Za-z]+)"?[,;\t]*\s*$/.exec(line);
     if (marker?.[1]) {
       current = marker[1].toLowerCase();
       blocks[current] = [];
@@ -81,6 +82,7 @@ function parseBlock(block: string | undefined): Record<string, string>[] {
   if (!block?.trim()) return [];
   return parse(block, {
     bom: true,
+    delimiter: csvDelimiter(block),
     columns: true,
     skip_empty_lines: true,
     trim: true,

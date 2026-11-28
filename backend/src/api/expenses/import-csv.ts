@@ -9,6 +9,7 @@ import {
   isElectricFuelType,
 } from '../../db/types';
 import { ValidationError } from '../../errors';
+import { csvDelimiter } from '../../utils/csv-delimiter';
 import { denormalizeCsvCell } from '../../utils/csv-safety';
 import { dollarsToCents, hasAtMostTwoDecimals, parsedToMinor } from '../../utils/money';
 import { isValidTimeZone } from '../../utils/time-zone';
@@ -20,7 +21,7 @@ import {
   ODOMETER_TOO_HIGH_MESSAGE,
   VOLUME_TOO_HIGH_MESSAGE,
 } from '../../utils/validation';
-import { buildImportDate } from './local-date';
+import { buildCalendarDate, buildImportDate } from './local-date';
 import { clearFuelFieldsIfNotFuel, MILEAGE_NOT_POSITIVE_MESSAGE } from './validation';
 
 export interface ImportVehicle {
@@ -76,8 +77,12 @@ function makeCellGetter(record: Record<string, string>): CellGetter {
   return (k: string) => denormalizeCsvCell((record[k] ?? '').trim());
 }
 
-function parseAmount(raw: string): { value: number } | { error: string } {
-  const amount = Number(raw);
+function toNumber(raw: string, decimalComma: boolean): number {
+  return Number(decimalComma && /^\d+,\d+$/.test(raw) ? raw.replace(',', '.') : raw);
+}
+
+function parseAmount(raw: string, decimalComma = false): { value: number } | { error: string } {
+  const amount = toNumber(raw, decimalComma);
   if (!raw || !Number.isFinite(amount) || amount <= 0) {
     return { error: `Invalid amount "${raw}"` };
   }
@@ -92,10 +97,11 @@ function parseAmount(raw: string): { value: number } | { error: string } {
 
 function parseMileage(
   raw: string,
-  category: (typeof EXPENSE_CATEGORIES)[number]
+  category: (typeof EXPENSE_CATEGORIES)[number],
+  decimalComma = false
 ): { value: number | null } | { error: string } {
   if (!raw) return { value: null };
-  const m = Number(raw);
+  const m = toNumber(raw, decimalComma);
   if (!Number.isInteger(m) || m < 0) return { error: `Invalid mileage "${raw}"` };
   if (m === 0)
     return category === 'fuel' ? { error: MILEAGE_NOT_POSITIVE_MESSAGE } : { value: null };
@@ -103,9 +109,12 @@ function parseMileage(
   return { value: m };
 }
 
-function parseVolume(raw: string): { value: number | null } | { error: string } {
+function parseVolume(
+  raw: string,
+  decimalComma = false
+): { value: number | null } | { error: string } {
   if (!raw) return { value: null };
-  const v = Number(raw);
+  const v = toNumber(raw, decimalComma);
   if (!Number.isFinite(v) || v <= 0) return { error: `Invalid volume "${raw}"` };
   if (v > EXP.maxVolume) return { error: VOLUME_TOO_HIGH_MESSAGE };
   return { value: v };
@@ -121,14 +130,31 @@ function parseCategory(
   return { value: category as (typeof EXPENSE_CATEGORIES)[number] };
 }
 
+const ISO_DATE_TIME =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/i;
+
+function clockTime(
+  hh: string,
+  mm: string | undefined,
+  ss: string | undefined
+): [number, number, number] | null {
+  const time: [number, number, number] = [Number(hh), Number(mm ?? 0), Number(ss ?? 0)];
+  return time[0] <= 23 && time[1] <= 59 && time[2] <= 59 ? time : null;
+}
+
 function parseDate(raw: string, timeZone?: string): { value: Date } | { error: string } {
   const invalid = { error: `Invalid date "${raw}". Use YYYY-MM-DD` };
+  const match = ISO_DATE_TIME.exec(raw.trim());
+  if (!match) return invalid;
+  const [, y, mo, d, hh, mm, ss, offset] = match;
+  const [year, month, day] = [Number(y), Number(mo), Number(d)];
+  if (!isDateInputYear(year)) return { error: DATE_OUT_OF_RANGE_MESSAGE };
+  if (!buildCalendarDate(year, month, day)) return invalid;
+  const time = hh === undefined ? undefined : clockTime(hh, mm, ss);
+  if (time === null) return invalid;
   // new Date("YYYY-MM-DD") parses as UTC and would shift the day west of UTC.
-  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
-  if (dateOnly) {
-    const [year, month, day] = [Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3])];
-    if (!isDateInputYear(year)) return { error: DATE_OUT_OF_RANGE_MESSAGE };
-    const date = buildImportDate(year, month, day, timeZone);
+  if (!offset) {
+    const date = buildImportDate(year, month, day, timeZone, time);
     return date ? { value: date } : invalid;
   }
   const parsed = dateInput.safeParse(raw);
@@ -205,7 +231,8 @@ function parseFuelCells(
 function parseRow(
   record: Record<string, string>,
   vehicleByName: Map<string, string | null>,
-  timeZone?: string
+  timeZone?: string,
+  decimalComma = false
 ): { expense: ImportableExpense } | { error: string } {
   const get = makeCellGetter(record);
 
@@ -215,13 +242,13 @@ function parseRow(
 
   const categoryResult = parseCategory(get('category'));
   if ('error' in categoryResult) return categoryResult;
-  const amountResult = parseAmount(get('amount'));
+  const amountResult = parseAmount(get('amount'), decimalComma);
   if ('error' in amountResult) return amountResult;
   const dateResult = parseDate(get('date'), timeZone);
   if ('error' in dateResult) return dateResult;
-  const mileageResult = parseMileage(get('mileage'), categoryResult.value);
+  const mileageResult = parseMileage(get('mileage'), categoryResult.value, decimalComma);
   if ('error' in mileageResult) return mileageResult;
-  const volumeResult = parseVolume(get('volume'));
+  const volumeResult = parseVolume(get('volume'), decimalComma);
   if ('error' in volumeResult) return volumeResult;
   const fuelCells = parseFuelCells(get);
   if ('error' in fuelCells) return fuelCells;
@@ -314,9 +341,11 @@ export function buildImportPlan(
   scale = 100
 ): ImportPlan {
   let records: Record<string, string>[];
+  const delimiter = csvDelimiter(csv);
   try {
     records = parse(csv, {
       bom: true,
+      delimiter,
       columns: true,
       skip_empty_lines: true,
       trim: true,
@@ -336,6 +365,8 @@ export function buildImportPlan(
       `Too many rows (${records.length}); the maximum is ${EXP.maxImportRows} per import`
     );
   }
+
+  const decimalComma = delimiter === ';';
 
   const vehicleByName = new Map<string, string | null>();
   const register = (name: string, id: string) => {
@@ -358,7 +389,9 @@ export function buildImportPlan(
       date: denormalizeCsvCell((record.date ?? '').trim()),
     };
     const preError = rowErrors.get(i);
-    const parsed = preError ? { error: preError } : parseRow(record, vehicleByName, timeZone);
+    const parsed = preError
+      ? { error: preError }
+      : parseRow(record, vehicleByName, timeZone, decimalComma);
     const result = 'error' in parsed ? parsed : fitsCurrency(parsed, scale);
     const rowNum = i + 2;
     if ('error' in result) {
