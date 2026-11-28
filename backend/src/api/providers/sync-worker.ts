@@ -5,6 +5,7 @@ import { isSyncError, SyncErrorCode } from '../../errors';
 import { extractErrorMessage } from '../../utils/error-handling';
 import { logger } from '../../utils/logger';
 import { OPERATION_TIMEOUTS, withTimeout } from '../../utils/timeout';
+import { MAX_FILE_SIZE } from '../photos/photo-service';
 import { storageProviderRegistry } from './domains/storage/registry';
 import type { PhotoCategory, StorageProvider } from './domains/storage/storage-provider';
 import { ENTITY_TO_CATEGORY } from './domains/storage/storage-provider';
@@ -260,10 +261,10 @@ async function processSingleRef(
     const buffer = await withHealth(
       sourceRef.providerId,
       withTimeout(
-        sourceProvider.download({
-          providerType: sourceProvider.type,
-          externalId: sourceRef.storageRef,
-        }),
+        sourceProvider.download(
+          { providerType: sourceProvider.type, externalId: sourceRef.storageRef },
+          { maxBytes: MAX_FILE_SIZE }
+        ),
         OPERATION_TIMEOUTS.DOWNLOAD,
         'Photo sync download'
       )

@@ -16,6 +16,7 @@ import { getVlmProvider } from '../providers/domains/vlm/registry';
 import { resolveProvider } from '../providers/resolve';
 import { GooglePhotosService } from '../providers/services/google-photos-service';
 import {
+  MAX_SCAN_BYTES,
   ReceiptScanStopped,
   type ScanStopReason,
   type StageDeps,
@@ -102,7 +103,7 @@ routes.get(
     const vlmProvider = await getVlmProvider(vlmRow);
     const deps: StageDeps = {
       listReceiptPhotos: (max) => photosService.listReceiptPhotos(max),
-      downloadPhoto: (id) => photosService.download(id),
+      downloadPhoto: (id) => photosService.download(id, { maxBytes: MAX_SCAN_BYTES }),
       freshUrl: (id) => photosService.getFreshUrl(id),
       parseImage: async (bytes, mimeType) =>
         parseExtraction(await vlmProvider.extractReceipt({ data: bytes, mimeType })),

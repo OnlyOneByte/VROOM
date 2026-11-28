@@ -299,10 +299,10 @@ export async function getPhotoThumbnailForEntity(
   }
 
   const provider = await storageProviderRegistry.getProvider(ref.providerId, photo.userId);
-  const buffer = await provider.download({
-    providerType: provider.type,
-    externalId: ref.storageRef,
-  });
+  const buffer = await provider.download(
+    { providerType: provider.type, externalId: ref.storageRef },
+    { maxBytes: MAX_FILE_SIZE }
+  );
 
   return { buffer, mimeType: photo.mimeType };
 }

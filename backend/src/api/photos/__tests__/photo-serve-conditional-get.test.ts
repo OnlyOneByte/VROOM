@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
 import type {
+  DownloadOptions,
   StorageFileInfo,
   StorageProvider,
   StorageRef,
   UploadParams,
 } from '../../providers/domains/storage/storage-provider';
+import { MAX_FILE_SIZE } from '../photo-service';
 
 const PHOTO_BYTES = Buffer.alloc(2_621_440, 7);
 const STORAGE_KEY = 'receipts/receipt.jpg';
@@ -13,6 +15,7 @@ const PHOTO_PATH = '/api/v1/photos/expense/exp-1/photo-1/thumbnail';
 
 let ctx: TestApp;
 let downloads = 0;
+let downloadOptions: DownloadOptions | undefined;
 let restoreRegistry: () => void;
 
 async function installCountingProvider(): Promise<void> {
@@ -31,9 +34,10 @@ async function installCountingProvider(): Promise<void> {
   const counting: StorageProvider = {
     type: fake.type,
     upload: (params: UploadParams) => fake.upload(params),
-    download: (ref: StorageRef) => {
+    download: (ref: StorageRef, options?: DownloadOptions) => {
       downloads++;
-      return fake.download(ref);
+      downloadOptions = options;
+      return fake.download(ref, options);
     },
     delete: (ref: StorageRef) => fake.delete(ref),
     getExternalUrl: (ref: StorageRef) => fake.getExternalUrl(ref),
@@ -99,6 +103,13 @@ afterEach(() => {
 });
 
 describe('photo serve: conditional GET', () => {
+  test('the original is read from storage with the photo size limit', async () => {
+    const res = await getPhoto();
+
+    expect(res.status).toBe(200);
+    expect(downloadOptions).toEqual({ maxBytes: MAX_FILE_SIZE });
+  });
+
   test('a cold GET serves the whole original and a strong validator for it', async () => {
     const res = await getPhoto();
 
