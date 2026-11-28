@@ -194,6 +194,34 @@ describe('GET /api/v1/expenses/export (CSV)', () => {
     expect(csv).toContain('USD');
   });
 
+  test('starts with a UTF-8 BOM so spreadsheet apps read non-ASCII text, and still re-imports', async () => {
+    const vehicleId = await seedCivic('Café car');
+    await createExpense(vehicleId, 'misc', 12, 'Péage €', '2024-06-01T12:00:00.000Z');
+
+    const res = await ctx.authed('GET', '/api/v1/expenses/export');
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    const csv = new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
+    expect(csv.startsWith('\uFEFF"date"')).toBe(true);
+
+    const dryRun = await ctx.authed('POST', '/api/v1/expenses/import', { csv, dryRun: true });
+    expect(dryRun.status, await dryRun.clone().text()).toBe(200);
+    expect(await dryRun.json()).toMatchObject({ data: { readyCount: 1, errorCount: 0 } });
+  });
+
+  test('a day column gives the calendar day in the requested time zone next to the UTC instant', async () => {
+    const vehicleId = await seedCivic('Kiwi');
+    await createExpense(vehicleId, 'misc', 12, 'Noon in Auckland', '2024-06-15T23:00:00.000Z');
+
+    const zoned = await ctx.authed('GET', '/api/v1/expenses/export?timeZone=Pacific/Auckland');
+    const zonedCsv = await zoned.text();
+    expect(zonedCsv.split('\n')[0]).toStartWith('"date","day","vehicle"');
+    expect(zonedCsv).toContain('"2024-06-15T23:00:00.000Z","2024-06-16"');
+
+    const utc = await (await ctx.authed('GET', '/api/v1/expenses/export')).text();
+    expect(utc).toContain('"2024-06-15T23:00:00.000Z","2024-06-15"');
+  });
+
   test('does not quote a numeric amount end-to-end', async () => {
     const vehicleId = await seedCivic('Numbers');
     await createExpense(vehicleId, 'misc', 52.4, 'Plain note', '2024-06-02T00:00:00.000Z');

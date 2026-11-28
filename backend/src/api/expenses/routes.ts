@@ -29,7 +29,7 @@ import {
 } from '../../utils/money';
 import { buildPaginatedResponse, clampPagination } from '../../utils/pagination';
 import { readJsonBody } from '../../utils/request-body';
-import { isValidTimeZone } from '../../utils/time-zone';
+import { calendarDayIn, isValidTimeZone } from '../../utils/time-zone';
 import {
   commonSchemas,
   dateInput,
@@ -647,6 +647,7 @@ function exportFuelCells(e: {
 
 export const EXPORT_COLUMNS = [
   'date',
+  'day',
   'vehicle',
   'category',
   'amount',
@@ -705,6 +706,7 @@ routes.get(
     const records = rows.map((e) =>
       neutralizeCsvRow({
         date: e.date instanceof Date ? e.date.toISOString() : e.date,
+        day: calendarDayIn(new Date(e.date), timeZone ?? 'UTC'),
         vehicle: vehicleName.get(e.vehicleId) ?? 'Unknown Vehicle',
         category: e.category,
         amount: e.expenseAmount / scale,
@@ -729,7 +731,7 @@ routes.get(
     const stamp = new Date().toISOString().slice(0, 10);
     c.header('Content-Type', 'text/csv; charset=utf-8');
     c.header('Content-Disposition', `attachment; filename="vroom-expenses-${stamp}.csv"`);
-    return c.body(csv);
+    return c.body(`\uFEFF${csv}`);
   }
 );
 
