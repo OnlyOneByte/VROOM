@@ -19,5 +19,14 @@
 			"src/lib/components/analytics/explore/ExploreTab.svelte",
 			"src/lib/components/analytics/explore/explore-bar-chart.ts"
 		]
+	},
+	"views": {
+		"/analytics (line view)": {
+			"route": "/analytics",
+			"firstView": [
+				"src/lib/components/analytics/explore/ExploreTab.svelte",
+				"src/lib/components/analytics/explore/explore-line-chart.ts"
+			]
+		}
 	}
 }

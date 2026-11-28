@@ -77,19 +77,36 @@ const rows = [
 	{ route: 'shared entry + root layout', size: kb(total(shared)), budget: budgets.shared },
 	{ route: 'fonts (woff2, as served)', size: kb(fontBytes), budget: budgets.fonts }
 ];
-for (const route of manifest.routes) {
-	if (!route.page) continue;
+function routeFiles(route, firstView) {
 	const files = new Set();
 	for (const index of [...route.page.layouts, route.page.leaf]) {
 		if (index === undefined) continue;
 		for (const file of nodeImports(index)) if (!shared.has(file)) files.add(file);
 	}
-	for (const source of budgets.firstView?.[route.id] ?? []) {
+	for (const source of firstView) {
 		for (const file of chunkGraph(source)) if (!shared.has(file)) files.add(file);
 	}
+	return files;
+}
+
+for (const route of manifest.routes) {
+	if (!route.page) continue;
 	rows.push({
 		route: route.id,
-		size: kb(total(files)),
+		size: kb(total(routeFiles(route, budgets.firstView?.[route.id] ?? []))),
+		budget: budgets.routes[route.id] ?? budgets.default
+	});
+}
+
+for (const [name, view] of Object.entries(budgets.views ?? {})) {
+	const route = manifest.routes.find(r => r.id === view.route && r.page);
+	if (!route) {
+		console.error(`bundle-budget: view "${name}" names route ${view.route}, which has no page.`);
+		process.exit(1);
+	}
+	rows.push({
+		route: name,
+		size: kb(total(routeFiles(route, view.firstView))),
 		budget: budgets.routes[route.id] ?? budgets.default
 	});
 }

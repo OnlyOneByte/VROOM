@@ -143,16 +143,15 @@
 	let lineChart = $state<(typeof import('./explore-line-chart.ts'))['AppLineChart']>();
 	let chartsError = $state<{ kind: 'bar' | 'line'; message: string } | null>(null);
 
-	function importChart(kind: 'bar' | 'line'): Promise<unknown> {
-		return kind === 'bar'
-			? import('./explore-bar-chart.ts').then(module => (barChart = module.AppBarChart))
-			: import('./explore-line-chart.ts').then(module => (lineChart = module.AppLineChart));
+	async function importChart(kind: 'bar' | 'line'): Promise<void> {
+		if (kind === 'bar') barChart = (await import('./explore-bar-chart.ts')).AppBarChart;
+		else lineChart = (await import('./explore-line-chart.ts')).AppLineChart;
+		if (chartsError?.kind === kind) chartsError = null;
 	}
 
 	async function loadChart(kind: 'bar' | 'line'): Promise<void> {
 		try {
 			await importChart(kind);
-			if (chartsError?.kind === kind) chartsError = null;
 		} catch (e) {
 			chartsError = { kind, message: userFacingErrorMessage(e) };
 		}
