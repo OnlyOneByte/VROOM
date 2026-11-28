@@ -19,7 +19,7 @@
 		formatDate,
 		formatDateWith,
 		getCurrencySymbol,
-		toAmountInput,
+		padAmountInput,
 		toDateInputValue
 	} from '#lib/utils/formatters.ts';
 	import {
@@ -351,7 +351,7 @@
 	function handleReceiptDraft(draft: ReceiptDraft, image: File) {
 		if (draft.category) form.selectCategory(draft.category);
 		if (typeof draft.amount === 'number')
-			form.formData.amount = toAmountInput(draft.amount, form.amountCurrency);
+			form.formData.amount = padAmountInput(draft.amount, form.amountCurrency);
 		if (draft.date) form.formData.date = draft.date;
 		if (typeof draft.odometer === 'number') form.formData.mileage = String(draft.odometer);
 		if (typeof draft.volume === 'number' && draft.volumeUnit) {

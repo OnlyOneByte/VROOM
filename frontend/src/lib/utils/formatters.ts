@@ -52,6 +52,11 @@ export function toAmountInput(amount: number, currency?: string): string {
 	return amount.toFixed(currencyFractionDigits(currency));
 }
 
+export function padAmountInput(amount: number, currency?: string): string {
+	const padded = toAmountInput(amount, currency);
+	return Number(padded) === amount ? padded : String(amount);
+}
+
 export function amountPlaceholder(currency?: string): string {
 	const digits = currencyFractionDigits(currency);
 	return digits > 0 ? `0.${'0'.repeat(digits)}` : '0';

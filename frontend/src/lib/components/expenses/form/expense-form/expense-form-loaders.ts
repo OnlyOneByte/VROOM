@@ -18,7 +18,7 @@ import {
 	toError,
 	userFacingErrorMessage
 } from '#lib/utils/error-handling.ts';
-import { toAmountInput, toDateInputValue } from '#lib/utils/formatters.ts';
+import { padAmountInput, toDateInputValue } from '#lib/utils/formatters.ts';
 import { parsePreselectedTags } from './expense-navigation';
 import { splitStateFromGroup } from './split-config';
 import { readQuickAddMemory } from './quick-add-memory';
@@ -76,7 +76,7 @@ export async function loadQueuedExpense(state: ExpenseFormState, id: string): Pr
 	state.formData.vehicleId = queued.vehicleId;
 	state.formData.tags = queued.tags ?? [];
 	state.formData.category = queued.category;
-	state.formData.amount = toAmountInput(queued.amount, ownerCurrency(state, queued.vehicleId));
+	state.formData.amount = padAmountInput(queued.amount, ownerCurrency(state, queued.vehicleId));
 	state.formData.date = toDateInputValue(queued.date);
 	state.formData.mileage = queued.mileage?.toString() ?? '';
 	state.formData.volume = queued.volume?.toString() ?? '';
@@ -155,7 +155,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 				if (isInsurance) {
 					state.isInsuranceManaged = true;
 					state.formData.category = first.category;
-					state.formData.amount = toAmountInput(
+					state.formData.amount = padAmountInput(
 						splitGroup.groupTotal,
 						ownerCurrency(state, first.vehicleId)
 					);
@@ -168,7 +168,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 
 				state.isGroupEditMode = true;
 				state.formData.category = first.category;
-				state.formData.amount = toAmountInput(
+				state.formData.amount = padAmountInput(
 					splitGroup.groupTotal,
 					ownerCurrency(state, first.vehicleId)
 				);
@@ -191,7 +191,7 @@ export async function loadExpense(state: ExpenseFormState): Promise<void> {
 		state.formData.vehicleId = expense.vehicleId;
 		state.formData.tags = expense.tags || [];
 		state.formData.category = expense.category;
-		state.formData.amount = toAmountInput(expense.amount, ownerCurrency(state, expense.vehicleId));
+		state.formData.amount = padAmountInput(expense.amount, ownerCurrency(state, expense.vehicleId));
 		state.formData.date = toDateInputValue(expense.date);
 		state.formData.mileage = expense.mileage?.toString() ?? '';
 		state.formData.volume = expense.volume?.toString() ?? '';

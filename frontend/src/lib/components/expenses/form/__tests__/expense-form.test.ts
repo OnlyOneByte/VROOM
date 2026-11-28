@@ -4,6 +4,7 @@ import { tick } from 'svelte';
 import type { Expense, SplitExpenseGroup, Vehicle } from '#lib/types/index.ts';
 import type { ReceiptDraft } from '#lib/services/vlm-api.ts';
 import { appStore } from '#lib/stores/app.svelte.ts';
+import { settingsStore } from '#lib/stores/settings.svelte.ts';
 import {
 	ApiError,
 	NETWORK_FAILURE_MESSAGE,
@@ -171,7 +172,9 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.useRealTimers();
+	vi.restoreAllMocks();
 	localStorage.clear();
+	resetPendingEdits();
 });
 
 describe('ExpenseForm create mode', () => {
@@ -704,6 +707,29 @@ describe('ExpenseForm edit mode', () => {
 		await renderEdit({ ...EXISTING, amount: 1200 });
 
 		await vi.waitFor(() => expect(field('amount').value).toBe('1200'));
+	});
+
+	test('when the car list fails, a yen user keeps $37.50 as entered: Retry and an unchanged save send 37.5', async () => {
+		vi.spyOn(settingsStore, 'settings', 'get').mockReturnValue({
+			currencyUnit: 'JPY'
+		} as never);
+		const usdCar = { ...CAMRY, ownerCurrency: 'USD' } as Vehicle;
+		getVehicles.mockRejectedValueOnce(new Error('offline'));
+		getVehicles.mockResolvedValue([usdCar, LEAF]);
+		getVehicle.mockImplementation(id => Promise.resolve(id === 'v2' ? LEAF : usdCar));
+		updateExpense.mockResolvedValue({ ...EXISTING, amount: 37.5 });
+		getExpense.mockResolvedValue({ ...EXISTING, amount: 37.5 });
+		render(ExpenseForm, { props: { expenseId: 'exp-1' } });
+
+		const card = await screen.findByTestId('vehicles-load-error');
+		await fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));
+		await vi.waitFor(() => expect(screen.queryByTestId('vehicles-load-error')).toBeNull());
+		await vi.waitFor(() => expect(getVehicle).toHaveBeenCalled());
+		expect(field('amount').value).toBe('37.5');
+		await save();
+
+		await vi.waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(1));
+		expect(updateExpense.mock.calls[0]?.[1]).toMatchObject({ amount: 37.5 });
 	});
 
 	test('saving sends the edited expense to updateExpense and returns', async () => {
