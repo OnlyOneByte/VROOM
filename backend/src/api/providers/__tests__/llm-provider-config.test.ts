@@ -35,8 +35,8 @@ function llmBody(over: Record<string, unknown> = {}) {
   };
 }
 
-function rawCredentials(id: string): string | null {
-  const row = ctx.sqlite.query('SELECT credentials FROM user_providers WHERE id = ?').get(id) as {
+async function rawCredentials(id: string): Promise<string | null> {
+  const row = (await ctx.sql.get('SELECT credentials FROM user_providers WHERE id = ?', [id])) as {
     credentials: string;
   } | null;
   return row?.credentials ?? null;
@@ -54,7 +54,7 @@ describe('POST /api/v1/providers — LLM domain', () => {
     expect(JSON.stringify(data)).not.toContain('sk-super-secret-llm-key-123');
     expect((data as unknown as Record<string, unknown>).credentials).toBeUndefined();
 
-    const stored = rawCredentials(data.id);
+    const stored = await rawCredentials(data.id);
     expect(stored).toBeTruthy();
     expect(stored).not.toContain('sk-super-secret-llm-key-123');
     expect(stored).not.toBe(JSON.stringify({ apiKey: 'sk-super-secret-llm-key-123' }));
@@ -208,7 +208,7 @@ describe('PUT /api/v1/providers/:id — LLM domain', () => {
       credentials: { apiKey: 'sk-rotated-llm-999' },
     });
     expect(res.status).toBe(200);
-    const stored = rawCredentials(id);
+    const stored = await rawCredentials(id);
     expect(stored).toBeTruthy();
     expect(stored).not.toContain('sk-rotated-llm-999');
   });

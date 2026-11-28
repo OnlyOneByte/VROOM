@@ -134,7 +134,7 @@ describe('POST /api/v1/providers — create', () => {
         'ValidationError'
       );
     }
-    expect(ctx.sqlite.query('SELECT count(*) AS n FROM user_providers').get()).toEqual({ n: 0 });
+    expect(await ctx.sql.get('SELECT count(*) AS n FROM user_providers')).toEqual({ n: 0 });
   });
 
   test('rejects an invalid providerType (400 via zValidator)', async () => {
@@ -240,15 +240,15 @@ describe('PUT /api/v1/providers/:id — update', () => {
     expect(JSON.stringify(data)).not.toContain('rotated-secret-9999');
     expect('credentials' in data).toBe(false);
 
-    const row = ctx.sqlite
-      .query('SELECT credentials FROM user_providers WHERE id = ?')
-      .get(created.id) as { credentials: string };
+    const row = (await ctx.sql.get('SELECT credentials FROM user_providers WHERE id = ?', [
+      created.id,
+    ])) as { credentials: string };
     expect(row.credentials, 'credentials column present').toBeTruthy();
     expect(row.credentials).not.toContain('rotated-secret-9999');
   });
 
   test('PUT against an AUTH-domain provider → 400 (managed via /auth only)', async () => {
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES ('auth-prov', ?, 'auth', 'google', 'My Login', '', 'active')`,
       [ctx.user.id]
@@ -302,7 +302,7 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
 
   test('counts each category from the user’s photos and this provider’s refs', async () => {
     const created = await createProvider();
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u-other-778', 'o778@test.com', 'Other')`
     );
     const photoRows: [string, string, string][] = [
@@ -313,7 +313,7 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
       ['p5', 'u-other-778', 'vehicle'],
     ];
     for (const [id, userId, entityType] of photoRows) {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         `INSERT INTO photos (id, user_id, entity_type, entity_id, file_name, mime_type, file_size)
          VALUES (?, ?, ?, 'e', 'f.jpg', 'image/jpeg', 1)`,
         [id, userId, entityType]
@@ -326,7 +326,7 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
       ['p4', 'active'],
     ];
     for (const [photoId, status] of refRows) {
-      ctx.sqlite.run(
+      await ctx.sql.run(
         `INSERT INTO photo_refs (id, photo_id, provider_id, storage_ref, status)
          VALUES (?, ?, ?, '', ?)`,
         [`ref-${photoId}`, photoId, created.id, status]
@@ -369,38 +369,38 @@ describe('GET /api/v1/providers/:id/sync-status — owned read + tenant isolatio
 });
 
 describe('provider PUT/DELETE writes are tenant-scoped (foreign row survives)', () => {
-  function seedForeignProvider(id: string): void {
-    ctx.sqlite.run(
+  async function seedForeignProvider(id: string): Promise<void> {
+    await ctx.sql.run(
       `INSERT INTO users (id, email, display_name) VALUES ('u-foreign-63', 'f63@test.com', 'Foreign 63')`
     );
-    ctx.sqlite.run(
+    await ctx.sql.run(
       `INSERT INTO user_providers (id, user_id, domain, provider_type, display_name, credentials, status)
        VALUES (?, 'u-foreign-63', 'storage', 's3', 'Foreign Provider', 'enc-blob', 'active')`,
       [id]
     );
   }
 
-  function providerExists(id: string): boolean {
-    const rows = ctx.sqlite.query('SELECT id FROM user_providers WHERE id = ?').all(id);
+  async function providerExists(id: string): Promise<boolean> {
+    const rows = await ctx.sql.all('SELECT id FROM user_providers WHERE id = ?', [id]);
     return rows.length === 1;
   }
 
   test('our DELETE of a foreign provider id 404s AND the foreign row SURVIVES', async () => {
-    seedForeignProvider('prov-foreign-del');
+    await seedForeignProvider('prov-foreign-del');
     const res = await ctx.authed('DELETE', '/api/v1/providers/prov-foreign-del');
     expect(res.status).toBe(404);
-    expect(providerExists('prov-foreign-del')).toBe(true);
+    expect(await providerExists('prov-foreign-del')).toBe(true);
   });
 
   test('our PUT of a foreign provider id 404s AND the foreign row is UNCHANGED', async () => {
-    seedForeignProvider('prov-foreign-put');
+    await seedForeignProvider('prov-foreign-put');
     const res = await ctx.authed('PUT', '/api/v1/providers/prov-foreign-put', {
       displayName: 'hijacked',
     });
     expect(res.status).toBe(404);
-    const row = ctx.sqlite
-      .query('SELECT display_name FROM user_providers WHERE id = ?')
-      .get('prov-foreign-put') as { display_name: string } | undefined;
+    const row = (await ctx.sql.get('SELECT display_name FROM user_providers WHERE id = ?', [
+      'prov-foreign-put',
+    ])) as { display_name: string } | undefined;
     expect(row?.display_name).toBe('Foreign Provider');
   });
 
@@ -408,6 +408,6 @@ describe('provider PUT/DELETE writes are tenant-scoped (foreign row survives)', 
     const created = await createProvider();
     const del = await ctx.authed('DELETE', `/api/v1/providers/${created.id}`);
     expect(del.status).toBe(204);
-    expect(providerExists(created.id)).toBe(false);
+    expect(await providerExists(created.id)).toBe(false);
   });
 });

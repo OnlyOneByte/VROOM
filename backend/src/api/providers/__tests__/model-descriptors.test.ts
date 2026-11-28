@@ -63,7 +63,7 @@ describe('a model vendor on the OpenAI-compatible transport is one descriptor en
     expect(res.status).toBe(201);
     const { id } = (await json<DataEnvelope<{ id: string }>>(res)).data;
 
-    const row = ctx.sqlite.query('SELECT * FROM user_providers WHERE id = ?').get(id) as Record<
+    const row = (await ctx.sql.get('SELECT * FROM user_providers WHERE id = ?', [id])) as Record<
       string,
       unknown
     >;
