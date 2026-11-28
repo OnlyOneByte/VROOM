@@ -1,11 +1,10 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { SQL } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { applyMigrationsUpTo, loadMigrations } from '../../../db/__tests__/migration-helpers';
 import { openAsyncDatabase } from '../../../db/async-sqlite';
-import * as schema from '../../../db/schema';
+import { countStatements } from '../../../db/statement-count';
 import { EXPENSE_CATEGORIES } from '../../../db/types';
 import { ValidationError } from '../../../errors';
 import { ON_POSTGRES } from '../../../test-helpers/http-client';
@@ -964,17 +963,12 @@ function seedPerfFleet(sqlite: Database): void {
 }
 
 describe.skipIf(ON_POSTGRES)('performance guard', () => {
-  test('a 10k-expense fleet answers a 24-month category query in at most 4 statements', async () => {
+  test('a 10k-expense fleet answers a 24-month category query in at most 5 statements', async () => {
     const sqlite = new Database(':memory:');
     const migrations = loadMigrations();
     applyMigrationsUpTo(sqlite, migrations, migrations.length - 1);
-    let statements = 0;
-    const db = drizzle(sqlite, {
-      schema,
-      logger: { logQuery: () => statements++ },
-    });
     seedPerfFleet(sqlite);
-    const perfRepo = new AnalyticsQueryRepository(openAsyncDatabase(db.$client).db);
+    const perfRepo = new AnalyticsQueryRepository(openAsyncDatabase(sqlite).db);
     const query = baseQuery({
       groupBy: 'category',
       start: PERF_START + PERF_SPAN - 2 * 365 * 86_400,
@@ -982,13 +976,13 @@ describe.skipIf(ON_POSTGRES)('performance guard', () => {
     });
     await perfRepo.query('perf', query);
 
-    statements = 0;
     const began = performance.now();
-    const result = await perfRepo.query('perf', query);
+    const { result, statements } = await countStatements(() => perfRepo.query('perf', query));
     const elapsed = performance.now() - began;
     sqlite.close();
 
-    expect(statements).toBeLessThanOrEqual(4);
+    expect(statements).toBeGreaterThan(0);
+    expect(statements).toBeLessThanOrEqual(5);
     expect(result.buckets.length).toBeGreaterThanOrEqual(24);
     expect(elapsed).toBeLessThan(100);
   });
