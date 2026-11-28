@@ -16,7 +16,7 @@ import { readJsonBody } from '../../utils/request-body';
 import { buildTripSummary } from '../../utils/trip-summary';
 import { convertDistance } from '../../utils/unit-conversions';
 import { commonSchemas, zValidator } from '../../utils/validation';
-import { requireVehicleAccess } from '../../utils/vehicle-access';
+import { readableVehicles, requireVehicleAccess } from '../../utils/vehicle-access';
 import { attributedDriver, hideDriverFields } from '../drivers/attribution';
 import { createTrip, deleteTrip, updateTrip } from './service';
 import {
@@ -64,6 +64,15 @@ const fromTrip: ResourceOf = async (c) => {
   return vehicleEntry(trip.vehicleId, trip.userId, trip.createdBy);
 };
 
+async function tripReadableVehicles(userId: string) {
+  return (await readableVehicles(userId)).filter((v) => v.seesTrips);
+}
+
+function withoutDriver(trip: Trip): Trip {
+  const { driverId: _driverId, ...rest } = trip;
+  return rest as Trip;
+}
+
 async function ownerOf(vehicleId: string | undefined, userId: string): Promise<string> {
   return vehicleId ? (await requireVehicleAccess(vehicleId, userId, 'read')).ownerId : userId;
 }
@@ -97,15 +106,25 @@ routes.get('/', zValidator('query', listQuerySchema), authorize(fromQueryVehicle
   const query = c.req.valid('query');
   const { limit, offset } = clampPagination(query);
 
+  if (!query.vehicleId) {
+    const readable = await tripReadableVehicles(user.id);
+    const { data, totalCount } = await repos().trips.findReadablePaginated(
+      readable,
+      limit,
+      offset,
+      query.purpose
+    );
+    const seesDrivers = new Set(readable.filter((v) => v.seesDrivers).map((v) => v.vehicleId));
+    const rows = data.map((trip) => (seesDrivers.has(trip.vehicleId) ? trip : withoutDriver(trip)));
+    return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
+  }
+
   const ownerId = await ownerOf(query.vehicleId, user.id);
   const { data, totalCount } = await repos().trips.findByUserIdPaginated(ownerId, limit, offset, {
     vehicleId: query.vehicleId,
     purpose: query.purpose,
   });
-
-  const rows = query.vehicleId
-    ? data.map((trip) => hideDriverFields(c, trip.vehicleId, trip))
-    : data;
+  const rows = data.map((trip) => hideDriverFields(c, trip.vehicleId, trip));
   return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
 });
 
@@ -118,14 +137,18 @@ routes.get(
     const { vehicleId, rate } = c.req.valid('query');
 
     const ownerId = await ownerOf(vehicleId, user.id);
-    const trips = vehicleId
-      ? await repos().trips.findByVehicle(vehicleId, ownerId)
-      : await repos().trips.findByUserId(user.id);
+    const readable = vehicleId ? null : await tripReadableVehicles(user.id);
+    const trips = readable
+      ? await repos().trips.findReadable(readable)
+      : await repos().trips.findByVehicle(vehicleId ?? '', ownerId);
 
     const prefs = await repos().preferences.getOrCreate(user.id);
     const userUnit = (parseUnitPreferences(prefs.unitPreferences) ?? DEFAULT_UNIT_PREFERENCES)
       .distanceUnit;
-    const vehicleUnits = await repos().trips.findVehicleDistanceUnits(ownerId);
+    const vehicleUnits = await repos().trips.findVehicleDistanceUnits(
+      ownerId,
+      readable ? readable.map((v) => v.vehicleId) : undefined
+    );
 
     const summary = buildTripSummary(
       trips,
