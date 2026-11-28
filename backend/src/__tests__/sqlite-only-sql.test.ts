@@ -19,6 +19,7 @@ const PATTERNS: Record<string, RegExp> = {
     /\bCROSS\s+JOIN\s+(?:\w+(?:\((?:[^()]|\([^()]*\))*\))?|"[^"]+"|`[^`]+`|\$\{[^}]*\}|\((?:[^()]|\([^()]*\))*\))(?:\s+(?:AS\s+)?\w+)?\s+ON\b/gi,
   'raw db/tx query': /\b(?:db|tx)\.(?:all|get|run|values)\s*(?:<[^(]*?>)?\s*\(\s*sql\b/g,
   'builder .all()/.get()/.run()': /\)\s*\.(?:all|get|run)\s*\(\s*\)/g,
+  'stored builder .all()/.get()/.run()': /\b[A-Za-z_$][\w$]*\.(?:all|get|run)\s*\(\s*\)/g,
   SQLITE_: /\bSQLITE_/g,
   sqlite_master: /\bsqlite_master\b/gi,
   randomblob: /\brandomblob\b/gi,
@@ -110,6 +111,11 @@ countRatchet({
     expect(one('tx.insert(t).values(row).run()', builder)).toBe(1);
     expect(one('cache.get(key)', builder)).toBe(0);
     expect(one('groupBy(rows).values()', builder)).toBe(0);
+    const stored = 'stored builder .all()/.get()/.run()';
+    expect(one('const q = db.select().from(t);\nawait q.get()', stored)).toBe(1);
+    expect(one('await this.pending.all()', stored)).toBe(1);
+    expect(one('db.select().from(t).all()', stored)).toBe(0);
+    expect(one('cache.get(key)', stored)).toBe(0);
     expect(one("code === 'SQLITE_CONSTRAINT_UNIQUE'", 'SQLITE_')).toBe(1);
     expect(one('SELECT name FROM sqlite_master', 'sqlite_master')).toBe(1);
     expect(one('lower(hex(randomblob(12)))', 'randomblob')).toBe(1);

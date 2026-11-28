@@ -22,6 +22,7 @@ import { CONFIG } from './config';
 import { type AsyncPgDatabase, portableDatabase } from './db/async-postgres';
 import { type AsyncAppDatabase, openAsyncDatabase } from './db/async-sqlite';
 import { getDb } from './db/connection';
+import { ACTIVE_DIALECT } from './db/dialect/active';
 
 export function createAppContext(sqlite: Database) {
   const asyncDb = openAsyncDatabase(sqlite).db;
@@ -66,12 +67,22 @@ export type AppContext = ReturnType<typeof createAppContext>;
 let current: AppContext | null = null;
 
 export function appContext(): AppContext {
+  if (!current && ACTIVE_DIALECT === 'pg') {
+    throw new Error(
+      'The Postgres database opens during startup migrations, which have not run yet'
+    );
+  }
   current ??= createAppContext(getDb().$client);
   return current;
 }
 
 export function installAppContext(context: AppContext): void {
   if (CONFIG.env !== 'test') throw new Error('installAppContext is only for tests');
+  current = context;
+}
+
+export function useAppContext(context: AppContext): void {
+  if (current && CONFIG.env !== 'test') throw new Error('The database is already open');
   current = context;
 }
 

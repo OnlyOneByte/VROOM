@@ -55,7 +55,7 @@ describe('GET /health checks the database', () => {
   }, SETUP_TIMEOUT_MS);
 
   test('a database that cannot answer makes /health 503, keeping the version', async () => {
-    const probe = spyOn(connection, 'checkDatabaseHealth').mockReturnValue(false);
+    const probe = spyOn(connection, 'checkDatabaseHealth').mockResolvedValue(false);
     try {
       const res = await ctx.app.request('/health');
       expect(res.status).toBe(503);

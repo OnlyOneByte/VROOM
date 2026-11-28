@@ -9,7 +9,7 @@ async function initializeDatabase() {
 
     await runMigrations();
 
-    const isHealthy = checkDatabaseHealth();
+    const isHealthy = await checkDatabaseHealth();
     if (!isHealthy) {
       throw new Error('Database health check failed after migration');
     }
