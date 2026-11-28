@@ -42,6 +42,21 @@ describe('DatePicker id', () => {
 	});
 });
 
+describe('DatePicker value parsing', () => {
+	test.each(['2026-02-30', '2026-13-01', '26-05-10', 'not a date'])(
+		'%s is not a date, so the placeholder shows',
+		value => {
+			render(DatePicker, { props: { value, id: 'pick', placeholder: 'Pick a date' } });
+			expect(document.getElementById('pick')).toHaveTextContent('Pick a date');
+		}
+	);
+
+	test('a leap day reads as that day', () => {
+		render(DatePicker, { props: { value: '2028-02-29', id: 'pick' } });
+		expect(document.getElementById('pick-value')?.textContent).toBe('February 29, 2028');
+	});
+});
+
 describe('DatePicker in a narrow field', () => {
 	test('a short date stands in when the field is narrow, hidden from screen readers', () => {
 		render(DatePicker, { props: { value: '2026-11-25', id: 'trip-date' } });
