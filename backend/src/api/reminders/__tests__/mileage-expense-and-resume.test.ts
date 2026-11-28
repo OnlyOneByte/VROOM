@@ -63,6 +63,27 @@ describe('mileage expense reminders', () => {
     expect(row.d).toBeGreaterThan(due);
   });
 
+  test('a time-or-mileage reminder whose next date passes its end date is switched off on mileage', async () => {
+    const vehicleId = await seedVehicle(ctx);
+    await seedMileageReminder(ctx, 'rem-ending', vehicleId, 10000);
+    const day = 86_400;
+    const now = Math.floor(Date.now() / 1000);
+    await ctx.sql.run(
+      "UPDATE reminders SET type = 'expense', trigger_mode = 'both', frequency = 'yearly', expense_amount = 8000, expense_category = 'maintenance', start_date = ?, next_due_date = ?, end_date = ? WHERE id = 'rem-ending'",
+      [now + 30 * day, now + 30 * day, now + 60 * day]
+    );
+    await addOdometerReading(ctx, vehicleId, 10200);
+    await trigger();
+    await addOdometerReading(ctx, vehicleId, 15300);
+    await trigger();
+
+    expect(await count("SELECT COUNT(*) AS n FROM expenses WHERE source_id = 'rem-ending'")).toBe(1);
+    const row = (await ctx.sql.get("SELECT is_active AS a FROM reminders WHERE id = 'rem-ending'")) as {
+      a: number | boolean;
+    };
+    expect(Boolean(row.a)).toBe(false);
+  });
+
   test('a notification reminder on mileage still books nothing', async () => {
     const vehicleId = await seedVehicle(ctx);
     await seedMileageReminder(ctx, 'rem-note', vehicleId, 10000);

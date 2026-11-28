@@ -332,6 +332,7 @@ export function nextDueAfterService(
       (reminder.lastTriggeredAt !== null && reminder.lastTriggeredAt >= periodStart));
   return alreadyAdvanced ? due : advanceReminderDueDate(reminder, due, timeZone);
 }
+
 export function isTimeDue(nextDue: Date, now: Date): boolean {
   return nextDue <= now;
 }
@@ -437,10 +438,18 @@ async function fastForwardPastNow(
   await repos().reminders.advanceNextDueDate(reminder.id, previousDue, nextDue);
 }
 
-async function rearmAfterMileage(reminder: Reminder, odometer: number): Promise<void> {
+async function rearmAfterMileage(
+  reminder: Reminder,
+  odometer: number,
+  timeZone: string | undefined
+): Promise<void> {
   const now = new Date();
   const nextDueDate =
-    reminder.nextDueDate && nextDueAfterService(reminder, reminder.nextDueDate, now, undefined);
+    reminder.nextDueDate && nextDueAfterService(reminder, reminder.nextDueDate, now, timeZone);
+  if (nextDueDate && hasReminderEndedBy(reminder, nextDueDate)) {
+    await repos().reminders.deactivate(reminder.id, reminder.userId);
+    return;
+  }
   await repos().reminders.markServiced(reminder.id, reminder.userId, {
     lastServiceOdometer: odometer,
     nextDueOdometer: odometer + (reminder.intervalMileage ?? 0),
@@ -476,7 +485,7 @@ class ReminderTriggerService {
     }
 
     const mileageReminders = await repos().reminders.findMileageTracking(userId);
-    await this.processMileageReminders(mileageReminders, result);
+    await this.processMileageReminders(mileageReminders, result, timeZone);
 
     return result;
   }
@@ -499,7 +508,8 @@ class ReminderTriggerService {
 
   private async processMileageReminders(
     mileageReminders: ReminderWithVehicles[],
-    result: TriggerResult
+    result: TriggerResult,
+    timeZone?: string
   ): Promise<void> {
     const odometerByVehicle = new Map<string, Promise<number | null>>();
     const currentOdometer = (vehicleId: string, userId: string): Promise<number | null> => {
@@ -513,7 +523,7 @@ class ReminderTriggerService {
 
     for (const { reminder, vehicleIds } of mileageReminders) {
       try {
-        await this.processMileageReminder(reminder, vehicleIds, result, currentOdometer);
+        await this.processMileageReminder(reminder, vehicleIds, result, currentOdometer, timeZone);
       } catch (error) {
         pushReminderSkipError(result, reminder.id, error);
       }
@@ -524,7 +534,8 @@ class ReminderTriggerService {
     reminder: Reminder,
     vehicleIds: string[],
     result: TriggerResult,
-    currentOdometer: (vehicleId: string, userId: string) => Promise<number | null>
+    currentOdometer: (vehicleId: string, userId: string) => Promise<number | null>,
+    timeZone: string | undefined
   ): Promise<void> {
     if (reminder.nextDueOdometer === null) return;
     const [vehicleId] = vehicleIds;
@@ -541,13 +552,16 @@ class ReminderTriggerService {
     const distanceUnit = await vehicleDistanceUnit(vehicleId);
     const dueOdometer = reminder.nextDueOdometer;
     const { created, booked } = await appContext().asyncDb.transaction(async (tx) => {
+      if (!(await repos().reminders.stillDueAt(reminder.id, dueOdometer))) {
+        return { created: null, booked: [] };
+      }
       const claimed = await repos().reminders.createMileageNotification(
         reminder.id,
         reminder.userId,
         dueOdometer
       );
       if (!claimed) return { created: null, booked: [] };
-      if (reminder.triggerMode === 'both') await rearmAfterMileage(reminder, odometer);
+      if (reminder.triggerMode === 'both') await rearmAfterMileage(reminder, odometer, timeZone);
       const expenses =
         reminder.type === 'expense'
           ? await createExpenseFromReminder(tx, { reminder, vehicleIds }, new Date())

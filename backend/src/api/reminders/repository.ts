@@ -339,6 +339,21 @@ export class ReminderRepository extends BaseRepository<Reminder, NewReminder> {
     });
   }
 
+  async stillDueAt(id: string, dueOdometer: number): Promise<boolean> {
+    const rows = await this.db
+      .update(reminders)
+      .set({ updatedAt: new Date() })
+      .where(
+        and(
+          eq(reminders.id, id),
+          eq(reminders.nextDueOdometer, dueOdometer),
+          eq(reminders.isActive, true)
+        )
+      )
+      .returning({ id: reminders.id });
+    return rows.length > 0;
+  }
+
   async rearmMileage(
     id: string,
     userId: string,
