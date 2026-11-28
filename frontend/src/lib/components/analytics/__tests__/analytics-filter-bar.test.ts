@@ -22,15 +22,15 @@ describe('AnalyticsFilterBar', () => {
 		});
 		expect(screen.queryByRole('button', { name: /^Range/ })).toBeNull();
 		expect(screen.getByRole('button', { name: /^Cars/ })).toBeTruthy();
-		expect(screen.queryByRole('button', { name: /Clear filters/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: /^Clear/ })).toBeNull();
 	});
 
-	test('without Range, clearing resets the cars and keeps the range', async () => {
+	test('without Range, "Clear cars" resets the cars and keeps the range', async () => {
 		const onChange = vi.fn();
 		render(AnalyticsFilterBar, {
 			props: { filters: { range: '3m', cars: ['civic'] }, vehicles, onChange, showRange: false }
 		});
-		await fireEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Clear cars' }));
 		expect(onChange).toHaveBeenCalledWith({ range: '3m', cars: [] });
 	});
 });

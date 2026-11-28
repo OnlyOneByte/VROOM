@@ -108,6 +108,28 @@ describe('insurance premium → expense hook lifecycle', () => {
     expect(new Set(rows.map((r) => r.vehicle_id))).toEqual(new Set([v1, v2]));
   });
 
+  test('the premium expense names the carrier, not the policy number', async () => {
+    const v1 = await seedVehicle('Honda');
+    const { policyId, termId } = await createPolicy([v1], 600);
+    const describe = (id: string) =>
+      ctx.sqlite
+        .query('SELECT description FROM expenses WHERE source_type = ? AND source_id = ?')
+        .all('insurance_term', id) as Array<{ description: string }>;
+    expect(describe(termId)).toEqual([{ description: 'Insurance premium, Acme Mutual' }]);
+
+    const res = await ctx.authed('POST', `/api/v1/insurance/${policyId}/terms`, {
+      startDate: '2025-01-01T00:00:00.000Z',
+      endDate: '2026-01-01T00:00:00.000Z',
+      policyNumber: 'POL-10',
+      totalCost: 700,
+      vehicleCoverage: { vehicleIds: [v1] },
+    });
+    const body = await json<DataEnvelope<PolicyRow>>(res);
+    expect(res.status, JSON.stringify(body)).toBe(201);
+    const added = body.data.terms.find((t) => t.id !== termId);
+    expect(describe(added?.id ?? '')).toEqual([{ description: 'Insurance premium, Acme Mutual' }]);
+  });
+
   test('a non-even premium split across three vehicles sums exactly to the total', async () => {
     const v1 = await seedVehicle('Honda');
     const v2 = await seedVehicle('Toyota');

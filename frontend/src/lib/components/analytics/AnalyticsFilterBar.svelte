@@ -52,6 +52,7 @@
 		void loadSheet();
 	}
 
+	let clearLabel = $derived(showRange ? 'Clear filters' : 'Clear cars');
 	let clearable = $derived(showRange ? !isDefaultFilters(filters) : filters.cars.length > 0);
 
 	async function clearFilters() {
@@ -94,7 +95,7 @@
 				variant="ghost"
 				size="icon"
 				class="size-10 shrink-0"
-				aria-label="Clear filters"
+				aria-label={clearLabel}
 				onclick={clearFilters}
 			>
 				<X class="h-4 w-4" aria-hidden="true" />
@@ -102,7 +103,7 @@
 		{:else}
 			<Button variant="ghost" onclick={clearFilters}>
 				<X class="mr-1 h-4 w-4" aria-hidden="true" />
-				Clear filters
+				{clearLabel}
 			</Button>
 		{/if}
 	{/if}

@@ -246,6 +246,29 @@ describe('YearEndTab', () => {
 		expect(text()).toContain('Not included: cars shared with you in EUR.');
 	});
 
+	test('with cars picked, the empty year says those cars have no expenses', async () => {
+		api.query.mockImplementation((p: AnalyticsQueryParams) =>
+			Promise.resolve({ buckets: [], series: [], totals: { value: 0 }, metric: p.metric })
+		);
+		render(YearEndTab, { props: { vehicleIds: ['civic'] } });
+		await screen.findByRole('heading', { level: 2, name: 'No expenses in 2026' });
+		expect(text()).toContain(
+			'The cars you picked have no expenses this year. Pick another year or other cars.'
+		);
+	});
+
+	test('picking other cars after an error clears the error card while it loads', async () => {
+		api.query.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+		const { rerender } = render(YearEndTab, { props: { vehicleIds: ['civic'] } });
+		expect(await screen.findByText("Couldn't load year-end summary")).toBeTruthy();
+		let release: (v: unknown) => void = () => {};
+		api.queryItems.mockImplementationOnce(() => new Promise(r => (release = r)));
+		await rerender({ vehicleIds: ['rav4'] });
+		await waitFor(() => expect(screen.queryByText("Couldn't load year-end summary")).toBeNull());
+		release(ITEMS);
+		expect(await screen.findByText('2026 so far · 3 vehicles')).toBeTruthy();
+	});
+
 	test('a failed request shows the error card, and Retry loads the year again', async () => {
 		api.query.mockImplementationOnce(() => Promise.reject(new Error('offline')));
 		render(YearEndTab);

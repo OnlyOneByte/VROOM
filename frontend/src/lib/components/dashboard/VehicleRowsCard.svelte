@@ -25,7 +25,7 @@
 		</div>
 		<a
 			href={resolve(routes.vehicles)}
-			class="rounded-sm text-sm font-semibold text-accent-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+			class="-my-1 -mr-2 inline-flex min-h-7 min-w-7 items-center justify-center rounded-sm px-2 text-sm font-semibold text-accent-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
 		>
 			All<span class="sr-only"> vehicles</span>
 		</a>

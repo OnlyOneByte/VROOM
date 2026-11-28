@@ -120,7 +120,7 @@
 			const notes = [
 				vehicleKindNote(v.vehicleKind),
 				v.nickname ? model : null,
-				v.vehicleType === 'electric' ? 'electric' : null,
+				v.vehicleType === 'electric' ? 'Electric' : v.vehicleType === 'hybrid' ? 'Hybrid' : null,
 				v.financing?.isActive ? 'Financed' : null,
 				v.sharedAccess ? `Shared by ${v.sharedAccess.sharedBy}` : null
 			].filter(Boolean);
