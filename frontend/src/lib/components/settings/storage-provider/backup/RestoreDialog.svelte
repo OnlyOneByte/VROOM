@@ -141,7 +141,7 @@
 				});
 				restorePreview = result.preview ?? null;
 				skippedPhotos = result.skipped?.photos ?? 0;
-				restoreConflicts = result.conflicts ?? [];
+				restoreConflicts = [];
 				step = 3;
 			} catch (err) {
 				error = `Couldn't preview the Sheets data. ${userFacingErrorMessage(err)}`;
@@ -168,7 +168,7 @@
 			});
 			restorePreview = result.preview ?? null;
 			skippedPhotos = result.skipped?.photos ?? 0;
-			restoreConflicts = result.conflicts ?? [];
+			restoreConflicts = [];
 			step = 3;
 		} catch (err) {
 			error = `Couldn't preview the backup. ${userFacingErrorMessage(err)}`;
@@ -188,7 +188,7 @@
 			const result = await settingsStore.uploadBackup(file, 'preview');
 			restorePreview = result.preview ?? null;
 			skippedPhotos = result.skipped?.photos ?? 0;
-			restoreConflicts = result.conflicts ?? [];
+			restoreConflicts = [];
 			step = 3;
 		} catch (err) {
 			error = `Couldn't preview the file. ${userFacingErrorMessage(err)}`;
