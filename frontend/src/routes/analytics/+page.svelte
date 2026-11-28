@@ -4,8 +4,12 @@
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { LoaderCircle } from '@lucide/svelte';
+	import { resolve } from '$app/paths';
+	import { ChartColumn, LoaderCircle, Plus } from '@lucide/svelte';
 	import NoVehiclesEmptyState from '#lib/components/common/NoVehiclesEmptyState.svelte';
+	import EmptyState from '#lib/components/common/empty-state.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { routes } from '#lib/routes.ts';
 	import * as Tabs from '#lib/components/ui/tabs/index.ts';
 	import PageHeader from '#lib/components/common/page-header.svelte';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
@@ -51,6 +55,8 @@
 	let vehicles = $state<Vehicle[]>([]);
 	let vehiclesLoaded = $state(false);
 	let vehiclesError = $state<string | null>(null);
+	// All-time count of the user's own expenses; null until known or if it can't load.
+	let ownExpenseCount = $state<number | null>(null);
 	let summaryRequest = 0;
 
 	let filters = $derived(parseAnalyticsFilters(page.url.searchParams));
@@ -144,6 +150,15 @@
 		}
 	}
 
+	async function loadOwnExpenseCount() {
+		try {
+			const { expenseApi } = await import('#lib/services/expense-api.ts');
+			ownExpenseCount = (await expenseApi.getExpenseSummary({ period: 'all' })).expenseCount;
+		} catch {
+			ownExpenseCount = null;
+		}
+	}
+
 	function revealActiveTab() {
 		const active = tabList?.querySelector('[data-state="active"]');
 		if (!tabList || !active) return;
@@ -213,6 +228,16 @@
 
 	let quickStats = $derived(summary?.quickStats ?? null);
 	let noVehicles = $derived(!isLoading && !error && quickStats?.vehicleCount === 0 && !vehicleIds);
+	// Own cars only and no expenses on them yet: every Explore measure would be empty. Only the
+	// Explore tab steps aside; other tabs can show loans, insurance or trips without any expense.
+	let nothingLogged = $derived(
+		!noVehicles &&
+			vehiclesLoaded &&
+			!vehiclesError &&
+			vehicles.length > 0 &&
+			vehicles.every(v => !v.sharedAccess) &&
+			ownExpenseCount === 0
+	);
 	let showTabs = $derived(quickStats ? quickStats.vehicleCount > 0 || !!vehicleIds : !!error);
 	let fuelStats = $derived(summary?.fuelStats ?? null);
 	let fuelAdvanced = $derived(summary?.fuelAdvanced ?? null);
@@ -225,6 +250,7 @@
 			: import('#lib/components/analytics/explore/explore-bar-chart.ts')
 		).catch(() => {});
 		void loadVehicles();
+		void loadOwnExpenseCount();
 	});
 </script>
 
@@ -259,12 +285,8 @@
 
 <div class="min-h-screen space-y-4 md:space-y-6">
 	<div>
-		{#if noVehicles}
-			<PageHeader title="Analytics" variant="display" />
-		{:else}
-			<p class="text-sm text-muted-foreground">Analytics</p>
-			<PageHeader title={TAB_TITLES[activeTab] ?? 'Explore'} variant="display" />
-		{/if}
+		<p class="text-sm text-muted-foreground">Analytics</p>
+		<PageHeader title={TAB_TITLES[activeTab] ?? 'Explore'} variant="display" />
 	</div>
 
 	{#if isLoading && !error && !summary}
@@ -315,32 +337,50 @@
 
 			{#if activeTab === 'explore'}
 				<Tabs.Content value="explore">
-					{#await import('#lib/components/analytics/explore/ExploreTab.svelte')}
-						<div class="flex min-h-[480px] justify-center p-8" aria-busy="true">
-							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
-						</div>
-					{:then { default: ExploreTab }}
-						<ExploreTab
-							query={explore}
-							onQueryChange={setExplore}
-							rangeText={rangeLabel(filters, d => formatDate(d))}
-							carsText={carsLabel(filters.cars, new Map(vehicleOptions.map(v => [v.id, v.name])))}
-							onOnlyCar={onlyCar}
-							onAllCars={() => setFilters({ ...filters, cars: [] })}
-							{dateRange}
-							{vehicleIds}
-							{vehicleColors}
-							filterLabel={filtered ? filterLabel : undefined}
-							onClearFilters={filtered ? clearFilters : undefined}
-							onApplyInsight={applyInsight}
-							driverSplit={sharedCars.some(v => !v.sharedAccess)}
-							filters={exploreFilterChips}
-							carCount={vehiclesLoaded && !vehiclesError ? vehicles.length : undefined}
-						/>
-					{:catch}
-						{@render filterChips(false)}
-						{@render tabLoadError('Explore')}
-					{/await}
+					{#if nothingLogged}
+						<EmptyState level={2}>
+							{#snippet icon()}
+								<ChartColumn class="mb-4 h-12 w-12 text-muted-foreground" aria-hidden="true" />
+							{/snippet}
+							{#snippet title()}Nothing to explore yet{/snippet}
+							{#snippet description()}
+								Log a fill-up or an expense and your costs show up here, by month, category and car.
+							{/snippet}
+							{#snippet action()}
+								<Button size="lg" href={resolve(routes.expenseNew)}>
+									<Plus class="mr-2 h-4 w-4" aria-hidden="true" />
+									Add first expense
+								</Button>
+							{/snippet}
+						</EmptyState>
+					{:else}
+						{#await import('#lib/components/analytics/explore/ExploreTab.svelte')}
+							<div class="flex min-h-[480px] justify-center p-8" aria-busy="true">
+								<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
+							</div>
+						{:then { default: ExploreTab }}
+							<ExploreTab
+								query={explore}
+								onQueryChange={setExplore}
+								rangeText={rangeLabel(filters, d => formatDate(d))}
+								carsText={carsLabel(filters.cars, new Map(vehicleOptions.map(v => [v.id, v.name])))}
+								onOnlyCar={onlyCar}
+								onAllCars={() => setFilters({ ...filters, cars: [] })}
+								{dateRange}
+								{vehicleIds}
+								{vehicleColors}
+								filterLabel={filtered ? filterLabel : undefined}
+								onClearFilters={filtered ? clearFilters : undefined}
+								onApplyInsight={applyInsight}
+								driverSplit={sharedCars.some(v => !v.sharedAccess)}
+								filters={exploreFilterChips}
+								carCount={vehiclesLoaded && !vehiclesError ? vehicles.length : undefined}
+							/>
+						{:catch}
+							{@render filterChips(false)}
+							{@render tabLoadError('Explore')}
+						{/await}
+					{/if}
 				</Tabs.Content>
 			{:else if activeTab === 'fuel-stats'}
 				<Tabs.Content value="fuel-stats">

@@ -259,6 +259,37 @@ test.describe('Analytics', () => {
 		await expect(page.getByRole('heading', { name: 'Fill-ups', exact: true })).toBeHidden();
 	});
 
+	test('own cars with nothing logged get a first-expense prompt instead of empty measures', async ({
+		page
+	}) => {
+		await mockAnalytics(page);
+		await page.route(
+			url => url.pathname === '/api/v1/expenses/summary',
+			route =>
+				route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify({
+						success: true,
+						data: { totalAmount: 0, expenseCount: 0, categoryBreakdown: [], monthlyTrend: [] }
+					})
+				})
+		);
+
+		await page.goto('/analytics');
+
+		await expect(page.getByRole('heading', { name: 'Nothing to explore yet' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Add first expense' })).toHaveAttribute(
+			'href',
+			'/expenses/new'
+		);
+		await expect(page.getByRole('heading', { level: 1, name: 'Explore' })).toBeVisible();
+
+		await page.getByRole('tab', { name: 'Cross-vehicle' }).click();
+		await expect(page.getByRole('heading', { level: 1, name: 'Cross-vehicle' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Nothing to explore yet' })).toBeHidden();
+	});
+
 	test('a failed load shows an error with a retry that re-requests', async ({ page }) => {
 		await mockAnalytics(page);
 		let attempts = 0;
