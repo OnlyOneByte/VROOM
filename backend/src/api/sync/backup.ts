@@ -39,7 +39,7 @@ import {
   vehicles,
 } from '../../db/schema';
 import { CHARGER_TYPES, type SplitConfig } from '../../db/types';
-import { ValidationError } from '../../errors';
+import { AppError, NotFoundError, ValidationError } from '../../errors';
 import type {
   BackupConfig,
   BackupData,
@@ -57,6 +57,11 @@ import { joinStoragePath, storagePathSchema } from '../../utils/paths';
 import { unitPreferencesSchema } from '../../utils/unit-preferences-schema';
 import { ownedVehiclesScope } from '../../utils/vehicle-access';
 import { storageProviderDescriptor } from '../providers/domains/storage/registry';
+import {
+  credentialCodeOf,
+  isMissingBucket,
+  isMissingObject,
+} from '../providers/domains/storage/storage-provider';
 import { hasZipBackup } from './backup-strategy';
 
 interface ValidationResult {
@@ -422,6 +427,14 @@ export function resolveBackupFolderPath(
   return joinStoragePath(providerRootPath, settings.folderPath);
 }
 
+async function providerReadError(error: unknown, missing: string): Promise<unknown> {
+  if (isMissingObject(error)) return new NotFoundError(missing);
+  const failure = isMissingBucket(error) ? 'config' : credentialCodeOf(error);
+  if (!failure) return error;
+  const { healthFailure } = await import('../providers/provider-status');
+  return new AppError(healthFailure(failure).message, 502);
+}
+
 class BackupService {
   async loadBackupConfig(userId: string): Promise<BackupConfig> {
     const prefs = await repos().preferences.getOrCreate(userId);
@@ -491,7 +504,9 @@ class BackupService {
     if (!settings) return [];
 
     const folderPath = resolveBackupFolderPath(providerRow, settings);
-    const files = await provider.list(folderPath);
+    const files = await provider.list(folderPath).catch(async (error: unknown) => {
+      throw await providerReadError(error, 'Backup folder');
+    });
 
     const backups = files
       .filter((f) => f.name.startsWith('vroom-backup-') && f.name.endsWith('.zip'))
@@ -554,7 +569,11 @@ class BackupService {
   async downloadBackup(userId: string, providerId: string, fileRef: string): Promise<Buffer> {
     const { storageProviderRegistry } = await import('../providers/domains/storage/registry');
     const provider = await storageProviderRegistry.getProvider(providerId, userId);
-    return provider.download({ providerType: provider.type, externalId: fileRef });
+    return provider
+      .download({ providerType: provider.type, externalId: fileRef })
+      .catch(async (error: unknown) => {
+        throw await providerReadError(error, 'Backup file');
+      });
   }
 
   createBackup(userId: string): Promise<BackupData> {

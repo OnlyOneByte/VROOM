@@ -10,7 +10,7 @@ import {
 } from '../../../test-helpers/http-client';
 import { FakeStorageProvider } from '../domains/storage/fake-provider';
 import { getStorageProviderRegistry } from '../domains/storage/registry';
-import { credentialFailureOf } from '../domains/storage/storage-provider';
+import { credentialFailureOf, ProviderConfigError } from '../domains/storage/storage-provider';
 import { FAILURES_BEFORE_ERROR, type HealthResult } from '../provider-status';
 import { processBatch, type SyncWorkerDeps } from '../sync-worker';
 
@@ -254,6 +254,29 @@ describe('POST /providers/:id/test works for every capability', () => {
       await seedStorage('s-key');
       expect((await testProvider('s-key')).data).toMatchObject({ ok: false, code: 'auth' });
       expect((await statusOf('s-key')).status).toBe('needs_reauth');
+    } finally {
+      built.mockRestore();
+    }
+  });
+
+  test('a storage settings problem reads as config and keeps its own message', async () => {
+    const fake = new FakeStorageProvider();
+    spyOn(fake, 'healthCheck').mockRejectedValue(
+      new ProviderConfigError(
+        'The bucket "b" doesn\'t exist. Check the bucket name, then test again.'
+      )
+    );
+    const built = spyOn(getStorageProviderRegistry(), 'createProviderInstance').mockResolvedValue(
+      fake
+    );
+    try {
+      await seedStorage('s-config');
+      expect((await testProvider('s-config')).data).toMatchObject({
+        ok: false,
+        code: 'config',
+        message: 'The bucket "b" doesn\'t exist. Check the bucket name, then test again.',
+      });
+      expect((await statusOf('s-config')).status).not.toBe('needs_reauth');
     } finally {
       built.mockRestore();
     }

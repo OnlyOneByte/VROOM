@@ -67,6 +67,7 @@ jobs:
     # (PGlite, in process) so each bring-your-own-SQL step proves itself; see #1634.
     name: Backend Tests (Postgres, optional)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     continue-on-error: true
     defaults:
       run:
