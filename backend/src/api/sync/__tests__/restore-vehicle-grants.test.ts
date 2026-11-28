@@ -18,11 +18,11 @@ const CUSTOM_ROLE = 'custom-mechanic';
 beforeEach(async () => {
   ctx = await createTestApp();
   vehicleId = await seedVehicle(ctx);
-  ctx.sqlite.run(
-    "INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES (?, 'vehicle', 'Mechanic', 0, ?)",
+  await ctx.sql.run(
+    "INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES (?, 'vehicle', 'Mechanic', FALSE, ?)",
     [CUSTOM_ROLE, ctx.user.id]
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     "INSERT INTO role_permissions (role_id, permission) VALUES (?, 'vehicle.odometer.write')",
     [CUSTOM_ROLE]
   );
@@ -30,13 +30,13 @@ beforeEach(async () => {
 afterEach(() => ctx.close());
 
 async function addMember(id: string): Promise<void> {
-  ctx.sqlite.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
+  await ctx.sql.run('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)', [
     id,
     `${id}@test.com`,
     id,
   ]);
   await assignServerRole(appContext().asyncDb, id, 'member');
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO vehicle_shares (id, vehicle_id, owner_id, shared_with_id, level, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, 'viewer', 'accepted', 0, 0)`,
     [`share-${id}`, vehicleId, ctx.user.id, id]
@@ -49,32 +49,30 @@ async function addMember(id: string): Promise<void> {
   });
 }
 
-function override(userId: string, permission: string, setBy = ctx.user.id, effect = 'allow') {
-  ctx.sqlite.run(
+async function override(userId: string, permission: string, setBy = ctx.user.id, effect = 'allow') {
+  await ctx.sql.run(
     "INSERT INTO permission_overrides (id, user_id, scope, scope_id, permission, effect, set_by) VALUES (?, ?, 'vehicle', ?, ?, ?, ?)",
     [`po-${userId}-${permission}`, userId, vehicleId, permission, effect, setBy]
   );
 }
 
-function assign(userId: string, roleId: string): void {
-  ctx.sqlite.run(
+async function assign(userId: string, roleId: string): Promise<void> {
+  await ctx.sql.run(
     'INSERT INTO role_assignments (id, user_id, role_id, scope_id, granted_by) VALUES (?, ?, ?, ?, ?)',
     [`ra-${userId}-${roleId}`, userId, roleId, vehicleId, ctx.user.id]
   );
 }
 
-function grantsOf(userId: string) {
-  const overrides = ctx.sqlite
-    .query(
-      'SELECT permission, effect FROM permission_overrides WHERE user_id = ? AND scope_id = ? ORDER BY permission'
-    )
-    .all(userId, vehicleId);
+async function grantsOf(userId: string) {
+  const overrides = await ctx.sql.all(
+    'SELECT permission, effect FROM permission_overrides WHERE user_id = ? AND scope_id = ? ORDER BY permission',
+    [userId, vehicleId]
+  );
   const roles = (
-    ctx.sqlite
-      .query(
-        'SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id = ? ORDER BY role_id'
-      )
-      .all(userId, vehicleId) as { role_id: string }[]
+    (await ctx.sql.all(
+      'SELECT role_id FROM role_assignments WHERE user_id = ? AND scope_id = ? ORDER BY role_id',
+      [userId, vehicleId]
+    )) as { role_id: string }[]
   ).map((row) => row.role_id);
   return { overrides, roles };
 }
@@ -107,15 +105,15 @@ async function can(userId: string, permission: string): Promise<boolean> {
 describe('a full restore keeps the per-person grants of current members, from live state', () => {
   test('overrides and custom or co-owner roles survive for people who still hold the share', async () => {
     await addMember('member-1');
-    override('member-1', 'vehicle.expense.write');
-    override('member-1', 'vehicle.photo.read', ctx.user.id, 'deny');
-    assign('member-1', CUSTOM_ROLE);
-    assign('member-1', builtInRoleId('co_owner'));
-    const before = grantsOf('member-1');
+    await override('member-1', 'vehicle.expense.write');
+    await override('member-1', 'vehicle.photo.read', ctx.user.id, 'deny');
+    await assign('member-1', CUSTOM_ROLE);
+    await assign('member-1', builtInRoleId('co_owner'));
+    const before = await grantsOf('member-1');
 
     const result = await restore(await exportZip());
 
-    expect(grantsOf('member-1')).toEqual(before);
+    expect(await grantsOf('member-1')).toEqual(before);
     expect(result.grants).toEqual({ reapplied: 4, dropped: [] });
     expect(await can('member-1', 'vehicle.expense.write')).toBe(true);
     expect(await can('member-1', 'vehicle.photo.read')).toBe(false);
@@ -124,12 +122,12 @@ describe('a full restore keeps the per-person grants of current members, from li
   test('grants of someone whose share is not in the restored data are dropped and reported', async () => {
     const zip = await exportZip();
     await addMember('late-1');
-    override('late-1', 'vehicle.expense.write');
-    assign('late-1', CUSTOM_ROLE);
+    await override('late-1', 'vehicle.expense.write');
+    await assign('late-1', CUSTOM_ROLE);
 
     const result = await restore(zip);
 
-    expect(grantsOf('late-1')).toEqual({ overrides: [], roles: [] });
+    expect(await grantsOf('late-1')).toEqual({ overrides: [], roles: [] });
     expect(result.grants).toEqual({
       reapplied: 0,
       dropped: [
@@ -142,7 +140,7 @@ describe('a full restore keeps the per-person grants of current members, from li
 
   test('a crafted backup cannot add or widen any grant', async () => {
     await addMember('member-2');
-    override('member-2', 'vehicle.odometer.write');
+    await override('member-2', 'vehicle.odometer.write');
     const zip = new AdmZip(await exportZip());
     zip.addFile(
       'permission_overrides.csv',
@@ -173,7 +171,7 @@ describe('a full restore keeps the per-person grants of current members, from li
 
     const result = await restore(zip.toBuffer());
 
-    expect(grantsOf('member-2')).toEqual({
+    expect(await grantsOf('member-2')).toEqual({
       overrides: [{ permission: 'vehicle.odometer.write', effect: 'allow' }],
       roles: [builtInRoleId('viewer')],
     });
@@ -185,20 +183,20 @@ describe('a full restore keeps the per-person grants of current members, from li
     await addMember('member-3');
     await addMember('gone-grantor');
     await addMember('disabled-1');
-    ctx.sqlite.run(
+    await ctx.sql.run(
       "INSERT INTO users (id, email, display_name) VALUES ('other-owner', 'o@test.com', 'o')"
     );
-    ctx.sqlite.run(
-      "INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES ('foreign-role', 'vehicle', 'Theirs', 0, 'other-owner')"
+    await ctx.sql.run(
+      "INSERT INTO roles (id, scope, name, built_in, owner_user_id) VALUES ('foreign-role', 'vehicle', 'Theirs', FALSE, 'other-owner')"
     );
-    override('member-3', 'vehicle.delete');
-    assign('member-3', 'foreign-role');
-    override('member-3', 'vehicle.trip.write', 'gone-grantor');
-    override('disabled-1', 'vehicle.trip.write');
-    ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', ['disabled-1']);
+    await override('member-3', 'vehicle.delete');
+    await assign('member-3', 'foreign-role');
+    await override('member-3', 'vehicle.trip.write', 'gone-grantor');
+    await override('disabled-1', 'vehicle.trip.write');
+    await ctx.sql.run('UPDATE users SET disabled_at = 1 WHERE id = ?', ['disabled-1']);
     await addMember('waiting-1');
-    assign('waiting-1', CUSTOM_ROLE);
-    ctx.sqlite.run('UPDATE users SET pending_approval_at = 1 WHERE id = ?', ['waiting-1']);
+    await assign('waiting-1', CUSTOM_ROLE);
+    await ctx.sql.run('UPDATE users SET pending_approval_at = 1 WHERE id = ?', ['waiting-1']);
     const zip = new AdmZip(await exportZip());
     const shares = zip.getEntry('vehicle_shares.csv')?.getData().toString('utf-8') ?? '';
     zip.updateFile(
@@ -214,9 +212,9 @@ describe('a full restore keeps the per-person grants of current members, from li
 
     const result = await restore(zip.toBuffer());
 
-    expect(grantsOf('member-3').overrides).toEqual([]);
-    expect(grantsOf('member-3').roles).toEqual([builtInRoleId('viewer')]);
-    expect(grantsOf('disabled-1').overrides).toEqual([]);
+    expect((await grantsOf('member-3')).overrides).toEqual([]);
+    expect((await grantsOf('member-3')).roles).toEqual([builtInRoleId('viewer')]);
+    expect((await grantsOf('disabled-1')).overrides).toEqual([]);
     expect(result.grants?.reapplied).toBe(0);
     expect(
       [...(result.grants?.dropped ?? [])].map((d) => `${d.userId} ${d.kind} ${d.reason}`).sort()
@@ -227,12 +225,12 @@ describe('a full restore keeps the per-person grants of current members, from li
       'member-3 role role_not_assignable',
       'waiting-1 role member_not_active',
     ]);
-    expect(grantsOf('waiting-1').roles).toEqual([builtInRoleId('viewer')]);
+    expect((await grantsOf('waiting-1')).roles).toEqual([builtInRoleId('viewer')]);
   });
 
   test('a restore that brings back none of the cars drops every grant on them', async () => {
     await addMember('member-4');
-    override('member-4', 'vehicle.expense.write');
+    await override('member-4', 'vehicle.expense.write');
     const zip = new AdmZip(await exportZip());
     for (const entry of ['vehicles.csv']) {
       const text = zip.getEntry(entry)?.getData().toString('utf-8') ?? '';
@@ -253,7 +251,7 @@ describe('a full restore keeps the per-person grants of current members, from li
       ],
     });
     expect(
-      ctx.sqlite.query('SELECT id FROM permission_overrides WHERE user_id = ?').all('member-4')
+      await ctx.sql.all('SELECT id FROM permission_overrides WHERE user_id = ?', ['member-4'])
     ).toEqual([]);
   });
 
@@ -261,13 +259,13 @@ describe('a full restore keeps the per-person grants of current members, from li
     await addMember('limited-1');
     await addMember('setter-1');
     await addMember('limited-2');
-    override('limited-1', 'vehicle.photo.read', 'setter-1', 'deny');
-    override('limited-1', 'vehicle.expense.read', ctx.user.id, 'deny');
-    ctx.sqlite.run(
+    await override('limited-1', 'vehicle.photo.read', 'setter-1', 'deny');
+    await override('limited-1', 'vehicle.expense.read', ctx.user.id, 'deny');
+    await ctx.sql.run(
       "UPDATE permission_overrides SET set_by = NULL WHERE user_id = 'limited-1' AND permission = 'vehicle.expense.read'"
     );
-    override('limited-2', 'vehicle.trip.read', ctx.user.id, 'deny');
-    ctx.sqlite.run('UPDATE users SET disabled_at = 1 WHERE id = ?', ['limited-2']);
+    await override('limited-2', 'vehicle.trip.read', ctx.user.id, 'deny');
+    await ctx.sql.run('UPDATE users SET disabled_at = 1 WHERE id = ?', ['limited-2']);
     const zip = new AdmZip(await exportZip());
     const shares = zip.getEntry('vehicle_shares.csv')?.getData().toString('utf-8') ?? '';
     zip.updateFile(
@@ -284,11 +282,11 @@ describe('a full restore keeps the per-person grants of current members, from li
     const result = await restore(zip.toBuffer());
 
     expect(result.grants).toEqual({ reapplied: 3, dropped: [] });
-    expect(grantsOf('limited-1').overrides).toEqual([
+    expect((await grantsOf('limited-1')).overrides).toEqual([
       { permission: 'vehicle.expense.read', effect: 'deny' },
       { permission: 'vehicle.photo.read', effect: 'deny' },
     ]);
-    expect(grantsOf('limited-2').overrides).toEqual([
+    expect((await grantsOf('limited-2')).overrides).toEqual([
       { permission: 'vehicle.trip.read', effect: 'deny' },
     ]);
     expect(await can('limited-1', 'vehicle.photo.read')).toBe(false);
@@ -298,8 +296,8 @@ describe('a full restore keeps the per-person grants of current members, from li
   test('a deny on someone with no share left on the car is cleaned up, one on an open invite stays', async () => {
     await addMember('left-1');
     await addMember('invited-1');
-    override('left-1', 'vehicle.trip.read', ctx.user.id, 'deny');
-    override('invited-1', 'vehicle.trip.read', ctx.user.id, 'deny');
+    await override('left-1', 'vehicle.trip.read', ctx.user.id, 'deny');
+    await override('invited-1', 'vehicle.trip.read', ctx.user.id, 'deny');
     const zip = new AdmZip(await exportZip());
     const shares = zip.getEntry('vehicle_shares.csv')?.getData().toString('utf-8') ?? '';
     zip.updateFile(
@@ -312,7 +310,7 @@ describe('a full restore keeps the per-person grants of current members, from li
         'utf-8'
       )
     );
-    ctx.sqlite.run("UPDATE vehicle_shares SET status = 'pending' WHERE shared_with_id = ?", [
+    await ctx.sql.run("UPDATE vehicle_shares SET status = 'pending' WHERE shared_with_id = ?", [
       'invited-1',
     ]);
 
@@ -322,15 +320,15 @@ describe('a full restore keeps the per-person grants of current members, from li
       reapplied: 1,
       dropped: [{ kind: 'override', vehicleId, userId: 'left-1', reason: 'no_accepted_share' }],
     });
-    expect(grantsOf('left-1').overrides).toEqual([]);
-    expect(grantsOf('invited-1').overrides).toEqual([
+    expect((await grantsOf('left-1')).overrides).toEqual([]);
+    expect((await grantsOf('invited-1')).overrides).toEqual([
       { permission: 'vehicle.trip.read', effect: 'deny' },
     ]);
   });
 
   test('merge and preview restores leave per-person grants alone and report none', async () => {
     await addMember('member-5');
-    override('member-5', 'vehicle.expense.write');
+    await override('member-5', 'vehicle.expense.write');
     const zip = await exportZip();
     const { restoreService } = await import('../restore');
 
@@ -339,7 +337,7 @@ describe('a full restore keeps the per-person grants of current members, from li
       expect(result.success).toBe(true);
       expect('grants' in result, mode).toBe(false);
     }
-    expect(grantsOf('member-5').overrides).toEqual([
+    expect((await grantsOf('member-5')).overrides).toEqual([
       { permission: 'vehicle.expense.write', effect: 'allow' },
     ]);
   });
