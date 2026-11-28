@@ -33,7 +33,7 @@ import {
   requireVehicleAccess,
   requireVehiclesAccess,
 } from '../../utils/vehicle-access';
-import { hideDriverFields } from '../drivers/attribution';
+import { memberView } from '../drivers/attribution';
 import { expenseSplitService } from '../expenses/split-service';
 import { withMileageDue } from './mileage-due';
 import { recurringCostSummary } from './reminder-cost';
@@ -497,7 +497,7 @@ routes.get(
     return c.json({
       success: true,
       data: readable.map((expense) => {
-        const row = hideDriverFields(c, expense.vehicleId, expenseToApi(expense, scale));
+        const row = memberView(c, expense.vehicleId, expenseToApi(expense, scale));
         return isOwner ? row : { ...row, groupTotal: null, splitMethod: null };
       }),
     });

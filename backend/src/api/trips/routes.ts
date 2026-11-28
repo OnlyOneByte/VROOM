@@ -17,7 +17,7 @@ import { buildTripSummary } from '../../utils/trip-summary';
 import { convertDistance } from '../../utils/unit-conversions';
 import { commonSchemas, zValidator } from '../../utils/validation';
 import { readableVehicles, requireVehicleAccess } from '../../utils/vehicle-access';
-import { attributedDriver, hideDriverFields } from '../drivers/attribution';
+import { attributedDriver, memberView } from '../drivers/attribution';
 import { createTrip, deleteTrip, updateTrip } from './service';
 import {
   createTripSchema,
@@ -96,7 +96,7 @@ routes.post('/', zValidator('json', createTripSchema), authorize(fromBodyVehicle
   );
 
   return c.json(
-    { success: true, data: hideDriverFields(c, trip.vehicleId, trip), message: 'Trip created' },
+    { success: true, data: memberView(c, trip.vehicleId, trip), message: 'Trip created' },
     201
   );
 });
@@ -124,7 +124,7 @@ routes.get('/', zValidator('query', listQuerySchema), authorize(fromQueryVehicle
     vehicleId: query.vehicleId,
     purpose: query.purpose,
   });
-  const rows = data.map((trip) => hideDriverFields(c, trip.vehicleId, trip));
+  const rows = data.map((trip) => memberView(c, trip.vehicleId, trip));
   return c.json(buildPaginatedResponse(rows, totalCount, limit, offset));
 });
 
@@ -181,7 +181,7 @@ routes.put(
     );
     return c.json({
       success: true,
-      data: hideDriverFields(c, updated.vehicleId, updated),
+      data: memberView(c, updated.vehicleId, updated),
       message: 'Trip updated',
     });
   }
