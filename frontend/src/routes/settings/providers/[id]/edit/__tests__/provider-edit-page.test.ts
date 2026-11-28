@@ -53,14 +53,14 @@ describe('storage provider edit page states', () => {
 		render(EditPage);
 
 		expect(screen.getByRole('heading', { level: 1, name: 'Edit storage' })).toBeInTheDocument();
-		expect(screen.getByRole('status')).toHaveTextContent('Loading provider');
+		expect(screen.getByRole('status')).toHaveTextContent('Loading storage');
 	});
 
 	test('an unknown provider keeps the heading and offers a 40px way back to Backups and storage', async () => {
 		getProviders.mockResolvedValue([]);
 		render(EditPage);
 
-		expect(await screen.findByText('Provider not found')).toBeInTheDocument();
+		expect(await screen.findByText('Storage not found')).toBeInTheDocument();
 		expect(screen.getByRole('heading', { level: 1, name: 'Edit storage' })).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
 		const back = screen.getByText('Back to Backups and storage', { selector: 'button' });
@@ -74,7 +74,7 @@ describe('storage provider edit page states', () => {
 		render(EditPage);
 
 		const alert = await screen.findByRole('alert');
-		expect(alert).toHaveTextContent("Couldn't load this provider");
+		expect(alert).toHaveTextContent("Couldn't load this storage");
 		expect(alert).toHaveTextContent(SERVER_FAILURE_MESSAGE);
 		expect(screen.getByRole('heading', { level: 1, name: 'Edit storage' })).toBeInTheDocument();
 		expect(screen.queryByText(/boom/)).toBeNull();

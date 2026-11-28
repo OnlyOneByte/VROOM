@@ -21,23 +21,23 @@
 	const PROBLEM: Record<ProviderHealthCode, { title: string; detail: string }> = {
 		auth: {
 			title: "The saved sign-in or key isn't accepted anymore.",
-			detail: 'Reconnect to keep using this provider.'
+			detail: 'Reconnect to keep using it.'
 		},
 		permission: {
-			title: "The provider is connected but doesn't allow access.",
+			title: "It's connected but doesn't allow access.",
 			detail: 'Reconnect and allow access.'
 		},
 		unreachable: {
-			title: "Couldn't reach the provider.",
+			title: "Couldn't connect.",
 			detail: 'Check its address and your network, then test again.'
 		},
 		config: {
-			title: 'The settings for this provider are incomplete or invalid.',
+			title: 'These settings are incomplete or invalid.',
 			detail: 'Edit them, then test again.'
 		},
 		endpoint: {
-			title: 'This server only lets providers reach public https:// addresses.',
-			detail: "Change the provider's address to a public https:// one, then test again."
+			title: 'This server only allows public https:// addresses.',
+			detail: 'Change the address to a public https:// one, then test again.'
 		}
 	};
 
@@ -130,7 +130,7 @@
 						onclick={() =>
 							onFix(provider, provider.status === 'needs_reauth' ? 'reconnect' : 'edit')}
 					>
-						{provider.status === 'needs_reauth' ? 'Reconnect' : 'Edit provider'}
+						{provider.status === 'needs_reauth' ? 'Reconnect' : 'Edit settings'}
 					</Button>
 					{@render testButton()}
 				</div>

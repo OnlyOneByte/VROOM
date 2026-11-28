@@ -376,7 +376,11 @@
 								<div class="min-w-0">
 									<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
 										<p class="font-medium break-words">{provider.displayName}</p>
-										<ProviderStatusBadge status={provider.status} />
+										<ProviderStatusBadge
+											status={provider.status}
+											lastCheckedAt={provider.lastCheckedAt}
+											lastErrorCode={provider.lastErrorCode}
+										/>
 									</div>
 									<p class="text-sm break-words text-muted-foreground">
 										{labelFor(provider.providerType)}

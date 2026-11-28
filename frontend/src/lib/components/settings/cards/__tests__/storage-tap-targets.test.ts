@@ -61,18 +61,18 @@ describe('Storage Providers controls are 40px tap targets on phones', () => {
 		expect(screen.queryByText(/Enable backup on a provider/)).toBeNull();
 	});
 
-	test('a provider’s edit, delete and expand icons and Sync All, spaced 8px apart', async () => {
+	test('a provider’s edit, delete and expand icons and Sync all, spaced 8px apart', async () => {
 		providers.mockResolvedValue([DRIVE]);
 		render(StorageProvidersCard, { props: {} });
 
 		const edit = await screen.findByRole('button', { name: 'Edit Family Drive' });
 		const del = screen.getByRole('button', { name: 'Delete Family Drive' });
-		const expand = screen.getByRole('button', { name: 'Expand provider details' });
+		const expand = screen.getByRole('button', { name: 'Expand storage details' });
 		for (const button of [edit, del, expand]) expect(button.className).toContain('size-10');
 		expect(edit.parentElement?.className).toMatch(/(^|\s)gap-2(\s|$)/);
 
 		await fireEvent.click(expand);
-		expectTouchHeight(await screen.findByRole('button', { name: /Sync All/ }));
+		expectTouchHeight(await screen.findByRole('button', { name: /Sync all/ }));
 	});
 
 	test('with a provider: one Add storage button under Connected, no empty state', async () => {

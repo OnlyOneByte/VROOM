@@ -90,7 +90,7 @@
 	<CardHeader>
 		<div class="flex items-center gap-2">
 			<UserCheck class="h-5 w-5 text-muted-foreground" />
-			<CardTitle level={2}>Waiting for Approval</CardTitle>
+			<CardTitle level={2}>Waiting for approval</CardTitle>
 		</div>
 		<CardDescription>
 			People who signed up while sign-up needed approval. They can't see or add anything yet.

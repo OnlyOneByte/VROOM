@@ -65,7 +65,7 @@ describe('Storage Providers card errors read as plain sentences', () => {
 		getSettings.mockRejectedValueOnce(new ApiError('boom', 500)).mockResolvedValueOnce(SETTINGS);
 		render(StorageProvidersCard, { props: {} });
 
-		expect(await screen.findByText("Couldn't load your storage providers")).toBeInTheDocument();
+		expect(await screen.findByText("Couldn't load your storage")).toBeInTheDocument();
 		expect(
 			screen.getByText('Something went wrong on our side. Try again in a moment.')
 		).toBeInTheDocument();
@@ -73,7 +73,7 @@ describe('Storage Providers card errors read as plain sentences', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		expect(await screen.findByText(/No storage connected yet/)).toBeInTheDocument();
-		expect(screen.queryByText("Couldn't load your storage providers")).toBeNull();
+		expect(screen.queryByText("Couldn't load your storage")).toBeNull();
 		await waitFor(() => expect(screen.getAllByRole('button')[0]).toHaveFocus());
 	});
 
