@@ -58,8 +58,9 @@ function sharedPolicyView<
   const coveredTermIds = new Set(
     policy.termVehicleCoverage.filter((c) => c.vehicleId === vehicleId).map((c) => c.termId)
   );
+  const { userId: _userId, ...shared } = policy as T & { userId?: string };
   return {
-    ...policy,
+    ...shared,
     terms: policy.terms
       .filter((t) => coveredTermIds.has(t.id))
       .map((t) => {
