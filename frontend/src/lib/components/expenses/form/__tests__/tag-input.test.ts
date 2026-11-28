@@ -287,6 +287,22 @@ describe('TagInput: focus', () => {
 		}
 		expect(box?.classList).not.toContain('bg-background');
 	});
+
+	test('an error keeps a 2px red border with a red ring, even while the field has focus', () => {
+		const input = renderTagInput([], { error: 'Too many tags', touched: true });
+		const box = input.closest('.min-h-11\\.5');
+
+		for (const cls of ['border-2', 'border-destructive', 'focus-within:ring-destructive/20']) {
+			expect(box?.classList).toContain(cls);
+		}
+		for (const cls of [
+			'border-[1.5px]',
+			'focus-within:border-foreground',
+			'focus-within:ring-ring/50'
+		]) {
+			expect(box?.classList).not.toContain(cls);
+		}
+	});
 });
 
 describe('TagInput: chip focus', () => {

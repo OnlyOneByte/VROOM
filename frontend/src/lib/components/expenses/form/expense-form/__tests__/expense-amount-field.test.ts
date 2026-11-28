@@ -12,6 +12,9 @@ describe('ExpenseAmountField on Quick Add', () => {
 		const input = screen.getByLabelText('Amount *');
 		expect(input).toHaveAttribute('placeholder', '0.00');
 		expect(input).toHaveClass('placeholder:text-muted-foreground/40');
+		expect(input.parentElement?.querySelector('[aria-hidden="true"]')).toHaveClass(
+			'text-muted-foreground/40'
+		);
 		expect(input).not.toHaveClass('placeholder:text-muted-foreground');
 	});
 });

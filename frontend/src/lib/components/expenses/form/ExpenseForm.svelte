@@ -764,7 +764,7 @@
 							{#if !form.isSplit}
 								{@render vehicleField(false)}
 								{#if quickAdd && form.canSplit}
-									<span class="h-0 basis-full sm:hidden" aria-hidden="true"></span>
+									<span class="-mt-2 h-0 basis-full sm:hidden" aria-hidden="true"></span>
 								{/if}
 							{/if}
 							<Label for="date" class="sr-only">Date *</Label>

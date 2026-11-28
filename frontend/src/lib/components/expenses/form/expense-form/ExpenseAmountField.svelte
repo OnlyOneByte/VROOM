@@ -40,7 +40,7 @@
 			<span
 				class="mt-1.5 text-3xl leading-none sm:mt-2 sm:text-5xl {amount
 					? ''
-					: 'text-muted-foreground'}"
+					: 'text-muted-foreground/40'}"
 				aria-hidden="true"
 			>
 				{currencySymbol}

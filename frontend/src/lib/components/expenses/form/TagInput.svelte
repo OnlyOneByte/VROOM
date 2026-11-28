@@ -87,10 +87,10 @@
 <div class="space-y-2" onfocusout={handleFocusOut}>
 	<Label for="tags">Tags (optional)</Label>
 	<div
-		class="min-h-11.5 rounded-[var(--r-md)] border-[1.5px] bg-surface px-3.5 py-1.5 text-base transition-[color,box-shadow,border-color] focus-within:border-foreground focus-within:ring-[3px] focus-within:ring-ring/50 has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 md:text-sm {touched &&
+		class="min-h-11.5 rounded-[var(--r-md)] bg-surface px-3.5 py-1.5 text-base transition-[color,box-shadow,border-color] focus-within:ring-[3px] has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50 md:text-sm {touched &&
 		error
-			? 'border-2 border-destructive'
-			: 'border-border-strong'}"
+			? 'border-2 border-destructive focus-within:ring-destructive/20 dark:focus-within:ring-destructive/40'
+			: 'border-[1.5px] border-border-strong focus-within:border-foreground focus-within:ring-ring/50'}"
 	>
 		<div class="flex flex-wrap gap-2 items-center">
 			{#each tags as tag (tag)}
