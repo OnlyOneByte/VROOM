@@ -23,7 +23,6 @@
 		Plus,
 		LogOut
 	} from '@lucide/svelte';
-	import SyncStatusInline from '../sync/SyncStatusInline.svelte';
 	import OfflineIndicator from '../sync/OfflineIndicator.svelte';
 	import { syncState, onlineStatus, offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 	import {
@@ -43,6 +42,20 @@
 	const wide = new MediaQuery('min-width: 64rem');
 	let moreOpen = $state(false);
 	let syncOpen = $state(false);
+
+	let syncStatusModule: Promise<typeof import('../sync/SyncStatusInline.svelte')> | undefined;
+
+	function loadSyncStatus() {
+		syncStatusModule ??= import('../sync/SyncStatusInline.svelte').catch(error => {
+			syncStatusModule = undefined;
+			throw error;
+		});
+		return syncStatusModule;
+	}
+
+	function prefetchSyncStatus() {
+		loadSyncStatus().catch(() => {});
+	}
 
 	onMount(() => {
 		syncManager.setupAutoSync();
@@ -147,6 +160,8 @@
 			<DialogPrimitive.Trigger
 				class="inline-flex min-h-10 items-center gap-1.5 rounded-full px-2 text-[13px] font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				aria-label="Sync status: {syncStatusInfo.text}"
+				onpointerenter={prefetchSyncStatus}
+				onfocusin={prefetchSyncStatus}
 			>
 				<span class="relative {syncStatusInfo.color}">
 					<StatusIcon class="h-5 w-5 {syncState.current === 'syncing' ? 'animate-spin' : ''}" />
@@ -164,7 +179,15 @@
 			</DialogPrimitive.Trigger>
 			<DialogPrimitive.Content class={panelClass} trapFocus preventScroll={false}>
 				<DialogPrimitive.Title class="sr-only">Sync status</DialogPrimitive.Title>
-				<SyncStatusInline />
+				{#await loadSyncStatus()}
+					<p class="px-3 py-2 text-sm text-muted-foreground" role="status">Loading sync status…</p>
+				{:then { default: SyncStatusInline }}
+					<SyncStatusInline />
+				{:catch}
+					<p class="px-3 py-2 text-sm text-muted-foreground" role="alert">
+						Couldn't load sync status. Close this and try again.
+					</p>
+				{/await}
 			</DialogPrimitive.Content>
 		</DialogPrimitive.Root>
 	</div>
