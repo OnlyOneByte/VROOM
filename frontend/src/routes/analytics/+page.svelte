@@ -236,6 +236,7 @@
 		{vehiclesError}
 		onRetryVehicles={loadVehicles}
 		{inline}
+		showRange={activeTab !== 'year-end'}
 	/>
 {/snippet}
 
@@ -406,7 +407,7 @@
 							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 						</div>
 					{:then { default: YearEndTab }}
-						<YearEndTab />
+						<YearEndTab {vehicleIds} />
 					{:catch}
 						{@render tabLoadError('Year in review')}
 					{/await}

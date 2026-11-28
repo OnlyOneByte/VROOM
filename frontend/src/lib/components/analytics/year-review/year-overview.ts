@@ -22,8 +22,17 @@ export type YearQuery = (typeof YEAR_QUERIES)[number];
 
 export function yearRequests(
 	year: number,
-	now: Date = new Date()
+	now: Date = new Date(),
+	vehicleIds?: string[]
 ): Record<YearQuery, AnalyticsQueryParams> {
+	const requests = allCarRequests(year, now);
+	if (!vehicleIds) return requests;
+	return Object.fromEntries(
+		YEAR_QUERIES.map(key => [key, { ...requests[key], vehicleIds }])
+	) as Record<YearQuery, AnalyticsQueryParams>;
+}
+
+function allCarRequests(year: number, now: Date): Record<YearQuery, AnalyticsQueryParams> {
 	const { start, end, soFar } = yearRange(year, now);
 	const whole = { interval: 'none' as const, start, end };
 	const lastDay = new Date(year - 1, now.getMonth() + 1, 0).getDate();

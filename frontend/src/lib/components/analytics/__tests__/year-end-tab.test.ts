@@ -151,6 +151,33 @@ describe('YearEndTab', () => {
 		expect(perCar).toEqual([]);
 	});
 
+	test('the Cars filter reaches every query, and the list of biggest expenses', async () => {
+		render(YearEndTab, { props: { vehicleIds: ['civic'] } });
+		await screen.findByText('2026 so far · 3 vehicles');
+		const sent = api.query.mock.calls.map(([p]) => (p as AnalyticsQueryParams).vehicleIds);
+		expect(sent).toHaveLength(7);
+		expect(sent.every(ids => ids?.join() === 'civic')).toBe(true);
+		expect(api.queryItems).toHaveBeenCalledWith(
+			expect.objectContaining({ vehicleIds: ['civic'] })
+		);
+	});
+
+	test('picking other cars reloads the year; the same cars again does not', async () => {
+		const { rerender } = render(YearEndTab, { props: { vehicleIds: ['civic'] } });
+		await screen.findByText('2026 so far · 3 vehicles');
+		await rerender({ vehicleIds: ['civic'] });
+		await new Promise(r => setTimeout(r, 20));
+		expect(api.queryItems).toHaveBeenCalledTimes(1);
+		await rerender({ vehicleIds: ['rav4', 'f150'] });
+		await waitFor(() => expect(api.queryItems).toHaveBeenCalledTimes(2));
+		expect(api.queryItems).toHaveBeenLastCalledWith(
+			expect.objectContaining({ vehicleIds: ['rav4', 'f150'] })
+		);
+		await rerender({ vehicleIds: undefined });
+		await waitFor(() => expect(api.queryItems).toHaveBeenCalledTimes(3));
+		expect(api.queryItems.mock.calls[2]?.[0]).not.toHaveProperty('vehicleIds');
+	});
+
 	test('a covered car with no spending this year still counts', async () => {
 		coverage = covering(['civic', 'rav4', 'f150', 'outback']);
 		render(YearEndTab);
