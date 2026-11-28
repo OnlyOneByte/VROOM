@@ -56,7 +56,7 @@ describe('VehicleRowsCard', () => {
 			props: { rows: ROWS, periodLabel: '30 days', distanceLabel: 'mi' }
 		});
 		expect(screen.getByTestId('no-per-distance-note')).toHaveTextContent(
-			'— means no cost per mi yet. It shows once there’s a newer odometer reading, like the one your next fill-up records.'
+			'— means no cost per mi yet. It needs odometer readings on two expenses, such as two fill-ups.'
 		);
 		unmount();
 

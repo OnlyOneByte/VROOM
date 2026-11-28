@@ -47,9 +47,12 @@ export interface VehicleRow {
 	runningPerDistance: number | null;
 }
 
-/** Explains a vehicle row's "—": cost per distance needs distance, so a second odometer reading. */
+/**
+ * Explains a vehicle row's "—". The rows' distance comes from odometer readings on expenses
+ * (not the starting odometer or standalone odometer entries), so it needs two of them.
+ */
 export function noPerDistanceNote(distanceLabel: string): string {
-	return `— means no cost per ${distanceLabel} yet. It shows once there’s a newer odometer reading, like the one your next fill-up records.`;
+	return `— means no cost per ${distanceLabel} yet. It needs odometer readings on two expenses, such as two fill-ups.`;
 }
 
 export interface PeriodSpend {

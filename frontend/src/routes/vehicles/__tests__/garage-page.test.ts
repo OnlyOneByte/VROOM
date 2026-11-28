@@ -131,7 +131,7 @@ describe('the Garage', () => {
 	test('a car with no cost per mile gets one note under the list saying what fills it in', async () => {
 		render(Page);
 		expect(await screen.findByTestId('no-per-distance-note')).toHaveTextContent(
-			'— means no cost per mi yet. It shows once there’s a newer odometer reading'
+			'— means no cost per mi yet. It needs odometer readings on two expenses, such as two fill-ups.'
 		);
 
 		query.mockResolvedValue({
