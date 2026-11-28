@@ -14,7 +14,6 @@ import {
 	unitTooltip,
 	formatDecimalAxis,
 	fitBandTickLabel,
-	getTrendLineProps,
 	insetTimeTicks,
 	isolatedValueRows,
 	getXTickCount,
@@ -231,18 +230,6 @@ describe('monthlyXAxisProps (monthly time-series axis wiring)', () => {
 		expect(format(42)).toBe('');
 		expect(format(null)).toBe('');
 		expect(format(undefined)).toBe('');
-	});
-});
-
-describe('getTrendLineProps (single-point visibility branch)', () => {
-	test('a single (or zero) data point gets an enlarged filled dot so the lone value is visible', () => {
-		expect(getTrendLineProps(1).points.r).toBe(6);
-		expect(getTrendLineProps(0).points.r).toBe(6);
-	});
-
-	test('two or more points use the standard trend dot (r:4)', () => {
-		expect(getTrendLineProps(2).points.r).toBe(4);
-		expect(getTrendLineProps(12).points.r).toBe(4);
 	});
 });
 
