@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { RestoreProviderInfo, RestoreResult } from '#lib/types/index.ts';
-import { ApiError } from '#lib/utils/error-handling.ts';
+import { ApiError, RequestTimeoutError } from '#lib/utils/error-handling.ts';
 
 const sheetsProvider: RestoreProviderInfo = {
 	providerId: 'prov-1',
@@ -109,6 +109,47 @@ describe('RestoreDialog merge', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Replace everything' }));
 
 		await screen.findByText(/Couldn't restore/);
+		expect(screen.queryByRole('button', { name: 'Merge instead' })).toBeNull();
+		await vi.waitFor(() =>
+			expect(screen.getByRole('button', { name: 'Replace everything' })).toHaveFocus()
+		);
+	});
+
+	test('a conflict puts focus on Merge instead', async () => {
+		await openSheetsPreview();
+		await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
+		restoreFromProvider.mockRejectedValueOnce(new ApiError('Conflict', 409));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Replace everything' }));
+
+		const mergeInstead = await screen.findByRole('button', { name: 'Merge instead' });
+		await vi.waitFor(() => expect(mergeInstead).toHaveFocus());
+	});
+
+	test('the source choices keep a visible edge on their icon squares', async () => {
+		renderDialog();
+		const upload = await screen.findByText('Upload file');
+		const choices = [upload, screen.getByText('Restore from storage')].map(label =>
+			label.closest('button')
+		);
+
+		for (const choice of choices) {
+			const square = choice?.querySelector('[aria-hidden="true"]');
+			expect(square?.classList.contains('border-border'), choice?.textContent ?? '').toBe(true);
+		}
+	});
+
+	test('a restore that times out says it may still finish, not that it failed', async () => {
+		await openSheetsPreview();
+		await fireEvent.click(screen.getByRole('radio', { name: /Replace everything/ }));
+		restoreFromProvider.mockRejectedValueOnce(new RequestTimeoutError());
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Replace everything' }));
+
+		const alert = await screen.findByRole('alert');
+		expect(alert).toHaveTextContent('taking longer than expected');
+		expect(alert).toHaveTextContent('It may still finish');
+		expect(alert).not.toHaveTextContent("Couldn't restore");
 		expect(screen.queryByRole('button', { name: 'Merge instead' })).toBeNull();
 	});
 });
