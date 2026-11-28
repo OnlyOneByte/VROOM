@@ -903,7 +903,7 @@ export class AnalyticsQueryRepository {
         NULL AS volume, NULL AS eff_distance, NULL AS eff_energy
       FROM b CROSS JOIN expenses e
       WHERE e.date >= b.t0 AND e.date < b.t1 AND ${this.scope(ctx)}
-      GROUP BY b.period, b.idx, ${key}
+      GROUP BY b.period, b.idx, key
     `
     );
   }
@@ -967,7 +967,7 @@ export class AnalyticsQueryRepository {
         SUM(CASE WHEN ${valid} THEN ${driven} * vu.dist_user END) AS eff_distance,
         SUM(CASE WHEN ${valid} THEN ${energyUser} END) AS eff_energy
       FROM f JOIN vu ON vu.vehicle_id = f.vehicle_id
-      GROUP BY f.period, f.idx, ${key}
+      GROUP BY f.period, f.idx, key
     `
     );
   }
