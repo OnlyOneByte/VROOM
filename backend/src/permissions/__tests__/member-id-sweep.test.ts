@@ -127,6 +127,26 @@ const parsed = (text: string): unknown => {
 const appliesTo = (table: Record<string, Exception>, field: string, role: Role) =>
   table[field]?.roles.includes(role) === true;
 
+function sortFields(
+  found: Set<string>,
+  key: string,
+  role: Role,
+  unexpected: Set<string>,
+  gapsSeen: Set<string>
+): void {
+  for (const hit of found) {
+    const field = `${key} ${hit}`;
+    if (appliesTo(ALLOWED, field, role)) continue;
+    if (appliesTo(KNOWN_GAPS, field, role)) gapsSeen.add(field);
+    else unexpected.add(field);
+  }
+}
+
+function headerNamesAny(res: Response, ids: Map<string, string>): boolean {
+  const header = [...res.headers.values()].join(' ');
+  return [...ids.keys()].some((id) => header.includes(id));
+}
+
 describe('responses to members of a shared car', () => {
   let ctx: TestApp;
   let members: Members;
@@ -155,16 +175,8 @@ describe('responses to members of a shared car', () => {
       if (res.ok) answered++;
       const found = new Set<string>();
       fieldsHolding(parsed(await res.text()), ids, '$', found);
-      for (const hit of found) {
-        const field = `${key} ${hit}`;
-        if (appliesTo(ALLOWED, field, role)) continue;
-        if (appliesTo(KNOWN_GAPS, field, role)) gapsSeen.add(field);
-        else unexpected.add(field);
-      }
-      const header = [...res.headers.values()].join(' ');
-      for (const id of ids.keys()) {
-        if (header.includes(id)) unexpected.add(`${key} (a response header)`);
-      }
+      sortFields(found, key, role, unexpected, gapsSeen);
+      if (headerNamesAny(res, ids)) unexpected.add(`${key} (a response header)`);
     }
     const gapsExpected = Object.keys(KNOWN_GAPS).filter((f) => appliesTo(KNOWN_GAPS, f, role));
     return {
