@@ -48,6 +48,11 @@ function startWindow(key: string, now: number, windowMs: number): void {
   rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
 }
 
+export function clearRateLimits(): void {
+  rateLimitStore.clear();
+  evictionCursor = null;
+}
+
 export function trackedRateLimitKeys(): number {
   return rateLimitStore.size;
 }

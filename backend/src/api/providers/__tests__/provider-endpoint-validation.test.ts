@@ -3,7 +3,7 @@ import { Readable } from 'node:stream';
 import { appContext } from '../../../app-context';
 import { CONFIG } from '../../../config';
 import type { UserProvider } from '../../../db/schema';
-import { ValidationError } from '../../../errors';
+import { SyncError, SyncErrorCode, ValidationError } from '../../../errors';
 import { assignServerRole, builtInRoleId } from '../../../permissions/grants';
 import {
   createTestApp,
@@ -201,6 +201,8 @@ describe('provider endpoints with private endpoints blocked', () => {
     expect(listed.data.find((p) => p.id === id)?.lastErrorCode).toBe('endpoint');
     expect(healthCodeOf(new EndpointNotAllowedError('x'))).toBe('endpoint');
     expect(healthCodeOf(new ValidationError('x'))).toBe('config');
+    expect(healthCodeOf(new SyncError(SyncErrorCode.QUOTA_EXCEEDED, 'x'))).toBe('busy');
+    expect(healthCodeOf(new SyncError(SyncErrorCode.NETWORK_ERROR, 'x'))).toBe('unreachable');
   });
 
   test.each([
@@ -769,5 +771,28 @@ describe('S3 request deadlines', () => {
     expect(signal?.aborted).toBe(false);
     caller.abort();
     expect(signal?.aborted).toBe(true);
+  });
+
+  test('a request with no caller signal still gets one for its deadline', async () => {
+    outboundResolver.lookup = async () => ['93.184.215.14'];
+    let signal: AbortSignal | undefined;
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      return new Response(null, { status: 200 });
+    }) as typeof fetch;
+    const handler = s3RequestHandlerFor(await privateEndpointPolicy()) as unknown as {
+      handle: (request: unknown, options?: { abortSignal?: AbortSignal }) => Promise<unknown>;
+    };
+
+    await handler.handle({
+      protocol: 'https:',
+      hostname: 'files.example.com',
+      path: '/k',
+      method: 'GET',
+      headers: {},
+    });
+
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(false);
   });
 });

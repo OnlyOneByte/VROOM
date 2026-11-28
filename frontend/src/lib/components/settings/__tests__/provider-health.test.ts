@@ -36,4 +36,12 @@ describe('ProviderHealth', () => {
 		});
 		expect(screen.getByText('These settings are incomplete or invalid.')).toBeTruthy();
 	});
+
+	test('a busy or rate-limited provider says to wait, not that it could not connect', () => {
+		render(ProviderHealth, {
+			props: { provider: provider('busy'), onFix: vi.fn(), onUpdated: vi.fn() }
+		});
+		expect(screen.getByText('The provider is busy or limiting requests right now.')).toBeTruthy();
+		expect(screen.queryByText("Couldn't connect.")).toBeNull();
+	});
 });

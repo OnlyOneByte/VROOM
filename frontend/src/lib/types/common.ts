@@ -41,7 +41,8 @@ export interface Photo {
 }
 
 export type ProviderStatus = 'active' | 'needs_reauth' | 'error' | 'disabled';
-export type ProviderHealthCode = 'auth' | 'permission' | 'unreachable' | 'config' | 'endpoint';
+export type ProviderHealthCode =
+	'auth' | 'permission' | 'unreachable' | 'busy' | 'config' | 'endpoint';
 
 export interface ProviderHealthResult {
 	ok: boolean;

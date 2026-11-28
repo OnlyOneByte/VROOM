@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
-import { createTestApp, SETUP_TIMEOUT_MS, type TestApp } from '../../../test-helpers/http-client';
+import {
+  createTestApp,
+  SETUP_TIMEOUT_MS,
+  socketFrom,
+  type TestApp,
+} from '../../../test-helpers/http-client';
 
 let ctx: TestApp;
 let isSafeReturnPath: typeof import('../routes').isSafeReturnPath;
@@ -104,5 +109,19 @@ describe('GET /auth/providers/connect/google', () => {
     );
     const location = new URL(callback.headers.get('location') ?? '');
     expect(location.searchParams.get('provider_error')).toBe('exchange_failed');
+  });
+});
+
+describe('GET /auth/callback/provider/google', () => {
+  test('is rate-limited like the sign-in callbacks', async () => {
+    const { CONFIG } = await import('../../../config');
+    const CALLBACK = '/api/v1/auth/callback/provider/google?state=x';
+    const statuses: number[] = [];
+    for (let i = 0; i <= CONFIG.rateLimit.auth.limit; i++) {
+      const res = await ctx.app.request(CALLBACK, {}, socketFrom('203.0.113.77'));
+      statuses.push(res.status);
+    }
+    expect(statuses.slice(0, -1).every((s) => s !== 429)).toBe(true);
+    expect(statuses.at(-1)).toBe(429);
   });
 });

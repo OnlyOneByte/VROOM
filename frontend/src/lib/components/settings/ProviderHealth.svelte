@@ -31,6 +31,10 @@
 			title: "Couldn't connect.",
 			detail: 'Check its address and your network, then test again.'
 		},
+		busy: {
+			title: 'The provider is busy or limiting requests right now.',
+			detail: 'Wait a few minutes, then test again.'
+		},
 		config: {
 			title: 'These settings are incomplete or invalid.',
 			detail: 'Edit them, then test again.'
