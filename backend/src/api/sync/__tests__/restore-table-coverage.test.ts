@@ -25,7 +25,9 @@ describe('restore table coverage', () => {
         missing.push(`${key} (table not found among schema exports)`);
         continue;
       }
-      const insertPattern = new RegExp(`\\binsert\\(\\s*${exportName}\\s*,`);
+      const insertPattern = new RegExp(
+        `\\binsert\\(\\s*${exportName}\\s*,|insertRows\\(\\s*tx,\\s*${exportName}\\s*,`
+      );
       if (!insertPattern.test(RESTORE_SRC)) {
         missing.push(`${key} → ${exportName} (getTableName: ${getTableName(table)})`);
       }

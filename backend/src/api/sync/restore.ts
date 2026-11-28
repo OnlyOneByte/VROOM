@@ -151,6 +151,33 @@ function mergeCounts(summary: ImportSummary, imported: ImportSummary): MergeCoun
   };
 }
 
+function eitherSideNew(
+  newParents: Set<string>,
+  parentId: unknown,
+  newCars: Set<string>,
+  vehicleId: unknown
+): boolean {
+  return newParents.has(String(parentId)) || newCars.has(String(vehicleId));
+}
+
+function coverOnlyOnNew<T extends Record<string, unknown>>(
+  row: T,
+  merge: boolean,
+  isNew: boolean
+): T {
+  if (!merge || isNew) return row;
+  return { ...row, isCover: false };
+}
+
+function linksToOwnSource(
+  row: Record<string, unknown>,
+  sources: Record<string, Set<string>>
+): boolean {
+  if (row.sourceId == null || row.sourceId === '') return true;
+  const type = String(row.sourceType);
+  return EXPENSE_SOURCES.has(type) && Boolean(sources[type]?.has(String(row.sourceId)));
+}
+
 function coerceRows(rows: Record<string, unknown>[], table: Table): Record<string, unknown>[] {
   return rows.map((row) => coerceRow(row, table));
 }
@@ -502,7 +529,26 @@ class RestoreService {
     return added;
   }
 
-  private async lastTermVehiclePosition(tx: AsyncHandle): Promise<number> {
+  private async expenseGroupsHere(
+    tx: AsyncHandle,
+    rows: Record<string, unknown>[],
+    userId: string,
+    merge: boolean
+  ): Promise<Set<string>> {
+    if (!merge) return new Set();
+    const groupIds = rows.flatMap((row) => (row.groupId ? [String(row.groupId)] : []));
+    return this.mineAmong(
+      tx,
+      expenses,
+      expenses.groupId,
+      expenses.userId,
+      groupIds,
+      (owner) => owner === userId
+    );
+  }
+
+  private async lastTermVehiclePosition(tx: AsyncHandle, merge: boolean): Promise<number> {
+    if (!merge) return 0;
     const row = await tx
       .select({ last: max(insuranceTermVehicles.position) })
       .from(insuranceTermVehicles)
@@ -582,7 +628,6 @@ class RestoreService {
     const onCar = (row: Row): boolean => carOk.has(String(row.vehicleId));
     const ownCar = (owner: string): boolean => carOk.has(owner);
     const newCars = idsOf(addedVehicles);
-    const onNewCar = (row: Row): boolean => newCars.has(String(row.vehicleId));
 
     const driverRows = gate(data.vehicleDrivers ?? [], onCar).map((driver) => ({
       ...driver,
@@ -629,7 +674,7 @@ class RestoreService {
       (owner) => policyOk.has(owner)
     );
     const newTerms = idsOf(addedTerms);
-    const positionBase = merge ? await this.lastTermVehiclePosition(tx) : 0;
+    const positionBase = await this.lastTermVehiclePosition(tx, merge);
     const addedTermVehicles = await insert(
       insuranceTermVehicles,
       gate(
@@ -637,7 +682,7 @@ class RestoreService {
         (row) =>
           termOk.has(String(row.termId)) &&
           onCar(row) &&
-          (newTerms.has(String(row.termId)) || onNewCar(row))
+          eitherSideNew(newTerms, row.termId, newCars, row.vehicleId)
       ).map((row, index) => ({ ...row, position: positionBase + index + 1 }))
     );
     const claimRows = gate(
@@ -676,7 +721,7 @@ class RestoreService {
         (row) =>
           onReminder(row) &&
           onCar(row) &&
-          (newReminders.has(String(row.reminderId)) || onNewCar(row))
+          eitherSideNew(newReminders, row.reminderId, newCars, row.vehicleId)
       )
     );
     const addedNotifications = await insert(
@@ -689,29 +734,15 @@ class RestoreService {
       financing: financingOk,
       insurance_term: termOk,
     };
-    const sourceOk = (row: Row): boolean =>
-      row.sourceId == null ||
-      row.sourceId === '' ||
-      (EXPENSE_SOURCES.has(String(row.sourceType)) &&
-        Boolean(sources[String(row.sourceType)]?.has(String(row.sourceId))));
-    const groupsHere = merge
-      ? await this.mineAmong(
-          tx,
-          expenses,
-          expenses.groupId,
-          expenses.userId,
-          (data.expenses ?? []).flatMap((row) => (row.groupId ? [String(row.groupId)] : [])),
-          isOwner
-        )
-      : new Set<string>();
+    const groupsHere = await this.expenseGroupsHere(tx, data.expenses ?? [], userId, merge);
     const expenseRows = this.keepMemberAuthors(
       gate(
         this.stampUserId(data.expenses, userId),
         (row) =>
           onCar(row) &&
           optional(driverOk, row.paidByDriverId) &&
-          sourceOk(row) &&
-          !(row.groupId && groupsHere.has(String(row.groupId)))
+          linksToOwnSource(row, sources) &&
+          !groupsHere.has(String(row.groupId ?? ''))
       ),
       consentedShares,
       (row) => [String(row.vehicleId)]
@@ -762,51 +793,26 @@ class RestoreService {
       )
     );
     const addedSyncState = await insert(syncState, this.stampUserId(data.syncState, userId));
-    const entryVehicle = new Map<string, string>(
-      [...(data.expenses ?? []), ...(data.odometer ?? [])].map((row) => [
-        String(row.id),
-        String(row.vehicleId),
-      ])
-    );
-    const photoVehicle = (row: Row): string =>
-      row.entityType === 'vehicle'
-        ? String(row.entityId)
-        : (entryVehicle.get(String(row.entityId)) ?? '');
-    const entities: Record<string, Set<string>> = {
-      vehicle: carOk,
-      expense: expenseOk,
-      insurance_policy: policyOk,
-      insurance_claim: claimOk,
-      odometer_entry: odometerOk,
-    };
-    const newEntities: Record<string, Set<string>> = {
-      vehicle: newCars,
-      expense: idsOf(addedExpenses),
-      insurance_policy: idsOf(addedPolicies),
-      insurance_claim: idsOf(addedClaims),
-      odometer_entry: idsOf(addedOdometer),
-    };
-    const onNewEntity = (row: Row): boolean =>
-      Boolean(newEntities[String(row.entityType)]?.has(String(row.entityId)));
-    const photoRows = this.keepMemberAuthors(
-      gate(this.stampUserId(data.photos, userId), (row) =>
-        Boolean(entities[String(row.entityType)]?.has(String(row.entityId)))
-      ).map((row) => (merge && !onNewEntity(row) ? { ...row, isCover: false } : row)),
-      consentedShares,
-      (row) => [photoVehicle(row)]
-    );
-    const addedPhotos = await insert(photos, photoRows);
-    const photoOk = await mine(photos, photos.id, photos.userId, photoRows, isOwner);
-    const refRows = await this.relinkPhotoRefs(
+    const { addedPhotos, addedPhotoRefs } = await this.insertPhotos(
       tx,
-      gate((data.photoRefs ?? []) as Row[], (ref) => photoOk.has(String(ref.photoId))),
-      data.metadata.storageProviders ?? {},
-      userId
-    );
-    const knownProviders = await this.knownProviderIds(tx, refRows, userId);
-    const addedPhotoRefs = await insert(
-      photoRefs,
-      refRows.filter((ref) => knownProviders.has(String(ref.providerId)))
+      data,
+      userId,
+      consentedShares,
+      merge,
+      {
+        vehicle: carOk,
+        expense: expenseOk,
+        insurance_policy: policyOk,
+        insurance_claim: claimOk,
+        odometer_entry: odometerOk,
+      },
+      {
+        vehicle: newCars,
+        expense: idsOf(addedExpenses),
+        insurance_policy: idsOf(addedPolicies),
+        insurance_claim: idsOf(addedClaims),
+        odometer_entry: idsOf(addedOdometer),
+      }
     );
     return {
       vehicles: addedVehicles.length,
@@ -828,6 +834,67 @@ class RestoreService {
       vehicleShares: addedShares.length,
       vehicleDrivers: addedDrivers.length,
     };
+  }
+
+  private async insertPhotos(
+    tx: AsyncHandle,
+    data: ParsedBackupData,
+    userId: string,
+    consentedShares: Set<string>,
+    merge: boolean,
+    entities: Record<string, Set<string>>,
+    newEntities: Record<string, Set<string>>
+  ): Promise<{
+    addedPhotos: Record<string, unknown>[];
+    addedPhotoRefs: Record<string, unknown>[];
+  }> {
+    type Row = Record<string, unknown>;
+    const entryVehicle = new Map<string, string>(
+      [...(data.expenses ?? []), ...(data.odometer ?? [])].map((row) => [
+        String(row.id),
+        String(row.vehicleId),
+      ])
+    );
+    const photoVehicle = (row: Row): string =>
+      row.entityType === 'vehicle'
+        ? String(row.entityId)
+        : (entryVehicle.get(String(row.entityId)) ?? '');
+    const onEntity = (row: Row, sets: Record<string, Set<string>>): boolean =>
+      Boolean(sets[String(row.entityType)]?.has(String(row.entityId)));
+    const stamped = this.stampUserId(data.photos, userId);
+    const photoRows = this.keepMemberAuthors(
+      (merge ? stamped.filter((row) => onEntity(row, entities)) : stamped).map((row) =>
+        coverOnlyOnNew(row, merge, onEntity(row, newEntities))
+      ),
+      consentedShares,
+      (row) => [photoVehicle(row)]
+    );
+    const addedPhotos = await this.insertRows(tx, photos, photoRows, merge);
+    const photoOk = merge
+      ? await this.mineAmong(
+          tx,
+          photos,
+          photos.id,
+          photos.userId,
+          photoRows.map((row) => String(row.id)),
+          (owner) => owner === userId
+        )
+      : new Set(photoRows.map((row) => String(row.id)));
+    const refs = (data.photoRefs ?? []) as Row[];
+    const refRows = await this.relinkPhotoRefs(
+      tx,
+      merge ? refs.filter((ref) => photoOk.has(String(ref.photoId))) : refs,
+      data.metadata.storageProviders ?? {},
+      userId
+    );
+    const knownProviders = await this.knownProviderIds(tx, refRows, userId);
+    const addedPhotoRefs = await this.insertRows(
+      tx,
+      photoRefs,
+      refRows.filter((ref) => knownProviders.has(String(ref.providerId))),
+      merge
+    );
+    return { addedPhotos, addedPhotoRefs };
   }
 
   private withoutCommunityConsent<T extends Record<string, unknown>>(row: T): T {

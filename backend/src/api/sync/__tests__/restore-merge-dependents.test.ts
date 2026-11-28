@@ -91,12 +91,15 @@ describe('restore merge with records that depend on other records', () => {
 
   test("an expense naming another account's driver is not added", async () => {
     const car = await createCar('DRV-1');
-    ctx.sqlite.run("INSERT INTO vehicle_drivers (id, vehicle_id, name) VALUES ('my-driver', ?, 'Me')", [
-      car.id,
-    ]);
+    ctx.sqlite.run(
+      "INSERT INTO vehicle_drivers (id, vehicle_id, name) VALUES ('my-driver', ?, 'Me')",
+      [car.id]
+    );
     insertExpense('my-expense', car.id, ctx.user.id, 'my-driver');
     const zip = await retag(await exportZip(), 'my-driver', 'their-driver');
-    ctx.sqlite.run("INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')");
+    ctx.sqlite.run(
+      "INSERT INTO users (id, email, display_name) VALUES ('them', 't@test.com', 'T')"
+    );
     ctx.sqlite.run(
       "INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('their-car', 'them', 'Kia', 'Rio', 2020)"
     );
@@ -139,6 +142,8 @@ describe('restore merge with records that depend on other records', () => {
     expect(result.imported?.vehicles).toBe(0);
     expect(result.imported?.expenses).toBe(0);
     expect(count('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ?', theirCar)).toBe(0);
-    expect(count('SELECT COUNT(*) AS n FROM vehicles WHERE id = ? AND user_id = ?', theirCar, owner.id)).toBe(1);
+    expect(
+      count('SELECT COUNT(*) AS n FROM vehicles WHERE id = ? AND user_id = ?', theirCar, owner.id)
+    ).toBe(1);
   });
 });
