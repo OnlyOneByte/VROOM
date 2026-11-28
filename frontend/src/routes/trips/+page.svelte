@@ -101,6 +101,22 @@
 		await load();
 	}
 
+	let loadingMore = $state(false);
+
+	async function loadMore() {
+		loadingMore = true;
+		try {
+			const next = await tripApi.list({ limit: 100, offset: trips.length });
+			const shown = new Set(trips.map(t => t.id));
+			trips = [...trips, ...next.data.filter(t => !shown.has(t.id))];
+			totalCount = next.pagination.totalCount;
+		} catch (error) {
+			appStore.showError(`Couldn't load more trips. ${userFacingErrorMessage(error)}`);
+		} finally {
+			loadingMore = false;
+		}
+	}
+
 	async function load() {
 		isLoading = true;
 		loadError = null;
@@ -306,6 +322,11 @@
 					>
 						Showing {formatNumber(trips.length, 0)} of {formatNumber(totalCount, 0)} trips
 					</p>
+					<div class="flex justify-center pt-2">
+						<Button variant="outline" size="lg" disabled={loadingMore} onclick={loadMore}>
+							{loadingMore ? 'Loading…' : 'Load more trips'}
+						</Button>
+					</div>
 				{/if}
 			</Card.Content>
 		</Card.Root>

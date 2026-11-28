@@ -307,6 +307,26 @@ describe('trips page list', () => {
 		expect(screen.getByTestId('trip-list-truncation')).toHaveTextContent('Showing 1 of 250 trips');
 	});
 
+	test('Load more fetches the next trips after the ones shown and adds them', async () => {
+		list.mockImplementation(filters =>
+			Promise.resolve(
+				filters?.offset
+					? tripPage([trip({ id: 't2', note: 'Older one' })], 2)
+					: tripPage([trip({ id: 't1' })], 2)
+			)
+		);
+		render(Page);
+		await settle();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Load more trips' }));
+		await settle();
+
+		expect(list).toHaveBeenLastCalledWith({ limit: 100, offset: 1 });
+		expect(screen.getByTestId('trip-card-t2')).toBeInTheDocument();
+		expect(screen.getByTestId('trip-card-t1')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Load more trips' })).toBeNull();
+	});
+
 	test('no truncation note when every trip is shown', async () => {
 		list.mockResolvedValue(tripPage([trip()]));
 		render(Page);
