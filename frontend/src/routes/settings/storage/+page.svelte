@@ -220,8 +220,9 @@
 		const sum = (counts: Record<string, number>) =>
 			Object.values(counts).reduce((total, count) => total + count, 0);
 		if (result.imported && result.kept) {
+			const added = sum(result.imported);
 			appStore.showSuccess(
-				`Added ${sum(result.imported)} records from the backup. ${sum(result.kept)} were already here or skipped.`
+				`Added ${added === 1 ? '1 record' : `${added} records`} from the backup. ${sum(result.kept)} already here or skipped.`
 			);
 		} else if (result.imported) {
 			appStore.showSuccess(`Successfully restored ${sum(result.imported)} records`);

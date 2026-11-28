@@ -469,7 +469,7 @@
 
 			{#if step === 3 && restorePreview}
 				<div class="rounded-lg border border-border bg-muted p-4">
-					<h4 class="mb-3 font-medium text-foreground">Import Summary</h4>
+					<h4 class="mb-3 font-medium text-foreground">In this backup</h4>
 					<div class="space-y-2 text-sm">
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Vehicles:</span><span
@@ -549,6 +549,13 @@
 										Keeps anything you added since the backup. Records already here stay as they
 										are.
 									</div>
+									{#if mergePreview}
+										<div class="text-sm text-foreground" data-testid="restore-merge-counts">
+											{total(mergePreview.imported) === 0
+												? 'Nothing new to add from this backup.'
+												: `${records(total(mergePreview.imported))} to add, ${total(mergePreview.kept)} already here or skipped.`}
+										</div>
+									{/if}
 								</div>
 							</Label>
 						</div>
@@ -564,13 +571,6 @@
 							</Label>
 						</div>
 					</RadioGroup.Root>
-					{#if restoreMode === 'merge' && mergePreview}
-						<p class="text-sm text-muted-foreground" data-testid="restore-merge-counts">
-							{total(mergePreview.imported) === 0
-								? `Nothing to add: all ${records(total(mergePreview.kept))} in this backup are already here or skipped.`
-								: `${records(total(mergePreview.imported))} to add, ${total(mergePreview.kept)} already here or skipped.`}
-						</p>
-					{/if}
 				</div>
 			{/if}
 		</div>

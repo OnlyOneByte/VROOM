@@ -70,7 +70,7 @@ describe('RestoreDialog merge', () => {
 		await openSheetsPreview();
 
 		expect(screen.getByTestId('restore-merge-counts')).toHaveTextContent(
-			'Nothing to add: all 8 records in this backup are already here or skipped.'
+			'Nothing new to add from this backup.'
 		);
 	});
 
