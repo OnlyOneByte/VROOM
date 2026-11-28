@@ -37,6 +37,12 @@ Delete the `cloudflared` service unless you are using a tunnel — with an empty
 - Backend: `http://localhost:3001`
 - Health: `http://localhost:3001/health`
 
+Both example stacks publish the backend on `127.0.0.1` only, so the API port is not open to
+the network by default (Docker's published ports bypass host firewalls such as ufw). To use
+VROOM from other machines, put a reverse proxy in front that sends `/api/*` to the backend
+(see [Reverse Proxy + SSL](#reverse-proxy--ssl)) or use the tunnel. Publishing the backend
+on every interface means deleting the `127.0.0.1:` prefix yourself.
+
 Examples in [`docs/examples/`](examples/):
 
 | File | Contents |
@@ -93,7 +99,7 @@ These have defaults, but the defaults only suit localhost.
 
 | Variable | Default | Description |
 |---|---|---|
-| `BACKEND_PORT` | `3001` | Host port in the example stacks |
+| `BACKEND_PORT` | `3001` | Host port in the example stacks, published on `127.0.0.1` only |
 | `FRONTEND_PORT` | `3000` | Host port in the example stacks |
 | `ORIGIN` | unset (derived from the request) | Frontend container only. The public origin the server reports, e.g. `https://yourdomain.com`, instead of deriving it from the request headers. Read at startup, so a change needs a container restart, not a rebuild. Leave it unset unless header-derived origins are wrong behind your proxy; an empty value stops the frontend from starting |
 | `HOST` | `127.0.0.1` | Address the backend binds. The default is loopback only, so a direct install is not exposed until you say so; containers need `0.0.0.0` (both Dockerfiles and example stacks set it). The backend exits naming `HOST` if this machine has no such address |
@@ -789,7 +795,7 @@ or a home server you share:
 - [ ] `PROVIDER_ENCRYPTION_KEY` randomly generated (`openssl rand -hex 32`) and stored safely, apart from the database backups
 - [ ] `CORS_ORIGINS` listing only your own origins
 - [ ] Only 80/443 reachable from the internet (plus 22 for SSH). Behind a proxy or tunnel, drop the `ports:` mappings for 3000/3001 so they stay on the Docker network
-- [ ] Bind to 127.0.0.1 when behind a reverse proxy on the same host: publish each port as `"127.0.0.1:3000:3000"` (the example stacks show this form above each mapping). A bare `"3000:3000"` listens on every interface, and Docker's published ports bypass host firewalls such as ufw
+- [ ] Bind to 127.0.0.1 when behind a reverse proxy on the same host: publish each port as `"127.0.0.1:3000:3000"` (the example stacks already publish the backend this way, and show the form above the frontend mapping). A bare `"3000:3000"` listens on every interface, and Docker's published ports bypass host firewalls such as ufw
 - [ ] `TRUSTED_PROXY_IPS` set when behind a proxy, so rate limits key on real client IPs
 - [ ] Sign-up set to invite only, approval or closed on a server reachable from the internet (see [Who can join](#who-can-join))
 - [ ] `PRIVATE_PROVIDER_ENDPOINTS` unset (private targets are refused once a second account exists), or listing only the LAN hosts and ports your own providers need: every signed-in user can reach what it allows
