@@ -18,6 +18,7 @@ import {
   fuelStatsToApi,
   insuranceToApi,
 } from '../../../analytics/api-transform';
+import { withMileageDue } from '../../../reminders/mileage-due';
 import type { ToolDefinition } from './llm-provider';
 
 export const RANGE_VALUES = ['30d', '90d', 'ytd', '12mo', 'all'] as const;
@@ -209,9 +210,12 @@ const TOOL_LIST: AssistantTool[] = [
   defineTool({
     name: 'getUpcomingReminders',
     description:
-      'Active reminders (service intervals, registration, etc.) and when they are next due.',
+      'Active reminders (service intervals, registration, etc.) and when they are next due. mileageDue is true once the car has reached the reminder mileage.',
     schema: emptyArgs,
-    read: async (_args, userId) => repos().reminders.findByUserId(userId, { isActive: true }),
+    read: async (_args, userId) => {
+      const rows = await repos().reminders.findByUserId(userId, { isActive: true });
+      return withMileageDue(rows, new Map(rows.map((row) => [row.reminder.id, row.vehicleIds])));
+    },
     toApi: (rows, scale) => rows.map((row) => reminderWithVehiclesToApi(row, scale)),
   }),
 ];

@@ -62,7 +62,7 @@
 
 	let vehicleNames = $derived(new Map(vehicles.map(v => [v.id, getVehicleDisplayName(v)])));
 
-	const isDue = (r: ReminderWithVehicles) => isReminderTimeDue(r.reminder);
+	const isDue = (r: ReminderWithVehicles) => isReminderTimeDue(r.reminder) || r.mileageDue === true;
 
 	let dueReminders = $derived(reminders.filter(r => r.reminder.isActive && isDue(r)));
 	let upcomingReminders = $derived(reminders.filter(r => r.reminder.isActive && !isDue(r)));
