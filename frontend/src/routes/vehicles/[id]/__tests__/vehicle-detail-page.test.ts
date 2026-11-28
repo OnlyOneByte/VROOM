@@ -59,6 +59,7 @@ vi.mock('#lib/components/common/MediaCaptureDialog.svelte', () => capture('media
 vi.mock('#lib/components/insurance/InsuranceTab.svelte', () => captureWithMarker('insurance'));
 
 const getExpensesByVehicle = vi.fn();
+const getMonthlyTotals = vi.fn((..._args: unknown[]) => Promise.resolve([]));
 const updateExpense = vi.fn((..._args: unknown[]) => new Promise(() => {}));
 const getExpenseSummary = vi.fn();
 const downloadExpensesCsv = vi.fn();
@@ -82,7 +83,8 @@ vi.mock('#lib/services/expense-api.ts', () => ({
 				: getExpensesByVehicle(vehicleId, params),
 		getExpenseSummary: (...args: unknown[]) => getExpenseSummary(...args),
 		downloadExpensesCsv: (...args: unknown[]) => downloadExpensesCsv(...args),
-		updateExpense: (...args: unknown[]) => updateExpense(...args)
+		updateExpense: (...args: unknown[]) => updateExpense(...args),
+		getMonthlyTotals: (...args: unknown[]) => getMonthlyTotals(...args)
 	}
 }));
 
@@ -661,13 +663,13 @@ describe('vehicle detail page tabs', () => {
 		await openTab('Expenses');
 
 		expect(screen.getByRole('status', { name: 'Loading expenses' })).toBeInTheDocument();
-		expect(screen.getByText('All Expenses')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Expenses' })).toBeInTheDocument();
 		expect(captured['table']).toBeUndefined();
 
 		answer({ data: [], pagination: { totalCount: 0, limit: 20, offset: 0, hasMore: false } });
 		await waitFor(() => expect(captured['table']).toBeDefined());
 		expect(screen.queryByRole('status', { name: 'Loading expenses' })).toBeNull();
-		expect(screen.getByText('All Expenses (0)')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: '0 expenses' })).toBeInTheDocument();
 		expect(captured['table']?.['expenses']).toEqual([]);
 	});
 
@@ -858,7 +860,7 @@ describe('vehicle detail page tabs', () => {
 
 		answer({ data: [], pagination: { totalCount: 0, limit: 20, offset: 0, hasMore: false } });
 		await waitFor(() => expect(captured['table']).toBeDefined());
-		expect(screen.getByText('All Expenses (0)')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: '0 expenses' })).toBeInTheDocument();
 	});
 
 	test('the Expenses tab loads the first page only once, on first open', async () => {
@@ -876,8 +878,30 @@ describe('vehicle detail page tabs', () => {
 			sortBy: 'date',
 			sortDir: 'desc'
 		});
-		expect(screen.getByText('All Expenses (1)')).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: '1 expense' })).toBeInTheDocument();
 		expect(captured['table']?.['expenses']).toEqual([EXPENSE]);
+	});
+
+	test('the Expenses tab is the month ledger, with month totals for this car and its filters', async () => {
+		getMonthlyTotals.mockResolvedValue([{ month: '2026-03', amount: 85.4 }]);
+		await mount();
+		await openTab('Expenses');
+
+		await vi.waitFor(() => expect(getMonthlyTotals).toHaveBeenCalledWith({ vehicleId: 'v1' }));
+		await vi.waitFor(() =>
+			expect(captured['table']?.['monthTotals']).toEqual(new Map([['2026-03', 85.4]]))
+		);
+		expect(captured['table']?.['ledger']).toBe(true);
+		expect(screen.queryByText('All Expenses')).toBeNull();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
+		await vi.waitFor(() =>
+			expect(getMonthlyTotals).toHaveBeenLastCalledWith({
+				vehicleId: 'v1',
+				category: 'maintenance'
+			})
+		);
+		expect(lastListParams()).toMatchObject({ category: 'maintenance', offset: 0 });
 	});
 
 	test('an expenses load failure shows the error and Retry refetches the same page', async () => {

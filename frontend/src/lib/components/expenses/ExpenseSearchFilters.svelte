@@ -1,25 +1,26 @@
 <script lang="ts">
-	import { Search, X, Car } from '@lucide/svelte';
+	import { Search, X } from '@lucide/svelte';
 	import Input from '#lib/components/ui/input/input.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import * as CardNs from '#lib/components/ui/card/index.ts';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import ExpenseTagFilter from '#lib/components/expenses/ExpenseTagFilter.svelte';
 	import DateRangePicker from '#lib/components/common/date-range-picker.svelte';
-	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
 	import { extractUniqueTags } from '#lib/utils/expense-filters.ts';
+	import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_INFO } from '#lib/constants/expense-categories.ts';
 	import { COMMON_MESSAGES } from '#lib/constants/messages.ts';
-	import type { Vehicle, Expense, ExpenseFilters } from '#lib/types/index.ts';
+	import type { Expense, ExpenseFilters } from '#lib/types/index.ts';
+
+	type Sort = 'date-desc' | 'date-asc' | 'amount-desc';
 
 	interface Props {
 		searchTerm: string;
 		filters: ExpenseFilters;
 		expenses: Expense[];
-		vehicles?: Vehicle[];
-		showVehicleSelector?: boolean;
-		selectedVehicleId?: string | undefined;
+		category: string;
+		sort: Sort;
 		onSearchChange: (_value: string) => void;
-		onVehicleChange?: (_vehicleId: string | undefined) => void;
+		onCategoryChange: (_category: string) => void;
+		onSortChange: (_sort: Sort) => void;
 		onClearFilters: () => void;
 	}
 
@@ -27,22 +28,27 @@
 		searchTerm,
 		filters = $bindable(),
 		expenses,
-		vehicles = [],
-		showVehicleSelector = false,
-		selectedVehicleId = undefined,
+		category,
+		sort,
 		onSearchChange,
-		onVehicleChange,
+		onCategoryChange,
+		onSortChange,
 		onClearFilters
 	}: Props = $props();
+
+	const SORTS: Record<Sort, string> = {
+		'date-desc': 'Newest first',
+		'date-asc': 'Oldest first',
+		'amount-desc': 'Largest first'
+	};
 
 	let selectedTags = $derived(filters.tags ?? []);
 	let allTags = $derived(extractUniqueTags(expenses));
 
 	let hasActiveFilters = $derived(
 		!!searchTerm ||
-			!!selectedVehicleId ||
 			selectedTags.length > 0 ||
-			!!filters.category ||
+			!!category ||
 			!!filters.startDate ||
 			!!filters.endDate
 	);
@@ -50,86 +56,65 @@
 	function setTags(tags: string[]): void {
 		filters = { ...filters, tags: tags.length > 0 ? tags : undefined };
 	}
+
+	const chip =
+		'h-9 shrink-0 rounded-full border px-3.5 text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50';
 </script>
 
-<CardNs.Root>
-	<CardNs.Header>
-		<div class="flex items-center justify-between gap-3">
-			<div>
-				<CardNs.Title>Search & Filters</CardNs.Title>
-				<CardNs.Description>Find and filter your expenses</CardNs.Description>
-			</div>
-			<div class="flex items-center gap-2">
-				<DateRangePicker
-					bind:startValue={filters.startDate}
-					bind:endValue={filters.endDate}
-					placeholder="Date range"
-					class="w-auto"
-				/>
-			</div>
+<div class="space-y-3" role="search" aria-label="Find expenses">
+	<div class="relative">
+		<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+			<Search class="h-5 w-5 text-muted-foreground" />
 		</div>
-	</CardNs.Header>
-	<CardNs.Content class="space-y-4">
-		<div class="flex flex-col sm:flex-row gap-3">
-			<div class="flex-1 relative">
-				<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-					<Search class="h-5 w-5 text-muted-foreground" />
-				</div>
-				<Input
-					type="text"
-					value={searchTerm}
-					oninput={e => onSearchChange(e.currentTarget.value)}
-					placeholder="Search by name, place, tag or amount"
-					class="pl-10 w-full"
-					aria-label="Search expenses"
-				/>
-			</div>
-			{#if showVehicleSelector && vehicles.length > 0}
-				<div class="sm:w-56">
-					<Select.Root
-						type="single"
-						value={selectedVehicleId ?? ''}
-						onValueChange={v => onVehicleChange?.(v === '' ? undefined : v)}
-					>
-						<Select.Trigger aria-label="Vehicle filter" class="w-full">
-							<div class="flex items-center gap-2">
-								<Car class="h-4 w-4 text-muted-foreground flex-shrink-0" />
-								<span class="truncate">
-									{#if selectedVehicleId}
-										{@const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId)}
-										{selectedVehicle
-											? getVehicleDisplayName(selectedVehicle)
-											: COMMON_MESSAGES.ALL_VEHICLES}
-									{:else}
-										{COMMON_MESSAGES.ALL_VEHICLES}
-									{/if}
-								</span>
-							</div>
-						</Select.Trigger>
-						<Select.Content>
-							<Select.Item value="" label={COMMON_MESSAGES.ALL_VEHICLES}>
-								{COMMON_MESSAGES.ALL_VEHICLES}
-							</Select.Item>
-							{#each vehicles as vehicle (vehicle.id)}
-								<Select.Item value={vehicle.id} label={getVehicleDisplayName(vehicle)}>
-									{getVehicleDisplayName(vehicle)}
-								</Select.Item>
-							{/each}
-						</Select.Content>
-					</Select.Root>
-				</div>
-			{/if}
-		</div>
+		<Input
+			type="text"
+			value={searchTerm}
+			oninput={e => onSearchChange(e.currentTarget.value)}
+			placeholder="Search “Costco”, “tires” or “42.50”"
+			class="h-12 w-full pl-10 sm:h-11"
+			aria-label="Search expenses"
+		/>
+	</div>
 
-		<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={setTags} />
+	<div class="flex flex-wrap gap-2" role="group" aria-label="Category">
+		{#each ['', ...EXPENSE_CATEGORIES] as value (value)}
+			<button
+				type="button"
+				class="{chip} {category === value
+					? 'border-foreground bg-foreground text-background'
+					: 'border-border bg-card text-foreground'}"
+				aria-pressed={category === value}
+				onclick={() => onCategoryChange(value)}
+			>
+				{value
+					? EXPENSE_CATEGORY_INFO[value as keyof typeof EXPENSE_CATEGORY_INFO].shortLabel
+					: 'All'}
+			</button>
+		{/each}
+	</div>
 
+	<div class="flex flex-wrap items-center gap-2">
+		<DateRangePicker
+			bind:startValue={filters.startDate}
+			bind:endValue={filters.endDate}
+			placeholder="Any date"
+			class="w-auto"
+		/>
+		<Select.Root type="single" value={sort} onValueChange={v => v && onSortChange(v as Sort)}>
+			<Select.Trigger aria-label="Sort expenses" class="w-auto">{SORTS[sort]}</Select.Trigger>
+			<Select.Content>
+				{#each Object.entries(SORTS) as [value, label] (value)}
+					<Select.Item {value} {label}>{label}</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
 		{#if hasActiveFilters}
-			<div class="flex justify-end pt-2">
-				<Button variant="outline" size="sm" onclick={onClearFilters}>
-					<X class="h-4 w-4 mr-2" />
-					{COMMON_MESSAGES.CLEAR_FILTERS}
-				</Button>
-			</div>
+			<Button variant="ghost" size="sm" onclick={onClearFilters}>
+				<X class="mr-1 h-4 w-4" />
+				{COMMON_MESSAGES.CLEAR_FILTERS}
+			</Button>
 		{/if}
-	</CardNs.Content>
-</CardNs.Root>
+	</div>
+
+	<ExpenseTagFilter {allTags} {selectedTags} onTagsChange={setTags} />
+</div>
