@@ -306,7 +306,6 @@ export class CommunityStatsRepository {
     return row?.refreshedAt ?? null;
   }
 
-  /** True when a stored row has no member tags or an older schema version, so it needs a new release. */
   async releaseOutdated(scope: string): Promise<boolean> {
     const row = await this.db
       .select({ bucketKey: communityStats.bucketKey })
