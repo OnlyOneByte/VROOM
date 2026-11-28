@@ -1,25 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
-import type {
-	InsuranceClaim,
-	InsurancePolicy,
-	PaginatedResponse,
-	Photo
-} from '#lib/types/index.ts';
-import {
-	chooseTermAction,
-	makeClaim,
-	makePhoto,
-	makePolicy,
-	makeTerm,
-	photoPage,
-	settle
-} from './insurance-fixtures.ts';
+import type { InsuranceClaim, InsurancePolicy } from '#lib/types/index.ts';
+import { makeClaim, makePolicy, makeTerm, settle } from './insurance-fixtures.ts';
 import {
 	ApiError,
 	SERVER_FAILURE_MESSAGE,
 	UNEXPECTED_FAILURE_MESSAGE
 } from '#lib/utils/error-handling.ts';
+import { dateOnlyToISO } from '#lib/utils/formatters.ts';
 
 const goto = vi.fn<(url: string) => Promise<void>>(() => Promise.resolve());
 vi.mock('$app/navigation', () => ({ goto: (url: string) => goto(url) }));
@@ -28,21 +16,12 @@ vi.mock('$app/paths', async () => ({
 }));
 
 const getPoliciesForVehicle = vi.fn<(vehicleId: string) => Promise<InsurancePolicy[]>>();
-const deleteTerm = vi.fn<(policyId: string, termId: string) => Promise<InsurancePolicy>>();
 const getClaims = vi.fn<(policyId: string) => Promise<InsuranceClaim[]>>();
-const getEntityDocuments =
-	vi.fn<(entityType: string, entityId: string) => Promise<PaginatedResponse<Photo>>>();
 
 vi.mock('#lib/services/insurance-api.ts', () => ({
 	insuranceApi: {
 		getPoliciesForVehicle: (vehicleId: string) => getPoliciesForVehicle(vehicleId),
-		deleteTerm: (policyId: string, termId: string) => deleteTerm(policyId, termId),
-		getClaims: (policyId: string) => getClaims(policyId),
-		getEntityDocuments: (entityType: string, entityId: string) =>
-			getEntityDocuments(entityType, entityId),
-		getEntityDocumentThumbnailUrl: () => '/thumb',
-		uploadEntityDocument: vi.fn(),
-		deleteEntityDocument: vi.fn()
+		getClaims: (policyId: string) => getClaims(policyId)
 	}
 }));
 
@@ -51,10 +30,6 @@ vi.mock('#lib/utils/error-handling.ts', async importOriginal => ({
 	...(await importOriginal<typeof import('#lib/utils/error-handling.ts')>()),
 	handleErrorWithNotification: (error: unknown, context?: string) =>
 		handleErrorWithNotification(error, context)
-}));
-
-vi.mock('#lib/services/provider-api.ts', () => ({
-	providerApi: { getProviders: vi.fn(() => Promise.resolve([])) }
 }));
 
 const InsuranceTab = (await import('../InsuranceTab.svelte')).default;
@@ -69,11 +44,11 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	getPoliciesForVehicle.mockResolvedValue([]);
 	getClaims.mockResolvedValue([]);
-	getEntityDocuments.mockResolvedValue(photoPage([]));
 });
 
 afterEach(() => {
 	cleanup();
+	vi.useRealTimers();
 });
 
 describe('InsuranceTab load states', () => {
@@ -117,7 +92,7 @@ describe('InsuranceTab empty state', () => {
 		await settle();
 		expect(screen.getByText('No insurance policies')).toBeInTheDocument();
 		expect(screen.getByText(/Add your first insurance policy/)).toBeInTheDocument();
-		await fireEvent.click(screen.getByRole('button', { name: /add policy/i }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Add policy' }));
 		expect(goto).toHaveBeenCalledWith(`/insurance/new?vehicleId=v1&returnTo=${RETURN_TO}`);
 	});
 
@@ -129,66 +104,144 @@ describe('InsuranceTab empty state', () => {
 	});
 });
 
-describe('InsuranceTab policy list', () => {
-	const policy = makePolicy({
-		terms: [makeTerm({ id: 't1', endDate: '2030-01-01' })]
+describe('InsuranceTab policies', () => {
+	const current = makePolicy({
+		id: 'p1',
+		company: 'State Farm',
+		terms: [
+			makeTerm({
+				id: 't1',
+				policyId: 'p1',
+				policyNumber: 'SF123',
+				startDate: '2026-07-26',
+				endDate: '2027-01-24',
+				totalCost: 1200
+			})
+		]
+	});
+	const lapsed = makePolicy({
+		id: 'p2',
+		company: 'Old Mutual',
+		isActive: false,
+		terms: [makeTerm({ id: 't2', policyId: 'p2', endDate: '2026-01-01', monthlyCost: 90 })]
 	});
 
-	test('lists the policies with a header add button', async () => {
-		getPoliciesForVehicle.mockResolvedValue([policy]);
+	function onNov23() {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(new Date(2026, 10, 23, 12));
+	}
+
+	test('each policy is one row: carrier, number, term, cost and when it renews', async () => {
+		onNov23();
+		getPoliciesForVehicle.mockResolvedValue([current]);
 		mount();
 		await settle();
-		expect(screen.getByRole('heading', { name: 'Insurance Policies' })).toBeInTheDocument();
-		expect(screen.getByText('Active Policies')).toBeInTheDocument();
-		await fireEvent.click(screen.getByRole('button', { name: /add policy/i }));
-		expect(goto).toHaveBeenCalledWith(`/insurance/new?vehicleId=v1&returnTo=${RETURN_TO}`);
+
+		const row = screen.getByRole('link', { name: /State Farm/ });
+		expect(row).toHaveTextContent('#SF123 · Jul 26, 2026 – Jan 24, 2027');
+		expect(row).toHaveTextContent('$1,200');
+		expect(row).toHaveTextContent('Renews in 62 days');
+		expect(row).toHaveAttribute('href', '/insurance/p1/edit?returnTo=/vehicles/v1');
+		expect(screen.queryAllByRole('button', { name: /settings|renew|claim|upload/i })).toHaveLength(
+			0
+		);
 	});
 
-	test('on the vehicle page the outline runs h2 to h5 without skipping a level', async () => {
-		getPoliciesForVehicle.mockResolvedValue([policy]);
-		getClaims.mockResolvedValue([makeClaim()]);
-		getEntityDocuments.mockResolvedValue(photoPage([makePhoto()]));
+	test('policies in force come first; one no longer in force says Inactive and has no renewal', async () => {
+		onNov23();
+		getPoliciesForVehicle.mockResolvedValue([lapsed, current]);
+		mount();
+		await settle();
+
+		const rows = within(screen.getByRole('region', { name: 'Policies' })).getAllByRole('listitem');
+		expect(rows.map(r => r.textContent?.match(/State Farm|Old Mutual/)?.[0])).toEqual([
+			'State Farm',
+			'Old Mutual'
+		]);
+		expect(rows[1]).toHaveTextContent('Inactive');
+		expect(rows[1]).toHaveTextContent('$90.00/mo');
+		expect(rows[1]).not.toHaveTextContent(/Renews|Ended/);
+	});
+
+	test('the tab outline is two h2 sections, and Add policy keeps the return path', async () => {
+		getPoliciesForVehicle.mockResolvedValue([current]);
 		mount();
 		await settle();
 
 		expect(screen.getAllByRole('heading').map(h => [h.tagName, h.textContent?.trim()])).toEqual([
-			['H2', 'Insurance Policies'],
-			['H3', 'Active Policies'],
-			['H4', 'Acme Mutual'],
-			['H5', 'Documents'],
-			['H5', 'Claims']
+			['H2', 'Policies'],
+			['H2', 'Claims']
+		]);
+		await fireEvent.click(screen.getByRole('button', { name: 'Add policy' }));
+		expect(goto).toHaveBeenCalledWith(`/insurance/new?vehicleId=v1&returnTo=${RETURN_TO}`);
+		expect(screen.getByRole('link', { name: 'Insurance page' })).toHaveAttribute(
+			'href',
+			'/insurance'
+		);
+	});
+
+	test('read-only viewers see plain rows with no links or add button', async () => {
+		getPoliciesForVehicle.mockResolvedValue([current]);
+		mount(true);
+		await settle();
+
+		expect(screen.getByText('State Farm')).toBeInTheDocument();
+		expect(screen.queryAllByRole('link')).toHaveLength(0);
+		expect(screen.queryByRole('button', { name: /add policy/i })).toBeNull();
+	});
+});
+
+describe('InsuranceTab claims', () => {
+	const policies = [makePolicy({ id: 'p1' }), makePolicy({ id: 'p2', company: 'Other Co' })];
+
+	test("lists this car's claims across its policies, newest first, without other cars' claims", async () => {
+		getPoliciesForVehicle.mockResolvedValue(policies);
+		getClaims.mockImplementation(async id =>
+			id === 'p1'
+				? [
+						makeClaim({
+							id: 'c1',
+							claimDate: dateOnlyToISO('2026-03-15'),
+							vehicleId: 'v1',
+							description: 'Windshield chip repair',
+							claimType: 'weather',
+							status: 'settled',
+							payoutAmount: 120
+						}),
+						makeClaim({ id: 'c2', vehicleId: 'v2', description: 'Other car' })
+					]
+				: [makeClaim({ id: 'c3', claimDate: dateOnlyToISO('2026-08-04'), status: 'filed' })]
+		);
+		mount();
+		await settle();
+
+		const rows = within(screen.getByRole('region', { name: 'Claims' })).getAllByRole('listitem');
+		expect(rows.map(r => r.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+			'Collision Aug 4, 2026 · Filed',
+			'Windshield chip repair Mar 15, 2026 · Settled · Weather $120.00'
 		]);
 	});
 
-	test('editing a policy navigates to its edit page with a return path', async () => {
-		getPoliciesForVehicle.mockResolvedValue([policy]);
+	test('a claims failure shows inline under Claims, and Retry reloads only the claims', async () => {
+		getPoliciesForVehicle.mockResolvedValue([policies[0] as InsurancePolicy]);
+		getClaims.mockRejectedValueOnce(new ApiError('down', 503));
+		getClaims.mockResolvedValueOnce([makeClaim()]);
 		mount();
 		await settle();
-		await fireEvent.click(screen.getByTitle('Policy settings'));
-		expect(goto).toHaveBeenCalledWith(`/insurance/p1/edit?returnTo=${RETURN_TO}`);
-	});
 
-	test('read-only lists policies without add or settings controls', async () => {
-		getPoliciesForVehicle.mockResolvedValue([policy]);
-		mount(true);
+		const claims = screen.getByRole('region', { name: 'Claims' });
+		expect(within(claims).getByText("Couldn't load this car's claims")).toBeInTheDocument();
+		await fireEvent.click(within(claims).getByRole('button', { name: 'Retry' }));
 		await settle();
-		expect(screen.getByText('Acme Mutual')).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /add policy/i })).toBeNull();
-		expect(screen.queryByTitle('Policy settings')).toBeNull();
+
+		expect(getPoliciesForVehicle).toHaveBeenCalledTimes(1);
+		expect(within(claims).getByText('Collision')).toBeInTheDocument();
 	});
 
-	test('deleting a term reloads the policies through onRefresh', async () => {
-		getPoliciesForVehicle.mockResolvedValue([policy]);
-		deleteTerm.mockResolvedValue(policy);
+	test('no claims says so', async () => {
+		getPoliciesForVehicle.mockResolvedValue([policies[0] as InsurancePolicy]);
 		mount();
 		await settle();
-		await chooseTermAction('Delete term');
-		await settle();
-		await fireEvent.click(
-			within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' })
-		);
-		await settle();
-		expect(deleteTerm).toHaveBeenCalledWith('p1', 't1');
-		expect(getPoliciesForVehicle).toHaveBeenCalledTimes(2);
+		expect(screen.getByText('No claims for this car.')).toBeInTheDocument();
 	});
 });
