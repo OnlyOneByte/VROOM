@@ -59,7 +59,7 @@ describe('ExpenseCategoryFilter', () => {
 
 		expect(screen.getAllByRole('option').map(o => o.textContent?.trim())).toEqual([
 			'All categories',
-			'Fuel & Charging',
+			'Fuel & charging',
 			'Maintenance',
 			'Financial',
 			'Regulatory',

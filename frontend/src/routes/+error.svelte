@@ -6,7 +6,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 
 	let notFound = $derived(page.status === 404);
-	let pageTitle = $derived(notFound ? 'Page Not Found' : 'Page Unavailable');
+	let pageTitle = $derived(notFound ? 'Page not found' : 'Page unavailable');
 </script>
 
 <svelte:head>

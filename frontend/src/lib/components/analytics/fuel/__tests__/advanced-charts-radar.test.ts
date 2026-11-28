@@ -26,7 +26,7 @@ function advanced(vehicleRadar: FuelAdvancedResponse['vehicleRadar']): FuelAdvan
 	} as unknown as FuelAdvancedResponse;
 }
 
-describe('Vehicle Performance Comparison fuel efficiency', () => {
+describe('Vehicle performance comparison fuel efficiency', () => {
 	test('names the vehicles that have no fuel efficiency score', () => {
 		render(AdvancedCharts, {
 			group: 'comparisons',
@@ -35,7 +35,7 @@ describe('Vehicle Performance Comparison fuel efficiency', () => {
 				radarVehicle('ev', 'Commuter EV', null)
 			])
 		});
-		expect(screen.getByText(/Fuel Efficiency: No data for Commuter EV\./)).toBeTruthy();
+		expect(screen.getByText(/Fuel efficiency: no data for Commuter EV\./)).toBeTruthy();
 	});
 
 	test('says No data when no vehicle has a fuel efficiency score', () => {
@@ -46,7 +46,7 @@ describe('Vehicle Performance Comparison fuel efficiency', () => {
 				radarVehicle('ev', 'Commuter EV', null)
 			])
 		});
-		expect(screen.getByText(/Fuel Efficiency: No data\.$/)).toBeTruthy();
+		expect(screen.getByText(/Fuel efficiency: no data\.$/)).toBeTruthy();
 	});
 
 	test('adds no note when every vehicle has a score', () => {
@@ -57,7 +57,7 @@ describe('Vehicle Performance Comparison fuel efficiency', () => {
 				radarVehicle('b', 'Weekend Car', 100)
 			])
 		});
-		expect(screen.queryByText(/Fuel Efficiency: No data/)).toBeNull();
+		expect(screen.queryByText(/Fuel efficiency: no data/)).toBeNull();
 		expect(
 			screen.getByText('Scores from 10 (worst in your fleet) to 100 (best), by metric.')
 		).toBeTruthy();

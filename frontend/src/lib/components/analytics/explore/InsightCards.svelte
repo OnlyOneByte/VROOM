@@ -71,10 +71,10 @@
 							<Button
 								variant="ghost"
 								class="h-10"
-								aria-label={`Show in Chart: ${insight.title}`}
+								aria-label={`Show in chart: ${insight.title}`}
 								onclick={() => onApply(insight.query)}
 							>
-								Show in Chart
+								Show in chart
 								<ArrowRight class="ml-1 h-4 w-4" aria-hidden="true" />
 							</Button>
 						</Card.Footer>

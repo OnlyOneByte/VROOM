@@ -142,7 +142,7 @@ describe('InsurancePolicyForm zero amounts', () => {
 		await settle();
 		await fillPolicyBasics();
 		await type('deductible', '0');
-		await click(/Create Policy/);
+		await click(/Create policy/);
 
 		expect(screen.getByText('Must be positive')).toBeInTheDocument();
 		expect(createPolicy).not.toHaveBeenCalled();
@@ -153,7 +153,7 @@ describe('InsurancePolicyForm zero amounts', () => {
 		await settle();
 		await fillPolicyBasics();
 		await type('total-cost', '0');
-		await click(/Create Policy/);
+		await click(/Create policy/);
 
 		expect(createPolicy).toHaveBeenCalledTimes(1);
 		expect(createPolicy.mock.calls[0]?.[0].terms[0]).toMatchObject({ totalCost: 0 });
@@ -166,7 +166,7 @@ describe('InsuranceTermForm zero amounts', () => {
 		await settle();
 		await fillTermBasics();
 		await type('deductible', '0');
-		await click(/Save Term/);
+		await click(/Save term/);
 
 		expect(screen.getByText('Must be positive')).toBeInTheDocument();
 		expect(addTerm).not.toHaveBeenCalled();
@@ -177,7 +177,7 @@ describe('InsuranceTermForm zero amounts', () => {
 		await settle();
 		await fillTermBasics();
 		await type('total-cost', '0');
-		await click(/Save Term/);
+		await click(/Save term/);
 
 		expect(addTerm.mock.calls[0]?.[1]).toMatchObject({ totalCost: 0 });
 	});
@@ -187,7 +187,7 @@ describe('InsuranceTermForm zero amounts', () => {
 		await settle();
 		await type('total-cost', '0');
 		await type('monthly-cost', '0');
-		await click(/Update Term/);
+		await click(/Update term/);
 
 		expect(updateTerm.mock.calls[0]?.[2]).toMatchObject({ totalCost: 0, monthlyCost: 0 });
 	});

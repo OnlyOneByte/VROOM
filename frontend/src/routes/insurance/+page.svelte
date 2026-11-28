@@ -79,7 +79,7 @@
 			{#if !isLoading && !error && policies.length > 0 && vehicles.length > 0}
 				<Button size="lg" onclick={handleAddPolicy}>
 					<Plus class="mr-2 h-4 w-4" />
-					Add Policy
+					Add policy
 				</Button>
 			{/if}
 		{/snippet}
@@ -110,7 +110,7 @@
 			{#snippet action()}
 				<Button size="lg" onclick={handleAddPolicy}>
 					<Plus class="mr-2 h-4 w-4" />
-					Add Policy
+					Add policy
 				</Button>
 			{/snippet}
 		</EmptyState>

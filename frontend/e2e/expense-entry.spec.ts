@@ -165,7 +165,7 @@ test.describe('Expense form', () => {
 		await page.getByRole('button', { name: /^Sync status:/ }).click();
 		const syncButton = page
 			.getByRole('dialog', { name: 'Sync status' })
-			.getByRole('button', { name: 'Sync Now' });
+			.getByRole('button', { name: 'Sync now' });
 		await expect(syncButton).toBeVisible();
 
 		await syncButton.click();

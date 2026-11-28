@@ -172,7 +172,7 @@ describe('Explore chart data', () => {
 	test('series get safe keys, category labels and colours', () => {
 		const series = seriesFor(response);
 		expect(series.map(s => s.key)).toEqual(['s0', 's1']);
-		expect(series[0]?.label).toBe('Fuel & Charging');
+		expect(series[0]?.label).toBe('Fuel & charging');
 		expect(series[0]?.color).toMatch(/^var\(--/);
 	});
 

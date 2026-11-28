@@ -73,21 +73,21 @@ describe('PolicyList grouping', () => {
 			makePolicy({ id: 'p-new', company: 'New Co', isActive: true, terms: inForce })
 		]);
 		await settle();
-		expect(sectionHeadings()).toEqual(['Active Policies', 'New Co', 'Inactive Policies', 'Old Co']);
+		expect(sectionHeadings()).toEqual(['Active policies', 'New Co', 'Inactive policies', 'Old Co']);
 	});
 
 	test('omits the inactive section when every policy is active', async () => {
 		mount([makePolicy({ company: 'Only Co', terms: inForce })]);
 		await settle();
-		expect(screen.getByText('Active Policies')).toBeInTheDocument();
-		expect(screen.queryByText('Inactive Policies')).toBeNull();
+		expect(screen.getByText('Active policies')).toBeInTheDocument();
+		expect(screen.queryByText('Inactive policies')).toBeNull();
 	});
 
 	test('omits the active section when every policy is inactive', async () => {
 		mount([makePolicy({ isActive: false })]);
 		await settle();
-		expect(screen.queryByText('Active Policies')).toBeNull();
-		expect(screen.getByText('Inactive Policies')).toBeInTheDocument();
+		expect(screen.queryByText('Active policies')).toBeNull();
+		expect(screen.getByText('Inactive policies')).toBeInTheDocument();
 	});
 
 	test('an active policy whose terms have all ended is listed as inactive', async () => {
@@ -98,8 +98,8 @@ describe('PolicyList grouping', () => {
 			})
 		]);
 		await settle();
-		expect(screen.queryByText('Active Policies')).toBeNull();
-		expect(sectionHeadings()).toEqual(['Inactive Policies', 'Lapsed Co']);
+		expect(screen.queryByText('Active policies')).toBeNull();
+		expect(sectionHeadings()).toEqual(['Inactive policies', 'Lapsed Co']);
 	});
 
 	test('renders nothing for an empty list', () => {
@@ -158,7 +158,7 @@ describe('PolicyList heading levels', () => {
 		await settle();
 
 		expect(headingOutline()).toEqual([
-			[2, 'Active Policies'],
+			[2, 'Active policies'],
 			[3, 'Acme Mutual']
 		]);
 	});
@@ -177,7 +177,7 @@ describe('PolicyList heading levels', () => {
 		await settle();
 
 		expect(headingOutline()).toEqual([
-			[3, 'Active Policies'],
+			[3, 'Active policies'],
 			[4, 'Acme Mutual']
 		]);
 	});

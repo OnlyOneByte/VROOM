@@ -36,7 +36,7 @@ a { color: LinkText; }
 <main>
 <h1>You're offline</h1>
 <p>This page hasn't been opened on this device yet, so it can't load without a connection. Reconnect and try again, or go to your dashboard.</p>
-<button type="button" onclick="location.reload()">Try Again</button>
+<button type="button" onclick="location.reload()">Try again</button>
 <a href="/dashboard">Go to Dashboard</a>
 </main>
 </body>

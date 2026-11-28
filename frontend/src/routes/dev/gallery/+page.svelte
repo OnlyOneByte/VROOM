@@ -72,7 +72,7 @@
 	const trendConfig = { amount: { label: 'Amount', color: 'var(--primary)' } };
 	const trendAverage = trend.reduce((sum, d) => sum + d.amount, 0) / trend.length;
 
-	const pageHeaderWithBack = `<PageHeader title="Edit Odometer Reading" description="2020 Toyota Camry">
+	const pageHeaderWithBack = `<PageHeader title="Edit odometer reading" description="2020 Toyota Camry">
 	{#snippet back()}
 		<Button variant="ghost" size="icon-lg" class="shrink-0" aria-label="Back">
 			<ArrowLeft class="size-5" />
@@ -81,14 +81,14 @@
 </PageHeader>`;
 
 	const statItems = [
-		{ label: 'Total Vehicles', value: '2', icon: Car, iconColor: 'primary' as const },
-		{ label: 'Total Expenses', value: '$955.72', icon: DollarSign, iconColor: 'chart-1' as const },
-		{ label: 'Monthly Avg', value: '$80.00', icon: TrendingUp, iconColor: 'chart-2' as const }
+		{ label: 'Total vehicles', value: '2', icon: Car, iconColor: 'primary' as const },
+		{ label: 'Total expenses', value: '$955.72', icon: DollarSign, iconColor: 'chart-1' as const },
+		{ label: 'Monthly avg', value: '$80.00', icon: TrendingUp, iconColor: 'chart-2' as const }
 	];
 </script>
 
 <svelte:head>
-	<title>Component Gallery (dev) - VROOM</title>
+	<title>Component gallery (dev) - VROOM</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
@@ -109,7 +109,7 @@
 {:else}
 	<div class="space-y-10 pb-24">
 		<PageHeader
-			title="Component Gallery"
+			title="Component gallery"
 			description="The live VROOM kit — compose from these, don't reinvent. See DesignSystem.md."
 		/>
 
@@ -356,7 +356,7 @@
 		</section>
 
 		<section class="space-y-3">
-			<h2 class="text-lg font-semibold">The Four States (every data view must handle all four)</h2>
+			<h2 class="text-lg font-semibold">The four states (every data view must handle all four)</h2>
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 				<Card.Root>
 					<Card.Header><Card.Title>Loading</Card.Title></Card.Header>

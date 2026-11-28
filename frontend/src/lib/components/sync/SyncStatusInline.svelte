@@ -295,7 +295,7 @@
 					variant={isExpanded ? 'default' : 'ghost'}
 					onclick={handleManualSync}
 					disabled={syncState.current === 'syncing'}
-					aria-label={isExpanded ? undefined : 'Sync Now'}
+					aria-label={isExpanded ? undefined : 'Sync now'}
 					aria-busy={syncState.current === 'syncing'}
 					title={isExpanded
 						? undefined
@@ -308,7 +308,7 @@
 							: ''}"
 					/>
 					{#if isExpanded}
-						{syncState.current === 'syncing' ? 'Syncing...' : 'Sync Now'}
+						{syncState.current === 'syncing' ? 'Syncing...' : 'Sync now'}
 					{/if}
 				</Button>
 			{/if}

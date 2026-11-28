@@ -71,7 +71,7 @@ describe.each(ZONES)(
 				}
 			});
 
-			expect(screen.getByText('Current Term')).toBeInTheDocument();
+			expect(screen.getByText('Current term')).toBeInTheDocument();
 			expect(screen.getByText('Jun 1, 2026')).toBeInTheDocument();
 		});
 	}

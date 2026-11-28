@@ -159,7 +159,7 @@
 						onclick={() => (customOpen = !customOpen)}
 					>
 						<CalendarRange class="mr-2 h-4 w-4" aria-hidden="true" />
-						Pick Custom Dates
+						Pick custom dates
 					</Button>
 					{#if customOpen}
 						<div id="analytics-range-calendar" class="flex flex-col items-center gap-2">

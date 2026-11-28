@@ -46,7 +46,7 @@
 		{ value: '93 (Super Premium)', label: '93 (Super Premium)' },
 		{ value: 'Diesel', label: 'Diesel' },
 		{ value: 'Ethanol-Free', label: 'Ethanol-Free' },
-		{ value: 'other', label: 'Other (Custom)' }
+		{ value: 'other', label: 'Other (custom)' }
 	];
 
 	const CHARGING_TYPE_OPTIONS = [
@@ -75,7 +75,7 @@
 		>
 			<Select.Trigger id="fuelType" class="w-full">
 				{#if showCustomFuelType}
-					Other (Custom)
+					Other (custom)
 				{:else if fuelType}
 					{fuelType}
 				{:else}

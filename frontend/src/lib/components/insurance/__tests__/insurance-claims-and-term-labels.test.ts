@@ -44,7 +44,7 @@ afterEach(() => {
 });
 
 describe('claim action buttons', () => {
-	test('claim icon buttons are 40px on touch and File Claim is not text-xs', async () => {
+	test('claim icon buttons are 40px on touch and File claim is not text-xs', async () => {
 		render(ClaimsSection, { props: { policyId: 'p1' } });
 		await settle();
 
@@ -54,7 +54,7 @@ describe('claim action buttons', () => {
 			expect(classes(button)).not.toContain('h-7');
 		}
 
-		const fileClaim = screen.getByRole('button', { name: 'File Claim' });
+		const fileClaim = screen.getByRole('button', { name: 'File claim' });
 		expect(classes(fileClaim)).toContain('h-10');
 		expect(classes(fileClaim)).not.toContain('text-xs');
 	});
@@ -87,8 +87,8 @@ describe('latest term label', () => {
 			props: { term: makeTerm({ startDate: '2023-07-01', endDate: '2024-06-30' }), isCurrent: true }
 		});
 
-		expect(screen.queryByText('Current Term')).toBeNull();
-		expect(screen.getByText('Latest Term')).toBeInTheDocument();
+		expect(screen.queryByText('Current term')).toBeNull();
+		expect(screen.getByText('Latest term')).toBeInTheDocument();
 		expect(screen.getByText('Ended')).toBeInTheDocument();
 		expect(screen.queryByText('Expires')).toBeNull();
 	});
@@ -98,7 +98,7 @@ describe('latest term label', () => {
 			props: { term: makeTerm({ startDate: '2026-06-01', endDate: '2027-06-01' }), isCurrent: true }
 		});
 
-		expect(screen.getByText('Current Term')).toBeInTheDocument();
+		expect(screen.getByText('Current term')).toBeInTheDocument();
 		expect(screen.getByText('Expires')).toBeInTheDocument();
 	});
 });

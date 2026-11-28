@@ -110,7 +110,7 @@ describe('a backup provider that needs attention', () => {
 	test('replaces Up to date, Synced and pending', () => {
 		for (const overrides of [{}, { syncStatus: 'success' as const }, { pendingCount: 2 }]) {
 			const info = getSyncStatusInfo(params({ ...overrides, providerNeedsAttention: true }));
-			expect(info.text).toBe('A backup provider needs attention');
+			expect(info.text).toBe('Backup storage needs attention');
 			expect(info.color).toBe('text-warning');
 		}
 	});

@@ -183,10 +183,10 @@ describe('fuel type select', () => {
 	test('choosing Other reveals a custom fuel type input that reports its blur', async () => {
 		const section = mount({ fuelType: 'Diesel' });
 		await openSelect(section.trigger());
-		await chooseOption('Other (Custom)');
+		await chooseOption('Other (custom)');
 
 		expect(section.form.fuelType).toBe('');
-		expect(section.trigger()).toHaveTextContent('Other (Custom)');
+		expect(section.trigger()).toHaveTextContent('Other (custom)');
 		const custom = section.input('customFuelType')!;
 		await fireEvent.input(custom, { target: { value: 'E85' } });
 		await fireEvent.blur(custom);
@@ -197,7 +197,7 @@ describe('fuel type select', () => {
 	test('choosing a listed fuel type after Other hides the custom input', async () => {
 		const section = mount();
 		await openSelect(section.trigger());
-		await chooseOption('Other (Custom)');
+		await chooseOption('Other (custom)');
 		await openSelect(section.trigger());
 		await chooseOption('Diesel');
 

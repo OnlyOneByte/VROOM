@@ -2,10 +2,10 @@
 	const RADAR_WIDE_TICKS_MIN_WIDTH = 500;
 
 	const radarMetrics = [
-		{ key: 'fuelEfficiency', label: 'Fuel Efficiency', tick: 'Efficiency' },
-		{ key: 'maintenanceCost', label: 'Maintenance Cost', tick: 'Maintenance' },
+		{ key: 'fuelEfficiency', label: 'Fuel efficiency', tick: 'Efficiency' },
+		{ key: 'maintenanceCost', label: 'Maintenance cost', tick: 'Maintenance' },
 		{ key: 'reliability', label: 'Reliability', tick: 'Reliability' },
-		{ key: 'annualCost', label: 'Annual Cost', tick: 'Annual Cost' },
+		{ key: 'annualCost', label: 'Annual cost', tick: 'Annual cost' },
 		{ key: 'mileage', label: 'Mileage', tick: 'Mileage' }
 	] as const;
 
@@ -91,9 +91,9 @@
 		const missing = fuelAdvanced.vehicleRadar.filter(v => v.fuelEfficiency === null);
 		if (missing.length === 0) return base;
 		if (missing.length === fuelAdvanced.vehicleRadar.length) {
-			return `${base} Fuel Efficiency: No data.`;
+			return `${base} Fuel efficiency: no data.`;
 		}
-		return `${base} Fuel Efficiency: No data for ${missing.map(v => v.vehicleName).join(', ')}.`;
+		return `${base} Fuel efficiency: no data for ${missing.map(v => v.vehicleName).join(', ')}.`;
 	});
 
 	let heatmapSeries = $derived(
@@ -130,7 +130,7 @@
 	{#if group === 'patterns'}
 		<AppBarChart
 			level={4}
-			title="Seasonal Efficiency"
+			title="Seasonal efficiency"
 			description="Average {efficiencyLabel} by season"
 			data={seasonalData}
 			x="season"
@@ -146,7 +146,7 @@
 		/>
 		<AppBarChart
 			level={4}
-			title="Time Between Fill-ups"
+			title="Time between fill-ups"
 			description="Distribution of fill-up intervals"
 			data={fuelAdvanced.fillupIntervals}
 			x="count"
@@ -163,7 +163,7 @@
 			<AppBarChart
 				level={4}
 				class="h-full"
-				title="Vehicle Performance Comparison"
+				title="Vehicle performance comparison"
 				description={radarDescription}
 				data={radarData}
 				x="metric"
@@ -179,7 +179,7 @@
 		</div>
 		<AppBarChart
 			level={4}
-			title="Monthly Spending by Category"
+			title="Monthly spending by category"
 			description="Spending by category over time"
 			data={heatmapData}
 			x="date"

@@ -199,7 +199,7 @@
 		{#if showGasCharts}
 			<AppLineChart
 				level={chartLevel}
-				title="Fuel Efficiency"
+				title="Fuel efficiency"
 				description="Monthly {efficiencyLabel}"
 				data={consumptionData}
 				x="date"
@@ -213,7 +213,7 @@
 
 			<AppBarChart
 				level={chartLevel}
-				title="Fuel Bought"
+				title="Fuel bought"
 				description="Monthly {getVolumeUnitName(units.volumeUnit, true)} bought"
 				data={volumeData}
 				x="date"
@@ -227,7 +227,7 @@
 
 			<AppLineChart
 				level={chartLevel}
-				title="Gas Price on Fill-up"
+				title="Gas price on fill-up"
 				description={pricePerVolumeDesc}
 				data={gasPriceData}
 				x="date"
@@ -241,7 +241,7 @@
 		{#if chargePriceData.length > 0}
 			<AppLineChart
 				level={chartLevel}
-				title="Charging Price"
+				title="Charging price"
 				description={pricePerChargeDesc}
 				data={chargePriceData}
 				x="date"
@@ -255,7 +255,7 @@
 		{#if showGasCharts}
 			<AppLineChart
 				level={chartLevel}
-				title="Fill-up Cost by Vehicle"
+				title="Fill-up cost by vehicle"
 				description="Average fill-up cost per vehicle over time"
 				data={fillupCostData}
 				x="date"
@@ -269,7 +269,7 @@
 		{#if showGasCharts}
 			<AppBarChart
 				level={chartLevel}
-				title="Fill-up Patterns by Day of Week"
+				title="Fill-up patterns by day of week"
 				description="When you typically fill up"
 				data={dayPatternData}
 				x="day"
@@ -300,7 +300,7 @@
 		/>
 		<AppAreaChart
 			level={chartLevel}
-			title="Total Odometer"
+			title="Total odometer"
 			description="Mileage progression per vehicle"
 			data={odometerData}
 			x="date"

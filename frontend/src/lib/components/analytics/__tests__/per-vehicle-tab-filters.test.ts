@@ -188,7 +188,7 @@ describe('PerVehicleTab', () => {
 	test('a shared car kept in another currency gets its health and totals, not a summed overview', async () => {
 		render(PerVehicleTab, { preferredVehicleId: 'euro' });
 		expect(await screen.findByText(/2017 VW Golf is shared with you and kept in EUR/)).toBeTruthy();
-		expect(screen.getByRole('heading', { level: 2, name: 'Vehicle Health Score' })).toBeTruthy();
+		expect(screen.getByRole('heading', { level: 2, name: 'Vehicle health score' })).toBeTruthy();
 		expect(api.query).not.toHaveBeenCalled();
 		expect(document.body.textContent ?? '').not.toMatch(/all time|\$0(?![.\d])|Not enough data/);
 	});

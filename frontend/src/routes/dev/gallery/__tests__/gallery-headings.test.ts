@@ -9,7 +9,7 @@ describe('the component gallery', () => {
 		const { container } = render(GalleryPage);
 		const titles = [...container.querySelectorAll('h1')].map(h => h.textContent?.trim());
 
-		expect(titles).toEqual(['Component Gallery']);
+		expect(titles).toEqual(['Component gallery']);
 	});
 
 	test('shows the shared How it works disclosure, closed', () => {

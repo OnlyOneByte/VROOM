@@ -30,7 +30,7 @@ describe('CategoryRemapPanel', () => {
 	test('shows the label of an already-mapped word', () => {
 		renderPanel(['gas', 'insurance'], { gas: 'fuel' });
 
-		expect(screen.getByTestId('remap-category-gas')).toHaveTextContent('Fuel & Charging');
+		expect(screen.getByTestId('remap-category-gas')).toHaveTextContent('Fuel & charging');
 		expect(screen.getByTestId('remap-category-insurance')).toHaveTextContent('Map to… (Misc)');
 	});
 

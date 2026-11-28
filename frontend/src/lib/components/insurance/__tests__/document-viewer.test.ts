@@ -163,7 +163,7 @@ describe('DocumentViewer uploads', () => {
 		mount();
 		await settle();
 		expect(dialogProps().open).toBe(false);
-		expect(dialogProps().title).toBe('Upload Documents');
+		expect(dialogProps().title).toBe('Upload documents');
 		expect(dialogProps().acceptedTypes).toEqual([
 			'image/jpeg',
 			'image/png',

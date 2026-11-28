@@ -7,7 +7,7 @@
 </script>
 
 <svelte:head>
-	<title>Edit Insurance Policy - VROOM Car Tracker</title>
+	<title>Edit insurance policy - VROOM Car Tracker</title>
 	<meta name="description" content="Edit insurance policy details" />
 </svelte:head>
 

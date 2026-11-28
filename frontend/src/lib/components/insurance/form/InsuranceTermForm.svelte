@@ -96,7 +96,7 @@
 	}
 	let errors = $state<FormErrors>({});
 
-	let pageTitle = $derived(isEditMode ? 'Edit Term' : renewFrom ? 'Renew Term' : 'Add Term');
+	let pageTitle = $derived(isEditMode ? 'Edit term' : renewFrom ? 'Renew term' : 'Add term');
 
 	let loadError = $state<string | null>(null);
 
@@ -315,13 +315,13 @@
 			<form onsubmit={handleSubmit} class="space-y-8">
 				<Card variant="section">
 					<CardHeader>
-						<CardTitle>Coverage Period</CardTitle>
+						<CardTitle>Coverage period</CardTitle>
 						<CardDescription>Start and end dates for this term</CardDescription>
 					</CardHeader>
 					<CardContent>
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="start-date">Start Date *</Label>
+								<Label for="start-date">Start date *</Label>
 								<DatePicker
 									id="start-date"
 									bind:value={startDate}
@@ -335,7 +335,7 @@
 								{/if}
 							</div>
 							<div class="space-y-2">
-								<Label for="end-date">End Date *</Label>
+								<Label for="end-date">End date *</Label>
 								<DatePicker
 									id="end-date"
 									bind:value={endDate}
@@ -354,13 +354,13 @@
 
 				<Card variant="section">
 					<CardHeader>
-						<CardTitle>Finance Details</CardTitle>
+						<CardTitle>Finance details</CardTitle>
 						<CardDescription>Cost and payment information for this term</CardDescription>
 					</CardHeader>
 					<CardContent>
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="total-cost">Total Cost ({currencySymbol})</Label>
+								<Label for="total-cost">Total cost ({currencySymbol})</Label>
 								<Input
 									id="total-cost"
 									type="number"
@@ -374,7 +374,7 @@
 								{/if}
 							</div>
 							<div class="space-y-2">
-								<Label for="monthly-cost">Monthly Cost ({currencySymbol})</Label>
+								<Label for="monthly-cost">Monthly cost ({currencySymbol})</Label>
 								<Input
 									id="monthly-cost"
 									type="number"
@@ -391,7 +391,7 @@
 
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
 							<div class="space-y-2">
-								<Label for="payment-amount">Payment Amount ({currencySymbol})</Label>
+								<Label for="payment-amount">Payment amount ({currencySymbol})</Label>
 								<Input
 									id="payment-amount"
 									type="number"
@@ -405,7 +405,7 @@
 								{/if}
 							</div>
 							<div class="space-y-2">
-								<Label for="premium-frequency">Premium Frequency</Label>
+								<Label for="premium-frequency">Premium frequency</Label>
 								<Select.Root
 									type="single"
 									value={premiumFrequency}
@@ -431,7 +431,7 @@
 
 				<Card variant="section">
 					<CardHeader>
-						<CardTitle>Covered Vehicles</CardTitle>
+						<CardTitle>Covered vehicles</CardTitle>
 						<CardDescription>Select which vehicles this term covers</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -478,14 +478,14 @@
 					<CardHeader>
 						<div class="flex items-center gap-2">
 							<FileText class="h-5 w-5 text-primary" />
-							<CardTitle>Policy Details</CardTitle>
+							<CardTitle>Policy details</CardTitle>
 						</div>
 						<CardDescription>Policy number, coverage, and agent information</CardDescription>
 					</CardHeader>
 					<CardContent class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="policy-number">Policy Number</Label>
+								<Label for="policy-number">Policy number</Label>
 								<Input id="policy-number" placeholder="e.g. SF-12345" bind:value={policyNumber} />
 							</div>
 							<div class="space-y-2">
@@ -505,7 +505,7 @@
 						</div>
 
 						<div class="space-y-2">
-							<Label for="coverage-desc">Coverage Description</Label>
+							<Label for="coverage-desc">Coverage description</Label>
 							<Textarea
 								id="coverage-desc"
 								placeholder="Describe coverage details"
@@ -516,7 +516,7 @@
 
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="coverage-limit">Coverage Limit ({currencySymbol})</Label>
+								<Label for="coverage-limit">Coverage limit ({currencySymbol})</Label>
 								<Input
 									id="coverage-limit"
 									type="number"
@@ -530,18 +530,18 @@
 								{/if}
 							</div>
 							<div class="space-y-2">
-								<Label for="agent-name">Agent Name</Label>
+								<Label for="agent-name">Agent name</Label>
 								<Input id="agent-name" bind:value={agentName} />
 							</div>
 						</div>
 
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div class="space-y-2">
-								<Label for="agent-phone">Agent Phone</Label>
+								<Label for="agent-phone">Agent phone</Label>
 								<Input id="agent-phone" type="tel" bind:value={agentPhone} />
 							</div>
 							<div class="space-y-2">
-								<Label for="agent-email">Agent Email</Label>
+								<Label for="agent-email">Agent email</Label>
 								<Input id="agent-email" type="email" bind:value={agentEmail} />
 							</div>
 						</div>
@@ -577,7 +577,7 @@
 							<LoaderCircle class="size-4 animate-spin" />
 							Saving…
 						{:else}
-							{isEditMode ? 'Update' : 'Save'} Term
+							{isEditMode ? 'Update' : 'Save'} term
 						{/if}
 					</Button>
 				</div>

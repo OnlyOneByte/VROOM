@@ -104,7 +104,7 @@ async function type(id: string, value: string) {
 	await fireEvent.input(field(id), { target: { value } });
 }
 
-async function clickSave(name: RegExp = /Save Term/) {
+async function clickSave(name: RegExp = /Save term/) {
 	await fireEvent.click(screen.getByRole('button', { name }));
 	await settle();
 }
@@ -150,9 +150,9 @@ describe('InsuranceTermForm amount inputs follow the currency', () => {
 });
 
 describe('InsuranceTermForm add mode', () => {
-	test('Save and Cancel sit in a sticky bar on phones and a plain row from lg, with a plain Save Term', async () => {
+	test('Save and Cancel sit in a sticky bar on phones and a plain row from lg, with a plain Save term', async () => {
 		await mount();
-		const save = screen.getByRole('button', { name: /Save Term/ });
+		const save = screen.getByRole('button', { name: /Save term/ });
 		expect(save.closest('.fixed')).toBeNull();
 		expect(save.closest('form')).toBeNull();
 		const bar = save.closest('[data-slot="form-action-bar"]');
@@ -164,7 +164,7 @@ describe('InsuranceTermForm add mode', () => {
 	test('shows the add title with the policy company and empty fields', async () => {
 		await mount();
 		expect(getPolicy).toHaveBeenCalledWith('p1');
-		expect(screen.getByRole('heading', { name: 'Add Term' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Add term' })).toBeInTheDocument();
 		expect(screen.getByText('Acme Mutual')).toBeInTheDocument();
 		expect(field('start-date')).toHaveValue('');
 		expect(field('policy-number')).toHaveValue('');
@@ -408,14 +408,14 @@ describe('InsuranceTermForm add mode', () => {
 		await mount();
 		expect(screen.getByRole('status', { name: 'Loading policy' })).toBeInTheDocument();
 		expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
-		expect(screen.queryByLabelText(/Start Date/)).toBeNull();
+		expect(screen.queryByLabelText(/Start date/)).toBeNull();
 	});
 });
 
 describe('InsuranceTermForm edit mode', () => {
 	test('prefills every field and the covered vehicles from the term', async () => {
 		await mount({ termId: 't1' });
-		expect(screen.getByRole('heading', { name: 'Edit Term' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Edit term' })).toBeInTheDocument();
 		expect(field('start-date')).toHaveValue('2025-06-01');
 		expect(field('end-date')).toHaveValue('2026-06-01');
 		expect(field('policy-number')).toHaveValue('POL-1');
@@ -437,7 +437,7 @@ describe('InsuranceTermForm edit mode', () => {
 			'aria-checked',
 			'false'
 		);
-		expect(screen.getByRole('button', { name: /Update Term/ })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Update term/ })).toBeInTheDocument();
 	});
 
 	test('an unknown term id reports and navigates back', async () => {
@@ -462,7 +462,7 @@ describe('InsuranceTermForm edit mode', () => {
 		);
 		await mount({ termId: 't1' });
 		await type('policy-number', '');
-		await clickSave(/Update Term/);
+		await clickSave(/Update term/);
 		expect(updateTerm).toHaveBeenCalledWith('p1', 't1', {
 			startDate: dateOnlyToISO('2025-06-01'),
 			endDate: dateOnlyToISO('2026-06-01'),
@@ -486,7 +486,7 @@ describe('InsuranceTermForm edit mode', () => {
 	test('sends the edited values with the prefilled ones on update', async () => {
 		await mount({ termId: 't1' });
 		await type('agent-name', 'Alex');
-		await clickSave(/Update Term/);
+		await clickSave(/Update term/);
 		const body = updateTerm.mock.calls[0]?.[2];
 		expect(body?.agentName).toBe('Alex');
 		expect(body?.policyNumber).toBe('POL-1');
@@ -498,7 +498,7 @@ describe('InsuranceTermForm edit mode', () => {
 	test('an update failure reports with the update verb', async () => {
 		updateTerm.mockRejectedValue(new ApiError('Internal server error', 500));
 		await mount({ termId: 't1' });
-		await clickSave(/Update Term/);
+		await clickSave(/Update term/);
 		expect(showError).toHaveBeenCalledWith(`Couldn't update the term. ${SERVER_FAILURE_MESSAGE}`);
 	});
 });
@@ -506,7 +506,7 @@ describe('InsuranceTermForm edit mode', () => {
 describe('InsuranceTermForm renew mode', () => {
 	test('copies the previous term details but leaves the dates blank', async () => {
 		await mount({ renewFrom: 't1' });
-		expect(screen.getByRole('heading', { name: 'Renew Term' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Renew term' })).toBeInTheDocument();
 		expect(field('start-date')).toHaveValue('');
 		expect(field('end-date')).toHaveValue('');
 		expect(field('policy-number')).toHaveValue('POL-1');
@@ -533,7 +533,7 @@ describe('InsuranceTermForm renew mode', () => {
 
 	test('an unknown renewFrom id falls back to an empty add form', async () => {
 		await mount({ renewFrom: 'missing' });
-		expect(screen.getByRole('heading', { name: 'Renew Term' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Renew term' })).toBeInTheDocument();
 		expect(field('policy-number')).toHaveValue('');
 		expect(showError).not.toHaveBeenCalled();
 	});

@@ -57,7 +57,7 @@ describe('insurance action buttons', () => {
 		});
 		await settle();
 
-		for (const name of ['Upload', 'File Claim', 'Renew']) {
+		for (const name of ['Upload', 'File claim', 'Renew']) {
 			const button = screen.getByRole('button', { name });
 			expect(button.className).toContain('h-10');
 			expect(button.className).not.toContain('text-xs');

@@ -22,7 +22,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Data We Collect</h2>
+		<h2 class="text-base font-semibold">Data we collect</h2>
 		<p>When you sign in with Google, we receive and store:</p>
 		<ul class="list-disc space-y-1 pl-6 marker:text-muted-foreground">
 			<li>Your Google account email address</li>
@@ -39,7 +39,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">How Data Is Stored</h2>
+		<h2 class="text-base font-semibold">How data is stored</h2>
 		<p>
 			All data is stored in a SQLite database on the server where the instance is hosted. No data is
 			sent to third-party analytics services, advertising networks, or data brokers.
@@ -55,7 +55,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Google API Usage</h2>
+		<h2 class="text-base font-semibold">Google API usage</h2>
 		<p>The Service uses the following Google API scopes:</p>
 		<ul class="list-disc space-y-1 pl-6 marker:text-muted-foreground">
 			<li>Drive file access — to create and manage backup files and photos in your Drive</li>
@@ -70,7 +70,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Cookies & Sessions</h2>
+		<h2 class="text-base font-semibold">Cookies & sessions</h2>
 		<p>
 			The Service uses a session cookie to keep you signed in. This cookie contains only a session
 			identifier and is required for the Service to function. No tracking cookies, analytics
@@ -79,7 +79,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Data Retention & Deletion</h2>
+		<h2 class="text-base font-semibold">Data retention & deletion</h2>
 		<p>
 			Your data is retained as long as your account exists. You can export all your data at any time
 			via the backup feature (CSV format). To delete your account and all associated data, contact
@@ -92,7 +92,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Community Comparisons (Optional)</h2>
+		<h2 class="text-base font-semibold">Community comparisons (optional)</h2>
 		<p>
 			If this server has community comparisons turned on and you switch on "Include my vehicles in
 			community stats" in Settings, anonymous averages built from your vehicles are shown to other
@@ -112,7 +112,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Third-Party Services</h2>
+		<h2 class="text-base font-semibold">Third-party services</h2>
 		<p>The Service interacts with the following third-party services:</p>
 		<ul class="list-disc space-y-1 pl-6 marker:text-muted-foreground">
 			<li>Google OAuth — for authentication</li>
@@ -126,7 +126,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Open Source</h2>
+		<h2 class="text-base font-semibold">Open source</h2>
 		<p>
 			VROOM is open-source software. You can review the complete source code to verify exactly what
 			data is collected and how it is handled. The source code is available on
@@ -142,7 +142,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Changes to This Policy</h2>
+		<h2 class="text-base font-semibold">Changes to this policy</h2>
 		<p>
 			This policy may be updated from time to time. Changes will be reflected on this page with an
 			updated date. Continued use of the Service after changes constitutes acceptance of the updated

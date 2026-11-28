@@ -123,7 +123,7 @@ describe('PolicyCard header', () => {
 		expect(screen.getByText('Acme Mutual')).toBeInTheDocument();
 		expect(screen.getByText('Policy #POL-42')).toBeInTheDocument();
 		expect(screen.getByText('10 days left')).toBeInTheDocument();
-		expect(screen.getByText('Current Term')).toBeInTheDocument();
+		expect(screen.getByText('Current term')).toBeInTheDocument();
 		expect(screen.getByText('$1,200.00')).toBeInTheDocument();
 		expect(screen.queryByText('Inactive')).toBeNull();
 	});
@@ -150,7 +150,7 @@ describe('PolicyCard header', () => {
 	test('a policy with no terms shows no term card, number or countdown', async () => {
 		mount({ policy: makePolicy() });
 		await settle();
-		expect(screen.queryByText('Current Term')).toBeNull();
+		expect(screen.queryByText('Current term')).toBeNull();
 		expect(screen.queryByText(/Policy #/)).toBeNull();
 		expect(screen.queryByText(/days left|Expired/)).toBeNull();
 		expect(screen.queryByRole('button', { name: /past term/ })).toBeNull();
@@ -194,15 +194,15 @@ describe('PolicyCard child sections', () => {
 		expect(screen.getByRole('heading', { name: 'Claims' })).toBeInTheDocument();
 	});
 
-	test('File Claim in the footer opens the claim dialog and gets focus back when it closes', async () => {
+	test('File claim in the footer opens the claim dialog and gets focus back when it closes', async () => {
 		mount();
 		await settle();
-		const trigger = screen.getByRole('button', { name: 'File Claim' });
+		const trigger = screen.getByRole('button', { name: 'File claim' });
 		trigger.focus();
 		await fireEvent.click(trigger);
 		await settle();
 		const dialog = screen.getByRole('dialog', { name: 'File a claim' });
-		expect(within(dialog).getByRole('button', { name: 'File Claim' })).toHaveAttribute(
+		expect(within(dialog).getByRole('button', { name: 'File claim' })).toHaveAttribute(
 			'type',
 			'submit'
 		);
@@ -217,7 +217,7 @@ describe('PolicyCard child sections', () => {
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
 		await settle();
-		expect(screen.getByRole('dialog', { name: 'Upload Documents' })).toBeInTheDocument();
+		expect(screen.getByRole('dialog', { name: 'Upload documents' })).toBeInTheDocument();
 	});
 
 	test('a failed documents load shows Retry on the card, and Retry loads them', async () => {
@@ -334,7 +334,7 @@ describe('PolicyCard term history', () => {
 		mount();
 		await settle();
 		expect(screen.getByRole('button', { name: '1 past term' })).toBeInTheDocument();
-		expect(screen.queryByText('Past Terms')).toBeNull();
+		expect(screen.queryByText('Past terms')).toBeNull();
 	});
 
 	test('expanding shows notes and past terms; collapsing hides them again', async () => {
@@ -346,10 +346,10 @@ describe('PolicyCard term history', () => {
 		await fireEvent.click(screen.getByRole('button', { name: '2 past terms' }));
 		expect(screen.getByText('Notes')).toBeInTheDocument();
 		expect(screen.getByText('Multi-car discount')).toBeInTheDocument();
-		expect(screen.getByText('Past Terms')).toBeInTheDocument();
-		expect(screen.getAllByText('Past Term')).toHaveLength(2);
-		await fireEvent.click(screen.getByRole('button', { name: 'Hide History' }));
-		expect(screen.queryByText('Past Terms')).toBeNull();
+		expect(screen.getByText('Past terms')).toBeInTheDocument();
+		expect(screen.getAllByText('Past term')).toHaveLength(2);
+		await fireEvent.click(screen.getByRole('button', { name: 'Hide history' }));
+		expect(screen.queryByText('Past terms')).toBeNull();
 		expect(screen.getByRole('button', { name: '2 past terms' })).toBeInTheDocument();
 	});
 
@@ -357,7 +357,7 @@ describe('PolicyCard term history', () => {
 		mount();
 		await settle();
 		await fireEvent.click(screen.getByRole('button', { name: '1 past term' }));
-		expect(screen.getByText('Past Terms')).toBeInTheDocument();
+		expect(screen.getByText('Past terms')).toBeInTheDocument();
 		expect(screen.queryByText('Notes')).toBeNull();
 	});
 });

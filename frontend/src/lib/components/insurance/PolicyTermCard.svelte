@@ -23,7 +23,7 @@
 	let ended = $derived(hasTermEnded(term));
 	const figure =
 		'font-(family-name:--font-fig) text-lg leading-tight font-semibold text-foreground tabular-nums';
-	let termLabel = $derived(isCurrent ? (ended ? 'Latest Term' : 'Current Term') : 'Past Term');
+	let termLabel = $derived(isCurrent ? (ended ? 'Latest term' : 'Current term') : 'Past term');
 </script>
 
 <div class={isCurrent ? 'space-y-3' : 'space-y-2 border-t border-border pt-3'}>
@@ -93,7 +93,7 @@
 			</div>
 			{#if term.totalCost !== undefined}
 				<div>
-					<dt class="text-xs text-muted-foreground">Total Cost</dt>
+					<dt class="text-xs text-muted-foreground">Total cost</dt>
 					<dd class={figure}>{formatCurrency(term.totalCost)}</dd>
 				</div>
 			{/if}
@@ -117,7 +117,7 @@
 			<dt class="text-muted-foreground">End</dt>
 			<dd class="font-medium text-foreground">{formatDate(term.endDate)}</dd>
 			{#if term.totalCost !== undefined}
-				<dt class="text-muted-foreground">Total Cost</dt>
+				<dt class="text-muted-foreground">Total cost</dt>
 				<dd class="font-semibold text-foreground tabular-nums">
 					{formatCurrency(term.totalCost)}
 				</dd>

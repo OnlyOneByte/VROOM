@@ -231,7 +231,7 @@ describe('only the navigation for the screen width is rendered', () => {
 		render(Navigation);
 
 		expect(syncManager.setupAutoSync).toHaveBeenCalledOnce();
-		expect(screen.queryByRole('button', { name: 'Sync Now' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Sync now' })).toBeNull();
 	});
 
 	describe('at lg and up', () => {

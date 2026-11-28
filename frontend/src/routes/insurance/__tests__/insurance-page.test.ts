@@ -98,13 +98,13 @@ afterEach(() => {
 });
 
 describe('insurance page loading and errors', () => {
-	test('keeps the header and shows skeletons, with no Add Policy, while data loads', async () => {
+	test('keeps the header and shows skeletons, with no Add policy, while data loads', async () => {
 		getAllPolicies.mockReturnValue(new Promise(() => {}));
 		await mount();
 
 		expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
 		expect(screen.getByRole('heading', { name: 'Insurance' })).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: 'Add Policy' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Add policy' })).toBeNull();
 	});
 
 	test('a load failure shows one inline error with no toast, and Retry recovers', async () => {
@@ -116,7 +116,7 @@ describe('insurance page loading and errors', () => {
 		expect(screen.queryByText('Gateway timeout')).toBeNull();
 		expect(screen.getByText("Couldn't load insurance")).toBeInTheDocument();
 		expect(notifyError).not.toHaveBeenCalled();
-		expect(screen.queryByRole('button', { name: 'Add Policy' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Add policy' })).toBeNull();
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 		await settle();
@@ -140,7 +140,7 @@ describe('insurance page loading and errors', () => {
 });
 
 describe('insurance page empty state', () => {
-	test('with no policies it shows the empty state and Add Policy opens the new-policy form', async () => {
+	test('with no policies it shows the empty state and Add policy opens the new-policy form', async () => {
 		getAllPolicies.mockResolvedValue([]);
 		await mount();
 
@@ -148,7 +148,7 @@ describe('insurance page empty state', () => {
 		expect(policyList.latest).toBeNull();
 
 		expect(screen.getAllByRole('button', { name: /policy/i })).toHaveLength(1);
-		await fireEvent.click(screen.getByRole('button', { name: 'Add Policy' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Add policy' }));
 		expect(goto).toHaveBeenCalledWith('/insurance/new');
 	});
 
@@ -209,18 +209,18 @@ describe('insurance page with policies', () => {
 		expect(policyList.latest?.policies.map(p => p.id)).toEqual(['p1', 'p2']);
 	});
 
-	test('policies left with no vehicles still list, with no Add Policy button', async () => {
+	test('policies left with no vehicles still list, with no Add policy button', async () => {
 		getVehicles.mockResolvedValue([]);
 		await mount();
 
 		expect(policyList.latest).not.toBeNull();
 		expect(screen.queryByRole('heading', { name: 'Add a vehicle first' })).toBeNull();
-		expect(screen.queryByRole('button', { name: 'Add Policy' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Add policy' })).toBeNull();
 	});
 
-	test('the header Add Policy button opens the new-policy form at every width', async () => {
+	test('the header Add policy button opens the new-policy form at every width', async () => {
 		await mount();
-		const button = screen.getByRole('button', { name: 'Add Policy' });
+		const button = screen.getByRole('button', { name: 'Add policy' });
 		expect(button).not.toHaveClass('hidden');
 
 		await fireEvent.click(button);

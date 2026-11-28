@@ -56,14 +56,14 @@ beforeEach(() => {
 	api.getInsurance.mockResolvedValue({});
 });
 
-describe('Fuel Efficiency Comparison series', () => {
+describe('Fuel efficiency comparison series', () => {
 	test('are keyed by vehicle id, so two cars named "Civic" are two series in the page colours', async () => {
 		const vehicleColors = buildVehicleColorMap(['v-camry', 'v-civic', 'v-civic-2']);
 		render(CrossVehicleTab, { vehicleColors });
 		await waitFor(() =>
-			expect(lines.some(l => l.title === 'Fuel Efficiency Comparison')).toBe(true)
+			expect(lines.some(l => l.title === 'Fuel efficiency comparison')).toBe(true)
 		);
-		const chart = lines.filter(l => l.title === 'Fuel Efficiency Comparison').at(-1)!;
+		const chart = lines.filter(l => l.title === 'Fuel efficiency comparison').at(-1)!;
 		expect(chart.series).toEqual([
 			{ key: 'v-civic', label: 'Civic', color: vehicleColors['v-civic'] },
 			{ key: 'v-civic-2', label: 'Civic', color: vehicleColors['v-civic-2'] }

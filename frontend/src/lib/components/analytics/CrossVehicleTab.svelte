@@ -147,10 +147,10 @@
 	let costBarData = $derived(crossVehicle?.vehicleCostComparison ?? []);
 
 	const costBarConfig: Chart.ChartConfig = {
-		totalCost: { label: 'Total Cost', color: 'var(--chart-1)' }
+		totalCost: { label: 'Total cost', color: 'var(--chart-1)' }
 	};
 
-	const costBarSeries = [{ key: 'totalCost', label: 'Total Cost', color: 'var(--chart-1)' }];
+	const costBarSeries = [{ key: 'totalCost', label: 'Total cost', color: 'var(--chart-1)' }];
 
 	const costBarPadding = { top: 4, left: 48, bottom: 40, right: 4 };
 	let costBarWidth = $state(0);
@@ -264,10 +264,7 @@
 			distanceUnit={distShortLabel}
 		/>
 
-		<div
-			class="grid gap-8 md:gap-10 {fleet > 0 ? 'md:grid-cols-2' : ''}"
-			data-loans-insurance
-		>
+		<div class="grid gap-8 md:gap-10 {fleet > 0 ? 'md:grid-cols-2' : ''}" data-loans-insurance>
 			<FinancingAnalytics {financing} />
 
 			<InsuranceAnalytics {insurance} {fleet} />
@@ -280,7 +277,7 @@
 			>
 				<div class="space-y-4 md:space-y-6">
 					{#if trendData.length > 0}
-						<ExpenseTrendChart level={3} data={trendData} title="Monthly Expense Trends">
+						<ExpenseTrendChart level={3} data={trendData} title="Monthly expense trends">
 							{#snippet icon()}
 								<TrendingUp class="h-5 w-5 text-primary" />
 							{/snippet}
@@ -291,7 +288,7 @@
 						{#if categoryRows.length > 0}
 							<AppBarChart
 								level={3}
-								title="Expense by Category"
+								title="Expense by category"
 								description="Spending across all vehicles"
 								data={categoryRows}
 								x="value"
@@ -310,7 +307,7 @@
 						{#if costBarData.length > 0 && hasExpenses}
 							<AppBarChart
 								level={3}
-								title="Vehicle Cost Comparison"
+								title="Vehicle cost comparison"
 								description="Total costs by vehicle"
 								data={costBarData}
 								x="vehicleName"
@@ -345,7 +342,7 @@
 					{#if fuelEffData.length > 0}
 						<AppLineChart
 							level={3}
-							title="Fuel Efficiency Comparison"
+							title="Fuel efficiency comparison"
 							description="{efficiencyLabel} trends across all vehicles"
 							data={fuelEffData}
 							x="date"

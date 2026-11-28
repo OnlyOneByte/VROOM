@@ -464,7 +464,7 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 
 		const named = screen.getByText('Arco').closest('button') as HTMLElement;
 		expect(named.querySelector('p')).toHaveTextContent('Arco');
-		expect(named).toHaveTextContent(/Fuel & Charging\s*· Daily Driver\s*· Mar 21, 2024/);
+		expect(named).toHaveTextContent(/Fuel & charging\s*· Daily Driver\s*· Mar 21, 2024/);
 
 		const unnamed = screen.getByText('Maintenance').closest('button') as HTMLElement;
 		expect(unnamed.querySelector('p')).toHaveTextContent('Maintenance');
@@ -474,7 +474,7 @@ describe('ExpensesTable rows lead with what the user would call the expense', ()
 		expect(within(split).getByText('Car wash').parentElement).toHaveTextContent(
 			/^Car wash\s*Split$/
 		);
-		expect(split).toHaveTextContent(/Fuel & Charging\s*· /);
+		expect(split).toHaveTextContent(/Fuel & charging\s*· /);
 	});
 
 	test("a fill shows the vehicle's unit, or the user's own unit when the vehicle isn't passed", () => {

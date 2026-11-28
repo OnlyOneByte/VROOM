@@ -12,7 +12,7 @@
 
 <LegalPage title="Terms of Service" updated="March 2026">
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Acceptance of Terms</h2>
+		<h2 class="text-base font-semibold">Acceptance of terms</h2>
 		<p>
 			By accessing or using VROOM ("the Service"), you agree to be bound by these Terms of Service.
 			If you do not agree to these terms, do not use the Service.
@@ -20,7 +20,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Description of Service</h2>
+		<h2 class="text-base font-semibold">Description of service</h2>
 		<p>
 			VROOM is an open-source vehicle expense tracking application that allows you to record and
 			analyze vehicle-related costs including fuel, maintenance, insurance, and financing. The
@@ -30,7 +30,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Account & Authentication</h2>
+		<h2 class="text-base font-semibold">Account & authentication</h2>
 		<p>
 			You sign in using your Google account. You are responsible for maintaining the security of
 			your Google account credentials. The Service does not store your Google password.
@@ -42,7 +42,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Your Data</h2>
+		<h2 class="text-base font-semibold">Your data</h2>
 		<p>
 			You retain full ownership of all data you enter into the Service. The Service does not claim
 			any rights to your data. You can export your data at any time using the built-in backup
@@ -56,7 +56,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Acceptable Use</h2>
+		<h2 class="text-base font-semibold">Acceptable use</h2>
 		<p>You agree not to:</p>
 		<ul class="list-disc space-y-1 pl-6 marker:text-muted-foreground">
 			<li>Use the Service for any unlawful purpose</li>
@@ -68,7 +68,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Service Availability</h2>
+		<h2 class="text-base font-semibold">Service availability</h2>
 		<p>
 			The Service is provided on an "as available" basis. The operator does not guarantee
 			uninterrupted or error-free operation. The Service may be temporarily unavailable for
@@ -77,7 +77,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Open Source License</h2>
+		<h2 class="text-base font-semibold">Open source license</h2>
 		<p>
 			VROOM is open-source software released under the
 			<a
@@ -101,7 +101,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Disclaimer of Warranties</h2>
+		<h2 class="text-base font-semibold">Disclaimer of warranties</h2>
 		<p>
 			THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER
 			EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY,
@@ -114,7 +114,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Limitation of Liability</h2>
+		<h2 class="text-base font-semibold">Limitation of liability</h2>
 		<p>
 			TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SERVICE OPERATOR AND CONTRIBUTORS SHALL NOT BE
 			LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING
@@ -124,7 +124,7 @@
 	</section>
 
 	<section class="space-y-3 border-t pt-5">
-		<h2 class="text-base font-semibold">Changes to These Terms</h2>
+		<h2 class="text-base font-semibold">Changes to these terms</h2>
 		<p>
 			These terms may be updated from time to time. Changes will be reflected on this page with an
 			updated date. Continued use of the Service after changes constitutes acceptance of the updated

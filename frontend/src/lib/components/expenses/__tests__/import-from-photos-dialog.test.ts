@@ -230,7 +230,7 @@ describe('ImportFromPhotosDialog: reviewing and importing', () => {
 		await fireEvent.input(first.querySelector('input[type="number"]') as HTMLInputElement, {
 			target: { value: '55.5' }
 		});
-		await pick(document.getElementById('photo-p1-category') as HTMLElement, 'Fuel & Charging');
+		await pick(document.getElementById('photo-p1-category') as HTMLElement, 'Fuel & charging');
 		await pick(document.getElementById('photo-p1-vehicle') as HTMLElement, '2020 Toyota RAV4');
 		await fireEvent.click(confirmButton());
 

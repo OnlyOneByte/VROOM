@@ -269,7 +269,7 @@ describe('compact layout: a row never nests one control inside another', () => {
 
 	test('a standalone row with its actions revealed nests nothing', async () => {
 		const { container } = mountTable();
-		const summary = byText<HTMLElement>(container, 'button', 'Fuel & Charging');
+		const summary = byText<HTMLElement>(container, 'button', 'Fuel & charging');
 
 		await fireEvent.click(summary);
 
@@ -292,7 +292,7 @@ describe('compact layout: a row never nests one control inside another', () => {
 
 	test('a read-only row is not a control, because it has nothing to reveal', () => {
 		const { container } = mountTable({ canWrite: false });
-		const row = compactRow(container, 'Fuel & Charging');
+		const row = compactRow(container, 'Fuel & charging');
 
 		expect(row.matches(INTERACTIVE)).toBe(false);
 		expect(row.querySelector(INTERACTIVE)).toBeNull();
@@ -304,7 +304,7 @@ describe('compact layout: rows and their actions are operable by keyboard', () =
 
 	test('Enter on a row reveals its actions and reports the state', async () => {
 		const { container } = mountTable();
-		const summary = byText<HTMLElement>(container, 'button', 'Fuel & Charging');
+		const summary = byText<HTMLElement>(container, 'button', 'Fuel & charging');
 
 		expect(summary.getAttribute('aria-expanded')).toBe('false');
 
@@ -349,7 +349,7 @@ describe('compact layout: rows and their actions are operable by keyboard', () =
 
 	test("Enter on a standalone row's Delete opens the confirmation", async () => {
 		const { container } = mountTable();
-		await fireEvent.click(byText<HTMLElement>(container, 'button', 'Fuel & Charging'));
+		await fireEvent.click(byText<HTMLElement>(container, 'button', 'Fuel & charging'));
 		const del = byText<HTMLElement>(container, 'button', 'Delete');
 
 		await pressKey(del, 'Enter');

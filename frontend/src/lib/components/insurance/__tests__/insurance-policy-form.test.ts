@@ -74,7 +74,7 @@ async function type(id: string, value: string) {
 }
 
 async function clickCreate() {
-	await fireEvent.click(screen.getByRole('button', { name: /Create Policy/ }));
+	await fireEvent.click(screen.getByRole('button', { name: /Create policy/ }));
 	await settle();
 }
 
@@ -100,7 +100,7 @@ afterEach(() => {
 describe('InsurancePolicyForm create mode', () => {
 	test('renders the create heading and one checkbox per vehicle', async () => {
 		await mount();
-		expect(screen.getByRole('heading', { name: 'New Insurance Policy' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'New insurance policy' })).toBeInTheDocument();
 		expect(screen.getByText('Add a new insurance policy with an initial term')).toBeInTheDocument();
 		expect(screen.getByRole('checkbox', { name: 'Daily' })).toBeInTheDocument();
 		expect(screen.getByRole('checkbox', { name: '2019 Honda Civic' })).toBeInTheDocument();
@@ -115,13 +115,13 @@ describe('InsurancePolicyForm create mode', () => {
 		for (let i = 1; i < levels.length; i++) {
 			expect(levels[i], `heading ${i}`).toBeLessThanOrEqual((levels[i - 1] ?? 1) + 1);
 		}
-		expect(screen.getByRole('heading', { level: 2, name: 'Initial Term' })).toBeInTheDocument();
-		expect(screen.getByRole('heading', { level: 3, name: 'Policy Details' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { level: 2, name: 'Initial term' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { level: 3, name: 'Policy details' })).toBeInTheDocument();
 	});
 
-	test('Save and Cancel sit in a sticky bar on phones and a plain row from lg, with a plain Create Policy', async () => {
+	test('Save and Cancel sit in a sticky bar on phones and a plain row from lg, with a plain Create policy', async () => {
 		await mount();
-		const save = screen.getByRole('button', { name: 'Create Policy' });
+		const save = screen.getByRole('button', { name: 'Create policy' });
 
 		expect(save.closest('.fixed')).toBeNull();
 		const bar = save.closest('[data-slot="form-action-bar"]');
@@ -288,7 +288,7 @@ describe('InsurancePolicyForm create mode', () => {
 		await clickCreate();
 		expect(showError).toHaveBeenCalledWith(`Couldn't create the policy. ${SERVER_FAILURE_MESSAGE}`);
 		expect(goto).not.toHaveBeenCalled();
-		expect(screen.getByRole('button', { name: /Create Policy/ })).not.toBeDisabled();
+		expect(screen.getByRole('button', { name: /Create policy/ })).not.toBeDisabled();
 	});
 
 	test('a non-Error rejection is reported as an unknown error', async () => {
@@ -343,7 +343,7 @@ describe('InsurancePolicyForm create mode', () => {
 		await settle();
 		expect(getVehicles).toHaveBeenCalledTimes(2);
 		expect(screen.queryByText("Couldn't load your vehicles")).toBeNull();
-		expect(screen.getByLabelText(/Insurance Company/)).toBeInTheDocument();
+		expect(screen.getByLabelText(/Insurance company/)).toBeInTheDocument();
 	});
 
 	test('keeps the header and shows field skeletons until vehicles load', async () => {
@@ -351,7 +351,7 @@ describe('InsurancePolicyForm create mode', () => {
 		await mount();
 		expect(screen.getByRole('status', { name: 'Loading vehicles' })).toBeInTheDocument();
 		expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
-		expect(screen.queryByLabelText(/Insurance Company/)).toBeNull();
+		expect(screen.queryByLabelText(/Insurance company/)).toBeNull();
 	});
 });
 
@@ -371,11 +371,11 @@ describe('InsurancePolicyForm edit mode', () => {
 	test('prefills the policy fields and hides the initial-term section', async () => {
 		await mount({ policyId: 'p9' });
 		expect(getPolicy).toHaveBeenCalledWith('p9');
-		expect(screen.getByRole('heading', { name: 'Edit Policy' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Edit policy' })).toBeInTheDocument();
 		expect(field('company')).toHaveValue('Acme Mutual');
 		expect(field('notes')).toHaveValue('Old note');
 		expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
-		expect(screen.queryByText('Initial Term')).toBeNull();
+		expect(screen.queryByText('Initial term')).toBeNull();
 		expect(document.getElementById('start-date')).toBeNull();
 	});
 
@@ -390,7 +390,7 @@ describe('InsurancePolicyForm edit mode', () => {
 		getPolicy.mockResolvedValue({ ...existing, vehicleIds: [] });
 		await mount({ policyId: 'p9' });
 
-		await fireEvent.click(screen.getByRole('button', { name: /Update Policy/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Update policy/ }));
 
 		await vi.waitFor(() => expect(updatePolicy).toHaveBeenCalledTimes(1));
 		expect(screen.queryByText('At least one vehicle is required')).toBeNull();
@@ -401,7 +401,7 @@ describe('InsurancePolicyForm edit mode', () => {
 		await type('company', '  Acme Renamed ');
 		await type('notes', 'New note');
 		await fireEvent.click(screen.getByRole('switch'));
-		await fireEvent.click(screen.getByRole('button', { name: /Update Policy/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Update policy/ }));
 		await settle();
 		expect(updatePolicy).toHaveBeenCalledWith('p9', {
 			company: 'Acme Renamed',
@@ -415,7 +415,7 @@ describe('InsurancePolicyForm edit mode', () => {
 	test('clearing the notes sends null so the server drops them', async () => {
 		await mount({ policyId: 'p9' });
 		await type('notes', '   ');
-		await fireEvent.click(screen.getByRole('button', { name: /Update Policy/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Update policy/ }));
 		await settle();
 		expect(updatePolicy).toHaveBeenCalledWith('p9', {
 			company: 'Acme Mutual',
@@ -427,7 +427,7 @@ describe('InsurancePolicyForm edit mode', () => {
 	test('a blank company blocks the update without date validation', async () => {
 		await mount({ policyId: 'p9' });
 		await type('company', '');
-		await fireEvent.click(screen.getByRole('button', { name: /Update Policy/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Update policy/ }));
 		await settle();
 		expect(screen.getByText('Company name is required')).toBeInTheDocument();
 		expect(screen.queryByText('Start date is required')).toBeNull();
@@ -437,7 +437,7 @@ describe('InsurancePolicyForm edit mode', () => {
 	test('an update failure reports with the update verb', async () => {
 		updatePolicy.mockRejectedValue(new ApiError('Policy number already in use', 409));
 		await mount({ policyId: 'p9' });
-		await fireEvent.click(screen.getByRole('button', { name: /Update Policy/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Update policy/ }));
 		await settle();
 		expect(showError).toHaveBeenCalledWith(
 			"Couldn't update the policy. Policy number already in use."
@@ -464,7 +464,7 @@ describe('InsurancePolicyForm edit mode', () => {
 		await settle();
 		expect(getPolicy).toHaveBeenCalledTimes(2);
 		expect(screen.queryByText("Couldn't load this policy")).toBeNull();
-		expect(screen.getByRole('heading', { name: 'Edit Policy' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Edit policy' })).toBeInTheDocument();
 	});
 
 	test('delete asks for confirmation and then deletes the policy', async () => {
@@ -475,7 +475,7 @@ describe('InsurancePolicyForm edit mode', () => {
 		expect(screen.getByText('1 vehicle covered')).toBeInTheDocument();
 		expect(deletePolicy).not.toHaveBeenCalled();
 
-		await fireEvent.click(screen.getByRole('button', { name: /Delete Policy/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Delete policy/ }));
 		await settle();
 		expect(deletePolicy).toHaveBeenCalledWith('p9');
 		expect(showSuccess).toHaveBeenCalledWith('Policy deleted successfully');
@@ -494,7 +494,7 @@ describe('InsurancePolicyForm edit mode', () => {
 		await mount({ policyId: 'p9' });
 		await fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }));
 		await screen.findByRole('alertdialog');
-		await fireEvent.click(screen.getByRole('button', { name: /Delete Policy/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Delete policy/ }));
 		await settle();
 		expect(showError).toHaveBeenCalledWith(
 			"Couldn't delete the policy. This policy still has claims."
@@ -508,7 +508,7 @@ describe('InsurancePolicyForm edit mode', () => {
 		await mount({ policyId: 'p9' });
 		await fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }));
 		await screen.findByRole('alertdialog');
-		await fireEvent.click(screen.getByRole('button', { name: /Delete Policy/ }));
+		await fireEvent.click(screen.getByRole('button', { name: /Delete policy/ }));
 		await settle();
 		expect(showError).toHaveBeenCalledWith(
 			`Couldn't delete the policy. ${UNEXPECTED_FAILURE_MESSAGE}`

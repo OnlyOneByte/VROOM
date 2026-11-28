@@ -25,14 +25,14 @@ afterEach(cleanup);
 describe('AccountPending', () => {
 	test('names the waiting email, rechecks, and signs out to the sign-in page', async () => {
 		render(AccountPending);
-		expect(screen.getByRole('heading', { name: 'Waiting for Approval' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Waiting for approval' })).toBeInTheDocument();
 		expect(screen.getByText('kim@example.com')).toBeInTheDocument();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Check Again' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
 		await waitFor(() => expect(showInfo).toHaveBeenCalledWith('Still waiting for an admin.'));
 		expect(authStore.recheckSession).toHaveBeenCalled();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 		await waitFor(() => expect(goto).toHaveBeenCalledWith('/auth'));
 		expect(authStore.logout).toHaveBeenCalled();
 	});

@@ -126,7 +126,7 @@
 </script>
 
 <svelte:head>
-	<title>Sign In - VROOM Car Tracker</title>
+	<title>Sign in - VROOM Car Tracker</title>
 	<meta name="description" content="Sign in to track your vehicle expenses" />
 </svelte:head>
 

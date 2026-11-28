@@ -52,7 +52,7 @@ describe('InsightCards', () => {
 		expect(screen.getByText('$3.00/gal')).toBeInTheDocument();
 		expect(screen.queryByText('Cost per trip')).not.toBeInTheDocument();
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Show in Chart: Record month' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Show in chart: Record month' }));
 		expect(onApply).toHaveBeenCalledWith({ metric: 'cost', per: 'month', sel: '2025-06' });
 	});
 

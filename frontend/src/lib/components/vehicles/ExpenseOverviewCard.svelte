@@ -25,7 +25,7 @@
 			iconColor: 'primary'
 		},
 		{
-			label: 'Last 30 Days',
+			label: 'Last 30 days',
 			value: formatCurrency(stats.recentExpenses),
 			unit: 'recent spending',
 			icon: Clock,
