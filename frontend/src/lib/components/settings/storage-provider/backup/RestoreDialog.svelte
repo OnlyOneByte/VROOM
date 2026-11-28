@@ -25,7 +25,11 @@
 	import { settingsStore } from '#lib/stores/settings.svelte.ts';
 	import { vehicleApi } from '#lib/services/vehicle-api.ts';
 	import { getVehicleDisplayName } from '#lib/utils/vehicle-helpers.ts';
-	import { ApiError, userFacingErrorMessage } from '#lib/utils/error-handling.ts';
+	import {
+		ApiError,
+		RequestTimeoutError,
+		userFacingErrorMessage
+	} from '#lib/utils/error-handling.ts';
 	import ProviderPicker from './RestoreProviderPicker.svelte';
 	import type {
 		RestoreResult,
@@ -47,6 +51,9 @@
 		role_not_assignable: "that role isn't available any more",
 		permission_not_grantable: "that permission can't be given on a car"
 	};
+
+	const RESTORE_TIMEOUT_MESSAGE =
+		"The restore is taking longer than expected, so we stopped waiting. It may still finish. Reload this page in a few minutes and check your data before you try again.";
 
 	interface Props {
 		open: boolean;
@@ -91,6 +98,8 @@
 	let carNames = $state<Record<string, string>>({});
 	let carNamesRequest = 0;
 	let doneButton = $state<HTMLButtonElement | null>(null);
+	let restoreButton = $state<HTMLButtonElement | null>(null);
+	let mergeInsteadButton = $state<HTMLButtonElement | null>(null);
 
 	function resetState() {
 		droppedGrants = [];
@@ -271,13 +280,19 @@
 			await tick();
 			doneButton?.focus();
 		} catch (err) {
-			error = `Couldn't restore. ${userFacingErrorMessage(err)}`;
+			error =
+				err instanceof RequestTimeoutError
+					? RESTORE_TIMEOUT_MESSAGE
+					: `Couldn't restore. ${userFacingErrorMessage(err)}`;
 			mergeInstead = restoreMode === 'replace' && err instanceof ApiError && err.statusCode === 409;
 			if (selectedSourceType === 'sheets') void settingsStore.load();
 		} finally {
 			isProcessing = false;
 			restoring = false;
 		}
+		if (!error) return;
+		await tick();
+		(mergeInsteadButton ?? restoreButton)?.focus();
 	}
 
 	function close() {
@@ -415,6 +430,7 @@
 						<p>{error}</p>
 						{#if mergeInstead}
 							<Button
+								bind:ref={mergeInsteadButton}
 								variant="outline"
 								size="sm"
 								class="mt-2"
@@ -440,7 +456,7 @@
 						}}
 					>
 						<div
-							class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+							class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
 							aria-hidden="true"
 						>
 							<Upload class="size-5 text-foreground" />
@@ -457,7 +473,7 @@
 							onclick={handleProviderFlow}
 						>
 							<div
-								class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) bg-sunk"
+								class="flex size-11 shrink-0 items-center justify-center rounded-(--r-md) border border-border bg-sunk"
 								aria-hidden="true"
 							>
 								<Cloud class="size-5 text-foreground" />
@@ -690,7 +706,7 @@
 				<Button variant="outline" onclick={close} disabled={restoring}>Cancel</Button>
 			{/if}
 			{#if step === 3 && restorePreview}
-				<Button disabled={isProcessing} onclick={handleRestore}>
+				<Button bind:ref={restoreButton} disabled={isProcessing} onclick={handleRestore}>
 					{#if isProcessing}
 						<LoaderCircle class="animate-spin" aria-hidden="true" />Restoring…
 					{:else if restoreMode === 'merge'}

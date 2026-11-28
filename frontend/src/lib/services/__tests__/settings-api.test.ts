@@ -8,7 +8,8 @@ vi.mock('../api-client', () => ({
 	apiClient: { get, post, put, raw }
 }));
 
-const { settingsApi } = await import('../settings-api');
+const { settingsApi, RESTORE_TIMEOUT_MS } = await import('../settings-api');
+const { RequestTimeoutError } = await import('#lib/utils/error-handling.ts');
 
 beforeEach(() => {
 	for (const fn of [get, post, put, raw]) fn.mockReset();
@@ -89,7 +90,7 @@ describe('settingsApi.restoreFromProvider — body branching + idempotency', () 
 		expect(post).toHaveBeenCalledWith(
 			'/sync/restore/from-provider',
 			{ providerId: 'p1', sourceType: 'zip', fileRef: 'backups/2024.zip', mode: 'replace' },
-			{ headers: { 'Idempotency-Key': 'idem-zip-1' } }
+			{ headers: { 'Idempotency-Key': 'idem-zip-1' }, signal: expect.any(AbortSignal) }
 		);
 	});
 
@@ -104,7 +105,10 @@ describe('settingsApi.restoreFromProvider — body branching + idempotency', () 
 		const [, body] = post.mock.calls[0] as [string, Record<string, string>, unknown];
 		expect(body).toEqual({ providerId: 'p2', sourceType: 'sheets', mode: 'merge' });
 		expect(body).not.toHaveProperty('fileRef');
-		expect(post.mock.calls[0]?.[2]).toEqual({ headers: { 'Idempotency-Key': 'idem-sheets-1' } });
+		expect(post.mock.calls[0]?.[2]).toEqual({
+			headers: { 'Idempotency-Key': 'idem-sheets-1' },
+			signal: expect.any(AbortSignal)
+		});
 	});
 });
 
@@ -119,6 +123,50 @@ describe('settingsApi.uploadBackup — FormData + idempotency', () => {
 		expect(body).toBeInstanceOf(FormData);
 		expect((body as FormData).get('file')).toBe(file);
 		expect((body as FormData).get('mode')).toBe('preview');
-		expect(opts).toEqual({ headers: { 'Idempotency-Key': 'idem-up-1' } });
+		expect(opts).toEqual({
+			headers: { 'Idempotency-Key': 'idem-up-1' },
+			signal: expect.any(AbortSignal)
+		});
+	});
+});
+
+describe('settingsApi restores give up after the restore deadline', () => {
+	afterEach(() => vi.useRealTimers());
+
+	function hangUntilAborted() {
+		post.mockImplementationOnce(
+			(_url: string, _body: unknown, opts: { signal: AbortSignal }) =>
+				new Promise((_resolve, reject) =>
+					opts.signal.addEventListener('abort', () => reject(opts.signal.reason))
+				)
+		);
+	}
+
+	test('a restore that never answers fails with a timeout just after the deadline', async () => {
+		vi.useFakeTimers();
+		hangUntilAborted();
+		const file = new File(['zip-bytes'], 'backup.zip', { type: 'application/zip' });
+		const outcome = settingsApi.uploadBackup(file, 'replace', 'idem-hang').catch(e => e);
+
+		await vi.advanceTimersByTimeAsync(RESTORE_TIMEOUT_MS - 1);
+		expect(post.mock.calls[0]?.[2].signal.aborted).toBe(false);
+		await vi.advanceTimersByTimeAsync(1);
+
+		expect(await outcome).toBeInstanceOf(RequestTimeoutError);
+	});
+
+	test('a restore that answers in time is not aborted later', async () => {
+		vi.useFakeTimers();
+		post.mockResolvedValueOnce({ success: true });
+		await settingsApi.restoreFromProvider({
+			providerId: 'p1',
+			sourceType: 'sheets',
+			mode: 'merge',
+			idempotencyKey: 'idem-fast'
+		});
+
+		await vi.advanceTimersByTimeAsync(RESTORE_TIMEOUT_MS);
+
+		expect(post.mock.calls[0]?.[2].signal.aborted).toBe(false);
 	});
 });
