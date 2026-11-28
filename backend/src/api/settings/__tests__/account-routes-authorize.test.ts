@@ -13,7 +13,7 @@ const CAR = 'acct-car';
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'acct');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
@@ -51,7 +51,7 @@ describe('account routes resolve through can()', () => {
     const compare = `/api/v1/community/compare?vehicleId=${CAR}`;
     expect(await status(m.viewer.request, compare)).toBe(200);
     expect(await status(m.stranger.request, compare)).toBe(404);
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.community.read', 'deny');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.community.read', 'deny');
     expect(await status(m.viewer.request, compare)).toBe(403);
   });
 });

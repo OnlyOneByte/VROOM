@@ -21,8 +21,8 @@ async function createVehicle(make: string): Promise<string> {
   return body.data.id;
 }
 
-describe('restore merge: userPreferences PK collision is detected as a conflict, not a raw DB throw', () => {
-  test('merging a backup whose ONLY collision is the prefs row → clean conflict, not an unhandled PK throw', async () => {
+describe('restore merge: the settings already here win', () => {
+  test('brings back a deleted car and keeps the current settings row unchanged', async () => {
     const myVehicleId = await createVehicle('Honda');
     const { backupService } = await import('../backup');
     const { restoreService } = await import('../restore');
@@ -30,25 +30,21 @@ describe('restore merge: userPreferences PK collision is detected as a conflict,
 
     const delRes = await ctx.authed('DELETE', `/api/v1/vehicles/${myVehicleId}`);
     expect(delRes.status).toBeLessThan(300);
-    const prefsRow = ctx.sqlite
-      .query('SELECT user_id FROM user_preferences WHERE user_id = ?')
-      .all(ctx.user.id) as { user_id: string }[];
-    expect(prefsRow, 'importer still has a prefs row after the vehicle delete').toHaveLength(1);
+    ctx.sqlite.run("UPDATE user_preferences SET theme_preference = 'midnight' WHERE user_id = ?", [
+      ctx.user.id,
+    ]);
 
-    let conflictReported = false;
-    let threw: unknown = null;
-    try {
-      const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
-      conflictReported = result.success === false && (result.conflicts ?? []).length > 0;
-    } catch (err) {
-      threw = err;
-    }
+    const result = await restoreService.restoreFromBackup(ctx.user.id, zip, 'merge');
 
-    expect(
-      conflictReported,
-      `merge should report the prefs collision as a conflict, not throw a raw DB error (threw: ${
-        threw instanceof Error ? threw.message : String(threw)
-      })`
-    ).toBe(true);
+    expect(result.success).toBe(true);
+    expect(result.imported?.vehicles).toBe(1);
+    expect(result.imported?.userPreferences).toBe(0);
+    expect(result.kept?.userPreferences).toBe(1);
+    const back = ctx.sqlite.query('SELECT id FROM vehicles WHERE id = ?').all(myVehicleId);
+    expect(back).toHaveLength(1);
+    const prefs = ctx.sqlite
+      .query('SELECT theme_preference FROM user_preferences WHERE user_id = ?')
+      .get(ctx.user.id) as { theme_preference: string };
+    expect(prefs.theme_preference).toBe('midnight');
   });
 });

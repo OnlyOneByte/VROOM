@@ -620,9 +620,12 @@ describe('restore after the account record is recreated (same person, new user i
     await expect(
       restoreService.restoreFromBackup(intruderId, zip, 'replace')
     ).rejects.toBeInstanceOf(ConflictError);
-    await expect(restoreService.restoreFromBackup(intruderId, zip, 'merge')).rejects.toBeInstanceOf(
-      ConflictError
-    );
+    const merged = await restoreService.restoreFromBackup(intruderId, zip, 'merge');
+    expect(merged.imported?.vehicles, 'the live car is not taken over').toBe(0);
+    const onLiveCar = ctx.sqlite
+      .query('SELECT COUNT(*) AS n FROM expenses WHERE vehicle_id = ? AND user_id = ?')
+      .get(vehicleId, intruderId) as { n: number };
+    expect(onLiveCar.n, 'nothing is added to the live car').toBe(0);
 
     const rows = vehicleRows();
     expect(rows).toHaveLength(1);

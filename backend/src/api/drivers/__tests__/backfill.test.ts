@@ -30,7 +30,7 @@ const trip = (start: number, date: string) => ({
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'bf');
   await ctx.authed('POST', '/api/v1/trips', trip(1000, '2024-03-01'));
   await m.editor.request('POST', '/api/v1/trips', trip(1100, '2024-03-05'));
@@ -83,7 +83,7 @@ describe('applying a planned backfill', () => {
     const { applyBackfill, undoBackfill } = await import('../backfill');
     const { asyncDb } = (await import('../../../app-context')).appContext();
     const tripId = (ctx.sqlite.query('SELECT id FROM trips LIMIT 1').get() as { id: string }).id;
-    seedCar(ctx, 'bf-other-car');
+    await seedCar(ctx, 'bf-other-car');
     ctx.sqlite.run(
       "INSERT INTO expenses (id, vehicle_id, user_id, category, date, expense_amount) VALUES ('bf-moved', 'bf-other-car', ?, 'maintenance', 1, 10)",
       [ctx.user.id]
@@ -196,7 +196,7 @@ describe('backfilling past entries', () => {
       201
     );
     expect(payerOf('bf-ins')).not.toBeNull();
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
 
     const partial = await m.coOwner.request('POST', `${base}/backfill/${batchId}/undo`);
     expect(partial.status).toBe(200);
@@ -215,7 +215,7 @@ describe('backfilling past entries', () => {
 
   test("skips expenses the manager can't read", async () => {
     insuranceExpense();
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.insurance.read', 'deny');
     const range = {
       mode: 'range',
       driverId: await driverOf(ctx.user.id),
@@ -236,7 +236,7 @@ describe('backfilling past entries', () => {
       { mode: 'logged' },
       201
     );
-    seedCar(ctx, 'bf-other');
+    await seedCar(ctx, 'bf-other');
     const other = '/api/v1/vehicles/bf-other/drivers';
     await ctx.authed('PUT', '/api/v1/vehicles/bf-other/car-share', { enabled: true });
     expect((await ctx.authed('POST', `${other}/backfill/${batchId}/undo`)).status).toBe(404);

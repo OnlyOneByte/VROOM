@@ -27,14 +27,14 @@ const VALID = (vehicleId: string, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function seedForeignTrip(): { tripId: string; vehicleId: string } {
-  ctx.sqlite.run(
+async function seedForeignTrip(): Promise<{ tripId: string; vehicleId: string }> {
+  await ctx.sql.run(
     `INSERT INTO users (id, email, display_name) VALUES ('u2', 'other@x.com', 'Other')`
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO vehicles (id, user_id, make, model, year) VALUES ('v2', 'u2', 'Honda', 'Civic', 2021)`
   );
-  ctx.sqlite.run(
+  await ctx.sql.run(
     `INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date)
      VALUES ('t2', 'v2', 'u2', 1000, 1100, 'personal', 1718890200)`
   );
@@ -180,7 +180,7 @@ describe('POST /api/v1/trips (create)', () => {
   });
 
   test('a trip on a vehicle the user does not own returns 404, not 403', async () => {
-    const { vehicleId } = seedForeignTrip();
+    const { vehicleId } = await seedForeignTrip();
     const res = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId));
     expect(res.status).toBe(404);
   });
@@ -197,9 +197,10 @@ describe('POST /api/v1/trips (create)', () => {
     const body = await json<DataEnvelope<{ id: string }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const row = ctx.sqlite
-      .query('SELECT start_location, end_location, note FROM trips WHERE id = ?')
-      .get(body.data.id) as {
+    const row = (await ctx.sql.get(
+      'SELECT start_location, end_location, note FROM trips WHERE id = ?',
+      [body.data.id]
+    )) as {
       start_location: string | null;
       end_location: string | null;
       note: string | null;
@@ -233,9 +234,10 @@ describe('POST /api/v1/trips (create)', () => {
     );
     expect(res.status).toBe(201);
 
-    const odoRows = ctx.sqlite
-      .query('SELECT odometer FROM odometer_entries WHERE vehicle_id = ?')
-      .all(vehicleId) as { odometer: number }[];
+    const odoRows = (await ctx.sql.all(
+      'SELECT odometer FROM odometer_entries WHERE vehicle_id = ?',
+      [vehicleId]
+    )) as { odometer: number }[];
     expect(odoRows.map((r) => r.odometer)).toContain(5000);
 
     expect(await repos().odometer.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
@@ -256,9 +258,9 @@ describe('POST /api/v1/trips (create)', () => {
     });
 
     const n = (
-      ctx.sqlite
-        .query('SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ?')
-        .get(vehicleId) as {
+      (await ctx.sql.get('SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ?', [
+        vehicleId,
+      ])) as {
         n: number;
       }
     ).n;
@@ -279,7 +281,9 @@ describe('POST /api/v1/trips (create)', () => {
       );
       expect(res.status, await res.text()).toBe(500);
       const n = (
-        ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips WHERE vehicle_id = ?').get(vehicleId) as {
+        (await ctx.sql.get('SELECT COUNT(*) AS n FROM trips WHERE vehicle_id = ?', [
+          vehicleId,
+        ])) as {
           n: number;
         }
       ).n;
@@ -291,9 +295,9 @@ describe('POST /api/v1/trips (create)', () => {
 });
 
 describe('a trip’s end reading must fit the odometer timeline', () => {
-  const tripCount = (vehicleId: string): number =>
+  const tripCount = async (vehicleId: string): Promise<number> =>
     (
-      ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips WHERE vehicle_id = ?').get(vehicleId) as {
+      (await ctx.sql.get('SELECT COUNT(*) AS n FROM trips WHERE vehicle_id = ?', [vehicleId])) as {
         n: number;
       }
     ).n;
@@ -321,8 +325,8 @@ describe('a trip’s end reading must fit the odometer timeline', () => {
     });
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('Mileage must be greater than 41,000 (from earlier entry)');
-    expect(tripCount(vehicleId)).toBe(0);
-    expect(odoCount(ctx, vehicleId)).toBe(1);
+    expect(await tripCount(vehicleId)).toBe(0);
+    expect(await odoCount(ctx, vehicleId)).toBe(1);
   });
 
   test('a trip ending above a later reading is refused', async () => {
@@ -339,7 +343,7 @@ describe('a trip’s end reading must fit the odometer timeline', () => {
     });
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('Mileage must be less than 41,000 (from later entry)');
-    expect(tripCount(vehicleId)).toBe(0);
+    expect(await tripCount(vehicleId)).toBe(0);
   });
 
   test('an edit that moves the end reading out of order is refused and keeps the trip and its entry', async () => {
@@ -364,13 +368,14 @@ describe('a trip’s end reading must fit the odometer timeline', () => {
     expect(put.status).toBe(400);
     expect(await put.text()).toContain('Mileage must be less than 41,000 (from later entry)');
 
-    const trip = ctx.sqlite
-      .query('SELECT end_odometer AS end, note FROM trips WHERE id = ?')
-      .get(data.id) as { end: number; note: string | null };
+    const trip = (await ctx.sql.get('SELECT end_odometer AS end, note FROM trips WHERE id = ?', [
+      data.id,
+    ])) as { end: number; note: string | null };
     expect(trip).toEqual({ end: 40_500, note: null });
-    const readings = ctx.sqlite
-      .query('SELECT odometer FROM odometer_entries WHERE vehicle_id = ? ORDER BY odometer')
-      .all(vehicleId) as { odometer: number }[];
+    const readings = (await ctx.sql.all(
+      'SELECT odometer FROM odometer_entries WHERE vehicle_id = ? ORDER BY odometer',
+      [vehicleId]
+    )) as { odometer: number }[];
     expect(readings.map((r) => r.odometer)).toEqual([40_500, 41_000]);
   });
 
@@ -394,13 +399,13 @@ describe('a trip’s end reading must fit the odometer timeline', () => {
     expect(put.status).toBe(400);
     expect(await put.text()).toContain('Mileage must be greater than 5,000 (from earlier entry)');
 
-    const stored = ctx.sqlite
-      .query('SELECT trip_date AS at FROM trips WHERE id = ?')
-      .get(evening) as {
+    const stored = (await ctx.sql.get('SELECT trip_date AS at FROM trips WHERE id = ?', [
+      evening,
+    ])) as {
       at: number;
     };
     expect(new Date(stored.at * 1000).toISOString()).toBe('2024-06-20T19:00:00.000Z');
-    expect(odoCount(ctx, vehicleId)).toBe(1);
+    expect(await odoCount(ctx, vehicleId)).toBe(1);
   });
 
   test('a trip ending below the vehicle’s initial mileage is refused', async () => {
@@ -412,35 +417,39 @@ describe('a trip’s end reading must fit the odometer timeline', () => {
     });
     expect(res.status).toBe(400);
     expect(await res.text()).toContain('Mileage cannot be less than initial mileage');
-    expect(tripCount(vehicleId)).toBe(0);
-    expect(odoCount(ctx, vehicleId)).toBe(0);
+    expect(await tripCount(vehicleId)).toBe(0);
+    expect(await odoCount(ctx, vehicleId)).toBe(0);
   });
 });
 
 describe('a trip crossing a mileage reminder milestone fires the notification', () => {
-  function seedMileageReminder(id: string, vehicleId: string, dueOdometer: number): void {
-    ctx.sqlite.run(
+  async function seedMileageReminder(
+    id: string,
+    vehicleId: string,
+    dueOdometer: number
+  ): Promise<void> {
+    await ctx.sql.run(
       `INSERT INTO reminders (id, user_id, name, type, action_mode, frequency, trigger_mode,
          interval_mileage, next_due_odometer, start_date, next_due_date, is_active)
-       VALUES (?, ?, 'Oil change', 'notification', 'automatic', 'mileage', 'mileage', 5000, ?, 0, NULL, 1)`,
+       VALUES (?, ?, 'Oil change', 'notification', 'automatic', 'mileage', 'mileage', 5000, ?, 0, NULL, TRUE)`,
       [id, ctx.user.id, dueOdometer]
     );
-    ctx.sqlite.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
+    await ctx.sql.run(`INSERT INTO reminder_vehicles (reminder_id, vehicle_id) VALUES (?, ?)`, [
       id,
       vehicleId,
     ]);
   }
-  const notifCount = (reminderId: string): number =>
+  const notifCount = async (reminderId: string): Promise<number> =>
     (
-      ctx.sqlite
-        .query('SELECT COUNT(*) AS n FROM reminder_notifications WHERE reminder_id = ?')
-        .get(reminderId) as { n: number }
+      (await ctx.sql.get('SELECT COUNT(*) AS n FROM reminder_notifications WHERE reminder_id = ?', [
+        reminderId,
+      ])) as { n: number }
     ).n;
 
   test('a trip whose endOdometer reaches the milestone fires exactly one notification', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
-    seedMileageReminder('rm-due', vehicleId, 10000);
-    expect(notifCount('rm-due')).toBe(0);
+    await seedMileageReminder('rm-due', vehicleId, 10000);
+    expect(await notifCount('rm-due')).toBe(0);
 
     const res = await ctx.authed(
       'POST',
@@ -448,12 +457,12 @@ describe('a trip crossing a mileage reminder milestone fires the notification', 
       VALID(vehicleId, { startOdometer: 9000, endOdometer: 10500 })
     );
     expect(res.status).toBe(201);
-    expect(notifCount('rm-due')).toBe(1);
+    expect(await notifCount('rm-due')).toBe(1);
   });
 
   test('a trip BELOW the milestone fires nothing (no false notification)', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Honda', model: 'Civic', year: 2021 });
-    seedMileageReminder('rm-far', vehicleId, 10000);
+    await seedMileageReminder('rm-far', vehicleId, 10000);
 
     const res = await ctx.authed(
       'POST',
@@ -461,15 +470,15 @@ describe('a trip crossing a mileage reminder milestone fires the notification', 
       VALID(vehicleId, { startOdometer: 8000, endOdometer: 9500 })
     );
     expect(res.status).toBe(201);
-    expect(notifCount('rm-far')).toBe(0);
+    expect(await notifCount('rm-far')).toBe(0);
   });
 });
 
-const odoCount = (ctx: TestApp, vehicleId: string): number =>
+const odoCount = async (ctx: TestApp, vehicleId: string): Promise<number> =>
   (
-    ctx.sqlite
-      .query('SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ?')
-      .get(vehicleId) as {
+    (await ctx.sql.get('SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ?', [
+      vehicleId,
+    ])) as {
       n: number;
     }
   ).n;
@@ -492,12 +501,12 @@ describe('trip edit and delete keep the linked odometer entry in sync', () => {
       VALID(vehicleId, { startOdometer: 1000, endOdometer: 5000 })
     );
     const { data } = await json<DataEnvelope<{ id: string }>>(created);
-    expect(odoCount(ctx, vehicleId)).toBe(1);
+    expect(await odoCount(ctx, vehicleId)).toBe(1);
 
     const del = await ctx.authed('DELETE', `/api/v1/trips/${data.id}`);
     expect(del.status).toBe(200);
 
-    expect(odoCount(ctx, vehicleId)).toBe(1);
+    expect(await odoCount(ctx, vehicleId)).toBe(1);
     expect(await repos().odometer.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(5000);
   });
 });
@@ -542,7 +551,7 @@ describe('GET /api/v1/trips (list)', () => {
   });
 
   test('a foreign user’s trips never appear in the list (tenant scope)', async () => {
-    seedForeignTrip();
+    await seedForeignTrip();
     const res = await ctx.authed('GET', '/api/v1/trips');
     const body = await json<{ data: { id: string }[] }>(res);
     expect(res.status).toBe(200);
@@ -550,7 +559,7 @@ describe('GET /api/v1/trips (list)', () => {
   });
 
   test('filtering by a vehicle the user does not own is 404, like the other trip routes', async () => {
-    const { vehicleId } = seedForeignTrip();
+    const { vehicleId } = await seedForeignTrip();
     const res = await ctx.authed('GET', `/api/v1/trips?vehicleId=${vehicleId}`);
     expect(res.status).toBe(404);
   });
@@ -683,7 +692,7 @@ describe('GET /api/v1/trips/summary (mileage rollup)', () => {
   });
 
   test('summary on an UNOWNED vehicle is 404 (no cross-tenant rollup)', async () => {
-    const { vehicleId } = seedForeignTrip();
+    const { vehicleId } = await seedForeignTrip();
     const res = await ctx.authed('GET', `/api/v1/trips/summary?vehicleId=${vehicleId}`);
     expect(res.status).toBe(404);
   });
@@ -777,9 +786,9 @@ describe('PUT /api/v1/trips/:id', () => {
 
     const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, { endOdometer: 500 });
     expect(res.status).toBe(400);
-    const row = ctx.sqlite
-      .query('SELECT start_odometer, end_odometer FROM trips WHERE id = ?')
-      .get(data.id) as { start_odometer: number; end_odometer: number };
+    const row = (await ctx.sql.get('SELECT start_odometer, end_odometer FROM trips WHERE id = ?', [
+      data.id,
+    ])) as { start_odometer: number; end_odometer: number };
     expect(row.start_odometer).toBe(1000);
     expect(row.end_odometer).toBe(1080);
   });
@@ -813,10 +822,10 @@ describe('PUT /api/v1/trips/:id', () => {
   });
 
   test('a foreign trip update returns 404 and writes nothing', async () => {
-    const { tripId } = seedForeignTrip();
+    const { tripId } = await seedForeignTrip();
     const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { note: 'hijack' });
     expect(res.status).toBe(404);
-    const row = ctx.sqlite.query('SELECT note FROM trips WHERE id = ?').get(tripId) as {
+    const row = (await ctx.sql.get('SELECT note FROM trips WHERE id = ?', [tripId])) as {
       note: string | null;
     };
     expect(row.note).toBeNull();
@@ -831,14 +840,14 @@ describe('DELETE /api/v1/trips/:id', () => {
 
     const res = await ctx.authed('DELETE', `/api/v1/trips/${data.id}`);
     expect(res.status).toBe(200);
-    expect(ctx.sqlite.query('SELECT id FROM trips WHERE id = ?').get(data.id)).toBeNull();
+    expect(await ctx.sql.get('SELECT id FROM trips WHERE id = ?', [data.id])).toBeNull();
   });
 
   test('a foreign trip delete returns 404 and removes nothing', async () => {
-    const { tripId } = seedForeignTrip();
+    const { tripId } = await seedForeignTrip();
     const res = await ctx.authed('DELETE', `/api/v1/trips/${tripId}`);
     expect(res.status).toBe(404);
-    const row = ctx.sqlite.query('SELECT COUNT(*) AS n FROM trips WHERE id = ?').get(tripId) as {
+    const row = (await ctx.sql.get('SELECT COUNT(*) AS n FROM trips WHERE id = ?', [tripId])) as {
       n: number;
     };
     expect(row.n).toBe(1);
@@ -851,19 +860,18 @@ describe('DELETE /api/v1/trips/:id', () => {
 });
 
 describe('trip-linked odometer lifecycle', () => {
-  function linkedEntryCount(vehicleId: string, odometer: number): number {
-    const row = ctx.sqlite
-      .query(
-        `SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ? AND odometer = ? AND note = 'From trip'`
-      )
-      .get(vehicleId, odometer) as { n: number };
+  async function linkedEntryCount(vehicleId: string, odometer: number): Promise<number> {
+    const row = (await ctx.sql.get(
+      `SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ? AND odometer = ? AND note = 'From trip'`,
+      [vehicleId, odometer]
+    )) as { n: number };
     return row.n;
   }
 
   test('create writes the linked odometer entry', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
   });
 
   test('deleting a trip by default keeps the linked odometer entry', async () => {
@@ -874,11 +882,11 @@ describe('trip-linked odometer lifecycle', () => {
       VALID(vehicleId, { endOdometer: 1080 })
     );
     const { data } = await json<DataEnvelope<{ id: string }>>(created);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
 
     const res = await ctx.authed('DELETE', `/api/v1/trips/${data.id}`);
     expect(res.status).toBe(200);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
   });
 
   test('deleting a trip with keepOdometer=false also removes the linked odometer entry', async () => {
@@ -889,11 +897,11 @@ describe('trip-linked odometer lifecycle', () => {
       VALID(vehicleId, { endOdometer: 1080 })
     );
     const { data } = await json<DataEnvelope<{ id: string }>>(created);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
 
     const res = await ctx.authed('DELETE', `/api/v1/trips/${data.id}?keepOdometer=false`);
     expect(res.status).toBe(200);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(0);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(0);
   });
 
   test('keepOdometer=false does not remove a manual reading at the same vehicle, day and value', async () => {
@@ -909,15 +917,14 @@ describe('trip-linked odometer lifecycle', () => {
       VALID(vehicleId, { endOdometer: 1080 })
     );
     const { data } = await json<DataEnvelope<{ id: string }>>(created);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(0);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(0);
 
     const res = await ctx.authed('DELETE', `/api/v1/trips/${data.id}?keepOdometer=false`);
     expect(res.status).toBe(200);
-    const manual = ctx.sqlite
-      .query(
-        `SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ? AND odometer = 1080 AND note = 'manual log'`
-      )
-      .get(vehicleId) as { n: number };
+    const manual = (await ctx.sql.get(
+      `SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ? AND odometer = 1080 AND note = 'manual log'`,
+      [vehicleId]
+    )) as { n: number };
     expect(manual.n).toBe(1);
   });
 
@@ -929,12 +936,12 @@ describe('trip-linked odometer lifecycle', () => {
       VALID(vehicleId, { endOdometer: 1080 })
     );
     const { data } = await json<DataEnvelope<{ id: string }>>(created);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
 
     const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, { endOdometer: 1200 });
     expect(res.status).toBe(200);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(0);
-    expect(linkedEntryCount(vehicleId, 1200)).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(0);
+    expect(await linkedEntryCount(vehicleId, 1200)).toBe(1);
   });
 
   test('editing the trip date moves the linked entry to the new day', async () => {
@@ -946,26 +953,25 @@ describe('trip-linked odometer lifecycle', () => {
     );
     const { data } = await json<DataEnvelope<{ id: string }>>(created);
 
-    const linkedOnDay = (day: string): number => {
+    const linkedOnDay = async (day: string): Promise<number> => {
       const start = Math.floor(new Date(`${day}T00:00:00`).getTime() / 1000);
       const end = start + 86400;
       return (
-        ctx.sqlite
-          .query(
-            `SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ? AND note = 'From trip' AND recorded_at >= ? AND recorded_at < ?`
-          )
-          .get(vehicleId, start, end) as { n: number }
+        (await ctx.sql.get(
+          `SELECT COUNT(*) AS n FROM odometer_entries WHERE vehicle_id = ? AND note = 'From trip' AND recorded_at >= ? AND recorded_at < ?`,
+          [vehicleId, start, end]
+        )) as { n: number }
       ).n;
     };
-    expect(linkedOnDay('2024-06-20')).toBe(1);
+    expect(await linkedOnDay('2024-06-20')).toBe(1);
 
     const res = await ctx.authed('PUT', `/api/v1/trips/${data.id}`, {
       tripDate: localIso('2024-06-25T13:30'),
     });
     expect(res.status).toBe(200);
-    expect(linkedOnDay('2024-06-20')).toBe(0);
-    expect(linkedOnDay('2024-06-25')).toBe(1);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    expect(await linkedOnDay('2024-06-20')).toBe(0);
+    expect(await linkedOnDay('2024-06-25')).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
   });
 
   test('deleting one of two trips that share an odometer entry keeps the entry', async () => {
@@ -973,11 +979,11 @@ describe('trip-linked odometer lifecycle', () => {
     const a = await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
     await ctx.authed('POST', '/api/v1/trips', VALID(vehicleId, { endOdometer: 1080 }));
     const { data: tripA } = await json<DataEnvelope<{ id: string }>>(a);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
 
     const res = await ctx.authed('DELETE', `/api/v1/trips/${tripA.id}?keepOdometer=false`);
     expect(res.status).toBe(200);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
 
     expect(await repos().odometer.getCurrentOdometer(vehicleId, ctx.user.id)).toBe(1080);
   });
@@ -990,17 +996,18 @@ describe('trip-linked odometer lifecycle', () => {
     const { data: tripB } = await json<DataEnvelope<{ id: string }>>(b);
 
     await ctx.authed('DELETE', `/api/v1/trips/${tripA.id}?keepOdometer=false`);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(1);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(1);
     await ctx.authed('DELETE', `/api/v1/trips/${tripB.id}?keepOdometer=false`);
-    expect(linkedEntryCount(vehicleId, 1080)).toBe(0);
+    expect(await linkedEntryCount(vehicleId, 1080)).toBe(0);
   });
 });
 
 describe('a trip finds its odometer entry through the link, not the note', () => {
-  function readings(vehicleId: string): { odometer: number; note: string | null }[] {
-    return ctx.sqlite
-      .query('SELECT odometer, note FROM odometer_entries WHERE vehicle_id = ? ORDER BY odometer')
-      .all(vehicleId) as { odometer: number; note: string | null }[];
+  async function readings(vehicleId: string): Promise<{ odometer: number; note: string | null }[]> {
+    return (await ctx.sql.all(
+      'SELECT odometer, note FROM odometer_entries WHERE vehicle_id = ? ORDER BY odometer',
+      [vehicleId]
+    )) as { odometer: number; note: string | null }[];
   }
 
   async function createTrip(vehicleId: string, over: Record<string, unknown> = {}) {
@@ -1009,9 +1016,10 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
   }
 
   async function renameEntryNote(vehicleId: string, odometer: number, note: string) {
-    const { id } = ctx.sqlite
-      .query('SELECT id FROM odometer_entries WHERE vehicle_id = ? AND odometer = ?')
-      .get(vehicleId, odometer) as { id: string };
+    const { id } = (await ctx.sql.get(
+      'SELECT id FROM odometer_entries WHERE vehicle_id = ? AND odometer = ?',
+      [vehicleId, odometer]
+    )) as { id: string };
     const res = await ctx.authed('PUT', `/api/v1/odometer/${id}`, { note });
     expect(res.status).toBe(200);
   }
@@ -1019,9 +1027,10 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
   test('the trip stores its id on the entry it creates', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const tripId = await createTrip(vehicleId);
-    const row = ctx.sqlite
-      .query('SELECT source_trip_id FROM odometer_entries WHERE vehicle_id = ?')
-      .get(vehicleId) as { source_trip_id: string };
+    const row = (await ctx.sql.get(
+      'SELECT source_trip_id FROM odometer_entries WHERE vehicle_id = ?',
+      [vehicleId]
+    )) as { source_trip_id: string };
     expect(row.source_trip_id).toBe(tripId);
   });
 
@@ -1033,7 +1042,7 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
     const res = await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { endOdometer: 1200 });
 
     expect(res.status).toBe(200);
-    expect(readings(vehicleId)).toEqual([{ odometer: 1200, note: 'Fuel stop' }]);
+    expect(await readings(vehicleId)).toEqual([{ odometer: 1200, note: 'Fuel stop' }]);
   });
 
   test('after the note is edited, moving the trip a day earlier is not refused by its own old entry', async () => {
@@ -1046,7 +1055,7 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
     });
 
     expect(res.status).toBe(200);
-    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'Fuel stop' }]);
+    expect(await readings(vehicleId)).toEqual([{ odometer: 1080, note: 'Fuel stop' }]);
   });
 
   test('after the note is edited, deleting the trip with keepOdometer=false removes its entry', async () => {
@@ -1057,7 +1066,7 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
     const res = await ctx.authed('DELETE', `/api/v1/trips/${tripId}?keepOdometer=false`);
 
     expect(res.status).toBe(200);
-    expect(readings(vehicleId)).toEqual([]);
+    expect(await readings(vehicleId)).toEqual([]);
   });
 
   test('a shared entry passes to the other trip when its first trip is deleted, kept or not', async () => {
@@ -1069,7 +1078,7 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
     await renameEntryNote(vehicleId, 1080, 'Fuel stop');
     await ctx.authed('DELETE', `/api/v1/trips/${second}?keepOdometer=false`);
 
-    expect(readings(vehicleId)).toEqual([]);
+    expect(await readings(vehicleId)).toEqual([]);
   });
 
   test('a shared entry stays with the other trip when its first trip moves away', async () => {
@@ -1079,10 +1088,10 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
 
     await ctx.authed('PUT', `/api/v1/trips/${first}`, { endOdometer: 1200 });
     await ctx.authed('DELETE', `/api/v1/trips/${first}?keepOdometer=false`);
-    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'From trip' }]);
+    expect(await readings(vehicleId)).toEqual([{ odometer: 1080, note: 'From trip' }]);
 
     await ctx.authed('DELETE', `/api/v1/trips/${second}?keepOdometer=false`);
-    expect(readings(vehicleId)).toEqual([]);
+    expect(await readings(vehicleId)).toEqual([]);
   });
 
   test('a trip re-created where a deleted trip kept its entry takes that entry over', async () => {
@@ -1095,10 +1104,10 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
       tripDate: localIso('2024-06-19T13:30'),
     });
     expect(moved.status).toBe(200);
-    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'From trip' }]);
+    expect(await readings(vehicleId)).toEqual([{ odometer: 1080, note: 'From trip' }]);
 
     await ctx.authed('DELETE', `/api/v1/trips/${recreated}?keepOdometer=false`);
-    expect(readings(vehicleId)).toEqual([]);
+    expect(await readings(vehicleId)).toEqual([]);
   });
 
   test('a trip created on a manual reading’s value and day leaves that reading alone', async () => {
@@ -1112,18 +1121,18 @@ describe('a trip finds its odometer entry through the link, not the note', () =>
 
     await ctx.authed('DELETE', `/api/v1/trips/${tripId}?keepOdometer=false`);
 
-    expect(readings(vehicleId)).toEqual([{ odometer: 1080, note: 'manual log' }]);
+    expect(await readings(vehicleId)).toEqual([{ odometer: 1080, note: 'manual log' }]);
   });
 
   test('an entry from before the link still matches by its note, day and value', async () => {
     const vehicleId = await seedVehicle(ctx, { make: 'Toyota', model: 'Camry', year: 2022 });
     const tripId = await createTrip(vehicleId, { endOdometer: 1080 });
-    ctx.sqlite.run('UPDATE odometer_entries SET source_trip_id = NULL WHERE vehicle_id = ?', [
+    await ctx.sql.run('UPDATE odometer_entries SET source_trip_id = NULL WHERE vehicle_id = ?', [
       vehicleId,
     ]);
 
     await ctx.authed('PUT', `/api/v1/trips/${tripId}`, { endOdometer: 1200 });
 
-    expect(readings(vehicleId)).toEqual([{ odometer: 1200, note: 'From trip' }]);
+    expect(await readings(vehicleId)).toEqual([{ odometer: 1200, note: 'From trip' }]);
   });
 });

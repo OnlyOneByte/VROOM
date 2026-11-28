@@ -185,7 +185,7 @@ describe('insurance claim reads for shared vehicles', () => {
       await b.request('GET', `/api/v1/insurance/${policyId}/claims`)
     );
     expect(without.data).toEqual([]);
-    overrideOn(ctx, vehicleA, b, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, vehicleA, b, 'vehicle.insurance.read', 'allow');
 
     const res = await b.request('GET', `/api/v1/insurance/${policyId}/claims`);
     const body = await json<DataEnvelope<ClaimRow[]>>(res);
@@ -216,7 +216,7 @@ describe('insurance claim reads for shared vehicles', () => {
     const claimA = await fileClaim(policyId, 'collision', vehicleA);
     await fileClaim(policyId, 'theft', vehicleB);
     await b.acceptShare(vehicleA, 'editor');
-    overrideOn(ctx, vehicleA, b, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, vehicleA, b, 'vehicle.insurance.read', 'allow');
 
     const body = await json<DataEnvelope<ClaimRow[]>>(
       await b.request('GET', `/api/v1/insurance/${policyId}/claims`)

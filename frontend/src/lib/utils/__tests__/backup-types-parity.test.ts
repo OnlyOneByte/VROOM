@@ -79,7 +79,7 @@ describe('backup types parity with the backend', () => {
 			'BackupOrchestratorResult',
 			['outcome', 'results']
 		],
-		['RestoreResult', 'restore.ts', 'RestoreResponse', ['preview', 'imported', 'conflicts']]
+		['RestoreResult', 'restore.ts', 'RestoreResponse', ['preview', 'merge', 'imported', 'kept']]
 	])(
 		'%s matches the backend %s, except where the backend names a type (%s)',
 		(frontendName, file, backendName, namedTypeFields) => {

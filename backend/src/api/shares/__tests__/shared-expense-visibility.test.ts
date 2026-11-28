@@ -34,12 +34,12 @@ function expense(
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   expense(RUNNING, 'maintenance', 8000, 'Oil change');
   expense(MANUAL, 'financial', 5000, 'Paperwork fee');
   expense(LINKED, 'financial', 40000, 'Loan payment', 'financing');
   viewer = await createInvitee(ctx, 'sev-viewer');
-  shareCar(ctx, CAR, viewer, 'viewer');
+  await shareCar(ctx, CAR, viewer, 'viewer');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -98,8 +98,8 @@ describe('expenses of a shared car follow the share settings everywhere', () => 
   });
 
   test('a viewer the owner lets see financials gets every row', async () => {
-    overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, CAR, viewer, 'vehicle.insurance.read', 'allow');
 
     expect(await listedIds(viewer.request)).toEqual([LINKED, MANUAL, RUNNING].sort());
     const summary = await data<{ totalAmount: number }>(
@@ -149,7 +149,7 @@ describe('other views of a shared car follow the same settings', () => {
 
   test('an editor without financial access cannot change or delete what they cannot see', async () => {
     const editor = await createInvitee(ctx, 'sev-editor');
-    shareCar(ctx, CAR, editor, 'editor');
+    await shareCar(ctx, CAR, editor, 'editor');
     ctx.sqlite.run('UPDATE expenses SET updated_at = ? WHERE id = ?', [JUNE, MANUAL]);
 
     const put = await editor.request('PUT', `/api/v1/expenses/${MANUAL}`, {

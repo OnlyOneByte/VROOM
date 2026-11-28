@@ -269,6 +269,52 @@ describe('C3 bar columns', () => {
 		expect(series[0]?.props.rounded({ fuel: 700, upkeep: 40 })).toBe('none');
 	});
 
+	test('several series with no layout are grouped, never drawn over each other', async () => {
+		await mount({
+			...SINGLE,
+			y: ['fuel', 'upkeep'],
+			data: [{ date: new Date(2026, 5, 1), fuel: 700, upkeep: 40 }],
+			series: [
+				{ key: 'fuel', label: 'Fuel', color: 'var(--chart-1)' },
+				{ key: 'upkeep', label: 'Upkeep', color: 'var(--chart-2)' }
+			]
+		});
+		expect(seen.chart?.['seriesLayout']).toBe('group');
+	});
+
+	test('a chosen layout is passed through, and one series keeps the default', async () => {
+		await mount({
+			...SINGLE,
+			y: ['fuel', 'upkeep'],
+			seriesLayout: 'stack',
+			data: [{ date: new Date(2026, 5, 1), fuel: 700, upkeep: 40 }],
+			series: [
+				{ key: 'fuel', label: 'Fuel', color: 'var(--chart-1)' },
+				{ key: 'upkeep', label: 'Upkeep', color: 'var(--chart-2)' }
+			]
+		});
+		expect(seen.chart?.['seriesLayout']).toBe('stack');
+		expect(seen.chart?.['y']).toBeUndefined();
+		cleanup();
+		await mount(SINGLE);
+		expect(seen.chart?.['seriesLayout']).toBeUndefined();
+	});
+
+	test('a stack with all but one series hidden still drops the array y', async () => {
+		await mount({
+			...SINGLE,
+			y: ['fuel', 'upkeep'],
+			seriesLayout: 'stack',
+			hiddenKeys: ['upkeep'],
+			data: [{ date: new Date(2026, 5, 1), fuel: 700, upkeep: 40 }],
+			series: [
+				{ key: 'fuel', label: 'Fuel', color: 'var(--chart-1)' },
+				{ key: 'upkeep', label: 'Upkeep', color: 'var(--chart-2)' }
+			]
+		});
+		expect(seen.chart?.['y']).toBeUndefined();
+	});
+
 	test('the insight sentence shows only under a chart with data', async () => {
 		const insight = 'June was the tires: $751.';
 		await mount({ ...SINGLE, insight });

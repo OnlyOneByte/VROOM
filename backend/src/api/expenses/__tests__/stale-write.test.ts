@@ -43,8 +43,8 @@ async function createExpense(): Promise<Row> {
 
 const put = (id: string, body: object) => ctx.authed('PUT', `/api/v1/expenses/${id}`, body);
 
-async function stored(id: string): Promise<unknown> {
-  return await ctx.sql.get('SELECT * FROM expenses WHERE id = ?', [id]);
+function stored(id: string): Promise<unknown> {
+  return ctx.sql.get('SELECT * FROM expenses WHERE id = ?', [id]);
 }
 
 describe('PUT /expenses/:id with expectedUpdatedAt', () => {
@@ -171,10 +171,8 @@ describe('PUT /expenses/split/:id with expectedUpdatedAt', () => {
   const splitPut = (groupId: string, body: object) =>
     ctx.authed('PUT', `/api/v1/expenses/split/${groupId}`, body);
 
-  const legAmounts = async (groupId: string) =>
-    await ctx.sql.all('SELECT expense_amount FROM expenses WHERE group_id = ? ORDER BY id', [
-      groupId,
-    ]);
+  const legAmounts = (groupId: string) =>
+    ctx.sql.all('SELECT expense_amount FROM expenses WHERE group_id = ? ORDER BY id', [groupId]);
 
   test('a matching value saves and a stale one is refused with nothing written', async () => {
     const { groupId, updatedAt } = await createSplit();

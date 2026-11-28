@@ -11,8 +11,13 @@ let ctx: TestApp;
 let m: Members;
 const CAR = 'trip-car';
 
-function trip(id: string, createdBy: string | null, vehicleId = CAR, end = 1200): void {
-  ctx.sqlite.run(
+async function trip(
+  id: string,
+  createdBy: string | null,
+  vehicleId = CAR,
+  end = 1200
+): Promise<void> {
+  await ctx.sql.run(
     "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, created_by) VALUES (?, ?, (SELECT user_id FROM vehicles WHERE id = ?), 1000, ?, 'business', 1717200000, ?)",
     [id, vehicleId, vehicleId, end, createdBy]
   );
@@ -33,10 +38,10 @@ const remove = (request: RequestFn, id: string) =>
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
   m = await seedMembers(ctx, CAR, 'trip');
-  trip('owners-trip', null);
-  trip('editors-trip', m.editor.id);
+  await trip('owners-trip', null);
+  await trip('editors-trip', m.editor.id);
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -54,12 +59,12 @@ describe('trips resolve through can() for every role', () => {
 
   test('writes: editors log trips on the owner’s books, viewers only with an allow override', async () => {
     expect(await log(m.editor.request, 5000)).toBe(201);
-    const row = ctx.sqlite
-      .query('SELECT user_id, created_by FROM trips WHERE end_odometer = 5000')
-      .get() as { user_id: string; created_by: string };
+    const row = (await ctx.sql.get(
+      'SELECT user_id, created_by FROM trips WHERE end_odometer = 5000'
+    )) as { user_id: string; created_by: string };
     expect(row).toEqual({ user_id: ctx.user.id, created_by: m.editor.id });
     expect(await log(m.viewer.request, 6000)).toBe(403);
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.trip.write', 'allow');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.trip.write', 'allow');
     expect(await log(m.viewer.request, 6000)).toBe(201);
   });
 
@@ -67,33 +72,33 @@ describe('trips resolve through can() for every role', () => {
     expect(await remove(m.editor.request, 'owners-trip')).toBe(403);
     expect(await remove(m.editor.request, 'editors-trip')).toBe(200);
     expect(await remove(m.viewer.request, 'owners-trip')).toBe(403);
-    overrideOn(ctx, CAR, m.coOwner, 'vehicle.trip.delete', 'deny');
+    await overrideOn(ctx, CAR, m.coOwner, 'vehicle.trip.delete', 'deny');
     expect(await remove(m.coOwner.request, 'owners-trip')).toBe(403);
     expect(await remove(ctx.authed, 'owners-trip')).toBe(200);
   });
 
   test("the reading from an editor's trip stays theirs after the trip is deleted", async () => {
     expect(await log(m.editor.request, 7000)).toBe(201);
-    const { id } = ctx.sqlite.query('SELECT id FROM trips WHERE end_odometer = 7000').get() as {
+    const { id } = (await ctx.sql.get('SELECT id FROM trips WHERE end_odometer = 7000')) as {
       id: string;
     };
     const deleted = await m.editor.request('DELETE', `/api/v1/trips/${id}?keepOdometer=true`);
     expect(deleted.status).toBe(200);
-    const reading = ctx.sqlite
-      .query('SELECT id, created_by FROM odometer_entries WHERE odometer = 7000')
-      .get() as { id: string; created_by: string | null };
+    const reading = (await ctx.sql.get(
+      'SELECT id, created_by FROM odometer_entries WHERE odometer = 7000'
+    )) as { id: string; created_by: string | null };
     expect(reading.created_by).toBe(m.editor.id);
     expect((await m.editor.request('DELETE', `/api/v1/odometer/${reading.id}`)).status).toBe(200);
   });
 
   test('a deny on trip reads hides them from a viewer', async () => {
-    overrideOn(ctx, CAR, m.viewer, 'vehicle.trip.read', 'deny');
+    await overrideOn(ctx, CAR, m.viewer, 'vehicle.trip.read', 'deny');
     expect(await list(m.viewer.request)).toBe(403);
   });
 
   test("another person's trips stay theirs", async () => {
-    seedCar(ctx, 'their-car', m.stranger.id);
-    trip('their-trip', null, 'their-car');
+    await seedCar(ctx, 'their-car', m.stranger.id);
+    await trip('their-trip', null, 'their-car');
     expect(await list(ctx.authed, 'their-car')).toBe(404);
     expect(await remove(ctx.authed, 'their-trip')).toBe(404);
     const unfiltered = await ctx.authed('GET', '/api/v1/trips');

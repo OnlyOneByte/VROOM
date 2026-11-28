@@ -114,6 +114,16 @@ describe('analytics filter bar recovery', () => {
 		expect(mocks.getSummary.mock.calls.at(-1)?.[0].vehicleIds).toBeUndefined();
 	});
 
+	test('on other tabs the filters sit under the tab strip, so the strip does not move', async () => {
+		mocks.url = new URL('https://vroom.test/analytics');
+		render(Page);
+
+		await fireEvent.click(await screen.findByRole('tab', { name: 'Fuel & charging' }));
+		const strip = screen.getByRole('tablist');
+		const filters = await screen.findByRole('group', { name: 'Analytics filters' });
+		expect(strip.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+	});
+
 	test('Clear filters hands focus to the date range button', async () => {
 		mocks.url = new URL('https://vroom.test/analytics?range=ytd');
 		render(Page);

@@ -37,15 +37,15 @@ function expense(vehicleId: string, category: string, cents: number, source: str
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, SHARED);
-  seedCar(ctx, PRIVATE);
+  await seedCar(ctx, SHARED);
+  await seedCar(ctx, PRIVATE);
   expense(SHARED, 'maintenance', 8000);
   expense(SHARED, 'financial', 5000);
   expense(SHARED, 'financial', 40000, 'financing');
   expense(PRIVATE, 'maintenance', 70000);
   viewer = await createInvitee(ctx, 'ssc-viewer');
   stranger = await createInvitee(ctx, 'ssc-stranger');
-  shareCar(ctx, SHARED, viewer, 'viewer');
+  await shareCar(ctx, SHARED, viewer, 'viewer');
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -78,8 +78,8 @@ describe('summary and Cross-vehicle cover cars shared with you, as each share al
   });
 
   test('a viewer the owner lets see financials gets them too', async () => {
-    overrideOn(ctx, SHARED, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, SHARED, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.insurance.read', 'allow');
     expect(costs(await cross(viewer.request))).toEqual({ [SHARED]: 80 + 50 + 400 });
   });
 
@@ -92,7 +92,7 @@ describe('summary and Cross-vehicle cover cars shared with you, as each share al
 
   test('someone the car is not shared with, or denied expense reads on it, gets nothing', async () => {
     expect(costs(await cross(stranger.request, `&vehicleIds=${SHARED}`))).toEqual({});
-    overrideOn(ctx, SHARED, viewer, 'vehicle.expense.read', 'deny');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.expense.read', 'deny');
     expect(costs(await cross(viewer.request))).toEqual({});
     expect((await summary(viewer.request)).quickStats.vehicleCount).toBe(0);
   });
@@ -193,8 +193,8 @@ describe('financing and insurance cover shared cars only where the share shows t
   });
 
   test("a viewer with financial access gets the shared car's share and nothing of the owner's other car", async () => {
-    overrideOn(ctx, SHARED, viewer, 'vehicle.financing.read', 'allow');
-    overrideOn(ctx, SHARED, viewer, 'vehicle.insurance.read', 'allow');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.financing.read', 'allow');
+    await overrideOn(ctx, SHARED, viewer, 'vehicle.insurance.read', 'allow');
     expect((await financing(viewer.request)).vehicleDetails.map((d) => d.vehicleId)).toEqual([
       SHARED,
     ]);
@@ -205,8 +205,8 @@ describe('financing and insurance cover shared cars only where the share shows t
 
   test("cars shared by two owners merge each owner's share of their own policies", async () => {
     const other = await createInvitee(ctx, 'ssc-owner2');
-    seedCar(ctx, 'ssc-other', other.id);
-    shareCar(ctx, 'ssc-other', viewer, 'viewer');
+    await seedCar(ctx, 'ssc-other', other.id);
+    await shareCar(ctx, 'ssc-other', viewer, 'viewer');
     const policy = await other.request('POST', '/api/v1/insurance', {
       company: 'Mutual',
       terms: [

@@ -236,6 +236,7 @@
 		{vehiclesError}
 		onRetryVehicles={loadVehicles}
 		{inline}
+		showRange={activeTab !== 'year-end'}
 	/>
 {/snippet}
 
@@ -260,10 +261,6 @@
 			<PageHeader title={TAB_TITLES[activeTab] ?? 'Explore'} variant="display" />
 		{/if}
 	</div>
-
-	{#if !noVehicles && activeTab !== 'explore'}
-		{@render filterChips(false)}
-	{/if}
 
 	{#if isLoading && !error && !summary}
 		<Skeleton class="h-10 w-full rounded-full" />
@@ -306,6 +303,10 @@
 					</Tabs.Trigger>
 				{/if}
 			</Tabs.List>
+
+			{#if !noVehicles && activeTab !== 'explore'}
+				{@render filterChips(false)}
+			{/if}
 
 			{#if activeTab === 'explore'}
 				<Tabs.Content value="explore">
@@ -406,7 +407,7 @@
 							<LoaderCircle class="h-8 w-8 animate-spin text-muted-foreground" />
 						</div>
 					{:then { default: YearEndTab }}
-						<YearEndTab />
+						<YearEndTab {vehicleIds} />
 					{:catch}
 						{@render tabLoadError('Year in review')}
 					{/await}

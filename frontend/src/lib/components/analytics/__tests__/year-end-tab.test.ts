@@ -151,6 +151,33 @@ describe('YearEndTab', () => {
 		expect(perCar).toEqual([]);
 	});
 
+	test('the Cars filter reaches every query, and the list of biggest expenses', async () => {
+		render(YearEndTab, { props: { vehicleIds: ['civic'] } });
+		await screen.findByText('2026 so far · 3 vehicles');
+		const sent = api.query.mock.calls.map(([p]) => (p as AnalyticsQueryParams).vehicleIds);
+		expect(sent).toHaveLength(7);
+		expect(sent.every(ids => ids?.join() === 'civic')).toBe(true);
+		expect(api.queryItems).toHaveBeenCalledWith(
+			expect.objectContaining({ vehicleIds: ['civic'] })
+		);
+	});
+
+	test('picking other cars reloads the year; the same cars again does not', async () => {
+		const { rerender } = render(YearEndTab, { props: { vehicleIds: ['civic'] } });
+		await screen.findByText('2026 so far · 3 vehicles');
+		await rerender({ vehicleIds: ['civic'] });
+		await new Promise(r => setTimeout(r, 20));
+		expect(api.queryItems).toHaveBeenCalledTimes(1);
+		await rerender({ vehicleIds: ['rav4', 'f150'] });
+		await waitFor(() => expect(api.queryItems).toHaveBeenCalledTimes(2));
+		expect(api.queryItems).toHaveBeenLastCalledWith(
+			expect.objectContaining({ vehicleIds: ['rav4', 'f150'] })
+		);
+		await rerender({ vehicleIds: undefined });
+		await waitFor(() => expect(api.queryItems).toHaveBeenCalledTimes(3));
+		expect(api.queryItems.mock.calls[2]?.[0]).not.toHaveProperty('vehicleIds');
+	});
+
 	test('a covered car with no spending this year still counts', async () => {
 		coverage = covering(['civic', 'rav4', 'f150', 'outback']);
 		render(YearEndTab);
@@ -217,6 +244,29 @@ describe('YearEndTab', () => {
 			await screen.findByRole('heading', { level: 2, name: 'No expenses in 2026' })
 		).toBeTruthy();
 		expect(text()).toContain('Not included: cars shared with you in EUR.');
+	});
+
+	test('with cars picked, the empty year says those cars have no expenses', async () => {
+		api.query.mockImplementation((p: AnalyticsQueryParams) =>
+			Promise.resolve({ buckets: [], series: [], totals: { value: 0 }, metric: p.metric })
+		);
+		render(YearEndTab, { props: { vehicleIds: ['civic'] } });
+		await screen.findByRole('heading', { level: 2, name: 'No expenses in 2026' });
+		expect(text()).toContain(
+			'The cars you picked have no expenses this year. Pick another year or other cars.'
+		);
+	});
+
+	test('picking other cars after an error clears the error card while it loads', async () => {
+		api.query.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+		const { rerender } = render(YearEndTab, { props: { vehicleIds: ['civic'] } });
+		expect(await screen.findByText("Couldn't load year-end summary")).toBeTruthy();
+		let release: (v: unknown) => void = () => {};
+		api.queryItems.mockImplementationOnce(() => new Promise(r => (release = r)));
+		await rerender({ vehicleIds: ['rav4'] });
+		await waitFor(() => expect(screen.queryByText("Couldn't load year-end summary")).toBeNull());
+		release(ITEMS);
+		expect(await screen.findByText('2026 so far · 3 vehicles')).toBeTruthy();
 	});
 
 	test('a failed request shows the error card, and Retry loads the year again', async () => {

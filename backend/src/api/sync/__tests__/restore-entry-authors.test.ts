@@ -41,7 +41,7 @@ async function exportZip(): Promise<AdmZip> {
 
 beforeEach(async () => {
   ctx = await createTestApp();
-  seedCar(ctx, CAR);
+  await seedCar(ctx, CAR);
 }, SETUP_TIMEOUT_MS);
 afterEach(() => ctx.close());
 
@@ -58,13 +58,13 @@ describe('restore keeps an entry author only while they are a member of the car'
     await restore(zip.toBuffer());
 
     expect(authorOf('odometer_entries', 'owners-reading')).toBeNull();
-    shareCar(ctx, CAR, outsider, 'editor');
+    await shareCar(ctx, CAR, outsider, 'editor');
     expect((await outsider.request('DELETE', '/api/v1/odometer/owners-reading')).status).toBe(403);
   });
 
   test('a real editor entry keeps its author through backup and restore', async () => {
     const editor = await createInvitee(ctx, 'authors-editor');
-    shareCar(ctx, CAR, editor, 'editor');
+    await shareCar(ctx, CAR, editor, 'editor');
     const added = await editor.request('POST', `/api/v1/odometer/${CAR}`, {
       odometer: 2000,
       recordedAt: '2024-07-01T00:00:00.000Z',
@@ -81,7 +81,7 @@ describe('restore keeps an entry author only while they are a member of the car'
   test('trips and photos keep a member author and drop a non-member one', async () => {
     const editor = await createInvitee(ctx, 'authors-trip-editor');
     const outsider = await createInvitee(ctx, 'authors-photo-outsider');
-    shareCar(ctx, CAR, editor, 'editor');
+    await shareCar(ctx, CAR, editor, 'editor');
     ctx.sqlite.run(
       "INSERT INTO trips (id, vehicle_id, user_id, start_odometer, end_odometer, purpose, trip_date, created_by) VALUES ('editors-trip', ?, ?, 10, 20, 'business', 1717200000, ?)",
       [CAR, ctx.user.id, editor.id]

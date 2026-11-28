@@ -3,7 +3,7 @@
 	import EmptyState from '#lib/components/common/empty-state.svelte';
 	import HeroFigure from '#lib/components/common/hero-figure.svelte';
 	import { userFacingErrorMessage } from '#lib/utils/error-handling.ts';
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 	import { CalendarX, Fuel, LoaderCircle, Receipt, Star } from '@lucide/svelte';
 	import * as Select from '#lib/components/ui/select/index.ts';
 	import type * as Chart from '#lib/components/ui/chart/index.ts';
@@ -42,6 +42,12 @@
 		type YearQuery
 	} from './year-review/year-overview';
 
+	interface Props {
+		vehicleIds?: string[];
+	}
+
+	let { vehicleIds }: Props = $props();
+
 	const currentYear = new Date().getFullYear();
 	const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
@@ -52,14 +58,21 @@
 	let error = $state<string | null>(null);
 	let request = 0;
 
-	async function loadData(year: number) {
+	async function loadData(year: number, cars: string[] | undefined) {
 		const current = ++request;
-		const queries = yearRequests(year);
+		const queries = yearRequests(year, new Date(), cars);
 		const { start, end } = yearRange(year);
 		try {
 			isLoading = true;
+			error = null;
 			const [items, ...responses] = await Promise.all([
-				analyticsApi.queryItems({ start, end, include: 'all', metric: 'cost' }),
+				analyticsApi.queryItems({
+					start,
+					end,
+					include: 'all',
+					metric: 'cost',
+					...(cars && { vehicleIds: cars })
+				}),
 				...YEAR_QUERIES.map(key => analyticsApi.query(queries[key]))
 			]);
 			if (current !== request) return;
@@ -67,7 +80,6 @@
 			results = Object.fromEntries(
 				YEAR_QUERIES.map((key, i) => [key, responses[i] as AnalyticsQueryResponse])
 			) as Record<YearQuery, AnalyticsQueryResponse>;
-			error = null;
 		} catch (e) {
 			if (current !== request) return;
 			error = userFacingErrorMessage(e);
@@ -79,12 +91,14 @@
 	function handleYearChange(value: string | undefined) {
 		if (!value) return;
 		selectedYear = Number.parseInt(value, 10);
-		error = null;
-		loadData(selectedYear);
 	}
 
-	onMount(() => {
-		loadData(selectedYear);
+	let carsKey = $derived(vehicleIds?.join(',') ?? '');
+
+	$effect(() => {
+		const year = selectedYear;
+		const cars = carsKey ? carsKey.split(',') : undefined;
+		untrack(() => loadData(year, cars));
 	});
 
 	let units = $derived(settingsStore.unitPreferences);
@@ -196,7 +210,7 @@
 		<LoadErrorCard
 			title="Couldn't load year-end summary"
 			message={error}
-			onRetry={() => loadData(selectedYear)}
+			onRetry={() => loadData(selectedYear, vehicleIds)}
 		/>
 	{:else if results && total <= 0}
 		{@render sharedNote()}
@@ -207,7 +221,11 @@
 				</div>
 			{/snippet}
 			{#snippet title()}No expenses in {selectedYear}{/snippet}
-			{#snippet description()}Pick another year, or log an expense to start this one.{/snippet}
+			{#snippet description()}
+				{vehicleIds
+					? 'The cars you picked have no expenses this year. Pick another year or other cars.'
+					: 'Pick another year, or log an expense to start this one.'}
+			{/snippet}
 		</EmptyState>
 	{:else if results}
 		<section aria-label="{selectedYear} in review" class="space-y-8">

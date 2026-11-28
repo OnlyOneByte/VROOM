@@ -24,12 +24,11 @@ interface ReminderRowDb {
   next_due_date: number | null;
 }
 
-function reminderRow(id: string): ReminderRowDb {
-  return ctx.sqlite
-    .query(
-      'SELECT trigger_mode, interval_mileage, last_service_odometer, next_due_odometer, next_due_date FROM reminders WHERE id = ?'
-    )
-    .get(id) as ReminderRowDb;
+async function reminderRow(id: string): Promise<ReminderRowDb> {
+  return (await ctx.sql.get(
+    'SELECT trigger_mode, interval_mileage, last_service_odometer, next_due_odometer, next_due_date FROM reminders WHERE id = ?',
+    [id]
+  )) as ReminderRowDb;
 }
 
 const MILEAGE_BASE = {
@@ -54,7 +53,7 @@ describe('create mileage reminder', () => {
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const r = reminderRow(body.data.reminder.id);
+    const r = await reminderRow(body.data.reminder.id);
     expect(r.trigger_mode).toBe('mileage');
     expect(r.interval_mileage).toBe(5000);
     expect(r.last_service_odometer).toBe(30000);
@@ -75,7 +74,7 @@ describe('create mileage reminder', () => {
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const r = reminderRow(body.data.reminder.id);
+    const r = await reminderRow(body.data.reminder.id);
     expect(r.last_service_odometer).toBe(42000);
     expect(r.next_due_odometer).toBe(48000);
   });
@@ -92,7 +91,7 @@ describe('create mileage reminder', () => {
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const r = reminderRow(body.data.reminder.id);
+    const r = await reminderRow(body.data.reminder.id);
     expect(r.trigger_mode).toBe('both');
     expect(r.next_due_odometer).toBe(50000);
     expect(r.next_due_date, 'both keeps the time axis = startDate').not.toBeNull();
@@ -110,7 +109,7 @@ describe('create mileage reminder', () => {
     const body = await json<DataEnvelope<{ reminder: { id: string } }>>(res);
     expect(res.status, JSON.stringify(body)).toBe(201);
 
-    const r = reminderRow(body.data.reminder.id);
+    const r = await reminderRow(body.data.reminder.id);
     expect(r.trigger_mode).toBe('time');
     expect(r.interval_mileage).toBeNull();
     expect(r.next_due_odometer).toBeNull();
@@ -153,10 +152,10 @@ describe('create mileage reminder', () => {
     const cBody = await json<DataEnvelope<{ reminder: { id: string } }>>(created);
     expect(created.status, JSON.stringify(cBody)).toBe(201);
     const id = cBody.data.reminder.id;
-    expect(reminderRow(id).next_due_odometer).toBe(35000);
+    expect((await reminderRow(id)).next_due_odometer).toBe(35000);
 
     const upd = await ctx.authed('PUT', `/api/v1/reminders/${id}`, { intervalMileage: 8000 });
     expect(upd.status, await upd.text()).toBe(200);
-    expect(reminderRow(id).next_due_odometer).toBe(38000);
+    expect((await reminderRow(id)).next_due_odometer).toBe(38000);
   });
 });
