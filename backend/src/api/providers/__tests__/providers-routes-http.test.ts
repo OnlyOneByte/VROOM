@@ -9,7 +9,7 @@ import {
   type TestApp,
 } from '../../../test-helpers/http-client';
 
-const SYNC_STATUS_MAX_STATEMENTS = ON_POSTGRES ? 9 : 11;
+const SYNC_STATUS_MAX_STATEMENTS = ON_POSTGRES ? 8 : 9;
 
 let ctx: TestApp;
 
