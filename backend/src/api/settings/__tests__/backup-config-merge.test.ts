@@ -136,7 +136,7 @@ describe('PUT /settings never overwrites server-owned backup fields', () => {
   });
 
   test('saving settings keeps the server-written backup warning', async () => {
-    seedProvider('drive-w', 'Drive W');
+    await seedProvider('drive-w', 'Drive W');
     await ctx.authed('PUT', '/api/v1/settings', {
       backupConfig: { providers: { 'drive-w': providerSettings('drive-w') } },
     });
@@ -151,10 +151,11 @@ describe('PUT /settings never overwrites server-owned backup fields', () => {
     });
     expect(res.status).toBe(200);
 
-    const stored = ctx.sqlite
-      .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
-      .get(ctx.user.id) as { backup_config: string };
-    expect(JSON.parse(stored.backup_config).providers['drive-w'].backupWarning).toBe(
+    const stored = await ctx.sql.get<{ backup_config: string }>(
+      'SELECT backup_config FROM user_preferences WHERE user_id = ?',
+      [ctx.user.id]
+    );
+    expect(JSON.parse(stored?.backup_config ?? '{}').providers['drive-w'].backupWarning).toBe(
       'Old backups could not be removed'
     );
   });
