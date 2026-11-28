@@ -25,7 +25,9 @@
 
 	let { data }: { data: PageData } = $props();
 	let vehicleId = $derived(data.vehicleId);
-	let returnTo = $derived(page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}`);
+	let returnTo = $derived(
+		page.url.searchParams.get('returnTo') || `/vehicles/${vehicleId}?tab=odometer`
+	);
 
 	let odometer = $state<string | number | null>('');
 	let date = $state(toDateInputValue(new Date()));

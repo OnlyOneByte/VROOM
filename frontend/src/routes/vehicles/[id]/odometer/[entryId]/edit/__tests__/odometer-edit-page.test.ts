@@ -416,7 +416,7 @@ describe('edit odometer reading save', () => {
 			recordedAt: new Date(2026, 2, 16, 12, 0, 0).toISOString(),
 			note: undefined
 		});
-		expect(goto).toHaveBeenCalledWith('/vehicles/v1');
+		expect(goto).toHaveBeenCalledWith('/vehicles/v1?tab=odometer');
 	});
 
 	test('returns to the returnTo target after saving', async () => {
@@ -506,7 +506,7 @@ describe('edit odometer reading save', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Back' }));
 
 		expect(goto).toHaveBeenCalledTimes(2);
-		expect(goto).toHaveBeenNthCalledWith(1, '/vehicles/v1');
+		expect(goto).toHaveBeenNthCalledWith(1, '/vehicles/v1?tab=odometer');
 		expect(update).not.toHaveBeenCalled();
 	});
 });
@@ -517,7 +517,9 @@ describe('edit odometer reading delete', () => {
 		await settle();
 
 		const dialog = await openDeleteDialog();
-		expect(within(dialog).getByText(/This action cannot be undone/)).toBeInTheDocument();
+		expect(dialog).toHaveTextContent(
+			"Delete the 45,000 reading from Mar 15, 2026? This can't be undone."
+		);
 		await fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 		await settle();
 
@@ -534,7 +536,7 @@ describe('edit odometer reading delete', () => {
 		await settle();
 
 		expect(deleteEntry).toHaveBeenCalledWith('o1');
-		expect(goto).toHaveBeenCalledWith('/vehicles/v1');
+		expect(goto).toHaveBeenCalledWith('/vehicles/v1?tab=odometer');
 	});
 
 	test('a failed delete shows the error inside the dialog', async () => {

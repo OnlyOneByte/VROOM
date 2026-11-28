@@ -2,7 +2,10 @@
 	import type { ChartConfig } from '#lib/components/ui/chart/index.ts';
 	import { AppBarChart } from '#lib/components/charts/index.ts';
 	import type { VehicleFinancing } from '#lib/types/index.ts';
-	import type { AmortizationEntry } from '#lib/utils/financing-calculations.ts';
+	import {
+		showsPaymentSchedule,
+		type AmortizationEntry
+	} from '#lib/utils/financing-calculations.ts';
 
 	interface Props {
 		financing: VehicleFinancing;
@@ -11,12 +14,7 @@
 
 	let { financing, amortizationSchedule = [] }: Props = $props();
 
-	let showAmortizationChart = $derived(
-		financing.financingType === 'loan' &&
-			financing.apr &&
-			financing.apr > 0 &&
-			amortizationSchedule.length > 0
-	);
+	let showAmortizationChart = $derived(showsPaymentSchedule(financing, amortizationSchedule));
 
 	let amortizationChartData = $derived.by(() => {
 		if (!showAmortizationChart) return [];

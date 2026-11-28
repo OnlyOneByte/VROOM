@@ -104,7 +104,10 @@
 	let isLoadingStats = $derived(isLoadingSummary || isLoadingVehicleStats);
 	let vehicle = $state<Vehicle | null>(null);
 	let showingCachedVehicle = $state(false);
-	let activeTab = $state('overview');
+	const TABS = ['overview', 'expenses', 'loan', 'odometer', 'insurance', 'trips'];
+	let activeTab = $state(
+		untrack(() => (data.tab && TABS.includes(data.tab) ? data.tab : 'overview'))
+	);
 	let visitedTabs = $state<Record<string, boolean>>({ overview: true });
 	let vehicleStatsData = $state<VehicleStats | null>(null);
 	const selectedStatsPeriod: TimePeriod = 'all';

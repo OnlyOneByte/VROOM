@@ -444,6 +444,17 @@ describe('vehicle detail page overview', () => {
 		expect(captured['photos']?.['photos']).toHaveLength(2);
 	});
 
+	test('?tab= opens that tab, and an unknown tab falls back to Overview', async () => {
+		const view = render(Page, { props: { data: { vehicleId: 'v1', tab: 'odometer' } } as never });
+		await settle();
+		expect(screen.getByRole('tab', { name: 'Odometer' })).toHaveAttribute('aria-selected', 'true');
+		view.unmount();
+
+		render(Page, { props: { data: { vehicleId: 'v1', tab: 'nope' } } as never });
+		await settle();
+		expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+	});
+
 	test('insurance is its own tab, loaded only when opened', async () => {
 		await mount();
 		expect(captured['insurance']).toBeUndefined();

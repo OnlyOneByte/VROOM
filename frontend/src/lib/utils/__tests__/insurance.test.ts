@@ -12,6 +12,7 @@ import {
 	isPolicyInForce,
 	prefillFromPreviousTerm,
 	sortTermsByEndDateDesc,
+	splitTermsByToday,
 	termBillingMonths
 } from '#lib/utils/insurance.ts';
 
@@ -273,5 +274,77 @@ describe('term premium matches what the API charges', () => {
 				endDate: ''
 			})
 		).toBe(0);
+	});
+});
+
+describe('splitTermsByToday', () => {
+	const NOW = new Date(2026, 10, 23, 12);
+	const t = (id: string, startDate: string, endDate: string): InsuranceTerm => ({
+		id,
+		policyId: 'p',
+		startDate,
+		endDate,
+		createdAt: '2026-01-01T00:00:00.000Z',
+		updatedAt: '2026-01-01T00:00:00.000Z'
+	});
+	const ids = (terms: InsuranceTerm[]) => terms.map(term => term.id);
+
+	test('no terms shows nothing', () => {
+		expect(splitTermsByToday([], NOW)).toEqual({
+			shown: undefined,
+			startsLater: false,
+			upcoming: undefined,
+			others: []
+		});
+	});
+
+	test('every term ended: the latest one is shown and the rest are others, newest first', () => {
+		const split = splitTermsByToday(
+			[t('a', '2025-01-01', '2025-07-01'), t('b', '2025-07-01', '2026-01-01')],
+			NOW
+		);
+		expect(split.shown?.id).toBe('b');
+		expect(split.startsLater).toBe(false);
+		expect(split.upcoming).toBeUndefined();
+		expect(ids(split.others)).toEqual(['a']);
+	});
+
+	test('only future terms: the earliest is shown, starting later, and the next one is upcoming', () => {
+		const split = splitTermsByToday(
+			[t('late', '2027-07-24', '2028-01-24'), t('soon', '2027-01-24', '2027-07-24')],
+			NOW
+		);
+		expect(split.shown?.id).toBe('soon');
+		expect(split.startsLater).toBe(true);
+		expect(split.upcoming?.id).toBe('late');
+		expect(ids(split.others)).toEqual(['late']);
+	});
+
+	test('a term ending today is still in force', () => {
+		const split = splitTermsByToday([t('ends', '2026-05-23', '2026-11-23')], NOW);
+		expect(split.shown?.id).toBe('ends');
+		expect(split.startsLater).toBe(false);
+	});
+
+	test('on the day one term ends and the next starts, the new one is shown and the old one is kept in others', () => {
+		const split = splitTermsByToday(
+			[t('old', '2026-05-23', '2026-11-23'), t('new', '2026-11-23', '2027-05-23')],
+			NOW
+		);
+		expect(split.shown?.id).toBe('new');
+		expect(ids(split.others)).toEqual(['old']);
+	});
+
+	test('every term other than the shown one is in others, so none goes missing', () => {
+		const terms = [
+			t('past', '2026-01-26', '2026-07-26'),
+			t('now', '2026-07-26', '2027-01-24'),
+			t('next', '2027-01-24', '2027-07-24'),
+			t('after', '2027-07-24', '2028-01-24')
+		];
+		const split = splitTermsByToday(terms, NOW);
+		expect(split.shown?.id).toBe('now');
+		expect(split.upcoming?.id).toBe('next');
+		expect(ids(split.others)).toEqual(['after', 'next', 'past']);
 	});
 });
