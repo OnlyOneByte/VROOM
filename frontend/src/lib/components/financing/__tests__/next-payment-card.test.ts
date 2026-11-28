@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { DerivedPaymentEntry, VehicleFinancing } from '#lib/types/index.ts';
 import { localNoon, makeEntry, makeLease, makeLoan } from './financing-fixtures';
 
@@ -32,7 +32,7 @@ function mount(
 		financing?: VehicleFinancing;
 		lastPayment?: DerivedPaymentEntry;
 		recordPaymentHref?: string;
-		progressPercentage?: number;
+		showProgress?: boolean;
 		onChangePayment?: () => void;
 		isOwner?: boolean;
 	} = {}
@@ -42,8 +42,15 @@ function mount(
 	});
 }
 
-function countdown(): string {
-	return screen.getByRole('status').textContent?.trim() ?? '';
+function countdown(): HTMLElement {
+	return screen.getByRole('status');
+}
+
+function rows(): string[] {
+	const section = screen.getByRole('region', { name: 'Next payment' });
+	return within(section)
+		.getAllByRole('listitem')
+		.map(li => (li.textContent ?? '').replace(/\s+/g, ' ').trim());
 }
 
 beforeEach(() => {
@@ -58,149 +65,134 @@ afterEach(() => {
 	nextDateOverride.value = null;
 });
 
-describe('NextPaymentCard due date', () => {
+describe('Next payment due date', () => {
 	test('after this month is paid the next monthly payment is due next month', () => {
 		mount({ lastPayment: makeEntry({ expense: { date: localNoon(2025, 5, 10) } }) });
-		expect(screen.getByText('Jul 10, 2025')).toBeTruthy();
-		expect(screen.getByText('Jul 10, 2025').getAttribute('datetime')).toBe(
-			new Date(2025, 6, 10, 12).toISOString()
-		);
-		expect(countdown()).toBe('Due in 25 days');
+		const time = screen.getByText('Jul 10, 2025');
+		expect(time.getAttribute('datetime')).toBe(new Date(2025, 6, 10, 12).toISOString());
+		expect(countdown().textContent).toBe('Due in 25 days');
+		expect(countdown().className).toContain('text-muted-foreground');
 	});
 
-	test('a payment due within a day reads as due tomorrow', () => {
+	test('a payment due within a day reads as due tomorrow, in the warning colour', () => {
 		mount({
 			financing: makeLoan({ startDate: '2025-01-16T12:00:00' }),
 			lastPayment: makeEntry({ expense: { date: localNoon(2025, 4, 16) } })
 		});
 		expect(screen.getByText('Jun 16, 2025')).toBeTruthy();
-		expect(countdown()).toBe('Due tomorrow');
+		expect(countdown().textContent).toBe('Due tomorrow');
+		expect(countdown().className).toContain('text-destructive');
 	});
 
-	test('a weekly loan that started this week has its first payment due a week after the start', () => {
+	test('a weekly loan has its first payment due a week after the start and says weekly', () => {
 		mount({
 			financing: makeLoan({ paymentFrequency: 'weekly', startDate: '2025-06-10T12:00:00' })
 		});
 		expect(screen.getByText('Jun 17, 2025')).toBeTruthy();
-		expect(countdown()).toBe('Due in 2 days');
-		expect(screen.getByText('Weekly')).toBeTruthy();
+		expect(countdown().textContent).toBe('Due in 2 days');
+		expect(rows()[1]).toBe('Loan terms 6% APR · Weekly · 60 months');
 	});
 
-	test('reports how many days a payment is overdue', () => {
-		nextDateOverride.value = new Date(2025, 5, 12, 12);
+	test.each([
+		[new Date(2025, 5, 12, 12), 'Overdue by 3 days'],
+		[new Date(2025, 5, 14, 12), 'Overdue by 1 day']
+	])('reports an overdue payment (%s)', (date, text) => {
+		nextDateOverride.value = date;
 		mount();
-		expect(countdown()).toBe('Overdue by 3 days');
-		expect(screen.getByText('Jun 12, 2025')).toBeTruthy();
-	});
-
-	test('uses the singular for a payment one day overdue', () => {
-		nextDateOverride.value = new Date(2025, 5, 14, 12);
-		mount();
-		expect(countdown()).toBe('Overdue by 1 day');
+		expect(countdown().textContent).toBe(text);
 	});
 });
 
-describe('NextPaymentCard amounts', () => {
-	test('shows the payment, frequency, loan type and APR', () => {
-		mount();
-		expect(screen.getByLabelText('Payment amount').textContent).toBe('$400.00');
-		expect(screen.getByText('Monthly')).toBeTruthy();
-		expect(screen.getByText('Loan Payment')).toBeTruthy();
-		expect(screen.getByText('6% APR')).toBeTruthy();
+describe('Next payment amounts', () => {
+	test('one row: the date, its principal and interest split, and the payment; then the terms', () => {
+		mount({
+			lastPayment: makeEntry({ expense: { date: localNoon(2025, 5, 10) } }),
+			showProgress: false
+		});
+		expect(rows()).toEqual([
+			'Jul 10, 2025 Due in 25 days $325.00 principal · $75.00 interest $400.00 Min: $386.66',
+			'Loan terms 6% APR · 60 months'
+		]);
+		expect(screen.getByLabelText('Payment amount').textContent?.trim()).toBe('$400.00');
 	});
 
-	test('shows the minimum payment when paying above it', () => {
-		mount();
-		expect(screen.getByText('Min: $386.66')).toBeTruthy();
-	});
-
-	test('hides the minimum when paying exactly the minimum', () => {
+	test('paying exactly the minimum shows no minimum', () => {
 		mount({ financing: makeLoan({ paymentAmount: 386.66 }) });
 		expect(screen.queryByText(/Min:/)).toBeNull();
 	});
 
-	test('a zero-APR loan has no minimum and no APR line', () => {
+	test('a zero-APR loan has no minimum, no split and no APR', () => {
 		mount({ financing: makeLoan({ apr: 0 }) });
-		expect(screen.queryByText(/Min:/)).toBeNull();
-		expect(screen.queryByText(/APR/)).toBeNull();
+		expect(screen.queryByText(/Min:|principal|APR/)).toBeNull();
 	});
 
-	test('shows original, principal paid and remaining balance', () => {
-		mount();
-		expect(screen.getByText('$20,000.00')).toBeTruthy();
-		expect(screen.getByText('$5,000.00')).toBeTruthy();
-		expect(screen.getByText('$15,000.00')).toBeTruthy();
+	test('a weekly loan shows no split, since interest accrues monthly', () => {
+		mount({ financing: makeLoan({ paymentFrequency: 'weekly' }) });
+		expect(screen.queryByText(/principal/)).toBeNull();
 	});
 
-	test('a balance grown above the original by interest shows no principal paid', () => {
-		mount({ financing: makeLoan({ computedBalance: 20_150 }) });
-		expect(screen.getByText('$0.00')).toBeTruthy();
-		expect(screen.getByText('$20,150.00')).toBeTruthy();
+	test('the loan progress is not repeated here: the hero shows it', () => {
+		mount({ showProgress: false });
+		expect(screen.queryByText('Paid so far')).toBeNull();
+		expect(screen.queryByRole('progressbar')).toBeNull();
 	});
 
-	test('a final paid-off balance shows the whole original as paid', () => {
-		mount({ financing: makeLoan({ computedBalance: 0 }), progressPercentage: 100 });
-		expect(screen.getAllByText('$20,000.00')).toHaveLength(2);
-		expect(screen.getByText('$0.00')).toBeTruthy();
-		expect(screen.getByText('100%')).toBeTruthy();
+	test('a lease shows what is paid so far, rounded, with the exact value on the progress role', () => {
+		mount({ financing: makeLease() });
+		expect(rows()).toContain('Paid so far $4,800.00 of $14,400.00 · $9,600.00 left 33%');
+		expect(
+			screen.getByRole('progressbar', { name: 'Payment progress' }).getAttribute('aria-valuenow')
+		).toMatch(/^33\.33/);
+		expect(rows()[1]).toBe('Lease terms 36 months');
+	});
+
+	test('a balance grown above the original shows nothing paid', () => {
+		mount({ financing: makeLease({ computedBalance: 14_500 }) });
+		expect(rows()).toContain('Paid so far $0.00 of $14,400.00 · $14,500.00 left 0%');
+	});
+
+	test('an unknown balance counts as nothing paid yet', () => {
+		mount({ financing: makeLease({ computedBalance: undefined }) });
+		expect(rows()).toContain('Paid so far $0.00 of $14,400.00 · $14,400.00 left 0%');
 	});
 
 	test('formats amounts in the user currency', () => {
 		store.currencyUnit = 'EUR';
 		mount();
-		expect(screen.getByLabelText('Payment amount').textContent).toBe('€400.00');
+		expect(screen.getByLabelText('Payment amount').textContent?.trim()).toBe('€400.00');
 		expect(screen.getByText('Min: €386.66')).toBeTruthy();
-		expect(screen.getByText('€15,000.00')).toBeTruthy();
 		expect(screen.queryByText(/\$/)).toBeNull();
-	});
-
-	test('rounds the progress percentage and reports it on the progress bar', () => {
-		mount({ progressPercentage: 33.4 });
-		expect(screen.getByText('33%')).toBeTruthy();
-		expect(
-			screen.getByRole('progressbar', { name: 'Payment progress' }).getAttribute('aria-valuenow')
-		).toBe('33.4');
 	});
 });
 
-describe('NextPaymentCard actions', () => {
+describe('Next payment actions', () => {
 	test('an owner can record a payment and open the planner for a loan', async () => {
 		const onChangePayment = vi.fn();
 		mount({ recordPaymentHref: '/expenses/new?vehicleId=v1', onChangePayment });
-		expect(screen.getByRole('link', { name: /Record Payment/ }).getAttribute('href')).toBe(
+		expect(screen.getByRole('link', { name: 'Record payment' }).getAttribute('href')).toBe(
 			'/expenses/new?vehicleId=v1'
 		);
-		await fireEvent.click(screen.getByRole('button', { name: /Change Payment/ }));
+		expect(screen.getByText('Paying extra?')).toBeTruthy();
+		await fireEvent.click(screen.getByRole('button', { name: 'Payment planner' }));
 		expect(onChangePayment).toHaveBeenCalledTimes(1);
 	});
 
-	test('a lease cannot change its payment', () => {
+	test('a lease can record a payment but has no planner', () => {
 		mount({ financing: makeLease(), recordPaymentHref: '/x', onChangePayment: vi.fn() });
-		expect(screen.getByText('Lease Payment')).toBeTruthy();
-		expect(screen.getByRole('link', { name: /Record Payment/ })).toBeTruthy();
-		expect(screen.queryByRole('button', { name: /Change Payment/ })).toBeNull();
+		expect(screen.getByRole('link', { name: 'Record payment' })).toBeTruthy();
+		expect(screen.queryByRole('button', { name: 'Payment planner' })).toBeNull();
+		expect(screen.queryByText('Paying extra?')).toBeNull();
 	});
 
 	test('a viewer sees no actions', () => {
 		mount({ recordPaymentHref: '/x', onChangePayment: vi.fn(), isOwner: false });
-		expect(screen.queryByRole('link', { name: /Record Payment/ })).toBeNull();
-		expect(screen.queryByRole('button', { name: /Change Payment/ })).toBeNull();
+		expect(screen.queryByRole('link')).toBeNull();
+		expect(screen.queryByRole('button')).toBeNull();
 	});
 
 	test('no actions render without a link or handler', () => {
 		mount();
 		expect(screen.queryByRole('link')).toBeNull();
 		expect(screen.queryByRole('button')).toBeNull();
-	});
-});
-
-describe('NextPaymentCard with no computed balance', () => {
-	test('treats an unknown balance as nothing paid yet, matching the Finance tab progress', () => {
-		mount({ financing: makeLoan({ computedBalance: undefined }), progressPercentage: 0 });
-
-		const paid = screen.getByText('Principal paid').nextElementSibling;
-		const remaining = screen.getByText('Remaining').nextElementSibling;
-		expect(paid?.textContent?.trim()).toBe('$0.00');
-		expect(remaining?.textContent?.trim()).toBe('$20,000.00');
 	});
 });

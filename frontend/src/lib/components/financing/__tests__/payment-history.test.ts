@@ -20,19 +20,15 @@ function mount(payments: DerivedPaymentEntry[], financing: VehicleFinancing = ma
 	return render(PaymentHistory, { props: { payments, financing } });
 }
 
-function paymentCards(): HTMLElement[] {
-	return screen.getAllByRole('listitem');
+function rows(): HTMLElement[] {
+	return within(screen.getByRole('list', { name: 'Payment history' })).getAllByRole('listitem');
 }
+
+const text = (el: HTMLElement) => (el.textContent ?? '').replace(/\s+/g, ' ').trim();
 
 function monthlyEntries(count: number): DerivedPaymentEntry[] {
 	return Array.from({ length: count }, (_, i) =>
-		makeEntry({
-			paymentNumber: i + 1,
-			expense: {
-				id: `e${i + 1}`,
-				date: localNoon(2015, i, 10)
-			}
-		})
+		makeEntry({ paymentNumber: i + 1, expense: { id: `e${i + 1}`, date: localNoon(2015, i, 10) } })
 	);
 }
 
@@ -41,83 +37,63 @@ afterEach(() => {
 	store.currencyUnit = 'USD';
 });
 
-describe('PaymentHistory empty state', () => {
-	test('invites the user to record payments when there are none', () => {
+describe('Payment history', () => {
+	test('with no payments it says so in one line, and lists nothing', () => {
 		mount([]);
-		expect(screen.getByRole('status').textContent).toMatch(/No Payment History/);
+		expect(screen.getByRole('status').textContent).toMatch(/No payments recorded yet/);
 		expect(screen.queryByRole('list')).toBeNull();
 	});
-});
 
-describe('PaymentHistory list', () => {
 	test('lists payments newest first with a recorded count', () => {
 		mount([
 			makeEntry({ paymentNumber: 1, expense: { id: 'a', date: localNoon(2025, 1, 10) } }),
 			makeEntry({ paymentNumber: 3, expense: { id: 'c', date: localNoon(2025, 3, 10) } }),
 			makeEntry({ paymentNumber: 2, expense: { id: 'b', date: localNoon(2025, 2, 10) } })
 		]);
-		expect(screen.getByText(/3 payments recorded/)).toBeTruthy();
-		const labels = paymentCards().map(
-			card => within(card).getByLabelText(/^Payment number/).textContent
-		);
-		expect(labels).toEqual(['#3', '#2', '#1']);
+		expect(screen.getByText('3 payments recorded')).toBeTruthy();
+		expect(rows().map(r => within(r).getByLabelText(/^Payment number/).textContent)).toEqual([
+			'#3',
+			'#2',
+			'#1'
+		]);
 		expect(screen.getByLabelText('Payment 3 on Apr 10, 2025')).toBeTruthy();
 	});
 
-	test('uses the singular for a single payment', () => {
-		mount([makeEntry()]);
-		expect(screen.getByText(/1 payment recorded/)).toBeTruthy();
-		expect(screen.queryByText(/optimized view/)).toBeNull();
-	});
-
-	test('shows the date, amount and remaining balance of each payment', () => {
-		mount([makeEntry({ remainingBalance: 19_700, expense: { amount: 400 } })]);
-		const card = paymentCards()[0]!;
-		const time = within(card).getByText('Feb 10, 2025');
-		expect(time.getAttribute('datetime')).toBe(localNoon(2025, 1, 10));
-		expect(within(card).getByLabelText('Payment amount').textContent).toBe('$400.00');
-		expect(within(card).getByText('$19,700.00')).toBeTruthy();
-	});
-
-	test('an interest-bearing loan breaks each payment into principal and interest', () => {
-		mount([makeEntry({ principalAmount: 300, interestAmount: 100 })]);
-		const breakdown = screen.getByRole('group', { name: 'Payment breakdown' });
-		expect(within(breakdown).getByText('$300.00')).toBeTruthy();
-		expect(within(breakdown).getByText('$100.00')).toBeTruthy();
+	test('one row per payment: number, date, split, amount and what was left', () => {
+		mount([makeEntry({ remainingBalance: 19_700, principalAmount: 300, interestAmount: 100 })]);
+		expect(screen.getByText('1 payment recorded')).toBeTruthy();
+		const row = rows()[0]!;
+		expect(text(row)).toBe(
+			'#1 · Feb 10, 2025 $300.00 principal · $100.00 interest $400.00 $19,700.00 left'
+		);
+		expect(within(row).getByText('Feb 10, 2025').getAttribute('datetime')).toBe(
+			localNoon(2025, 1, 10)
+		);
 	});
 
 	test.each<[string, VehicleFinancing]>([
 		['a zero-APR loan', makeLoan({ apr: 0 })],
 		['a lease', makeLease()]
-	])('%s shows no principal and interest breakdown', (_label, financing) => {
+	])('%s shows no principal and interest split', (_label, financing) => {
 		mount([makeEntry()], financing);
 		expect(screen.queryByRole('group', { name: 'Payment breakdown' })).toBeNull();
 	});
 
-	test('flags extra payments and leaves standard ones unflagged', () => {
+	test('an extra payment says so; a standard one carries no label', () => {
 		mount([
 			makeEntry({ paymentType: 'extra', expense: { id: 'x', date: localNoon(2025, 2, 10) } }),
 			makeEntry({ paymentType: 'standard', expense: { id: 's' } })
 		]);
-		const [extra, standard] = paymentCards();
-		expect(within(extra!).getByLabelText('Extra payment indicator')).toBeTruthy();
-		expect(within(standard!).queryByLabelText('Extra payment indicator')).toBeNull();
-	});
-
-	test.each([
-		['extra', 'Extra Payment'],
-		['standard', 'Standard']
-	] as const)('a %s payment is badged %s', (paymentType, label) => {
-		mount([makeEntry({ paymentType })]);
-		expect(within(paymentCards()[0]!).getByText(label)).toBeTruthy();
+		const [extra, standard] = rows();
+		expect(within(extra!).getByText('Extra payment')).toBeTruthy();
+		expect(within(standard!).queryByText(/Extra|Standard/)).toBeNull();
 	});
 
 	test('formats amounts in the user currency', () => {
 		store.currencyUnit = 'EUR';
-		mount([makeEntry({ remainingBalance: 19_700, expense: { amount: 400 } })]);
-		expect(screen.getByLabelText('Payment amount').textContent).toBe('€400.00');
+		mount([makeEntry({ remainingBalance: 19_700 })]);
+		expect(screen.getByLabelText('Payment amount').textContent?.trim()).toBe('€400.00');
 		expect(screen.getByText('€19,700.00')).toBeTruthy();
-		expect(screen.getByText('€300.00')).toBeTruthy();
 		expect(screen.queryByText(/\$/)).toBeNull();
 	});
 
@@ -131,75 +107,33 @@ describe('PaymentHistory list', () => {
 			financing
 		);
 		mount(entries, financing);
-		const [latest, first] = paymentCards();
-		expect(within(latest!).getByLabelText('Payment amount').textContent).toBe('$2,000.00');
-		expect(within(latest!).getByText('$96.50')).toBeTruthy();
-		expect(within(latest!).getByText('$1,903.50')).toBeTruthy();
-		expect(within(latest!).getByText('$7,746.50')).toBeTruthy();
-		expect(within(latest!).getByLabelText('Extra payment indicator')).toBeTruthy();
-		expect(within(first!).getByText('$9,650.00')).toBeTruthy();
-		expect(within(first!).getByText('$100.00')).toBeTruthy();
+		const [latest, first] = rows();
+		expect(text(latest!)).toBe(
+			'#2 · Mar 10, 2025 Extra payment $1,903.50 principal · $96.50 interest $2,000.00 $7,746.50 left'
+		);
+		expect(text(first!)).toBe(
+			'#1 · Feb 10, 2025 $350.00 principal · $100.00 interest $450.00 $9,650.00 left'
+		);
 	});
 });
 
-describe('PaymentHistory large history', () => {
-	test('up to 100 payments render in full', () => {
-		mount(monthlyEntries(100));
-		expect(paymentCards()).toHaveLength(100);
-		expect(screen.queryByText(/optimized view/)).toBeNull();
+describe('Payment history length', () => {
+	test('shows the latest 6 in the page, with no scroll box, and "Show all" lists the rest', async () => {
+		const { container } = mount(monthlyEntries(24));
+		expect(rows()).toHaveLength(6);
+		expect(within(rows()[0]!).getByLabelText(/^Payment number/).textContent).toBe('#24');
+		expect(
+			container.querySelector('[class*="overflow-y-auto"], [data-slot="scroll-area"]')
+		).toBeNull();
+		await fireEvent.click(screen.getByRole('button', { name: 'Show all 24' }));
+		expect(rows()).toHaveLength(24);
+		await fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }));
+		expect(rows()).toHaveLength(6);
 	});
 
-	test('over 100 payments render only a window around the scroll position', () => {
-		mount(monthlyEntries(120));
-		expect(screen.getByText(/120 payments recorded/)).toBeTruthy();
-		expect(screen.getByText(/optimized view/)).toBeTruthy();
-		const cards = paymentCards();
-		expect(cards.length).toBeLessThan(120);
-		expect(within(cards[0]!).getByLabelText(/^Payment number/).textContent).toBe('#120');
-	});
-
-	test('scrolling moves the rendered window down the history', async () => {
-		mount(monthlyEntries(120));
-		const list = screen.getByRole('list', { name: 'Payment history timeline' });
-		const scroller = list.parentElement!.parentElement!;
-		scroller.scrollTop = 180 * 50;
-		await fireEvent.scroll(scroller);
-		const numbers = paymentCards().map(
-			card => within(card).getByLabelText(/^Payment number/).textContent
-		);
-		expect(numbers[0]).toBe('#75');
-		expect(numbers).not.toContain('#120');
-		expect(list.getAttribute('style')).toContain(`translateY(${45 * 180}px)`);
-	});
-
-	test('the windowed view badges, flags and breaks down payments like the full list', () => {
-		const entries = monthlyEntries(120);
-		entries[119] = { ...entries[119]!, paymentType: 'extra' };
-		mount(entries);
-		const [latest, previous] = paymentCards();
-		expect(within(latest!).getByText('Extra Payment')).toBeTruthy();
-		expect(within(latest!).getByLabelText('Extra payment indicator')).toBeTruthy();
-		expect(within(latest!).getByRole('group', { name: 'Payment breakdown' })).toBeTruthy();
-		expect(within(previous!).getByText('Standard')).toBeTruthy();
-		expect(within(previous!).queryByLabelText('Extra payment indicator')).toBeNull();
-	});
-
-	test('the windowed view of a lease shows no principal and interest breakdown', () => {
-		mount(monthlyEntries(120), makeLease());
-		expect(paymentCards().length).toBeGreaterThan(0);
-		expect(screen.queryByRole('group', { name: 'Payment breakdown' })).toBeNull();
-	});
-
-	test('scrolling to the end renders the oldest payment without a connector below it', async () => {
-		mount(monthlyEntries(120));
-		const list = screen.getByRole('list', { name: 'Payment history timeline' });
-		const scroller = list.parentElement!.parentElement!;
-		scroller.scrollTop = 180 * 120;
-		await fireEvent.scroll(scroller);
-		const cards = paymentCards();
-		const oldest = cards.at(-1)!;
-		expect(within(oldest).getByLabelText(/^Payment number/).textContent).toBe('#1');
-		expect(oldest.querySelector('[aria-hidden="true"].absolute')).toBeNull();
-		expect(cards[0]!.querySelector('[aria-hidden="true"].absolute')).not.toBeNull();
+	test('6 or fewer payments show with no toggle', () => {
+		mount(monthlyEntries(6));
+		expect(rows()).toHaveLength(6);
+		expect(screen.queryByRole('button')).toBeNull();
 	});
 });

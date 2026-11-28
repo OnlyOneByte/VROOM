@@ -22,7 +22,6 @@
 		calculateAmortizationSchedule,
 		calculatePayoffDate,
 		derivePaymentEntries,
-		remainingBalance,
 		resolveCurrentOdometer
 	} from '#lib/utils/financing-calculations.ts';
 	import type { Expense, Vehicle, VehicleStats, DerivedPaymentEntry } from '#lib/types/index.ts';
@@ -46,22 +45,6 @@
 	let paymentHistoryError = $state<string | null>(null);
 	let hasAttemptedPaymentLoad = $state(false);
 	let showPaymentPlanner = $state(false);
-
-	let progressPercentage = $derived.by(() => {
-		try {
-			if (!vehicle?.financing?.isActive) return 0;
-			const financing = vehicle.financing;
-			if (!financing.originalAmount || financing.originalAmount <= 0) return 0;
-			const balance = remainingBalance(financing);
-			return Math.min(
-				100,
-				Math.max(0, ((financing.originalAmount - balance) / financing.originalAmount) * 100)
-			);
-		} catch (error) {
-			if (import.meta.env.DEV) console.error('Error calculating progress percentage:', error);
-			return 0;
-		}
-	});
 
 	let totalInterestPaid = $derived.by(() => {
 		try {
@@ -176,7 +159,7 @@
 				{paymentsLoaded}
 				{isOwner}
 				recordPaymentHref={`${resolve(routes.expenseNew)}?vehicleId=${vehicleId}&category=financial&financingId=${vehicle.financing.id}&amount=${vehicle.financing.paymentAmount}&returnTo=${resolve(paramRoutes.vehicle, { id: vehicleId })}`}
-				{progressPercentage}
+				showProgress={vehicle.financing.financingType !== 'loan'}
 				onChangePayment={() => (showPaymentPlanner = true)}
 			/>
 		{/if}
