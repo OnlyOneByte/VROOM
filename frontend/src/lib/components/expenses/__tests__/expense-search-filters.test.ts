@@ -242,9 +242,14 @@ describe('ExpenseSearchFilters: category chips and sort', () => {
 		expect(onCategoryChange).toHaveBeenLastCalledWith('');
 	});
 
+	test('each category chip is a 40px tap target', () => {
+		renderFilters({ category: '' });
+		expect(screen.getByRole('button', { name: 'All' })).toHaveClass('h-10');
+	});
+
 	test('the sort menu names the current order and reports a new one', async () => {
 		const { onSortChange } = renderFilters({ sort: 'date-desc' });
-		const trigger = screen.getByLabelText('Sort expenses');
+		const trigger = screen.getByLabelText('Newest first, sort order');
 		expect(trigger).toHaveTextContent('Newest first');
 		await pickOption(trigger, 'Largest first');
 		expect(onSortChange).toHaveBeenCalledWith('amount-desc');

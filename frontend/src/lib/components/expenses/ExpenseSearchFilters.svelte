@@ -59,7 +59,7 @@
 	}
 
 	const chip =
-		'h-9 shrink-0 rounded-full border px-3.5 text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50';
+		'h-10 shrink-0 rounded-full border px-3.5 text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50';
 </script>
 
 <div class="space-y-3" role="search" aria-label="Find expenses">
@@ -102,7 +102,9 @@
 			class="w-auto"
 		/>
 		<Select.Root type="single" value={sort} onValueChange={v => v && onSortChange(v as Sort)}>
-			<Select.Trigger aria-label="Sort expenses" class="w-auto">{SORTS[sort]}</Select.Trigger>
+			<Select.Trigger aria-label="{SORTS[sort]}, sort order" class="w-auto">
+				{SORTS[sort]}
+			</Select.Trigger>
 			<Select.Content>
 				{#each Object.entries(SORTS) as [value, label] (value)}
 					<Select.Item {value} {label}>{label}</Select.Item>

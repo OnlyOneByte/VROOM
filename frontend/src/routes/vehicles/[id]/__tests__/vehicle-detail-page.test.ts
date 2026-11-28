@@ -115,6 +115,11 @@ import Page from '../+page.svelte';
 import { forgetRecentlySynced, rememberSynced } from '#lib/utils/sync/recently-synced.svelte.ts';
 import { offlineExpenseQueue } from '#lib/stores/offline.svelte.ts';
 import { resetPendingEdits, scheduleEdit, undoEdit } from '#lib/utils/pending-edits.svelte.ts';
+import {
+	resetPendingDeletes,
+	scheduleDelete,
+	undoDelete
+} from '#lib/utils/pending-deletes.svelte.ts';
 
 const VEHICLE = {
 	id: 'v1',
@@ -952,6 +957,26 @@ describe('vehicle detail page tabs', () => {
 		} finally {
 			offlineExpenseQueue.current = [];
 			resetPendingEdits();
+		}
+	});
+
+	test("a deleted row leaves its month's total during the undo window, and Undo puts it back", async () => {
+		getMonthlyTotals.mockResolvedValue([{ month: '2024-03', amount: 100 }]);
+		const total = () => (captured['table']?.['monthTotals'] as Map<string, number>).get('2024-03');
+		try {
+			await mount();
+			await openTab('Expenses');
+			await vi.waitFor(() => expect(total()).toBe(100));
+
+			scheduleDelete(EXPENSE);
+			await settle();
+			expect(total()).toBe(54.5);
+
+			undoDelete(EXPENSE.id);
+			await settle();
+			expect(total()).toBe(100);
+		} finally {
+			resetPendingDeletes();
 		}
 	});
 
