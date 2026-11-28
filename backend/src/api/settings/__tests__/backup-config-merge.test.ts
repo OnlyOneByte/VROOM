@@ -159,4 +159,24 @@ describe('PUT /settings never overwrites server-owned backup fields', () => {
       'Old backups could not be removed'
     );
   });
+
+  test('turning ZIP backup off clears a stored backup warning', async () => {
+    await seedProvider('drive-x', 'Drive X');
+    await ctx.authed('PUT', '/api/v1/settings', {
+      backupConfig: { providers: { 'drive-x': providerSettings('drive-x') } },
+    });
+    await repos().preferences.mergeJsonField(ctx.user.id, 'backupConfig', {
+      providers: { 'drive-x': { backupWarning: 'Old backups could not be removed' } },
+    });
+
+    const res = await ctx.authed('PUT', '/api/v1/settings', {
+      backupConfig: { providers: { 'drive-x': providerSettings('drive-x', { enabled: false }) } },
+    });
+    expect(res.status).toBe(200);
+
+    const stored = ctx.sqlite
+      .query('SELECT backup_config FROM user_preferences WHERE user_id = ?')
+      .get(ctx.user.id) as { backup_config: string };
+    expect(JSON.parse(stored.backup_config).providers['drive-x'].backupWarning).toBeUndefined();
+  });
 });

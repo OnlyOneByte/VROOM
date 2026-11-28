@@ -43,6 +43,28 @@ export function assertWithinSize(bytes: number, options: DownloadOptions | undef
   throw new PayloadTooLargeError(`The file is larger than the ${limitMb} MB limit`);
 }
 
+export async function readWithinSize(
+  body: AsyncIterable<Uint8Array>,
+  declaredBytes: number | undefined,
+  options: DownloadOptions,
+  stop: () => void
+): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    assertWithinSize(declaredBytes ?? 0, options);
+    for await (const chunk of body) {
+      total += chunk.length;
+      assertWithinSize(total, options);
+      chunks.push(Buffer.from(chunk));
+    }
+  } catch (error) {
+    stop();
+    throw error;
+  }
+  return Buffer.concat(chunks);
+}
+
 export interface StorageProvider {
   readonly type: string;
   readonly capabilities?: StorageCapabilities;

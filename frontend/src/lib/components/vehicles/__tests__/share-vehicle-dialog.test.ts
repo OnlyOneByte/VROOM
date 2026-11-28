@@ -196,17 +196,40 @@ describe('ShareVehicleDialog loading the share list', () => {
 });
 
 describe('ShareVehicleDialog inviting', () => {
-	test('Send invitation is disabled until an email is typed', async () => {
+	test('Send invitation stays reachable, and an empty or partial email is explained on the field', async () => {
 		mount();
 		await settle();
 
-		expect(sendButton()).toBeDisabled();
+		expect(sendButton()).toBeEnabled();
+		await fireEvent.click(sendButton());
+		await settle();
+		expect(emailInput()).toHaveAttribute('aria-invalid', 'true');
+		expect(emailInput()).toHaveAccessibleDescription(
+			'Enter the email address of the person to invite'
+		);
+		expect(document.activeElement).toBe(emailInput());
 
-		await fireEvent.input(emailInput(), { target: { value: '   ' } });
-		expect(sendButton()).toBeDisabled();
+		await fireEvent.input(emailInput(), { target: { value: 'pat' } });
+		expect(emailInput()).toHaveAttribute('aria-invalid', 'false');
+		await fireEvent.click(sendButton());
+		await settle();
+		expect(emailInput()).toHaveAccessibleDescription(
+			'Enter a full email address, like person@example.com'
+		);
+		expect(invite).not.toHaveBeenCalled();
+	});
+
+	test('after an invitation is sent, focus is back on the email field for the next one', async () => {
+		mount();
+		await settle();
 
 		await fireEvent.input(emailInput(), { target: { value: 'pat@example.com' } });
-		expect(sendButton()).toBeEnabled();
+		sendButton().focus();
+		await fireEvent.click(sendButton());
+		await settle();
+
+		expect(invite).toHaveBeenCalled();
+		expect(document.activeElement).toBe(emailInput());
 	});
 
 	test('a whitespace-only email never reaches the API', async () => {
@@ -273,7 +296,9 @@ describe('ShareVehicleDialog inviting', () => {
 		await settle();
 
 		expect(sendButton()).toHaveTextContent('Sending…');
-		expect(sendButton()).toBeDisabled();
+		expect(sendButton()).toHaveAttribute('aria-disabled', 'true');
+		await fireEvent.click(sendButton());
+		expect(invite).toHaveBeenCalledTimes(1);
 
 		release(share());
 		await settle();

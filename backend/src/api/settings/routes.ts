@@ -155,6 +155,7 @@ function clientBackupConfigPatch(
     for (const [key, value] of Object.entries(settings)) {
       if (!SERVER_OWNED_BACKUP_FIELDS.has(key)) entry[key] = value;
     }
+    if (settings.enabled === false) entry.backupWarning = null;
     providers[providerId] = entry;
   }
   return providers;

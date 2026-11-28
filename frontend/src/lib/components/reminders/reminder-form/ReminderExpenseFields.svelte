@@ -26,6 +26,9 @@
 					id="reminder-expense-category"
 					class="w-full"
 					aria-invalid={!!form.errors['expenseCategory']}
+					aria-describedby={form.errors['expenseCategory']
+						? 'reminder-expenseCategory-error'
+						: undefined}
 				>
 					{categoryLabels[form.values.expenseCategory]}
 				</Select.Trigger>
@@ -59,7 +62,7 @@
 				</FormFieldError>{/if}
 		</div>
 	</div>
-	{#if form.errors['expenseCategory']}<FormFieldError>
+	{#if form.errors['expenseCategory']}<FormFieldError id="reminder-expenseCategory-error">
 			{form.errors['expenseCategory']}
 		</FormFieldError>{/if}
 </div>

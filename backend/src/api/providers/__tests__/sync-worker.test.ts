@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import type { Photo, PhotoRef } from '../../../db/schema';
 import { logger } from '../../../utils/logger';
+import { MAX_FILE_SIZE } from '../../photos/photo-service';
 import type { StorageRef } from '../domains/storage/storage-provider';
 import {
   MAX_RETRY_COUNT,
@@ -274,10 +275,10 @@ describe('processBatch', () => {
       'vehicle_photos'
     );
 
-    expect(mockDownload).toHaveBeenCalledWith({
-      providerType: 'google-drive',
-      externalId: 'existing-file-id',
-    });
+    expect(mockDownload).toHaveBeenCalledWith(
+      { providerType: 'google-drive', externalId: 'existing-file-id' },
+      { maxBytes: MAX_FILE_SIZE }
+    );
 
     expect(mockUpload).toHaveBeenCalledWith(
       expect.objectContaining({
