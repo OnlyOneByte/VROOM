@@ -321,7 +321,9 @@ no-ops when nothing changed since the last sync, so an idle user with no edits c
 Before a bucket is stored, the job enforces the privacy rules:
 
 - n counts people: each owner contributes one value per bucket, the median of their vehicles in it;
-- values outside the bucket's band `[lo, hi]` are dropped first. Bands come only from public data, never from the bucket's own values. Fuel efficiency for a petrol or electric model and year in `fuel-economy-ratings.json` uses 80% of its lowest to 120% of its highest fueleconomy.gov combined rating; hybrids and everything else use the wide plausible band for their unit;
+- every bucket has a band `[lo, hi]` that comes only from public data, never from the bucket's own values:
+  - **Fuel efficiency:** a petrol or electric model and year in `fuel-economy-ratings.json` uses 80% of its lowest to 120% of its highest fueleconomy.gov combined rating, and hybrids and unrated models use the wide plausible band for their unit. An efficiency outside the band is dropped.
+  - **Running cost, maintenance and insurance:** the bands are set in US cents (`MONEY_BANDS_USD_CENTS`) and scaled to the bucket's currency with the approximate rates in `usd-rates.json` and the currency's minor unit. A money value outside the band still counts, clamped to the nearest edge. A currency with no rate gets no money buckets;
 - the count and the sum are noised separately, and everything published is computed from those two noisy numbers. No quantiles are published.
 
 #### The release, and what it guarantees (#1591)

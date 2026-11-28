@@ -10,9 +10,11 @@ import {
   sortByVehicleThenDate,
 } from '../../utils/analytics-charts';
 import { logger } from '../../utils/logger';
+import { minorUnitScale } from '../../utils/money';
 import { canonicalScale, convertDistance, convertVolume } from '../../utils/unit-conversions';
 import FUEL_ECONOMY from './fuel-economy-ratings.json';
 import type { CommunityStatsRepository } from './repository';
+import USD_RATE_TABLE from './usd-rates.json';
 
 export type CommunityMetric = 'efficiency' | 'running_cost' | 'maintenance' | 'insurance';
 export type CommunityUnit = 'km_per_l' | 'km_per_kwh' | 'cents_per_km' | 'cents_per_year';
@@ -34,14 +36,26 @@ const AGE_BANDS: [maxAge: number, band: string][] = [
   [14, '10-14'],
 ];
 
-export const PLAUSIBLE_BANDS: Record<CommunityUnit, { lo: number; hi: number; step: number }> = {
+export interface Band {
+  lo: number;
+  hi: number;
+  step: number;
+}
+
+export const PLAUSIBLE_BANDS: Record<'km_per_l' | 'km_per_kwh', Band> = {
   km_per_l: { lo: 2, hi: 60, step: 0.1 },
   km_per_kwh: { lo: 1.5, hi: 13, step: 0.1 },
-  cents_per_km: { lo: 1, hi: 200, step: 0.1 },
-  cents_per_year: { lo: 0, hi: 2_000_000, step: 1000 },
 };
 
-const INSURANCE_BAND = { lo: 5000, hi: 2_000_000, step: 1000 };
+type MoneyMetric = Exclude<CommunityMetric, 'efficiency'>;
+
+export const MONEY_BANDS_USD_CENTS: Record<MoneyMetric, Band> = {
+  running_cost: { lo: 1, hi: 30, step: 0.1 },
+  maintenance: { lo: 0, hi: 240_000, step: 1000 },
+  insurance: { lo: 30_000, hi: 600_000, step: 1000 },
+};
+
+const USD_RATES: Record<string, number> = USD_RATE_TABLE;
 export const RATED_MARGIN = 0.2;
 const RATINGS: Record<string, number[]> = FUEL_ECONOMY.ratings;
 
@@ -173,6 +187,13 @@ const isMaintenance = (expense: CommunityExpense) =>
 const isRunningCost = (expense: CommunityExpense) =>
   (expense.category === 'fuel' || expense.category === 'maintenance') && !isInsurance(expense);
 
+function firstFillUpCost(vehicle: CommunityVehicle): number {
+  const fuel = vehicle.expenses.filter((expense) => expense.category === 'fuel');
+  if (fuel.length === 0) return 0;
+  return fuel.reduce((first, expense) => (expense.date < first.date ? expense : first))
+    .expenseAmount;
+}
+
 export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSample[] {
   const samples: VehicleSample[] = [];
   const { vehicleType, vehicleKind, currency, region, modelYear, catalogModelId } = vehicle;
@@ -200,7 +221,7 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
       metric: 'running_cost',
       bucketKey: `running_cost|${vehicleType}|${vehicleKind}|${currency}|${region ?? '-'}`,
       unit: 'cents_per_km',
-      value: sumCents(vehicle, isRunningCost) / km,
+      value: (sumCents(vehicle, isRunningCost) - firstFillUpCost(vehicle)) / km,
       fields: { vehicleType, currency, region },
     });
   }
@@ -228,13 +249,19 @@ export function vehicleSamples(vehicle: CommunityVehicle, now: Date): VehicleSam
   return samples;
 }
 
-type BandFields = Pick<VehicleSample['fields'], 'catalogModelId' | 'modelYear' | 'vehicleType'>;
+type BandFields = Partial<
+  Pick<VehicleSample['fields'], 'catalogModelId' | 'modelYear' | 'vehicleType' | 'currency'>
+>;
 
-export function ratedEfficiencyBand(fields: BandFields, unit: CommunityUnit) {
+function efficiencyBand(unit: CommunityUnit): Band {
+  return unit === 'km_per_kwh' ? PLAUSIBLE_BANDS.km_per_kwh : PLAUSIBLE_BANDS.km_per_l;
+}
+
+export function ratedEfficiencyBand(fields: BandFields, unit: CommunityUnit): Band | null {
   const [min, max] =
     RATINGS[`${fields.catalogModelId}|${fields.modelYear}|${fields.vehicleType}`] ?? [];
   if (min === undefined || max === undefined) return null;
-  const plausible = PLAUSIBLE_BANDS[unit];
+  const plausible = efficiencyBand(unit);
   return {
     lo: Math.max(plausible.lo, Math.round(min * (1 - RATED_MARGIN) * 10) / 10),
     hi: Math.min(plausible.hi, Math.round(max * (1 + RATED_MARGIN) * 10) / 10),
@@ -242,9 +269,25 @@ export function ratedEfficiencyBand(fields: BandFields, unit: CommunityUnit) {
   };
 }
 
-export function bandFor(metric: CommunityMetric, unit: CommunityUnit, fields: BandFields = {}) {
-  if (metric === 'insurance') return INSURANCE_BAND;
-  return (metric === 'efficiency' && ratedEfficiencyBand(fields, unit)) || PLAUSIBLE_BANDS[unit];
+export function moneyBand(metric: MoneyMetric, currency: string | null | undefined): Band | null {
+  const rate = currency ? USD_RATES[currency] : undefined;
+  if (!currency || rate === undefined) return null;
+  const factor = (rate * minorUnitScale(currency)) / 100;
+  const base = MONEY_BANDS_USD_CENTS[metric];
+  return {
+    lo: base.lo * factor,
+    hi: base.hi * factor,
+    step: 10 ** Math.round(Math.log10(base.step * factor)),
+  };
+}
+
+export function bandFor(
+  metric: CommunityMetric,
+  unit: CommunityUnit,
+  fields: BandFields = {}
+): Band | null {
+  if (metric !== 'efficiency') return moneyBand(metric, fields.currency);
+  return ratedEfficiencyBand(fields, unit) ?? efficiencyBand(unit);
 }
 
 export function median(values: number[]): number {
@@ -303,7 +346,9 @@ function collectBuckets(vehicles: CommunityVehicle[], now: Date): Bucket[] {
   for (const vehicle of vehicles) {
     for (const sample of vehicleSamples(vehicle, now)) {
       const band = bandFor(sample.metric, sample.unit, sample.fields);
-      if (sample.value < band.lo || sample.value > band.hi) continue;
+      if (!band) continue;
+      const outside = sample.value < band.lo || sample.value > band.hi;
+      if (outside && sample.metric === 'efficiency') continue;
       const bucket = buckets.get(sample.bucketKey) ?? { sample, byOwner: new Map() };
       const ownerValues = bucket.byOwner.get(vehicle.ownerId) ?? [];
       ownerValues.push(sample.value);
@@ -320,6 +365,7 @@ function publishBucket(
   uniform: NoiseSource
 ): NewCommunityStat | null {
   const band = bandFor(sample.metric, sample.unit, sample.fields);
+  if (!band) return null;
   const ownerValues = [...byOwner.values()]
     .map((values) => Math.min(Math.max(roundToStep(median(values), band.step), band.lo), band.hi))
     .sort((a, b) => a - b);

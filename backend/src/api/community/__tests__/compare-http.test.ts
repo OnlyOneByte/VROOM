@@ -61,12 +61,13 @@ async function seedCivic(extra: Record<string, unknown> = { catalogModelId: 'hon
 
 function insertBucket(bucketKey: string, metric: string, unit: string, n: number, mean: number) {
   ctx.sqlite.run(
-    `INSERT INTO community_stats (id, scope, metric, bucket_key, unit, n_published, mean, computed_at, schema_version)
-     VALUES (?, 'local', ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO community_stats (id, scope, metric, bucket_key, currency, unit, n_published, mean, computed_at, schema_version)
+     VALUES (?, 'local', ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       `row-${bucketKey}`,
       metric,
       bucketKey,
+      metric === 'efficiency' ? null : 'USD',
       unit,
       n,
       mean,

@@ -10,6 +10,8 @@ import {
   EPSILON_COUNT,
   EPSILON_SUM,
   keyedUniform,
+  MONEY_BANDS_USD_CENTS,
+  moneyBand,
   noiseScaleFor,
   PLAUSIBLE_BANDS,
   premiumInWindow,
@@ -143,9 +145,34 @@ describe('community stats aggregation privacy', () => {
     expect(bandFor('efficiency', 'km_per_l', { ...CIVIC_FIELDS, vehicleType: 'hybrid' })).toEqual(
       PLAUSIBLE_BANDS.km_per_l
     );
-    expect(bandFor('running_cost', 'cents_per_km', CIVIC_FIELDS)).toEqual(
-      PLAUSIBLE_BANDS.cents_per_km
+    expect(bandFor('running_cost', 'cents_per_km', { ...CIVIC_FIELDS, currency: 'USD' })).toEqual(
+      MONEY_BANDS_USD_CENTS.running_cost
     );
+  });
+
+  test('money ranges are set in US cents and scaled to each currency and its minor unit', () => {
+    expect(moneyBand('running_cost', 'EUR')).toEqual({ lo: 0.92, hi: 27.6, step: 0.1 });
+    expect(moneyBand('running_cost', 'INR')).toEqual({ lo: 84, hi: 2520, step: 10 });
+    expect(moneyBand('maintenance', 'JPY')).toEqual({ lo: 0, hi: 360_000, step: 1000 });
+    expect(moneyBand('insurance', 'VND')).toEqual({
+      lo: 7_500_000,
+      hi: 150_000_000,
+      step: 100_000,
+    });
+    expect(moneyBand('running_cost', 'ARS')).toBeNull();
+    expect(moneyBand('running_cost', null)).toBeNull();
+  });
+
+  test('a typical running cost in rupees is counted, and a currency with no range publishes nothing', () => {
+    const rupees = owners(10).map((id) =>
+      vehicle(id, { currency: 'INR', expenses: fillUps({ cents: 400_000 }) })
+    );
+    const running = aggregate(rupees, OPTIONS).rows.find((row) => row.metric === 'running_cost');
+    expect(running?.nPublished).toBe(10);
+    expect(running?.currency).toBe('INR');
+
+    const pesos = owners(10).map((id) => vehicle(id, { currency: 'ARS' }));
+    expect(aggregate(pesos, OPTIONS).rows.filter((row) => row.metric !== 'efficiency')).toEqual([]);
   });
 
   test('a value outside the rated band is dropped, but counts for an unrated model', () => {
@@ -248,7 +275,14 @@ describe('community stats aggregation privacy', () => {
     expect(row?.mean).not.toBeCloseTo(Math.round(CIVIC_KM_PER_L * 10) / 10, 3);
   });
 
-  test('values outside the plausibility band are dropped before counting', () => {
+  test('an efficiency outside the plausibility band is dropped before counting', () => {
+    const odd = owners(10).map((id) =>
+      vehicle(id, { catalogModelId: 'audi-a1', expenses: fillUps({ volume: 0.5 }) })
+    );
+    expect(efficiencyRow(odd)).toBeUndefined();
+  });
+
+  test('a money value outside its range still counts, clamped to the range edge', () => {
     const pricey = owners(10).map((id) =>
       vehicle(id, {
         expenses: fillUps({}).map((expense, index) =>
@@ -256,8 +290,9 @@ describe('community stats aggregation privacy', () => {
         ),
       })
     );
-    const rows = aggregate(pricey, OPTIONS).rows;
-    expect(rows.find((row) => row.metric === 'maintenance')).toBeUndefined();
+    const maintenance = aggregate(pricey, OPTIONS).rows.find((row) => row.metric === 'maintenance');
+    expect(maintenance?.nPublished).toBe(10);
+    expect(maintenance?.mean).toBe(MONEY_BANDS_USD_CENTS.maintenance.hi);
   });
 
   test('rows carry no owner or vehicle identifiers', () => {
@@ -341,8 +376,17 @@ describe('per-vehicle samples', () => {
     const tooShort = vehicle('short', { expenses: fillUps({ distance: 50 }) });
     expect(vehicleSamples(tooShort, NOW).some((s) => s.metric === 'running_cost')).toBe(false);
     const running = vehicleSamples(vehicle('long'), NOW).find((s) => s.metric === 'running_cost');
-    expect(running?.value).toBeCloseTo((6 * 4000) / (5 * 300 * 1.609344), 6);
+    expect(running?.value).toBeCloseTo((5 * 4000) / (5 * 300 * 1.609344), 6);
     expect(running?.bucketKey).toBe('running_cost|gas|car|USD|-');
+  });
+
+  test('running cost is the same per km however often a vehicle fills up', () => {
+    const costPerKm = (count: number) =>
+      vehicleSamples(
+        vehicle('v', { expenses: fillUps({ count, distance: 500 / 1.609344 }) }),
+        NOW
+      ).find((s) => s.metric === 'running_cost')?.value;
+    for (const count of [3, 4, 13]) expect(costPerKm(count)).toBeCloseTo(4000 / 500, 6);
   });
 
   test('a motorcycle and a car with the same powertrain never share a cost or maintenance group', () => {
