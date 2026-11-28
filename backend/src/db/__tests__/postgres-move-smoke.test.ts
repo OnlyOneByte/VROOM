@@ -76,3 +76,17 @@ describe('the SQLite to Postgres move script', () => {
     expect(differences[0]).toMatch(/^expenses\.csv: \d+ on SQLite, 0 on Postgres$/);
   }, 60_000);
 });
+
+describe('the move script command line', () => {
+  test('a session command prints only the session id on stdout, even with info logging', () => {
+    const dir = process.env.KIROCREW_SCRATCH ?? process.env.TMPDIR ?? '/tmp';
+    const { TEST_DB: _testDb, ...env } = process.env;
+    const run = Bun.spawnSync(['bun', 'src/db/postgres-move-smoke.ts', 'session-postgres'], {
+      cwd: join(import.meta.dir, '..', '..', '..'),
+      env: { ...env, DATABASE_URL: join(dir, `move-cli-${process.pid}.db`), LOG_LEVEL: 'info' },
+    });
+    expect(run.exitCode).toBe(0);
+    expect(run.stdout.toString()).toMatch(/^[a-z0-9]+\n$/);
+    expect(run.stderr.toString()).toContain('Running database migrations');
+  }, 60_000);
+});
